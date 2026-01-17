@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fintech Competitive Intelligence Report - {{ report_date }}</title>
+    <style>
+        /* Reset */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #4a69bd 100%);
+            color: #fff;
+            padding: 30px;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .header .period {
+            opacity: 0.8;
+            font-size: 0.95em;
+        }
+
+        /* Summary Stats */
+        .summary-stats {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+
+        .stat-box {
+            flex: 1;
+            min-width: 120px;
+            text-align: center;
+            padding: 15px;
+        }
+
+        .stat-number {
+            font-size: 2.2em;
+            font-weight: 700;
+            color: #4a69bd;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* Content */
+        .content {
+            padding: 30px;
+        }
+
+        h2 {
+            color: #1a1a2e;
+            font-size: 1.3em;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4a69bd;
+        }
+
+        h2:first-child {
+            margin-top: 0;
+        }
+
+        h3 {
+            color: #4a69bd;
+            font-size: 1.1em;
+            margin: 20px 0 10px 0;
+        }
+
+        /* Company Section */
+        .company-section {
+            background: #fff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+
+        .company-header {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            font-weight: 600;
+            color: #1a1a2e;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .company-header .count {
+            float: right;
+            background: #4a69bd;
+            color: #fff;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+        }
+
+        .posting-list {
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+        .posting-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .posting-item:last-child {
+            border-bottom: none;
+        }
+
+        .posting-title {
+            font-weight: 500;
+            color: #1a1a2e;
+        }
+
+        .posting-title a {
+            color: #4a69bd;
+            text-decoration: none;
+        }
+
+        .posting-title a:hover {
+            text-decoration: underline;
+        }
+
+        .posting-meta {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        /* Insights */
+        .insight-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #4a69bd;
+        }
+
+        .insight-card.new-direction {
+            background: #fff5f5;
+            border-left-color: #e74c3c;
+        }
+
+        .insight-header {
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 8px;
+        }
+
+        .insight-summary {
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .signal-tags {
+            margin-top: 10px;
+        }
+
+        .signal-tag {
+            display: inline-block;
+            background: #e9ecef;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            margin: 2px;
+            color: #555;
+        }
+
+        .confidence {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        .confidence.high { color: #27ae60; }
+        .confidence.medium { color: #f39c12; }
+        .confidence.low { color: #e74c3c; }
+
+        /* Trends */
+        .trends-box {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .trend-item {
+            display: inline-block;
+            margin-right: 30px;
+            margin-bottom: 10px;
+        }
+
+        .trend-value {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #4a69bd;
+        }
+
+        .trend-value.positive { color: #27ae60; }
+        .trend-value.negative { color: #e74c3c; }
+
+        .trend-label {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        /* Footer */
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            border-top: 1px solid #eee;
+            font-size: 0.85em;
+            color: #888;
+        }
+
+        /* Category Badge */
+        .category-badge {
+            display: inline-block;
+            background: #4a69bd;
+            color: #fff;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .stat-box { min-width: 50%; }
+            .summary-stats { padding: 10px; }
+            .content { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Fintech Competitive Intelligence Report</h1>
+            <p class="period">{{ period_start }} to {{ period_end }}</p>
+        </div>
+
+        <div class="summary-stats">
+            <div class="stat-box">
+                <div class="stat-number">{{ summary.new_postings_count }}</div>
+                <div class="stat-label">New Postings</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">{{ summary.closed_postings_count }}</div>
+                <div class="stat-label">Closed</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">{{ summary.companies_with_activity }}</div>
+                <div class="stat-label">Active Companies</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">{{ summary.insights_generated }}</div>
+                <div class="stat-label">Insights</div>
+            </div>
+        </div>
+
+        <div class="content">
+            {% if new_postings_by_company %}
+            <h2>New Job Postings</h2>
+            {% for company, postings in new_postings_by_company.items() %}
+            <div class="company-section">
+                <div class="company-header">
+                    {{ company }}
+                    <span class="count">{{ postings|length }} new</span>
+                </div>
+                <ul class="posting-list">
+                    {% for posting in postings %}
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            {% if posting.url %}
+                            <a href="{{ posting.url }}" target="_blank">{{ posting.title }}</a>
+                            {% else %}
+                            {{ posting.title }}
+                            {% endif %}
+                        </div>
+                        <div class="posting-meta">
+                            {% if posting.department %}{{ posting.department }} | {% endif %}
+                            {% if posting.location %}{{ posting.location }} | {% endif %}
+                            Posted: {{ posting.first_seen }}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% if insights_by_category %}
+            <h2>Strategic Insights</h2>
+            {% for category, insights in insights_by_category.items() %}
+            <h3><span class="category-badge">{{ category|replace('-', ' ')|title }}</span></h3>
+            {% for insight in insights %}
+            <div class="insight-card {% if insight.is_new_direction %}new-direction{% endif %}">
+                <div class="insight-header">
+                    {{ insight.company }} - {{ insight.title }}
+                    {% if insight.is_new_direction %}<span style="color: #e74c3c;">*New Direction*</span>{% endif %}
+                </div>
+                <div class="insight-summary">{{ insight.summary }}</div>
+                {% if insight.signals %}
+                <div class="signal-tags">
+                    {% for signal in insight.signals %}
+                    <span class="signal-tag">{{ signal }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="confidence {{ insight.confidence }}">
+                    Confidence: {{ insight.confidence|title }}
+                </div>
+            </div>
+            {% endfor %}
+            {% endfor %}
+            {% endif %}
+
+            {% if trends_30_day %}
+            <h2>30-Day Trends</h2>
+            <div class="trends-box">
+                <div class="trend-item">
+                    <div class="trend-value">{{ trends_30_day.new_postings }}</div>
+                    <div class="trend-label">New Postings</div>
+                </div>
+                <div class="trend-item">
+                    <div class="trend-value">{{ trends_30_day.closed_postings }}</div>
+                    <div class="trend-label">Closed Postings</div>
+                </div>
+                <div class="trend-item">
+                    {% if trends_30_day.net_change >= 0 %}
+                    <div class="trend-value positive">+{{ trends_30_day.net_change }}</div>
+                    {% else %}
+                    <div class="trend-value negative">{{ trends_30_day.net_change }}</div>
+                    {% endif %}
+                    <div class="trend-label">Net Change</div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if company_stats %}
+            <h2>Current Headcount by Company</h2>
+            <div class="trends-box">
+                {% for company, stats in company_stats.items() %}
+                <div class="trend-item">
+                    <div class="trend-value">{{ stats.active }}</div>
+                    <div class="trend-label">{{ company }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="footer">
+            <p>Generated by Fintech Job Intelligence System</p>
+            <p>This report tracks job postings from Canadian fintech competitors for strategic analysis.</p>
+        </div>
+    </div>
+</body>
+</html>

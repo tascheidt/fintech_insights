@@ -1,0 +1,25 @@
+database:
+  path: data/jobs.db
+
+analysis:
+  provider: gemini
+  model: gemini-2.0-flash
+  temperature: 0.3
+  max_tokens: 2048
+
+email:
+  enabled: true
+  # SMTP settings loaded from environment variables
+
+reports:
+  weekly_day: monday
+  include_international: false
+
+logging:
+  level: INFO
+  file: logs/fintech_insights.log
+
+schedule:
+  collection_time: "06:00"
+  weekly_report_time: "08:00"
+  weekly_report_day: monday

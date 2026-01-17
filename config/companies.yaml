@@ -1,0 +1,69 @@
+companies:
+  # Canadian Fintechs - Track for strategic intelligence
+  - name: Wealthsimple
+    slug: wealthsimple
+    country: CA
+    track_for_strategy: true
+    ats_type: lever
+    ats_identifier: wealthsimple
+    careers_url: https://www.wealthsimple.com/en-ca/careers
+
+  # Note: Koho's ATS identifier needs investigation - currently disabled
+  # - name: Koho
+  #   slug: koho
+  #   country: CA
+  #   track_for_strategy: true
+  #   ats_type: lever
+  #   ats_identifier: koho
+  #   careers_url: https://www.koho.ca/careers/
+
+  # Note: Neo Financial's ATS identifier needs investigation - currently disabled
+  # - name: Neo Financial
+  #   slug: neo-financial
+  #   country: CA
+  #   track_for_strategy: true
+  #   ats_type: lever
+  #   ats_identifier: neofinancial
+  #   careers_url: https://www.neofinancial.com/careers
+
+  - name: Questrade
+    slug: questrade
+    country: CA
+    track_for_strategy: true
+    ats_type: custom
+    ats_identifier: questrade
+    careers_url: https://www.questrade.com/about-us/careers
+
+  - name: Tangerine
+    slug: tangerine
+    country: CA
+    track_for_strategy: true
+    ats_type: workday
+    ats_identifier: tangerine
+    careers_url: https://jobs.tangerine.ca/
+
+  # International Fintechs - Job templates only (no strategic tracking)
+  - name: Monzo
+    slug: monzo
+    country: UK
+    track_for_strategy: false
+    ats_type: greenhouse
+    ats_identifier: monzo
+    careers_url: https://monzo.com/careers/
+
+  # Note: Revolut doesn't appear to use public Greenhouse API - needs investigation
+  # - name: Revolut
+  #   slug: revolut
+  #   country: UK
+  #   track_for_strategy: false
+  #   ats_type: greenhouse
+  #   ats_identifier: revolut
+  #   careers_url: https://www.revolut.com/careers/
+
+  - name: Starling Bank
+    slug: starling
+    country: UK
+    track_for_strategy: false
+    ats_type: workable
+    ats_identifier: starling-bank
+    careers_url: https://www.starlingbank.com/careers/

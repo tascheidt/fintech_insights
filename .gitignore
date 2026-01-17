@@ -1,0 +1,18 @@
+.env
+*.pyc
+__pycache__/
+data/*.db
+logs/*.log
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.DS_Store
+
+# Web app (Next.js)
+web/node_modules/
+web/.next/
+web/.env.local
+web/.env*.local
+web/out/

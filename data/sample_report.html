@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fintech Competitive Intelligence Report - 2026-01-17</title>
+    <style>
+        /* Reset */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #4a69bd 100%);
+            color: #fff;
+            padding: 30px;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .header .period {
+            opacity: 0.8;
+            font-size: 0.95em;
+        }
+
+        /* Summary Stats */
+        .summary-stats {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+
+        .stat-box {
+            flex: 1;
+            min-width: 120px;
+            text-align: center;
+            padding: 15px;
+        }
+
+        .stat-number {
+            font-size: 2.2em;
+            font-weight: 700;
+            color: #4a69bd;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* Content */
+        .content {
+            padding: 30px;
+        }
+
+        h2 {
+            color: #1a1a2e;
+            font-size: 1.3em;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4a69bd;
+        }
+
+        h2:first-child {
+            margin-top: 0;
+        }
+
+        h3 {
+            color: #4a69bd;
+            font-size: 1.1em;
+            margin: 20px 0 10px 0;
+        }
+
+        /* Company Section */
+        .company-section {
+            background: #fff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+
+        .company-header {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            font-weight: 600;
+            color: #1a1a2e;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .company-header .count {
+            float: right;
+            background: #4a69bd;
+            color: #fff;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+        }
+
+        .posting-list {
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+        .posting-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .posting-item:last-child {
+            border-bottom: none;
+        }
+
+        .posting-title {
+            font-weight: 500;
+            color: #1a1a2e;
+        }
+
+        .posting-title a {
+            color: #4a69bd;
+            text-decoration: none;
+        }
+
+        .posting-title a:hover {
+            text-decoration: underline;
+        }
+
+        .posting-meta {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        /* Insights */
+        .insight-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #4a69bd;
+        }
+
+        .insight-card.new-direction {
+            background: #fff5f5;
+            border-left-color: #e74c3c;
+        }
+
+        .insight-header {
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 8px;
+        }
+
+        .insight-summary {
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .signal-tags {
+            margin-top: 10px;
+        }
+
+        .signal-tag {
+            display: inline-block;
+            background: #e9ecef;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            margin: 2px;
+            color: #555;
+        }
+
+        .confidence {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        .confidence.high { color: #27ae60; }
+        .confidence.medium { color: #f39c12; }
+        .confidence.low { color: #e74c3c; }
+
+        /* Trends */
+        .trends-box {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .trend-item {
+            display: inline-block;
+            margin-right: 30px;
+            margin-bottom: 10px;
+        }
+
+        .trend-value {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #4a69bd;
+        }
+
+        .trend-value.positive { color: #27ae60; }
+        .trend-value.negative { color: #e74c3c; }
+
+        .trend-label {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        /* Footer */
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            border-top: 1px solid #eee;
+            font-size: 0.85em;
+            color: #888;
+        }
+
+        /* Category Badge */
+        .category-badge {
+            display: inline-block;
+            background: #4a69bd;
+            color: #fff;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .stat-box { min-width: 50%; }
+            .summary-stats { padding: 10px; }
+            .content { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Fintech Competitive Intelligence Report</h1>
+            <p class="period">2025-12-18 to 2026-01-17</p>
+        </div>
+
+        <div class="summary-stats">
+            <div class="stat-box">
+                <div class="stat-number">44</div>
+                <div class="stat-label">New Postings</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">0</div>
+                <div class="stat-label">Closed</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">2</div>
+                <div class="stat-label">Active Companies</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">5</div>
+                <div class="stat-label">Insights</div>
+            </div>
+        </div>
+
+        <div class="content">
+            
+            <h2>New Job Postings</h2>
+            
+            <div class="company-section">
+                <div class="company-header">
+                    Wealthsimple
+                    <span class="count">40 new</span>
+                </div>
+                <ul class="posting-list">
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/3f4a4d8c-c706-4ef1-9670-36fed0c2df85" target="_blank">Associate, Brokerage Operations (Reconciliations)</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Regulatory | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/2fdf3263-abed-484e-9eeb-6dc2b3585a36" target="_blank">Associate, Fraud Investigations - Multiple Specializations (Fixed-Term Contract)</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Operations | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/bf73c648-530b-4d9e-a567-33bd5e75db4b" target="_blank">Concierge Support Specialist</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Operations | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/f15e88dc-90ba-4900-8173-1cced715414e" target="_blank">Design Director, Brand Design</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Marketing | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/6e890c37-f540-461b-933b-e8304079c33a" target="_blank">Director of Design, Portfolios</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Product | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/3f4a5360-229a-4a6e-b04c-9bc0ced495dc" target="_blank">Director, Product Marketing, Wealth Management</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Marketing | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/a0962226-596c-468e-882d-7aacf69be05c" target="_blank">Director, Treasury &amp; Capital Markets</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Finance | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/b25082f6-16fa-4db3-b6e1-091de7588548" target="_blank">Enterprise Account Executive, Wealthsimple for Business</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Commercial | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/7b3a85a6-8728-4acd-a609-439d420f0d65" target="_blank">Future Opportunities - North Star: Calling all Canadians Abroad</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            General | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/ff351b04-1180-43b8-9eff-973d52b12c82" target="_blank">Intern, Data Science (Summer 2026)</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Internships | 
+                            Toronto, Ontario | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/6d809709-f7e2-410c-b186-869ebc960994" target="_blank">Intern, Software Development (Summer 2026)</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Internships | 
+                            Toronto, Ontario | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/ee4908ed-0597-46c0-be68-f4ae238de391" target="_blank">Lead Advisor, Wealth Management</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Commercial | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/49c679b9-0864-4928-9acb-832573dfc2f2" target="_blank">Mortgage Broker (Contract - Independent)</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Regulatory | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/4df5cfe8-f04a-4de0-a814-2fa09805d938" target="_blank">Product Manager, Growth Platform</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Product | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/0d93b7c5-c711-47ce-96fb-9194d4891be0" target="_blank">Product Manager, Transfers Platform</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Product | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/e292f4b4-3cb5-430a-a2c6-2e0534bb23fd" target="_blank">Product Marketing Manager, Households &amp; Money Management</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Marketing | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/49e69268-fc30-4a74-8ff6-e980bfcfc6d9" target="_blank">Senior Advisor, Wealth Management</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Commercial | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/7c02de35-f5f4-4cd5-a9be-995631f53129" target="_blank">Senior Analyst, Investment Research</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Product | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/395ebbaa-32aa-459a-be23-4cdef071fb29" target="_blank">Senior Associate, Crypto Operations</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Regulatory | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/2a0ef375-05ee-4eab-adee-c2d2f5d15ba6" target="_blank">Senior Associate, Derivatives Risk Remediation</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Regulatory | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/28850778-ff5b-4a9d-aacb-68b83610c7d9" target="_blank">Senior Associate, Investing Operations</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Regulatory | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/b38087c0-c5cf-4cb9-9735-e0804f86e547" target="_blank">Senior Data Scientist, Fraud</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Data &amp; Engineering | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/d4157dfb-2018-41cb-8342-f7990c1c3180" target="_blank">Senior Data Scientist, Valuations</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Data &amp; Engineering | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/0b33636c-21bc-4d86-9c38-f42bbd4edbd0" target="_blank">Senior Manager, Compliance Program Management</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Regulatory | 
+                            Toronto, Ontario | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/0a645e34-88dc-41d1-9a07-cd8d5c7298fb" target="_blank">Senior Manager, Infrastructure</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Data &amp; Engineering | 
+                            Toronto, Ontario | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/ca118930-744c-41c3-9662-41468cda6e94" target="_blank">Senior Manager, Treasury &amp; Capital Markets (Structured Credit, Asset Backed Financing)</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Finance | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/15a74b55-0993-4048-b3b1-fe94ac8f797f" target="_blank">Senior News Writer, Wealthsimple Media</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Marketing | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/f26b6e6d-46c2-42f7-aa95-6ea6c5cab459" target="_blank">Senior Product Designer (Multiple Roles, Multiple Teams)</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Product | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/ce293b17-5a07-4b69-b8b4-b733ab0d7330" target="_blank">Senior Product Manager, Payment Cards</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Product | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/61940c18-7bc0-4ac1-a240-ab6c3999b519" target="_blank">Senior Software Developer, Crypto</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Data &amp; Engineering | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/881f7bab-41bb-4dcc-9d41-02c99d697ea6" target="_blank">Senior Software Developer, Data Platform</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Data &amp; Engineering | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/154d5ca3-0695-4fc6-b53a-db726bec972d" target="_blank">Sr. Database Administrator, Data Platform</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Data &amp; Engineering | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/c5e56c36-342f-4eec-84d1-01852b8664d1" target="_blank">Staff Data Scientist, Transfers</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Data &amp; Engineering | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/9bc260d2-db83-46af-80d7-398d9ab62392" target="_blank">Staff MLOps Developer, Risk</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Data &amp; Engineering | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/3262b650-0730-4bfc-85e4-3654554eae84" target="_blank">Staff Product Designer (Multiple Roles, Multiple Teams)</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Product | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/c19202bc-e212-4821-aa4d-8c41ca5026e8" target="_blank">Staff Product Designer, Crypto</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Product | 
+                            Toronto, Ontario | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/7630bd99-99a9-4169-a72b-c06a6ea06b31" target="_blank">Staff Product Designer, Investing</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Product | 
+                            Canada | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/29fd913c-bf73-461c-bbf2-72221040a402" target="_blank">Team Lead, AML Operations</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Regulatory | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/0fa267ed-e383-4c04-9898-0785af42ff4b" target="_blank">Team Lead, Investment Representative</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Operations | 
+                            Remote | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://jobs.lever.co/wealthsimple/4f22f867-fa30-4031-a25d-8ffb97b196e2" target="_blank">Team Lead, Transfers (Manual Receiving)</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            Operations | 
+                            Toronto, Ontario | 
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                </ul>
+            </div>
+            
+            <div class="company-section">
+                <div class="company-header">
+                    Questrade
+                    <span class="count">4 new</span>
+                </div>
+                <ul class="posting-list">
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://www.questrade.com/about-us/careers" target="_blank">English</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            
+                            
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://www.questrade.com/fr/about-us/careers" target="_blank">français</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            
+                            
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://www.questrade.com/about-us/careers/technology" target="_blank">Explore technology at Questrade</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            
+                            
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                    <li class="posting-item">
+                        <div class="posting-title">
+                            
+                            <a href="https://www.questrade.com/about-us/careers" target="_blank">Careers</a>
+                            
+                        </div>
+                        <div class="posting-meta">
+                            
+                            
+                            Posted: 2026-01-17
+                        </div>
+                    </li>
+                    
+                </ul>
+            </div>
+            
+            
+
+            
+            <h2>Strategic Insights</h2>
+            
+            <h3><span class="category-badge">Compliance</span></h3>
+            
+            <div class="insight-card ">
+                <div class="insight-header">
+                    Wealthsimple - Associate, Brokerage Operations (Reconciliations)
+                    
+                </div>
+                <div class="insight-summary">Wealthsimple is strengthening its brokerage operations and compliance functions, likely in response to increased regulatory scrutiny or anticipated growth in trading volume. The focus on reconciliations, risk management, and settlement expertise suggests a commitment to maintaining accuracy and mitigating potential financial risks within their brokerage services.</div>
+                
+                <div class="signal-tags">
+                    
+                    <span class="signal-tag">Emphasis on reconciliation and risk management within brokerage operations.</span>
+                    
+                    <span class="signal-tag">Requirement for knowledge of settlement and clearance of equities through CDS and DTC.</span>
+                    
+                    <span class="signal-tag">Preference for experience at an IIROC-regulated dealer, indicating focus on Canadian regulatory compliance.</span>
+                    
+                </div>
+                
+                <div class="confidence high">
+                    Confidence: High
+                </div>
+            </div>
+            
+            
+            <h3><span class="category-badge">Operational</span></h3>
+            
+            <div class="insight-card ">
+                <div class="insight-header">
+                    Wealthsimple - Associate, Fraud Investigations - Multiple Specializations (Fixed-Term Contract)
+                    
+                </div>
+                <div class="insight-summary">Wealthsimple is scaling its fraud investigation capabilities to protect its growing user base and assets under management. The focus on multiple specializations (Cash &amp; Banking, Identity &amp; Onboarding) suggests a need for specialized expertise to address different types of fraud, indicating a maturing fraud prevention program.</div>
+                
+                <div class="signal-tags">
+                    
+                    <span class="signal-tag">Scaling operations: The posting explicitly mentions &#39;high-volume, fast-paced transaction monitoring&#39; and managing multiple cases, indicating a need to handle increased fraud activity.</span>
+                    
+                    <span class="signal-tag">Customer focus: The role involves direct communication with customers to investigate and resolve cases, highlighting the importance of maintaining customer trust and satisfaction.</span>
+                    
+                    <span class="signal-tag">Risk management: The position is within the Security &amp; Risk CXO Group, emphasizing the company&#39;s commitment to mitigating financial crime risks and safeguarding client assets.</span>
+                    
+                </div>
+                
+                <div class="confidence high">
+                    Confidence: High
+                </div>
+            </div>
+            
+            
+            <h3><span class="category-badge">Customer</span></h3>
+            
+            <div class="insight-card ">
+                <div class="insight-header">
+                    Wealthsimple - Concierge Support Specialist
+                    
+                </div>
+                <div class="insight-summary">Wealthsimple is doubling down on providing high-touch, personalized service to its Wealth Management clients. This hire signals a focus on retaining and growing its high-value customer base by offering a &#39;private banking&#39; experience in a digital format, emphasizing proactive and relationship-based support.</div>
+                
+                <div class="signal-tags">
+                    
+                    <span class="signal-tag">Focus on Wealth Management segment and premium customer experience.</span>
+                    
+                    <span class="signal-tag">Emphasis on relationship management and proactive support, moving beyond basic customer service.</span>
+                    
+                    <span class="signal-tag">Integration of &#39;private banking&#39; concepts into a digital platform.</span>
+                    
+                </div>
+                
+                <div class="confidence high">
+                    Confidence: High
+                </div>
+            </div>
+            
+            
+            <h3><span class="category-badge">Marketing</span></h3>
+            
+            <div class="insight-card ">
+                <div class="insight-header">
+                    Wealthsimple - Design Director, Brand Design
+                    
+                </div>
+                <div class="insight-summary">Wealthsimple is doubling down on its brand identity and visual communication to further solidify its market position and attract new users. The company is seeking a Design Director to lead and evolve its brand design strategy across all touchpoints, indicating a focus on brand consistency and impactful creative execution.</div>
+                
+                <div class="signal-tags">
+                    
+                    <span class="signal-tag">Emphasis on brand consistency across all touchpoints (digital, OOH, etc.)</span>
+                    
+                    <span class="signal-tag">Investment in high-quality design and visual communication, including 3D/motion graphics</span>
+                    
+                    <span class="signal-tag">Focus on attracting and retaining users through a strong and appealing brand experience</span>
+                    
+                </div>
+                
+                <div class="confidence high">
+                    Confidence: High
+                </div>
+            </div>
+            
+            
+            <h3><span class="category-badge">Leadership</span></h3>
+            
+            <div class="insight-card ">
+                <div class="insight-header">
+                    Wealthsimple - Director of Design, Portfolios
+                    
+                </div>
+                <div class="insight-summary">Wealthsimple is doubling down on its managed investing experience (Portfolios) and is seeking a strong design leader to scale the team and improve the user experience. This signals a continued focus on attracting and retaining clients through a simple, smart, and high-performing investment product, and a commitment to design as a competitive advantage.</div>
+                
+                <div class="signal-tags">
+                    
+                    <span class="signal-tag">Emphasis on scaling the design team for the Portfolios product, indicating significant growth expectations.</span>
+                    
+                    <span class="signal-tag">Focus on simplifying complex financial concepts and improving the user journey, suggesting a strategy to attract a broader range of investors.</span>
+                    
+                    <span class="signal-tag">Requirement for experience in a regulated space (fintech/investing) highlights the importance of compliance and risk management in their product development.</span>
+                    
+                </div>
+                
+                <div class="confidence high">
+                    Confidence: High
+                </div>
+            </div>
+            
+            
+            
+
+            
+            <h2>30-Day Trends</h2>
+            <div class="trends-box">
+                <div class="trend-item">
+                    <div class="trend-value">105</div>
+                    <div class="trend-label">New Postings</div>
+                </div>
+                <div class="trend-item">
+                    <div class="trend-value">0</div>
+                    <div class="trend-label">Closed Postings</div>
+                </div>
+                <div class="trend-item">
+                    
+                    <div class="trend-value positive">+105</div>
+                    
+                    <div class="trend-label">Net Change</div>
+                </div>
+            </div>
+            
+
+            
+            <h2>Current Headcount by Company</h2>
+            <div class="trends-box">
+                
+                <div class="trend-item">
+                    <div class="trend-value">40</div>
+                    <div class="trend-label">Wealthsimple</div>
+                </div>
+                
+                <div class="trend-item">
+                    <div class="trend-value">0</div>
+                    <div class="trend-label">Koho</div>
+                </div>
+                
+                <div class="trend-item">
+                    <div class="trend-value">0</div>
+                    <div class="trend-label">Neo Financial</div>
+                </div>
+                
+                <div class="trend-item">
+                    <div class="trend-value">4</div>
+                    <div class="trend-label">Questrade</div>
+                </div>
+                
+                <div class="trend-item">
+                    <div class="trend-value">0</div>
+                    <div class="trend-label">Tangerine</div>
+                </div>
+                
+                <div class="trend-item">
+                    <div class="trend-value">51</div>
+                    <div class="trend-label">Monzo</div>
+                </div>
+                
+                <div class="trend-item">
+                    <div class="trend-value">0</div>
+                    <div class="trend-label">Revolut</div>
+                </div>
+                
+                <div class="trend-item">
+                    <div class="trend-value">10</div>
+                    <div class="trend-label">Starling Bank</div>
+                </div>
+                
+            </div>
+            
+        </div>
+
+        <div class="footer">
+            <p>Generated by Fintech Job Intelligence System</p>
+            <p>This report tracks job postings from Canadian fintech competitors for strategic analysis.</p>
+        </div>
+    </div>
+</body>
+</html>
