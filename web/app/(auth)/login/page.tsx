@@ -7,12 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export default function LoginPage() {
   const supabase = createClient();
 
-  async function signInWith(provider: "google" | "azure") {
+  async function signInWithGoogle() {
     const redirectTo = typeof window !== "undefined" 
       ? `${window.location.origin}/auth/callback` 
       : "/auth/callback";
     await supabase.auth.signInWithOAuth({
-      provider,
+      provider: "google",
       options: { redirectTo },
     });
   }
@@ -23,19 +23,9 @@ export default function LoginPage() {
         <CardTitle>Fintech Intelligence</CardTitle>
         <CardDescription>Sign in to access competitive intelligence</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <Button
-          className="w-full"
-          onClick={() => signInWith("google")}
-        >
+      <CardContent>
+        <Button className="w-full" onClick={signInWithGoogle}>
           Sign in with Google
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => signInWith("azure")}
-        >
-          Sign in with Microsoft
         </Button>
       </CardContent>
     </Card>
