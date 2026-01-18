@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchJobs, jobToRow } from "@/lib/scrapers";
-import { analyzeJob } from "@/lib/analysis";
+import { analyzeJobAdvanced } from "@/lib/analysis";
 
 export const maxDuration = 300;
 
@@ -60,8 +60,24 @@ export async function GET(req: NextRequest) {
             .single();
           totalNew++;
           if (inserted?.id && company.track_for_strategy) {
-            const insight = await analyzeJob(company.name, job);
+            // Use advanced analysis with Gemini 3 Pro
+            const insight = await analyzeJobAdvanced({
+              companyId: company.id,
+              companyName: company.name,
+              job: {
+                title: job.title,
+                department: job.department,
+                location: job.location,
+                description_text: job.description_text,
+              },
+            });
+            
             if (insight) {
+              // Extract web context for storage
+              const webContext = insight.web_corroboration 
+                ? [{ snippet: insight.web_corroboration }] 
+                : [];
+
               await supabase.from("strategic_insights").insert({
                 job_posting_id: inserted.id,
                 category: insight.category,
@@ -69,6 +85,14 @@ export async function GET(req: NextRequest) {
                 strategic_signals: insight.strategic_signals,
                 is_new_direction: insight.is_new_direction,
                 confidence: insight.confidence,
+                // Advanced fields
+                novelty_score: insight.novelty_score,
+                novelty_reasoning: insight.novelty_reasoning,
+                is_executive_movement: insight.is_executive_movement,
+                executive_context: insight.executive_context,
+                strategic_hypothesis: insight.strategic_hypothesis,
+                web_context: webContext,
+                model_reasoning: insight.model_reasoning,
               });
             }
           }
