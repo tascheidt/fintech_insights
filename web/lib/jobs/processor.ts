@@ -4,6 +4,7 @@ import { triggerScrapeWorkflow } from "@/lib/github";
 import type { Browser } from "puppeteer-core";
 import type { Company, IngestResult } from "./types";
 import { updateTaskProgress } from "./progress";
+import { extractJobStructure, normalizeJobTitle } from "@/lib/analysis/structure";
 
 /**
  * Stage 1: Scrape - Fetch raw data from ATS
@@ -72,8 +73,58 @@ export async function runScrapeStage(
 }
 
 /**
+ * Extract Silver Layer structure and update job posting
+ * This runs asynchronously and doesn't block the ingestion pipeline
+ */
+async function extractAndUpdateStructure(
+  jobId: string,
+  jobTitle: string,
+  description: string
+): Promise<void> {
+  const supabase = createAdminClient();
+
+  // Skip if no description available
+  if (!description || description.trim().length === 0) {
+    return;
+  }
+
+  try {
+    // Extract structured data
+    const structure = await extractJobStructure(jobTitle, description);
+
+    if (!structure) {
+      // Extraction failed, but continue - we'll still have the raw data
+      return;
+    }
+
+    // Normalize title
+    const normalizedTitle = normalizeJobTitle(jobTitle);
+
+    // Update job posting with extracted structure
+    await supabase
+      .from('job_postings')
+      .update({
+        summary: structure.summary,
+        seniority_level: structure.seniority_level,
+        salary_min: structure.salary_min,
+        salary_max: structure.salary_max,
+        salary_currency: structure.salary_currency,
+        tech_stack: structure.tech_stack,
+        keywords: [], // Keywords extraction can be added later if needed
+        standardized_department: structure.standardized_department,
+        normalized_title: normalizedTitle,
+      })
+      .eq('id', jobId);
+  } catch (error) {
+    // Log error but don't throw - ingestion should continue even if extraction fails
+    console.error(`Error extracting structure for job ${jobId}:`, error);
+  }
+}
+
+/**
  * Stage 2: Ingest - Diff and upsert jobs to database
  * Updates task: new_jobs, updated_jobs, closed_jobs, pending_analysis_job_ids, stage_progress.ingest
+ * Also extracts Silver Layer structure for each job
  */
 export async function runIngestStage(
   taskId: string,
@@ -103,6 +154,7 @@ export async function runIngestStage(
     let updatedJobs = 0;
     let closedJobs = 0;
     const newJobIds: string[] = [];
+    const extractionPromises: Promise<void>[] = [];
 
     const total = jobs.length;
     let processed = 0;
@@ -135,6 +187,13 @@ export async function runIngestStage(
           })
           .eq('id', existingId);
         updatedJobs++;
+
+        // Queue Silver Layer extraction for updated jobs
+        if (row.description_text) {
+          extractionPromises.push(
+            extractAndUpdateStructure(existingId, job.title, row.description_text)
+          );
+        }
       } else {
         // Insert new job
         const { data: inserted } = await supabase
@@ -152,6 +211,13 @@ export async function runIngestStage(
           if (company.track_for_strategy) {
             newJobIds.push(inserted.id);
           }
+
+          // Queue Silver Layer extraction for new jobs
+          if (row.description_text) {
+            extractionPromises.push(
+              extractAndUpdateStructure(inserted.id, job.title, row.description_text)
+            );
+          }
         }
       }
 
@@ -159,6 +225,19 @@ export async function runIngestStage(
       if (onProgress) {
         onProgress(processed, total);
       }
+    }
+
+    // Wait for all Silver Layer extractions to complete (or fail gracefully)
+    // This runs in parallel but doesn't block ingestion completion
+    if (extractionPromises.length > 0) {
+      Promise.allSettled(extractionPromises).then((results) => {
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        if (failed > 0) {
+          console.warn(
+            `Silver Layer extraction: ${failed} of ${extractionPromises.length} jobs failed`
+          );
+        }
+      });
     }
 
     // Mark jobs as closed if no longer in feed
