@@ -6,6 +6,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TaskProgressBar } from "@/components/jobs/TaskProgressBar";
 import type { JobRunTask, TaskStage } from "@/lib/jobs/types";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface ProcessButtonProps {
   companyId: string;
@@ -21,7 +22,7 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
     success?: boolean;
     message?: string;
   } | null>(null);
-  const channelRef = useRef<ReturnType<typeof createClient>["channel"] | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   // Cleanup subscription on unmount
   useEffect(() => {
