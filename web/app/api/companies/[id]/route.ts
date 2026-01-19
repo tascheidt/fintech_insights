@@ -165,8 +165,8 @@ export async function DELETE(
   if (!profile?.organization_id) {
     return NextResponse.json({ error: "No organization" }, { status: 403 });
   }
-  if (profile.role !== "admin") {
-    return NextResponse.json({ error: "Only admins can delete companies" }, { status: 403 });
+  if (!["editor", "admin"].includes(profile.role ?? "")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   // Verify company belongs to user's organization
@@ -183,9 +183,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Soft delete: set is_active to false instead of hard deleting
   const { error } = await supabase
     .from("companies")
-    .delete()
+    .update({ is_active: false })
     .eq("id", id);
 
   if (error) {

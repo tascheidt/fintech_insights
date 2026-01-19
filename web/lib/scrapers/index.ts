@@ -68,3 +68,29 @@ export async function isBrowserScrapingAvailable(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Check if an ATS type requires browser-based scraping
+ * Browser scrapers should be offloaded to GitHub Actions to avoid Vercel timeouts
+ * 
+ * @param atsType - The ATS platform type
+ * @returns true if the ATS requires browser scraping, false if it uses API
+ */
+export function isBrowserScraper(atsType: string): boolean {
+  const normalized = atsType.toLowerCase();
+  
+  // Browser-based scrapers (no API available or unreliable)
+  const browserScrapers = [
+    'workday',
+    'smartrecruiters',
+    'bamboohr',
+    'jazzhr',
+    'recruitee',
+    'custom',
+    'icims',
+    'taleo',
+    'dayforce', // Can fall back to browser scraping
+  ];
+  
+  return browserScrapers.includes(normalized);
+}

@@ -49,22 +49,69 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
 
   const slug = slugify(parsed.data.name);
-  const { data, error } = await supabase
+  
+  // Check if company with same slug exists in this organization
+  const { data: existingCompany } = await supabase
     .from("companies")
-    .insert({
-      organization_id: profile.organization_id,
-      name: parsed.data.name,
-      slug,
-      country: parsed.data.country,
-      track_for_strategy: parsed.data.trackForStrategy,
-      ats_type: parsed.data.atsType,
-      ats_identifier: parsed.data.atsIdentifier,
-      careers_url: parsed.data.careersUrl || null,
-      is_active: true,
-      created_by: user.id,
-    })
-    .select("id, slug")
+    .select("id, is_active")
+    .eq("organization_id", profile.organization_id)
+    .eq("slug", slug)
     .single();
+
+  let data;
+  let error;
+
+  if (existingCompany) {
+    // Company exists
+    if (existingCompany.is_active) {
+      // Active company exists - return error
+      return NextResponse.json(
+        { error: "A company with this name already exists" },
+        { status: 400 }
+      );
+    } else {
+      // Inactive company exists - reactivate and update
+      const { data: updated, error: updateError } = await supabase
+        .from("companies")
+        .update({
+          name: parsed.data.name,
+          country: parsed.data.country,
+          track_for_strategy: parsed.data.trackForStrategy,
+          ats_type: parsed.data.atsType,
+          ats_identifier: parsed.data.atsIdentifier,
+          careers_url: parsed.data.careersUrl || null,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingCompany.id)
+        .select("id, slug")
+        .single();
+      
+      data = updated;
+      error = updateError;
+    }
+  } else {
+    // Company doesn't exist - insert new
+    const { data: inserted, error: insertError } = await supabase
+      .from("companies")
+      .insert({
+        organization_id: profile.organization_id,
+        name: parsed.data.name,
+        slug,
+        country: parsed.data.country,
+        track_for_strategy: parsed.data.trackForStrategy,
+        ats_type: parsed.data.atsType,
+        ats_identifier: parsed.data.atsIdentifier,
+        careers_url: parsed.data.careersUrl || null,
+        is_active: true,
+        created_by: user.id,
+      })
+      .select("id, slug")
+      .single();
+    
+    data = inserted;
+    error = insertError;
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data, { status: 201 });

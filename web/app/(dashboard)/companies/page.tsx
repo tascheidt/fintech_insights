@@ -15,7 +15,11 @@ export default async function CompaniesPage() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   const canEdit = ["editor", "admin"].includes(profile?.role ?? "");
 
-  const { data: companies } = await supabase.from("companies").select("id, name, slug, country, ats_type, is_active, last_collected_at").order("name");
+  const { data: companies } = await supabase
+    .from("companies")
+    .select("id, name, slug, country, ats_type, is_active, last_collected_at")
+    .eq("is_active", true)
+    .order("name");
   const ids = (companies ?? []).map((c) => c.id);
   const { data: jobs } = ids.length > 0
     ? await supabase.from("job_postings").select("company_id").eq("is_active", true)

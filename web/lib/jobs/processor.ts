@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchJobs, jobToRow, type JobData } from "@/lib/scrapers";
+import { fetchJobs, jobToRow, type JobData, isBrowserScraper } from "@/lib/scrapers";
+import { triggerScrapeWorkflow } from "@/lib/github";
 import type { Browser } from "puppeteer-core";
 import type { Company, IngestResult } from "./types";
 import { updateTaskProgress } from "./progress";
@@ -275,7 +276,59 @@ export async function processCollectionTask(
       // Use stored scraped data
       jobs = task.scraped_data as unknown as JobData[];
     } else {
-      // Run scrape stage
+      // Check if this is a browser-based scraper that should be offloaded
+      if (isBrowserScraper(company.ats_type)) {
+        // Offload heavy browser scraping to GitHub Actions
+        console.log(`🌐 Offloading heavy scrape to GitHub Actions for company: ${company.name} (${company.ats_type})`);
+        
+        try {
+          await triggerScrapeWorkflow(company.id);
+          
+          // Update task to indicate it's been offloaded
+          await supabase
+            .from('job_run_tasks')
+            .update({
+              status: 'running',
+              current_stage: 'scrape',
+              stage_progress: {
+                scrape: {
+                  status: 'running',
+                  startedAt: new Date().toISOString(),
+                  offloaded_to_github: true,
+                },
+              },
+            })
+            .eq('id', taskId);
+          
+          // Return early - GitHub Actions will handle the scraping and update the task
+          // The GitHub script will create its own task/job run, so this task will remain in 'running' state
+          // until the GitHub workflow completes and updates it
+          return;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error(`❌ Failed to trigger GitHub Actions workflow: ${errorMessage}`);
+          
+          // Update task to failed
+          await supabase
+            .from('job_run_tasks')
+            .update({
+              status: 'failed',
+              error_message: `Failed to offload to GitHub Actions: ${errorMessage}`,
+              error_stage: 'scrape',
+              stage_progress: {
+                scrape: {
+                  status: 'failed',
+                  error: errorMessage,
+                },
+              },
+            })
+            .eq('id', taskId);
+          
+          throw error;
+        }
+      }
+      
+      // Run scrape stage locally (API-based scrapers)
       jobs = await runScrapeStage(taskId, company, undefined);
     }
 

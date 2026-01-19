@@ -20,6 +20,7 @@ export default async function CompanyInsightDetailPage({
     .from("companies")
     .select("id, name, slug")
     .eq("slug", slug)
+    .eq("is_active", true)
     .single();
 
   if (companyError || !company) notFound();

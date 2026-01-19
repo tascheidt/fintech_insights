@@ -8,12 +8,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { EditCompanyForm } from "@/components/companies/EditCompanyForm";
 import { CompanyInsightsCard } from "@/components/companies/CompanyInsightsCard";
+import { DeleteCompanyButton } from "@/components/companies/DeleteCompanyButton";
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("role").eq("id", user.id).single()
+    : { data: null };
+  const canEdit = ["editor", "admin"].includes(profile?.role ?? "");
 
-  const { data: company, error } = await supabase.from("companies").select("*").eq("slug", slug).single();
+  const { data: company, error } = await supabase
+    .from("companies")
+    .select("*")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .single();
   if (error || !company) notFound();
 
   const [{ data: jobs }, { data: latestInsight }] = await Promise.all([
@@ -205,7 +216,19 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         </TabsContent>
 
         <TabsContent value="settings">
-          <EditCompanyForm company={company} />
+          <div className="space-y-6">
+            <EditCompanyForm company={company} />
+            {canEdit && (
+              <div className="flex items-center gap-4 pt-4 border-t">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">
+                    Delete this company to hide it from your list. Historical data will be preserved.
+                  </p>
+                </div>
+                <DeleteCompanyButton companyId={company.id} companyName={company.name} />
+              </div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
