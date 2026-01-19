@@ -82,33 +82,34 @@ export async function scrapeJobsWithBrowser(
 
     const page = await browserInstance.newPage();
     
-    // Set a realistic user agent
-    await page.setUserAgent(
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    );
+    try {
+      // Set a realistic user agent
+      await page.setUserAgent(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      );
 
-    // Navigate to the page
-    await page.goto(config.url, { 
-      waitUntil: "networkidle2",
-      timeout: 30000 
-    });
+      // Navigate to the page
+      await page.goto(config.url, { 
+        waitUntil: "networkidle2",
+        timeout: 30000 
+      });
 
-    // Wait for job listings to load
-    if (config.waitSelector) {
-      try {
-        await page.waitForSelector(config.waitSelector, { timeout: 10000 });
-      } catch {
-        // Selector might not exist, continue anyway
+      // Wait for job listings to load
+      if (config.waitSelector) {
+        try {
+          await page.waitForSelector(config.waitSelector, { timeout: 10000 });
+        } catch {
+          // Selector might not exist, continue anyway
+        }
       }
-    }
 
-    // Extra wait if needed for dynamic content
-    if (config.extraWaitMs) {
-      await new Promise(resolve => setTimeout(resolve, config.extraWaitMs));
-    }
+      // Extra wait if needed for dynamic content
+      if (config.extraWaitMs) {
+        await new Promise(resolve => setTimeout(resolve, config.extraWaitMs));
+      }
 
-    // Extract jobs using custom script or generic extraction
-    const jobs = await page.evaluate((customScript) => {
+      // Extract jobs using custom script or generic extraction
+      const jobs = await page.evaluate((customScript) => {
       if (customScript) {
         // Execute custom extraction script
         return eval(customScript);
@@ -193,6 +194,10 @@ export async function scrapeJobsWithBrowser(
     }, config.extractScript);
 
     return jobs;
+    } finally {
+      // Always close the page to prevent memory leaks
+      await page.close();
+    }
   } finally {
     // Only close browser if we created it (not if it was injected)
     if (shouldCloseBrowser && browserInstance) {

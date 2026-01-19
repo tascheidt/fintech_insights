@@ -159,6 +159,7 @@ export async function performDeepResearch(
     try {
       const model = genAI.getGenerativeModel({
         model: "gemini-2.0-flash",
+        // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
         tools: [{ googleSearch: {} }],
       });
 

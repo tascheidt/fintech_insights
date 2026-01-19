@@ -117,6 +117,7 @@ async function performWebSearch(companyName: string): Promise<Array<{ title: str
     // Use a model with Google Search tool enabled
     const model = genAI.getGenerativeModel({
       model: "gemini-3-pro-preview",
+      // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
     });
 
@@ -221,6 +222,7 @@ export async function analyzeJobAdvanced(
     // Use Gemini 3 Pro with extended thinking and web search
     const model = genAI.getGenerativeModel({
       model: "gemini-3-pro-preview",
+      // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
       generationConfig: {
         temperature: 0.6,
