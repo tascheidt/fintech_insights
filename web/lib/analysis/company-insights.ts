@@ -143,7 +143,8 @@ export async function generateCompanyInsight(
   }
 
   // Step 2: Get previous insight for comparison
-  let previousInsight: { id: string; core_functions: FunctionStats[] } | null = null;
+  type PreviousInsightData = { id: string; core_functions: FunctionStats[] };
+  let previousInsight: PreviousInsightData | null = null;
   if (compareToPrevious) {
     const { data } = await supabase
       .from("company_insights")
@@ -153,7 +154,12 @@ export async function generateCompanyInsight(
       .limit(1)
       .single();
     
-    previousInsight = data as typeof previousInsight;
+    if (data) {
+      previousInsight = {
+        id: data.id as string,
+        core_functions: (data.core_functions as FunctionStats[]) || [],
+      };
+    }
   }
 
   // Step 3: Build extended historical context (reuses context-builder.ts)
@@ -345,7 +351,7 @@ async function generateInsightWithLLM(
   context: ExtendedHistoricalContext,
   research: ResearchResult,
   companyType: CompanyType,
-  previousInsight: { id: string; core_functions: FunctionStats[] } | null
+  _previousInsight: { id: string; core_functions: FunctionStats[] } | null
 ): Promise<GeneratedInsightContent> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
