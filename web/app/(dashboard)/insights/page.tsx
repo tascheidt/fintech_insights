@@ -23,7 +23,8 @@ export default async function InsightsPage({
 
   let query = supabase
     .from("strategic_insights")
-    .select("id, category, insight_summary, run_date, confidence, job_postings!job_posting_id(title, companies(name))")
+    .select("id, category, insight_summary, run_date, confidence, job_postings!inner(title, companies!inner(name, is_active))")
+    .eq("job_postings.companies.is_active", true)
     .order("run_date", { ascending: false })
     .limit(100);
 
@@ -41,7 +42,7 @@ export default async function InsightsPage({
 
   const { data: insights } = await query;
 
-  const { data: companies } = await supabase.from("companies").select("slug, name").order("name");
+  const { data: companies } = await supabase.from("companies").select("slug, name").eq("is_active", true).order("name");
 
   return (
     <div className="space-y-6">
