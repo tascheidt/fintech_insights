@@ -12,7 +12,7 @@ import type { Browser } from "puppeteer-core";
 import { htmlToText, detectLocationType, normalizeCommitment } from "./utils";
 
 let puppeteer: typeof import("puppeteer-core") | null = null;
-let chromium: typeof import("@sparticuz/chromium") | null = null;
+let chromium: any = null;
 
 async function loadBrowserDependencies() {
   if (!puppeteer) {
@@ -312,6 +312,330 @@ export async function scrapeDayforceWithBrowser(
     posted_date: job.postedDate ? new Date(job.postedDate) : null,
     url: job.url || `https://jobs.dayforcehcm.com/en-US/${atsIdentifier}/CANDIDATEPORTAL/jobs/${job.id}`,
   }));
+}
+
+/**
+ * SuccessFactors-specific browser scraper
+ * Handles SAP SuccessFactors job boards with pagination
+ * 
+ * @param url - SuccessFactors job board URL
+ * @param browser - Optional browser instance (for dependency injection)
+ */
+export async function scrapeSuccessFactors(
+  url: string,
+  browser?: Browser
+): Promise<JobData[]> {
+  let browserInstance: Browser | null = null;
+  let shouldCloseBrowser = false;
+  
+  try {
+    if (browser) {
+      browserInstance = browser;
+    } else {
+      const { puppeteer, chromium } = await loadBrowserDependencies();
+      const executablePath = await chromium.executablePath();
+      
+      browserInstance = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath,
+        headless: true,
+      });
+      shouldCloseBrowser = true;
+    }
+
+    const page = await browserInstance.newPage();
+    
+    try {
+      // Set realistic user agent
+      await page.setUserAgent(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      );
+
+      const jobs: JobData[] = [];
+      let currentUrl = url;
+      let hasNextPage = true;
+      let pageNumber = 1;
+      const maxPages = 50; // Safety limit
+
+      while (hasNextPage && pageNumber <= maxPages) {
+        console.log(`Scraping SuccessFactors page ${pageNumber}: ${currentUrl}`);
+        
+        // Navigate to the page
+        await page.goto(currentUrl, {
+          waitUntil: "networkidle2",
+          timeout: 30000,
+        });
+
+        // Wait for job listings to load
+        await page.waitForSelector(
+          '.searchResultsShell, table, .jobTitle, [class*="jobTitle"]',
+          { timeout: 15000 }
+        ).catch(() => {
+          // Try alternative selectors
+          return page.waitForSelector(
+            'a[href*="/job/"], a[href*="/jobs/"], .job-item, .job-row',
+            { timeout: 10000 }
+          );
+        });
+
+        // Extra wait for dynamic content
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Extract job links from current page
+        const jobLinks = await page.evaluate(() => {
+          const links: Array<{ url: string; title: string; id: string }> = [];
+          const seenIds = new Set<string>();
+
+          // Try multiple selectors for job links
+          const linkSelectors = [
+            'a.jobTitle-link',
+            'a[class*="jobTitle"]',
+            'a[href*="/job/"]',
+            'a[href*="/jobs/"]',
+            '.jobTitle a',
+            '[class*="jobTitle"] a',
+            'table a[href*="/job/"]',
+          ];
+
+          for (const selector of linkSelectors) {
+            const elements = document.querySelectorAll(selector);
+            for (const el of elements) {
+              const href = (el as HTMLAnchorElement).href;
+              if (!href || !href.includes('/job/')) continue;
+
+              // Extract job ID from URL
+              const idMatch = href.match(/\/job\/(\d+)/);
+              const id = idMatch ? idMatch[1] : href.split('/').pop() || href;
+
+              if (seenIds.has(id)) continue;
+              seenIds.add(id);
+
+              // Extract title
+              const title = el.textContent?.trim() || 
+                           el.querySelector('.jobTitle, [class*="title"]')?.textContent?.trim() ||
+                           '';
+
+              if (title && title.length > 3) {
+                links.push({ url: href, title, id });
+              }
+            }
+          }
+
+          return links;
+        });
+
+        console.log(`Found ${jobLinks.length} job links on page ${pageNumber}`);
+
+        // Visit each job link to get full description
+        for (const jobLink of jobLinks) {
+          try {
+            await page.goto(jobLink.url, {
+              waitUntil: "networkidle2",
+              timeout: 20000,
+            });
+
+            // Wait for job description to load
+            await page.waitForSelector(
+              '[class*="description"], [class*="Description"], .jobDescription, #jobDescription',
+              { timeout: 10000 }
+            ).catch(() => {
+              // Description might be in different format
+            });
+
+            // Extract full job details
+            const jobDetails = await page.evaluate((linkTitle, linkId) => {
+              // Extract description HTML
+              const descSelectors = [
+                '[class*="description"]',
+                '[class*="Description"]',
+                '.jobDescription',
+                '#jobDescription',
+                '[id*="description"]',
+                '[id*="Description"]',
+              ];
+
+              let descriptionHtml = '';
+              let descriptionText = '';
+
+              for (const selector of descSelectors) {
+                const descEl = document.querySelector(selector);
+                if (descEl) {
+                  descriptionHtml = descEl.innerHTML || '';
+                  descriptionText = descEl.textContent?.trim() || '';
+                  if (descriptionHtml.length > 100) break;
+                }
+              }
+
+              // If no description found, try to get body content
+              if (!descriptionHtml || descriptionHtml.length < 100) {
+                const bodyEl = document.querySelector('body');
+                if (bodyEl) {
+                  // Remove navigation and footer
+                  const nav = bodyEl.querySelector('nav, header, footer');
+                  if (nav) nav.remove();
+                  descriptionHtml = bodyEl.innerHTML || '';
+                  descriptionText = bodyEl.textContent?.trim() || '';
+                }
+              }
+
+              // Extract location
+              const locationSelectors = [
+                '[class*="location"]',
+                '[class*="Location"]',
+                '[data-location]',
+                '.jobLocation',
+              ];
+              let location = '';
+              for (const selector of locationSelectors) {
+                const locEl = document.querySelector(selector);
+                if (locEl) {
+                  location = locEl.textContent?.trim() || '';
+                  if (location) break;
+                }
+              }
+
+              // Extract department
+              const deptSelectors = [
+                '[class*="department"]',
+                '[class*="Department"]',
+                '[class*="category"]',
+                '[class*="Category"]',
+              ];
+              let department = '';
+              for (const selector of deptSelectors) {
+                const deptEl = document.querySelector(selector);
+                if (deptEl) {
+                  department = deptEl.textContent?.trim() || '';
+                  if (department) break;
+                }
+              }
+
+              // Extract posted date
+              const dateSelectors = [
+                '[class*="date"]',
+                '[class*="Date"]',
+                '[class*="posted"]',
+                '[class*="Posted"]',
+              ];
+              let postedDate = '';
+              for (const selector of dateSelectors) {
+                const dateEl = document.querySelector(selector);
+                if (dateEl) {
+                  postedDate = dateEl.textContent?.trim() || '';
+                  if (postedDate) break;
+                }
+              }
+
+              // Extract employment type
+              const typeSelectors = [
+                '[class*="type"]',
+                '[class*="Type"]',
+                '[class*="employment"]',
+                '[class*="Employment"]',
+              ];
+              let employmentType = '';
+              for (const selector of typeSelectors) {
+                const typeEl = document.querySelector(selector);
+                if (typeEl) {
+                  employmentType = typeEl.textContent?.trim() || '';
+                  if (employmentType) break;
+                }
+              }
+
+              return {
+                id: linkId,
+                title: linkTitle,
+                url: window.location.href,
+                descriptionHtml,
+                descriptionText,
+                location,
+                department,
+                postedDate,
+                employmentType,
+              };
+            }, jobLink.title, jobLink.id);
+
+            // Convert to JobData format
+            const jobData: JobData = {
+              external_id: jobDetails.id,
+              title: jobDetails.title,
+              department: jobDetails.department || null,
+              team: null,
+              location: jobDetails.location || null,
+              location_type: detectLocationType(jobDetails.location || "", jobDetails.descriptionText || ""),
+              description_html: jobDetails.descriptionHtml || null,
+              description_text: jobDetails.descriptionText || null,
+              commitment: normalizeCommitment(jobDetails.employmentType || "") || "full-time",
+              posted_date: jobDetails.postedDate ? new Date(jobDetails.postedDate) : null,
+              url: jobDetails.url,
+            };
+
+            jobs.push(jobData);
+          } catch (error) {
+            console.error(`Error scraping job ${jobLink.url}:`, error);
+            // Continue with other jobs even if one fails
+          }
+        }
+
+        // Check for next page
+        const nextPageInfo = await page.evaluate(() => {
+          // Look for Next button
+          const nextSelectors = [
+            'a[title="Next Page"]',
+            'a[title="Next"]',
+            '.pagination-next',
+            '[class*="pagination"] a[aria-label*="Next"]',
+            '[class*="pagination"] a:contains("Next")',
+            'a[href*="page="]',
+          ];
+
+          for (const selector of nextSelectors) {
+            const nextEl = document.querySelector(selector);
+            if (nextEl && !nextEl.classList.contains('disabled')) {
+              const href = (nextEl as HTMLAnchorElement).href;
+              return { hasNext: true, url: href };
+            }
+          }
+
+          // Try to find next page link by checking pagination
+          const pagination = document.querySelector('[class*="pagination"]');
+          if (pagination) {
+            const links = pagination.querySelectorAll('a');
+            const currentPage = Array.from(links).findIndex(link => 
+              link.classList.contains('active') || link.classList.contains('current')
+            );
+            if (currentPage >= 0 && currentPage < links.length - 1) {
+              const nextLink = links[currentPage + 1];
+              if (nextLink && !nextLink.classList.contains('disabled')) {
+                return { hasNext: true, url: (nextLink as HTMLAnchorElement).href };
+              }
+            }
+          }
+
+          return { hasNext: false, url: null };
+        });
+
+        if (nextPageInfo.hasNext && nextPageInfo.url) {
+          currentUrl = nextPageInfo.url;
+          pageNumber++;
+          // Small delay before next page
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          hasNextPage = false;
+        }
+      }
+
+      console.log(`Successfully scraped ${jobs.length} jobs from SuccessFactors`);
+      return jobs;
+    } finally {
+      await page.close();
+    }
+  } finally {
+    if (shouldCloseBrowser && browserInstance) {
+      await browserInstance.close();
+    }
+  }
 }
 
 /**
