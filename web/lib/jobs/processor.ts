@@ -240,7 +240,7 @@ export async function processCollectionTask(
   // Get task
   const { data: task } = await supabase
     .from('job_run_tasks')
-    .select('company_id')
+    .select('company_id, scraped_data')
     .eq('id', taskId)
     .single();
 
@@ -279,7 +279,7 @@ export async function processCollectionTask(
       // Check if this is a browser-based scraper that should be offloaded
       if (isBrowserScraper(company.ats_type)) {
         // Offload heavy browser scraping to GitHub Actions
-        console.log(`🌐 Offloading heavy scrape to GitHub Actions for company: ${company.name} (${company.ats_type})`);
+        console.log("Offloaded heavy scrape to GitHub Actions");
         
         try {
           await triggerScrapeWorkflow(company.id);
