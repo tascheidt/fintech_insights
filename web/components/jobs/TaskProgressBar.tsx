@@ -36,13 +36,13 @@ export function TaskProgressBar({ progress, currentStage, className }: TaskProgr
     if (stageProgress.status === 'failed') return 0;
     if (stageProgress.status === 'running') {
       if (stage === 'ingest' && 'processed' in stageProgress && 'total' in stageProgress) {
-        const processed = stageProgress.processed || 0;
-        const total = stageProgress.total || 1;
+        const processed = Number(stageProgress.processed) || 0;
+        const total = Number(stageProgress.total) || 1;
         return Math.round((processed / total) * 100);
       }
       if (stage === 'analyze' && 'analyzed' in stageProgress && 'total' in stageProgress) {
-        const analyzed = stageProgress.analyzed || 0;
-        const total = stageProgress.total || 1;
+        const analyzed = Number(stageProgress.analyzed) || 0;
+        const total = Number(stageProgress.total) || 1;
         return Math.round((analyzed / total) * 100);
       }
       return 50; // Default running progress
@@ -55,10 +55,14 @@ export function TaskProgressBar({ progress, currentStage, className }: TaskProgr
     if (!stageProgress || stageProgress.status !== 'running') return null;
 
     if (stage === 'ingest' && 'processed' in stageProgress && 'total' in stageProgress) {
-      return `Processing job ${stageProgress.processed || 0} of ${stageProgress.total || 0}`;
+      const processed = Number(stageProgress.processed) || 0;
+      const total = Number(stageProgress.total) || 0;
+      return `Processing job ${processed} of ${total}`;
     }
     if (stage === 'analyze' && 'analyzed' in stageProgress && 'total' in stageProgress) {
-      return `Analyzing ${stageProgress.analyzed || 0} of ${stageProgress.total || 0}`;
+      const analyzed = Number(stageProgress.analyzed) || 0;
+      const total = Number(stageProgress.total) || 0;
+      return `Analyzing ${analyzed} of ${total}`;
     }
     return null;
   };
