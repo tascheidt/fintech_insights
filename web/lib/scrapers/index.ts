@@ -9,7 +9,7 @@ import { fetchDayforceJobs } from "./dayforce";
 export type { JobData } from "./types";
 export { jobToRow } from "./types";
 export { detectATSFromUrl, SUPPORTED_ATS, type ATSType, type ATSDetectionResult } from "./detect-ats";
-export { scrapeJobsWithBrowser, scrapeGenericJobBoard } from "./browser";
+export { scrapeJobsWithBrowser, scrapeGenericJobBoard, scrapeSuccessFactors } from "./browser";
 
 /**
  * Fetch jobs from a company's ATS
@@ -35,6 +35,14 @@ export async function fetchJobs(
       return fetchAshbyJobs(atsIdentifier);
     case "dayforce":
       return fetchDayforceJobs(atsIdentifier, browser);
+    
+    case "successfactors": {
+      if (!careersUrl) {
+        throw new Error(`${atsType} requires a careers URL for browser-based scraping`);
+      }
+      const { scrapeSuccessFactors } = await import("./browser");
+      return scrapeSuccessFactors(careersUrl, browser);
+    }
     
     // Browser-based scraping for platforms without APIs
     case "workday":
@@ -80,16 +88,15 @@ export function isBrowserScraper(atsType: string): boolean {
   const normalized = atsType.toLowerCase();
   
   // Browser-based scrapers (no API available or unreliable)
+  // These will be offloaded to GitHub Actions
   const browserScrapers = [
     'workday',
-    'smartrecruiters',
     'bamboohr',
-    'jazzhr',
-    'recruitee',
-    'custom',
-    'icims',
+    'smartrecruiters',
+    'dayforce',
+    'successfactors',
     'taleo',
-    'dayforce', // Can fall back to browser scraping
+    'icims',
   ];
   
   return browserScrapers.includes(normalized);

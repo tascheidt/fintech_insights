@@ -9,9 +9,10 @@
  * Trigger the "Heavy Scraper" GitHub Actions workflow for a company
  * 
  * @param companyId - UUID of the company to scrape
+ * @param taskId - Optional UUID of the existing task to update (instead of creating new one)
  * @throws Error if the workflow trigger fails
  */
-export async function triggerScrapeWorkflow(companyId: string): Promise<void> {
+export async function triggerScrapeWorkflow(companyId: string, taskId?: string): Promise<void> {
   const token = process.env.GJ_GITHUB_TOKEN;
   const owner = process.env.GJ_GITHUB_OWNER;
   const repo = process.env.GJ_GITHUB_REPO;
@@ -44,12 +45,23 @@ export async function triggerScrapeWorkflow(companyId: string): Promise<void> {
   const workflowFile = "scrape-heavy.yml";
   const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`;
 
-  const payload = {
+  const payload: {
+    ref: string;
+    inputs: {
+      company_id: string;
+      task_id?: string;
+    };
+  } = {
     ref: "main",
     inputs: {
       company_id: companyId,
     },
   };
+
+  // Add task_id if provided
+  if (taskId) {
+    payload.inputs.task_id = taskId;
+  }
 
   try {
     console.log(`🚀 Triggering GitHub Actions workflow for company: ${companyId}`);
@@ -83,7 +95,7 @@ export async function triggerScrapeWorkflow(companyId: string): Promise<void> {
       throw new Error(fullError);
     }
 
-    console.log(`✅ Successfully triggered workflow for company: ${companyId}`);
+    console.log(`✅ Successfully triggered workflow for company: ${companyId}${taskId ? ` (updating task ${taskId})` : ''}`);
   } catch (error) {
     // Re-throw if it's already our Error
     if (error instanceof Error) {

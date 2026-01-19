@@ -282,7 +282,8 @@ export async function processCollectionTask(
         console.log("Offloaded heavy scrape to GitHub Actions");
         
         try {
-          await triggerScrapeWorkflow(company.id);
+          // Pass taskId so GitHub Actions updates the existing task instead of creating a new one
+          await triggerScrapeWorkflow(company.id, taskId);
           
           // Update task to indicate it's been offloaded
           await supabase
@@ -300,9 +301,7 @@ export async function processCollectionTask(
             })
             .eq('id', taskId);
           
-          // Return early - GitHub Actions will handle the scraping and update the task
-          // The GitHub script will create its own task/job run, so this task will remain in 'running' state
-          // until the GitHub workflow completes and updates it
+          // Return early - GitHub Actions will handle the scraping and update this task
           return;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);

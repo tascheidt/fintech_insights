@@ -7,6 +7,10 @@ on:
         description: 'Company ID (UUID) to scrape'
         required: true
         type: string
+      task_id:
+        description: 'Task ID (UUID) to update (optional, creates new task if not provided)'
+        required: false
+        type: string
 
 jobs:
   scrape:
@@ -31,6 +35,7 @@ jobs:
         working-directory: web
         env:
           COMPANY_ID: ${{ inputs.company_id }}
+          TASK_ID: ${{ inputs.task_id }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npx tsx scripts/scrape-heavy.ts

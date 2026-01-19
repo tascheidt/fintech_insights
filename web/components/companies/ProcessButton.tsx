@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TaskProgressBar } from "@/components/jobs/TaskProgressBar";
 import type { JobRunTask, TaskStage } from "@/lib/jobs/types";
@@ -13,6 +13,8 @@ interface ProcessButtonProps {
   companyName: string;
 }
 
+const CLIENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
 export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [jobRunId, setJobRunId] = useState<string | null>(null);
@@ -22,13 +24,19 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
     success?: boolean;
     message?: string;
   } | null>(null);
+  const [timeoutWarning, setTimeoutWarning] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number | null>(null);
 
-  // Cleanup subscription on unmount
+  // Cleanup subscription and timeout on unmount
   useEffect(() => {
     return () => {
       if (channelRef.current) {
         channelRef.current.unsubscribe();
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, []);
@@ -62,6 +70,15 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
           // Check if task is completed or failed
           if (updatedTask.status === "completed" || updatedTask.status === "failed") {
             setIsProcessing(false);
+            setTimeoutWarning(false);
+            
+            // Clear timeout
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
+            startTimeRef.current = null;
+            
             if (updatedTask.status === "completed") {
               const message = `Completed: ${updatedTask.new_jobs} new, ${updatedTask.updated_jobs} updated, ${updatedTask.closed_jobs} closed${updatedTask.insights_generated > 0 ? `, ${updatedTask.insights_generated} insights` : ""}`;
               setResult({
@@ -113,12 +130,60 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
     };
   }, [taskId, companyName]);
 
+  // Set up client-side timeout
+  useEffect(() => {
+    if (isProcessing && startTimeRef.current) {
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Set timeout to show warning after 10 minutes
+      timeoutRef.current = setTimeout(() => {
+        const elapsed = Date.now() - startTimeRef.current!;
+        if (elapsed >= CLIENT_TIMEOUT_MS) {
+          setTimeoutWarning(true);
+        }
+      }, CLIENT_TIMEOUT_MS);
+    }
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [isProcessing]);
+
+  function handleCancel() {
+    setIsProcessing(false);
+    setTimeoutWarning(false);
+    setResult({
+      success: false,
+      message: "Stopped waiting for job (job may still be running)",
+    });
+    
+    // Clear timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    startTimeRef.current = null;
+    
+    // Unsubscribe from realtime updates
+    if (channelRef.current) {
+      channelRef.current.unsubscribe();
+      channelRef.current = null;
+    }
+  }
+
   async function handleProcess() {
     if (isProcessing) return;
 
     setIsProcessing(true);
     setResult(null);
     setTaskStatus(null);
+    setTimeoutWarning(false);
+    startTimeRef.current = Date.now();
 
     try {
       const response = await fetch(`/api/companies/${companyId}/process`, {
@@ -129,6 +194,14 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
 
       if (response.ok && data.jobRunId) {
         setJobRunId(data.jobRunId);
+
+        // Handle "already running" case
+        if (data.status === "already_running") {
+          setResult({
+            success: true,
+            message: data.message || "Job already running",
+          });
+        }
 
         // Get the task ID for this company (with retry since task creation is async)
         const supabase = createClient();
@@ -141,6 +214,7 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
             .select("id")
             .eq("job_run_id", data.jobRunId)
             .eq("company_id", companyId)
+            .order("started_at", { ascending: false })
             .limit(1);
 
           if (tasks && tasks.length > 0) {
@@ -148,6 +222,13 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
           } else if (attempts < maxAttempts) {
             attempts++;
             setTimeout(findTask, 500);
+          } else {
+            // Couldn't find task after retries
+            setResult({
+              success: false,
+              message: "Could not find task. Job may still be running.",
+            });
+            setIsProcessing(false);
           }
         };
 
@@ -158,6 +239,7 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
           message: data.error || "Failed to start processing",
         });
         setIsProcessing(false);
+        startTimeRef.current = null;
       }
     } catch (error) {
       setResult({
@@ -165,6 +247,7 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
         message: "Network error",
       });
       setIsProcessing(false);
+      startTimeRef.current = null;
     }
   }
 
@@ -194,6 +277,17 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
             </>
           )}
         </Button>
+        {isProcessing && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCancel}
+            className="h-auto py-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+            title="Stop waiting (job may still be running)"
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        )}
         {result && (
           <span
             className={`text-xs ${result.success ? "text-green-600" : "text-red-600"}`}
@@ -202,6 +296,11 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
           </span>
         )}
       </div>
+      {timeoutWarning && (
+        <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+          ⚠️ Job has been running for over 10 minutes. It may have timed out. Check the job status badge.
+        </div>
+      )}
       {isProcessing && taskStatus && (
         <div className="w-64">
           <TaskProgressBar

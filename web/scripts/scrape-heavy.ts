@@ -5,10 +5,11 @@
  * for environments that support it (e.g., GitHub Actions).
  * 
  * Usage:
- *   COMPANY_ID=<uuid> npx tsx web/scripts/scrape-heavy.ts
+ *   COMPANY_ID=<uuid> [TASK_ID=<uuid>] npx tsx web/scripts/scrape-heavy.ts
  * 
  * Environment Variables:
- *   COMPANY_ID - UUID of the company to scrape
+ *   COMPANY_ID - UUID of the company to scrape (required)
+ *   TASK_ID - UUID of existing task to update (optional, creates new task if not provided)
  *   NEXT_PUBLIC_SUPABASE_URL - Supabase project URL
  *   SUPABASE_SERVICE_ROLE_KEY - Supabase service role key
  */
@@ -23,13 +24,20 @@ import type { Company } from "@/lib/jobs/types";
 async function main() {
   console.log("🚀 Starting heavy scraper script...");
 
-  // Step 1: Get COMPANY_ID from environment
+  // Step 1: Get COMPANY_ID and optional TASK_ID from environment
   const companyId = process.env.COMPANY_ID;
+  const taskId = process.env.TASK_ID;
+  
   if (!companyId) {
     console.error("❌ Error: COMPANY_ID environment variable is required");
     process.exit(1);
   }
   console.log(`📋 Company ID: ${companyId}`);
+  if (taskId) {
+    console.log(`📋 Task ID: ${taskId} (will update existing task)`);
+  } else {
+    console.log(`📋 No TASK_ID provided (will create new task)`);
+  }
 
   // Step 2: Initialize Supabase Admin Client
   console.log("🔌 Initializing Supabase admin client...");
@@ -79,47 +87,116 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 5: Create a task for tracking (required by runIngestStage)
-  console.log("📝 Creating job run task...");
-  const { data: jobRun, error: jobRunError } = await supabase
-    .from("job_runs")
-    .insert({
-      job_type: "collect",
-      trigger_type: "manual",
-      scope: "single",
-      company_id: companyId,
-      status: "running",
-      started_at: new Date().toISOString(),
-      total_companies: 1,
-    })
-    .select("id")
-    .single();
+  // Step 5: Get or create task for tracking (required by runIngestStage)
+  let task: { id: string; job_run_id: string } | null = null;
+  let jobRun: { id: string } | null = null;
 
-  if (jobRunError || !jobRun) {
-    console.error(`❌ Error creating job run: ${jobRunError?.message || "Unknown error"}`);
-    await browser?.close();
-    process.exit(1);
+  if (taskId) {
+    // Update existing task
+    console.log(`📝 Updating existing task: ${taskId}...`);
+    
+    // Fetch existing task
+    const { data: existingTask, error: taskFetchError } = await supabase
+      .from("job_run_tasks")
+      .select("id, job_run_id")
+      .eq("id", taskId)
+      .single();
+
+    if (taskFetchError || !existingTask) {
+      console.error(`❌ Error fetching existing task: ${taskFetchError?.message || "Task not found"}`);
+      await browser?.close();
+      process.exit(1);
+    }
+
+    task = { id: existingTask.id, job_run_id: existingTask.job_run_id };
+    
+    // Fetch the job run to verify it exists
+    const { data: existingJobRun, error: jobRunFetchError } = await supabase
+      .from("job_runs")
+      .select("id")
+      .eq("id", existingTask.job_run_id)
+      .single();
+
+    if (jobRunFetchError || !existingJobRun) {
+      console.error(`❌ Error: Job run not found for task ${taskId}`);
+      await browser?.close();
+      process.exit(1);
+    }
+    jobRun = existingJobRun;
+
+    // Update task status to running
+    const { error: updateError } = await supabase
+      .from("job_run_tasks")
+      .update({
+        status: "running",
+        started_at: new Date().toISOString(),
+        current_stage: "scrape",
+        error_message: null,
+        error_stage: null,
+      })
+      .eq("id", taskId);
+
+    if (updateError) {
+      console.error(`❌ Error updating task: ${updateError.message}`);
+      await browser?.close();
+      process.exit(1);
+    }
+
+    // Update job run status to running
+    await supabase
+      .from("job_runs")
+      .update({
+        status: "running",
+        started_at: new Date().toISOString(),
+      })
+      .eq("id", jobRun.id);
+
+    console.log(`✅ Updated existing task: ${task.id}`);
+  } else {
+    // Create new task (backward compatibility)
+    console.log("📝 Creating new job run task...");
+    const { data: newJobRun, error: jobRunError } = await supabase
+      .from("job_runs")
+      .insert({
+        job_type: "collect",
+        trigger_type: "manual",
+        scope: "single",
+        company_id: companyId,
+        status: "running",
+        started_at: new Date().toISOString(),
+        total_companies: 1,
+      })
+      .select("id")
+      .single();
+
+    if (jobRunError || !newJobRun) {
+      console.error(`❌ Error creating job run: ${jobRunError?.message || "Unknown error"}`);
+      await browser?.close();
+      process.exit(1);
+    }
+    jobRun = newJobRun;
+
+    const { data: newTask, error: taskError } = await supabase
+      .from("job_run_tasks")
+      .insert({
+        job_run_id: jobRun.id,
+        company_id: companyId,
+        status: "running",
+        started_at: new Date().toISOString(),
+        current_stage: "scrape",
+        stage_progress: {},
+      })
+      .select("id")
+      .single();
+
+    if (taskError || !newTask) {
+      console.error(`❌ Error creating task: ${taskError?.message || "Unknown error"}`);
+      await browser?.close();
+      process.exit(1);
+    }
+    task = { id: newTask.id, job_run_id: jobRun.id };
+    console.log(`✅ Created new task: ${task.id}`);
   }
-
-  const { data: task, error: taskError } = await supabase
-    .from("job_run_tasks")
-    .insert({
-      job_run_id: jobRun.id,
-      company_id: companyId,
-      status: "running",
-      started_at: new Date().toISOString(),
-      current_stage: "scrape",
-      stage_progress: {},
-    })
-    .select("id")
-    .single();
-
-  if (taskError || !task) {
-    console.error(`❌ Error creating task: ${taskError?.message || "Unknown error"}`);
-    await browser?.close();
-    process.exit(1);
-  }
-  console.log(`✅ Created task: ${task.id}`);
 
   try {
     // Step 6: Fetch jobs using browser instance
