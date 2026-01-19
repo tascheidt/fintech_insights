@@ -220,100 +220,296 @@ export async function scrapeDayforceWithBrowser(
 ): Promise<JobData[]> {
   const url = `https://jobs.dayforcehcm.com/en-US/${atsIdentifier}/CANDIDATEPORTAL`;
   
-  // Dayforce-specific extraction script
-  const extractScript = `
-    (function() {
-      const jobs = [];
-      const seenIds = new Set();
+  let browserInstance: Browser | null = null;
+  let shouldCloseBrowser = false;
+  
+  try {
+    if (browser) {
+      browserInstance = browser;
+    } else {
+      const { puppeteer, chromium } = await loadBrowserDependencies();
+      const executablePath = await chromium.executablePath();
       
-      // Look for job cards/links
-      const jobElements = document.querySelectorAll('a[href*="/jobs/"], [class*="job"], [data-testid*="job"]');
-      
-      for (const el of jobElements) {
-        // Get the link
-        const link = el.tagName === 'A' ? el : el.querySelector('a[href*="/jobs/"]');
-        if (!link) continue;
+      browserInstance = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath,
+        headless: true,
+      });
+      shouldCloseBrowser = true;
+    }
+
+    const page = await browserInstance.newPage();
+    
+    try {
+      await page.setUserAgent(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      );
+
+      // Navigate to job listings page
+      await page.goto(url, {
+        waitUntil: "networkidle2",
+        timeout: 30000,
+      });
+
+      // Wait for job listings to load
+      await page.waitForSelector('a[href*="/jobs/"]', { timeout: 10000 }).catch(() => {});
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Extra wait for Dayforce
+
+      // Extract job links from listing page
+      const jobLinks = await page.evaluate(() => {
+        const jobs: Array<{ id: string; title: string; url: string }> = [];
+        const seenIds = new Set<string>();
         
-        const href = link.href;
-        const idMatch = href.match(/\\/jobs\\/(\\d+)/);
-        if (!idMatch) continue;
+        const jobElements = document.querySelectorAll('a[href*="/jobs/"], [class*="job"], [data-testid*="job"]');
         
-        const id = idMatch[1];
-        if (seenIds.has(id)) continue;
-        seenIds.add(id);
-        
-        // Find the job card container
-        let container = el;
-        while (container.parentElement && !container.className.includes('card') && !container.className.includes('item')) {
-          container = container.parentElement;
-          if (container.tagName === 'BODY') {
-            container = el;
-            break;
+        for (const el of jobElements) {
+          const link = el.tagName === 'A' ? el : el.querySelector('a[href*="/jobs/"]');
+          if (!link) continue;
+          
+          const href = (link as HTMLAnchorElement).href;
+          const idMatch = href.match(/\/jobs\/(\d+)/);
+          if (!idMatch) continue;
+          
+          const id = idMatch[1];
+          if (seenIds.has(id)) continue;
+          seenIds.add(id);
+          
+          // Find the job card container
+          let container = el;
+          while (container.parentElement && !container.className.includes('card') && !container.className.includes('item')) {
+            container = container.parentElement;
+            if (container.tagName === 'BODY') {
+              container = el;
+              break;
+            }
           }
+          
+          // Extract title
+          let title = '';
+          const titleEl = container.querySelector('h1, h2, h3, h4, strong, [class*="title"], [class*="Title"]');
+          if (titleEl) {
+            title = titleEl.textContent?.trim() || '';
+          } else {
+            title = link.textContent?.trim() || '';
+          }
+          
+          if (!title || title.length < 3) continue;
+          
+          jobs.push({
+            id,
+            title: title.substring(0, 200),
+            url: href,
+          });
         }
         
-        // Extract title - look for heading or strong text
-        let title = '';
-        const titleEl = container.querySelector('h1, h2, h3, h4, strong, [class*="title"], [class*="Title"]');
-        if (titleEl) {
-          title = titleEl.textContent.trim();
-        } else {
-          title = link.textContent.trim();
-        }
-        
-        if (!title || title.length < 3) continue;
-        
-        // Extract location
-        let location = '';
-        const locationEl = container.querySelector('[class*="location"], [class*="Location"], svg + span, [data-testid*="location"]');
-        if (locationEl) {
-          location = locationEl.textContent.trim();
-        }
-        
-        // Extract department
-        let department = '';
-        const deptEl = container.querySelector('[class*="department"], [class*="Department"], [class*="category"]');
-        if (deptEl) {
-          department = deptEl.textContent.trim();
-        }
-        
-        jobs.push({
-          id,
-          title: title.substring(0, 200),
-          url: href,
-          location,
-          department,
-        });
-      }
+        return jobs;
+      });
+
+      console.log(`Found ${jobLinks.length} job links for Dayforce ${atsIdentifier}`);
+
+      // Visit each job link to get full description
+      const jobsWithDescriptions: JobData[] = [];
       
-      return jobs;
-    })()
-  `;
+      for (const jobLink of jobLinks) {
+        try {
+          await page.goto(jobLink.url, {
+            waitUntil: "networkidle2",
+            timeout: 20000,
+          });
 
-  const browserJobs = await scrapeJobsWithBrowser(
-    {
-      url,
-      waitSelector: 'a[href*="/jobs/"]',
-      extraWaitMs: 2000, // Dayforce needs extra time to load
-      extractScript,
-    },
-    browser
-  );
+          // Wait for job description to load
+          await page.waitForSelector(
+            '[class*="description"], [class*="Description"], .jobDescription, #jobDescription, main, [role="main"]',
+            { timeout: 10000 }
+          ).catch(() => {
+            // Description might be in different format
+          });
 
-  // Convert to JobData format
-  return browserJobs.map((job): JobData => ({
-    external_id: job.id,
-    title: job.title,
-    department: job.department || null,
-    team: null,
-    location: job.location || null,
-    location_type: job.locationType ? detectLocationType(job.location || "", "") : null,
-    description_html: null,
-    description_text: null,
-    commitment: normalizeCommitment(job.employmentType || "") || "full-time",
-    posted_date: job.postedDate ? new Date(job.postedDate) : null,
-    url: job.url || `https://jobs.dayforcehcm.com/en-US/${atsIdentifier}/CANDIDATEPORTAL/jobs/${job.id}`,
-  }));
+          // Extract full job details
+          const jobDetails = await page.evaluate((linkTitle, linkId) => {
+            // Extract description HTML - try multiple selectors
+            const descSelectors = [
+              '[class*="description"]',
+              '[class*="Description"]',
+              '.jobDescription',
+              '#jobDescription',
+              '[id*="description"]',
+              '[id*="Description"]',
+              'main [class*="content"]',
+              '[role="main"]',
+              'main',
+            ];
+
+            let descriptionHtml = '';
+            let descriptionText = '';
+
+            for (const selector of descSelectors) {
+              const descEl = document.querySelector(selector);
+              if (descEl) {
+                // Try to find the actual description content
+                const content = descEl.querySelector('[class*="description"], [class*="Description"], [class*="content"], [class*="Content"]') || descEl;
+                descriptionHtml = content.innerHTML || '';
+                descriptionText = content.textContent?.trim() || '';
+                if (descriptionHtml.length > 200 && descriptionText.length > 200) break;
+              }
+            }
+
+            // If no description found, try to get main content area
+            if (!descriptionHtml || descriptionHtml.length < 200) {
+              const mainEl = document.querySelector('main, [role="main"], [class*="main"], [class*="Main"]');
+              if (mainEl) {
+                // Remove navigation, header, footer, and other non-content elements
+                const toRemove = mainEl.querySelectorAll('nav, header, footer, [class*="nav"], [class*="Nav"], [class*="header"], [class*="Header"], [class*="footer"], [class*="Footer"], [class*="breadcrumb"], [class*="Breadcrumb"]');
+                toRemove.forEach(el => el.remove());
+                
+                // Try to find the job description section
+                const descSection = mainEl.querySelector('[class*="description"], [class*="Description"], [class*="content"], [class*="Content"], [class*="detail"], [class*="Detail"]') || mainEl;
+                descriptionHtml = descSection.innerHTML || '';
+                descriptionText = descSection.textContent?.trim() || '';
+              }
+            }
+
+            // Extract location
+            const locationSelectors = [
+              '[class*="location"]',
+              '[class*="Location"]',
+              '[data-location]',
+              '.jobLocation',
+              '[class*="address"]',
+            ];
+            let location = '';
+            for (const selector of locationSelectors) {
+              const locEl = document.querySelector(selector);
+              if (locEl) {
+                location = locEl.textContent?.trim() || '';
+                if (location) break;
+              }
+            }
+
+            // Extract department
+            const deptSelectors = [
+              '[class*="department"]',
+              '[class*="Department"]',
+              '[class*="category"]',
+              '[class*="Category"]',
+            ];
+            let department = '';
+            for (const selector of deptSelectors) {
+              const deptEl = document.querySelector(selector);
+              if (deptEl) {
+                department = deptEl.textContent?.trim() || '';
+                if (department) break;
+              }
+            }
+
+            // Extract posted date
+            const dateSelectors = [
+              '[class*="date"]',
+              '[class*="Date"]',
+              '[class*="posted"]',
+              '[class*="Posted"]',
+            ];
+            let postedDate = '';
+            for (const selector of dateSelectors) {
+              const dateEl = document.querySelector(selector);
+              if (dateEl) {
+                postedDate = dateEl.textContent?.trim() || '';
+                if (postedDate) break;
+              }
+            }
+
+            // Extract employment type
+            const typeSelectors = [
+              '[class*="type"]',
+              '[class*="Type"]',
+              '[class*="employment"]',
+              '[class*="Employment"]',
+              '[class*="work"]',
+              '[class*="Work"]',
+            ];
+            let employmentType = '';
+            for (const selector of typeSelectors) {
+              const typeEl = document.querySelector(selector);
+              if (typeEl) {
+                employmentType = typeEl.textContent?.trim() || '';
+                if (employmentType) break;
+              }
+            }
+
+            return {
+              id: linkId,
+              title: linkTitle,
+              url: window.location.href,
+              descriptionHtml,
+              descriptionText,
+              location,
+              department,
+              postedDate,
+              employmentType,
+            };
+          }, jobLink.title, jobLink.id);
+
+          // Only add if we got a description
+          if (jobDetails.descriptionHtml && jobDetails.descriptionHtml.length > 100) {
+            jobsWithDescriptions.push({
+              external_id: jobDetails.id,
+              title: jobDetails.title,
+              department: jobDetails.department || null,
+              team: null,
+              location: jobDetails.location || null,
+              location_type: jobDetails.location ? detectLocationType(jobDetails.location, jobDetails.descriptionText) : null,
+              description_html: jobDetails.descriptionHtml,
+              description_text: jobDetails.descriptionText,
+              commitment: normalizeCommitment(jobDetails.employmentType || "") || "full-time",
+              posted_date: jobDetails.postedDate ? (() => {
+                try {
+                  const date = new Date(jobDetails.postedDate);
+                  return isNaN(date.getTime()) ? null : date;
+                } catch {
+                  return null;
+                }
+              })() : null,
+              url: jobDetails.url,
+            });
+          } else {
+            // Still add the job even without description (better than nothing)
+            jobsWithDescriptions.push({
+              external_id: jobDetails.id,
+              title: jobDetails.title,
+              department: jobDetails.department || null,
+              team: null,
+              location: jobDetails.location || null,
+              location_type: jobDetails.location ? detectLocationType(jobDetails.location, "") : null,
+              description_html: jobDetails.descriptionHtml || null,
+              description_text: jobDetails.descriptionText || null,
+              commitment: normalizeCommitment(jobDetails.employmentType || "") || "full-time",
+              posted_date: jobDetails.postedDate ? (() => {
+                try {
+                  const date = new Date(jobDetails.postedDate);
+                  return isNaN(date.getTime()) ? null : date;
+                } catch {
+                  return null;
+                }
+              })() : null,
+              url: jobDetails.url,
+            });
+          }
+        } catch (error) {
+          console.error(`Error scraping job ${jobLink.url}:`, error);
+          // Continue with next job even if one fails
+        }
+      }
+
+      return jobsWithDescriptions;
+    } finally {
+      await page.close();
+    }
+  } finally {
+    if (shouldCloseBrowser && browserInstance) {
+      await browserInstance.close();
+    }
+  }
 }
 
 /**
@@ -582,13 +778,12 @@ export async function scrapeSuccessFactors(
 
         // Check for next page
         const nextPageInfo = await page.evaluate(() => {
-          // Look for Next button
+          // Look for Next button using valid CSS selectors
           const nextSelectors = [
             'a[title="Next Page"]',
             'a[title="Next"]',
             '.pagination-next',
             '[class*="pagination"] a[aria-label*="Next"]',
-            '[class*="pagination"] a:contains("Next")',
             'a[href*="page="]',
           ];
 
@@ -598,6 +793,18 @@ export async function scrapeSuccessFactors(
               const href = (nextEl as HTMLAnchorElement).href;
               return { hasNext: true, url: href };
             }
+          }
+
+          // Find "Next" button by text content (since :contains() is not valid CSS)
+          const nextByText = Array.from(document.querySelectorAll('a')).find(el => {
+            const text = el.innerText?.toLowerCase() || '';
+            const title = el.title?.toLowerCase() || '';
+            return (text.includes('next') || title.includes('next')) && 
+                   !el.classList.contains('disabled');
+          }) as HTMLAnchorElement | undefined;
+          
+          if (nextByText?.href) {
+            return { hasNext: true, url: nextByText.href };
           }
 
           // Try to find next page link by checking pagination
