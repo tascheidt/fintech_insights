@@ -372,7 +372,12 @@ export async function retryTask(taskId: string, fromStage?: TaskStage): Promise<
     throw new Error(`Task ${taskId} not found`);
   }
 
-  const jobType = (task.job_runs as { job_type: JobType }).job_type;
+  // Supabase joins return arrays, so we need to access the first element
+  const jobRuns = task.job_runs as { job_type: JobType }[] | null;
+  if (!jobRuns || jobRuns.length === 0) {
+    throw new Error(`Job run not found for task ${taskId}`);
+  }
+  const jobType = jobRuns[0].job_type;
 
   // Reset task status
   await supabase

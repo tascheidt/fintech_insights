@@ -274,7 +274,8 @@ async function JobHistoryTab({ companyId }: { companyId: string }) {
           </TableHeader>
           <TableBody>
             {(tasks ?? []).map((task: any) => {
-              const jobRun = task.job_runs;
+              // Supabase joins return arrays, so we need to access the first element
+              const jobRun = Array.isArray(task.job_runs) ? task.job_runs[0] : task.job_runs;
               return (
                 <TableRow key={task.id}>
                   <TableCell>
