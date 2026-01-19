@@ -13,6 +13,7 @@ const bodySchema = z.object({
     "dayforce",
     "workday",
     "smartrecruiters",
+    "successfactors",
     "bamboohr",
     "jazzhr",
     "recruitee",

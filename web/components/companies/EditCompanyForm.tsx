@@ -39,6 +39,7 @@ const SUPPORTED_ATS = [
   { value: "dayforce", label: "Dayforce" },
   { value: "workday", label: "Workday" },
   { value: "smartrecruiters", label: "SmartRecruiters" },
+  { value: "successfactors", label: "SuccessFactors" },
   { value: "bamboohr", label: "BambooHR" },
   { value: "jazzhr", label: "JazzHR" },
   { value: "recruitee", label: "Recruitee" },
