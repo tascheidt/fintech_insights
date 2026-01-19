@@ -20,9 +20,9 @@ interface AnalysisSettings {
 }
 
 interface Settings {
-  job_collection?: { value: JobSettings };
-  weekly_report?: { value: JobSettings };
-  analysis_settings?: { value: AnalysisSettings };
+  job_collection?: { value: JobSettings; description?: string };
+  weekly_report?: { value: JobSettings; description?: string };
+  analysis_settings?: { value: AnalysisSettings; description?: string };
 }
 
 interface JobScheduleSettingsProps {
