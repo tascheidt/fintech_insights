@@ -6,6 +6,9 @@ import type { TaskProgress, TaskStage } from "@/lib/jobs/types";
 import { Check, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Progress stage keys (excludes 'done' which is a TaskStage but not in TaskProgress)
+type ProgressStageKey = keyof TaskProgress;
+
 interface TaskProgressBarProps {
   progress: TaskProgress;
   currentStage?: TaskStage | null;
@@ -13,19 +16,19 @@ interface TaskProgressBarProps {
 }
 
 export function TaskProgressBar({ progress, currentStage, className }: TaskProgressBarProps) {
-  const stages: Array<{ key: TaskStage; label: string }> = [
+  const stages: Array<{ key: ProgressStageKey; label: string }> = [
     { key: 'scrape', label: 'Scrape' },
     { key: 'ingest', label: 'Ingest' },
     { key: 'analyze', label: 'Analyze' },
   ];
 
-  const getStageStatus = (stage: TaskStage) => {
+  const getStageStatus = (stage: ProgressStageKey) => {
     const stageProgress = progress[stage];
     if (!stageProgress) return 'pending';
     return stageProgress.status;
   };
 
-  const getStageProgress = (stage: TaskStage) => {
+  const getStageProgress = (stage: ProgressStageKey) => {
     const stageProgress = progress[stage];
     if (!stageProgress) return 0;
     
@@ -47,7 +50,7 @@ export function TaskProgressBar({ progress, currentStage, className }: TaskProgr
     return 0;
   };
 
-  const getStageDetail = (stage: TaskStage) => {
+  const getStageDetail = (stage: ProgressStageKey) => {
     const stageProgress = progress[stage];
     if (!stageProgress || stageProgress.status !== 'running') return null;
 
