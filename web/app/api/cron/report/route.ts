@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { format, subDays } from "date-fns";
+import {
+  generateCompanyInsight,
+  getNextCompanyForInsight,
+} from "@/lib/analysis/company-insights";
 
-export const maxDuration = 60;
+export const maxDuration = 300; // Increased to handle company insights generation
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
@@ -26,6 +30,38 @@ export async function GET(req: NextRequest) {
   const cronLogId = cronLog?.id;
 
   try {
+    // First, generate company insights (process one company per week)
+    let companyInsightResult = null;
+    try {
+      const company = await getNextCompanyForInsight();
+      if (company) {
+        console.log(`Generating insight for ${company.name}...`);
+        const insight = await generateCompanyInsight(company.id, company.name, {
+          periodDays: 90,
+          researchDepth: "deep",
+          forceRegenerate: false,
+        });
+        companyInsightResult = {
+          success: true,
+          companyId: company.id,
+          companyName: company.name,
+          insightId: insight.id,
+        };
+      } else {
+        companyInsightResult = {
+          success: true,
+          message: "All companies have recent insights",
+        };
+      }
+    } catch (error) {
+      console.error("Error generating company insight:", error);
+      companyInsightResult = {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+      // Continue with report generation even if insight generation fails
+    }
+
     const since = subDays(new Date(), 7).toISOString();
 
     const [
@@ -108,12 +144,17 @@ export async function GET(req: NextRequest) {
             insightsCount: (insights ?? []).length,
             emailSent,
             recipient: emailSent ? to : null,
+            companyInsight: companyInsightResult,
           },
         })
         .eq("id", cronLogId);
     }
 
-    return NextResponse.json({ success: true, sent: emailSent });
+    return NextResponse.json({ 
+      success: true, 
+      sent: emailSent,
+      companyInsight: companyInsightResult,
+    });
   } catch (error) {
     // Update cron log with error
     if (cronLogId) {

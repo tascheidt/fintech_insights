@@ -1,15 +1,14 @@
 {
   "crons": [
     { "path": "/api/cron/collect", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/report", "schedule": "0 8 * * 1" },
-    { "path": "/api/cron/company-insights", "schedule": "0 9 * * 1" }
+    { "path": "/api/cron/report", "schedule": "0 8 * * 1" }
   ],
   "functions": {
     "app/api/cron/collect/route.ts": {
       "maxDuration": 300,
       "memory": 1024
     },
-    "app/api/cron/company-insights/route.ts": {
+    "app/api/cron/report/route.ts": {
       "maxDuration": 300,
       "memory": 1024
     },
