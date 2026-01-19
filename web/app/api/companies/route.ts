@@ -82,7 +82,6 @@ export async function POST(req: Request) {
           ats_identifier: parsed.data.atsIdentifier,
           careers_url: parsed.data.careersUrl || null,
           is_active: true,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", existingCompany.id)
         .select("id, slug")

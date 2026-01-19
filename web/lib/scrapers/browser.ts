@@ -19,7 +19,9 @@ async function loadBrowserDependencies() {
     puppeteer = await import("puppeteer-core");
   }
   if (!chromium) {
-    chromium = await import("@sparticuz/chromium");
+    const chromiumModule = await import("@sparticuz/chromium");
+    // Handle both ESM default export and CommonJS module patterns
+    chromium = chromiumModule.default || chromiumModule;
   }
   return { puppeteer, chromium };
 }
