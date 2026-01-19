@@ -3,6 +3,7 @@ import { startOfWeek, subDays } from "date-fns";
 import { StatsCards } from "@/components/dashboard/StatsCards";
 import { RecentInsights } from "@/components/dashboard/RecentInsights";
 import { HiringChart } from "@/components/dashboard/HiringChart";
+import { RecentCompanyInsights } from "@/components/dashboard/RecentCompanyInsights";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -19,6 +20,7 @@ export default async function DashboardPage() {
     { count: thisWeek },
     { data: recentInsightsRaw },
     { data: hiringRaw },
+    { data: companyInsightsRaw },
   ] = await Promise.all([
     supabase.from("job_postings").select("*", { count: "exact", head: true }).eq("is_active", true),
     supabase.from("job_postings").select("*", { count: "exact", head: true }).gte("first_seen_date", startOfToday.toISOString()),
@@ -26,6 +28,7 @@ export default async function DashboardPage() {
     supabase.from("job_postings").select("*", { count: "exact", head: true }).gte("first_seen_date", startOfWeekDate.toISOString()),
     supabase.from("strategic_insights").select("id, category, insight_summary, job_postings(title, companies(name))").order("run_date", { ascending: false }).limit(5),
     supabase.from("job_postings").select("companies(name)").eq("is_active", true),
+    supabase.from("company_insights").select("id, generated_at, executive_summary, confidence, companies(name, slug)").order("generated_at", { ascending: false }).limit(5),
   ]);
 
   const recentInsights = (recentInsightsRaw ?? []).map((i: unknown) => {
@@ -50,6 +53,31 @@ export default async function DashboardPage() {
   }
   const hiringData = Object.entries(byCompany).map(([name, count]) => ({ name, count }));
 
+  // Process company insights
+  const companyInsights = (companyInsightsRaw ?? []).map((i: unknown) => {
+    const x = i as {
+      id: string;
+      generated_at: string;
+      executive_summary: string;
+      confidence: string;
+      companies?: unknown;
+    };
+    const co = (Array.isArray(x.companies) ? x.companies[0] : x.companies) as {
+      name?: string;
+      slug?: string;
+    } | null | undefined;
+    return {
+      id: x.id,
+      generated_at: x.generated_at,
+      executive_summary: x.executive_summary,
+      confidence: x.confidence,
+      company: {
+        name: co?.name ?? "Unknown",
+        slug: co?.slug ?? "",
+      },
+    };
+  });
+
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -62,6 +90,9 @@ export default async function DashboardPage() {
       <div className="grid gap-8 md:grid-cols-2">
         <RecentInsights insights={recentInsights} />
         <HiringChart data={hiringData} />
+      </div>
+      <div className="grid gap-8 md:grid-cols-2">
+        <RecentCompanyInsights insights={companyInsights} />
       </div>
     </div>
   );

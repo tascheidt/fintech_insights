@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
+import { ProcessButton } from "@/components/companies/ProcessButton";
+import { JobStatusBadge } from "@/components/companies/JobStatusBadge";
 
 export default async function CompaniesPage() {
   const supabase = await createClient();
@@ -43,7 +45,7 @@ export default async function CompaniesPage() {
                 <TableHead>ATS</TableHead>
                 <TableHead>Active Jobs</TableHead>
                 <TableHead>Last Collected</TableHead>
-                <TableHead></TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -57,7 +59,11 @@ export default async function CompaniesPage() {
                   <TableCell>{countByCompany[c.id] ?? 0}</TableCell>
                   <TableCell>{c.last_collected_at ? format(new Date(c.last_collected_at), "MMM d, yyyy") : "—"}</TableCell>
                   <TableCell>
-                    <Link href={`/companies/${c.slug}`} className="text-primary text-sm hover:underline">View</Link>
+                    <div className="flex items-center gap-3">
+                      <Link href={`/companies/${c.slug}`} className="text-primary text-sm hover:underline">View</Link>
+                      {canEdit && <ProcessButton companyId={c.id} companyName={c.name} />}
+                      <JobStatusBadge companyId={c.id} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

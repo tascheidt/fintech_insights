@@ -12,20 +12,34 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createAdminClient();
-  const since = subDays(new Date(), 7).toISOString();
+  
+  // Create cron log entry
+  const { data: cronLog } = await supabase
+    .from("cron_logs")
+    .insert({
+      job_type: "report",
+      status: "running",
+      started_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  const cronLogId = cronLog?.id;
 
-  const [
-    { count: activeJobs },
-    { count: newJobs },
-    { data: insights },
-  ] = await Promise.all([
-    supabase.from("job_postings").select("*", { count: "exact", head: true }).eq("is_active", true),
-    supabase.from("job_postings").select("*", { count: "exact", head: true }).gte("first_seen_date", since),
-    supabase.from("strategic_insights").select("id, category, insight_summary, run_date, job_postings!job_posting_id(title, companies(name))").gte("run_date", since).order("run_date", { ascending: false }).limit(10),
-  ]);
+  try {
+    const since = subDays(new Date(), 7).toISOString();
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://your-app.vercel.app";
-  const html = `<!DOCTYPE html>
+    const [
+      { count: activeJobs },
+      { count: newJobs },
+      { data: insights },
+    ] = await Promise.all([
+      supabase.from("job_postings").select("*", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("job_postings").select("*", { count: "exact", head: true }).gte("first_seen_date", since),
+      supabase.from("strategic_insights").select("id, category, insight_summary, run_date, job_postings!job_posting_id(title, companies(name))").gte("run_date", since).order("run_date", { ascending: false }).limit(10),
+    ]);
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://your-app.vercel.app";
+    const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Fintech Intelligence Report</title></head>
 <body style="font-family:sans-serif;line-height:1.6;color:#333;padding:20px;max-width:600px;margin:0 auto">
   <h1 style="color:#1a1a2e">Fintech Competitive Intelligence Report</h1>
@@ -52,20 +66,66 @@ export async function GET(req: NextRequest) {
   <p style="margin-top:24px"><a href="${appUrl}" style="color:#4a69bd">View full dashboard →</a></p>
 </body></html>`;
 
-  const to = process.env.REPORT_EMAIL;
-  const from = process.env.RESEND_FROM || "onboarding@resend.dev";
-  const resendKey = process.env.RESEND_API_KEY;
+    const to = process.env.REPORT_EMAIL;
+    const from = process.env.RESEND_FROM || "onboarding@resend.dev";
+    const resendKey = process.env.RESEND_API_KEY;
 
-  if (resendKey && to) {
-    try {
-      const resend = new Resend(resendKey);
-      await resend.emails.send({ from, to, subject: `Fintech Intelligence Report – ${format(new Date(), "MMM d, yyyy")}`, html });
-      return NextResponse.json({ success: true, sent: true });
-    } catch (e) {
-      console.error("Resend error:", e);
-      return NextResponse.json({ success: false, error: "Failed to send email" }, { status: 500 });
+    let emailSent = false;
+    if (resendKey && to) {
+      try {
+        const resend = new Resend(resendKey);
+        await resend.emails.send({ from, to, subject: `Fintech Intelligence Report – ${format(new Date(), "MMM d, yyyy")}`, html });
+        emailSent = true;
+      } catch (e) {
+        console.error("Resend error:", e);
+        // Update cron log with error
+        if (cronLogId) {
+          await supabase
+            .from("cron_logs")
+            .update({
+              status: "error",
+              completed_at: new Date().toISOString(),
+              error_message: e instanceof Error ? e.message : "Failed to send email",
+              details: { activeJobs, newJobs, insightsCount: (insights ?? []).length },
+            })
+            .eq("id", cronLogId);
+        }
+        return NextResponse.json({ success: false, error: "Failed to send email" }, { status: 500 });
+      }
     }
-  }
 
-  return NextResponse.json({ success: true, sent: false });
+    // Update cron log with success
+    if (cronLogId) {
+      await supabase
+        .from("cron_logs")
+        .update({
+          status: "success",
+          completed_at: new Date().toISOString(),
+          insights_generated: (insights ?? []).length,
+          details: { 
+            activeJobs, 
+            newJobs, 
+            insightsCount: (insights ?? []).length,
+            emailSent,
+            recipient: emailSent ? to : null,
+          },
+        })
+        .eq("id", cronLogId);
+    }
+
+    return NextResponse.json({ success: true, sent: emailSent });
+  } catch (error) {
+    // Update cron log with error
+    if (cronLogId) {
+      await supabase
+        .from("cron_logs")
+        .update({
+          status: "error",
+          completed_at: new Date().toISOString(),
+          error_message: error instanceof Error ? error.message : "Unknown error",
+        })
+        .eq("id", cronLogId);
+    }
+    throw error;
+  }
 }

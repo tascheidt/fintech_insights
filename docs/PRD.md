@@ -121,7 +121,7 @@ A comprehensive competitive intelligence platform that automatically tracks comp
 
 **Status:** ✅ Complete
 
-- **AI Provider**: Google Gemini (gemini-2.0-flash)
+- **AI Provider**: Google Gemini (Gemini 3 Flash / Pro)
 - **Analysis Categories**:
   - `expansion` - Geographic/market expansion signals
   - `new-product` - Product development indicators

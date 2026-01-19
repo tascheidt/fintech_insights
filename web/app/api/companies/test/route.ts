@@ -3,7 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchJobs } from "@/lib/scrapers";
 import { z } from "zod";
 
-const bodySchema = z.object({ atsType: z.string(), atsIdentifier: z.string() });
+const bodySchema = z.object({ 
+  atsType: z.string(), 
+  atsIdentifier: z.string(),
+  careersUrl: z.string().optional(),
+});
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -20,7 +24,11 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "atsType and atsIdentifier required" }, { status: 400 });
 
   try {
-    const jobs = await fetchJobs(parsed.data.atsType, parsed.data.atsIdentifier);
+    const jobs = await fetchJobs(
+      parsed.data.atsType, 
+      parsed.data.atsIdentifier,
+      parsed.data.careersUrl
+    );
     return NextResponse.json({ success: true, jobCount: jobs.length });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";

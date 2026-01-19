@@ -268,3 +268,271 @@ export function formatHistoricalContextForPrompt(context: HistoricalContext): st
 
   return text;
 }
+
+// ============================================================================
+// Extended Context for Company-Level Insights
+// ============================================================================
+
+import {
+  type FunctionStats,
+  type GroupStats,
+  type RoleCategory,
+  categorizeJobs,
+  getGroupStats,
+  getCategoryLabel,
+} from "./function-categories";
+
+export { type FunctionStats, type GroupStats, type RoleCategory };
+
+export interface FunctionTrend {
+  category: RoleCategory;
+  label: string;
+  group: string;
+  trend: "increasing" | "decreasing" | "stable" | "new";
+  currentCount: number;
+  previousCount: number;
+  description: string;
+}
+
+export interface ExtendedHistoricalContext extends HistoricalContext {
+  functionBreakdown: FunctionStats[];
+  groupBreakdown: GroupStats[];
+  functionTrends: FunctionTrend[];
+  periodStart: Date;
+  periodEnd: Date;
+}
+
+/**
+ * Build extended historical context with function categorization
+ * This is used for company-level strategic insights.
+ */
+export async function buildExtendedHistoricalContext(
+  companyId: string,
+  days: number = 90
+): Promise<ExtendedHistoricalContext> {
+  const supabase = createAdminClient();
+  const now = new Date();
+  const periodEnd = now;
+  const periodStart = new Date();
+  periodStart.setDate(periodStart.getDate() - days);
+
+  // Also calculate previous period for trend comparison
+  const previousPeriodStart = new Date(periodStart);
+  previousPeriodStart.setDate(previousPeriodStart.getDate() - days);
+
+  // Fetch current period jobs
+  const { data: currentJobs } = await supabase
+    .from("job_postings")
+    .select("id, title, department, first_seen_date, is_active")
+    .eq("company_id", companyId)
+    .gte("first_seen_date", periodStart.toISOString())
+    .order("first_seen_date", { ascending: false });
+
+  // Fetch previous period jobs for trend comparison
+  const { data: previousJobs } = await supabase
+    .from("job_postings")
+    .select("id, title, department, first_seen_date, is_active")
+    .eq("company_id", companyId)
+    .gte("first_seen_date", previousPeriodStart.toISOString())
+    .lt("first_seen_date", periodStart.toISOString())
+    .order("first_seen_date", { ascending: false });
+
+  const jobs = currentJobs || [];
+  const prevJobs = previousJobs || [];
+
+  if (jobs.length === 0) {
+    return {
+      summary: `No historical hiring data available for the past ${days} days.`,
+      hiringTrends: [],
+      recentExecutiveHires: [],
+      departmentBreakdown: [],
+      totalJobsInPeriod: 0,
+      functionBreakdown: [],
+      groupBreakdown: [],
+      functionTrends: [],
+      periodStart,
+      periodEnd,
+    };
+  }
+
+  // Build base context using existing functions
+  const trends = detectHiringTrends(jobs, days);
+  const executives = getRecentExecutiveHires(jobs);
+  const departments = getDepartmentBreakdown(jobs);
+
+  // Add function categorization
+  const functionBreakdown = categorizeJobs(jobs);
+  const groupBreakdown = getGroupStats(functionBreakdown);
+
+  // Calculate function trends vs previous period
+  const previousFunctionBreakdown = categorizeJobs(prevJobs);
+  const functionTrends = calculateFunctionTrends(functionBreakdown, previousFunctionBreakdown, days);
+
+  // Build enhanced summary
+  const summary = buildExtendedSummaryText(jobs.length, trends, executives, departments, functionBreakdown, days);
+
+  return {
+    summary,
+    hiringTrends: trends,
+    recentExecutiveHires: executives,
+    departmentBreakdown: departments,
+    totalJobsInPeriod: jobs.length,
+    functionBreakdown,
+    groupBreakdown,
+    functionTrends,
+    periodStart,
+    periodEnd,
+  };
+}
+
+/**
+ * Calculate function trends by comparing current vs previous period
+ */
+function calculateFunctionTrends(
+  current: FunctionStats[],
+  previous: FunctionStats[],
+  days: number
+): FunctionTrend[] {
+  const previousMap = new Map(previous.map((f) => [f.category, f.count]));
+  const trends: FunctionTrend[] = [];
+
+  for (const func of current) {
+    const prevCount = previousMap.get(func.category) || 0;
+    const currentCount = func.count;
+
+    let trend: FunctionTrend["trend"];
+    let description: string;
+
+    if (prevCount === 0 && currentCount > 0) {
+      trend = "new";
+      description = `New function with ${currentCount} posting(s)`;
+    } else if (currentCount > prevCount * 1.5) {
+      trend = "increasing";
+      description = `Growing: ${currentCount} vs ${prevCount} in previous ${days} days (+${Math.round(((currentCount - prevCount) / Math.max(prevCount, 1)) * 100)}%)`;
+    } else if (currentCount < prevCount * 0.5) {
+      trend = "decreasing";
+      description = `Declining: ${currentCount} vs ${prevCount} in previous ${days} days (${Math.round(((currentCount - prevCount) / Math.max(prevCount, 1)) * 100)}%)`;
+    } else {
+      trend = "stable";
+      description = `Stable: ${currentCount} postings (was ${prevCount})`;
+    }
+
+    trends.push({
+      category: func.category,
+      label: func.label,
+      group: func.group,
+      trend,
+      currentCount,
+      previousCount: prevCount,
+      description,
+    });
+  }
+
+  // Also check for functions that existed in previous but not in current (declining to zero)
+  for (const prev of previous) {
+    if (!current.find((c) => c.category === prev.category)) {
+      trends.push({
+        category: prev.category,
+        label: getCategoryLabel(prev.category),
+        group: prev.group,
+        trend: "decreasing",
+        currentCount: 0,
+        previousCount: prev.count,
+        description: `Eliminated: was ${prev.count} posting(s), now 0`,
+      });
+    }
+  }
+
+  return trends.sort((a, b) => b.currentCount - a.currentCount);
+}
+
+/**
+ * Build extended summary text including function analysis
+ */
+function buildExtendedSummaryText(
+  totalJobs: number,
+  trends: HiringTrend[],
+  executives: ExecutiveHire[],
+  departments: DepartmentStats[],
+  functions: FunctionStats[],
+  days: number
+): string {
+  const parts: string[] = [];
+
+  parts.push(`Over the past ${days} days, ${totalJobs} job posting(s) have been tracked.`);
+
+  // Top functions by category
+  if (functions.length > 0) {
+    const topFunctions = functions.slice(0, 3);
+    parts.push(
+      `Top functions: ${topFunctions.map((f) => `${f.label} (${f.count}, ${f.percentage}%)`).join(", ")}.`
+    );
+  }
+
+  // Department info
+  if (departments.length > 0) {
+    const topDepts = departments.slice(0, 3);
+    parts.push(
+      `Top departments: ${topDepts.map((d) => `${d.department || "Unspecified"} (${d.count})`).join(", ")}.`
+    );
+  }
+
+  // Growing areas
+  const increasing = trends.filter((t) => t.trend === "increasing");
+  if (increasing.length > 0) {
+    parts.push(`Growing areas: ${increasing.map((t) => t.department || "Unspecified").join(", ")}.`);
+  }
+
+  // Executives
+  if (executives.length > 0) {
+    parts.push(
+      `Recent executive/leadership hires: ${executives.slice(0, 5).map((e) => e.title).join(", ")}.`
+    );
+  }
+
+  return parts.join(" ");
+}
+
+/**
+ * Format extended context for company insight LLM prompt
+ */
+export function formatExtendedContextForPrompt(context: ExtendedHistoricalContext): string {
+  let text = `## Company Hiring Analysis (${context.periodStart.toLocaleDateString()} - ${context.periodEnd.toLocaleDateString()})\n\n`;
+  text += `${context.summary}\n\n`;
+
+  // Function breakdown by group
+  if (context.groupBreakdown.length > 0) {
+    text += `### Hiring by Function Group:\n`;
+    for (const group of context.groupBreakdown) {
+      text += `- **${group.group}**: ${group.count} postings (${group.percentage}%)\n`;
+      for (const cat of group.categories.slice(0, 3)) {
+        text += `  - ${cat.label}: ${cat.count}\n`;
+      }
+    }
+    text += `\n`;
+  }
+
+  // Function trends
+  const significantTrends = context.functionTrends.filter(
+    (t) => t.trend === "increasing" || t.trend === "new" || t.trend === "decreasing"
+  );
+  if (significantTrends.length > 0) {
+    text += `### Significant Hiring Trends:\n`;
+    for (const trend of significantTrends.slice(0, 10)) {
+      const emoji = trend.trend === "increasing" ? "📈" : trend.trend === "new" ? "🆕" : "📉";
+      text += `- ${emoji} ${trend.label}: ${trend.description}\n`;
+    }
+    text += `\n`;
+  }
+
+  // Executive hires
+  if (context.recentExecutiveHires.length > 0) {
+    text += `### Recent Executive/Leadership Hires:\n`;
+    for (const exec of context.recentExecutiveHires.slice(0, 10)) {
+      text += `- ${exec.description} (posted ${new Date(exec.firstSeenDate).toLocaleDateString()})\n`;
+    }
+    text += `\n`;
+  }
+
+  return text;
+}

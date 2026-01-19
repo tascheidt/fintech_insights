@@ -1,14 +1,28 @@
 import type { JobData } from "./types";
+import type { Browser } from "puppeteer-core";
 import { fetchLeverJobs } from "./lever";
 import { fetchGreenhouseJobs } from "./greenhouse";
 import { fetchWorkableJobs } from "./workable";
+import { fetchAshbyJobs } from "./ashby";
+import { fetchDayforceJobs } from "./dayforce";
 
 export type { JobData } from "./types";
 export { jobToRow } from "./types";
+export { detectATSFromUrl, SUPPORTED_ATS, type ATSType, type ATSDetectionResult } from "./detect-ats";
+export { scrapeJobsWithBrowser, scrapeGenericJobBoard } from "./browser";
 
+/**
+ * Fetch jobs from a company's ATS
+ * @param atsType - The ATS platform type
+ * @param atsIdentifier - The company's identifier on the ATS
+ * @param careersUrl - Optional careers URL for browser-based scraping fallback
+ * @param browser - Optional browser instance (for dependency injection in GitHub Actions)
+ */
 export async function fetchJobs(
   atsType: string,
-  atsIdentifier: string
+  atsIdentifier: string,
+  careersUrl?: string,
+  browser?: Browser
 ): Promise<JobData[]> {
   switch (atsType.toLowerCase()) {
     case "lever":
@@ -17,10 +31,40 @@ export async function fetchJobs(
       return fetchGreenhouseJobs(atsIdentifier);
     case "workable":
       return fetchWorkableJobs(atsIdentifier);
+    case "ashby":
+      return fetchAshbyJobs(atsIdentifier);
+    case "dayforce":
+      return fetchDayforceJobs(atsIdentifier, browser);
+    
+    // Browser-based scraping for platforms without APIs
     case "workday":
-    case "custom":
-      throw new Error(`${atsType} scraper not implemented`);
+    case "smartrecruiters":
+    case "bamboohr":
+    case "jazzhr":
+    case "recruitee":
+    case "custom": {
+      if (!careersUrl) {
+        throw new Error(`${atsType} requires a careers URL for browser-based scraping`);
+      }
+      const { scrapeGenericJobBoard } = await import("./browser");
+      return scrapeGenericJobBoard(careersUrl, atsIdentifier, browser);
+    }
+    
     default:
       throw new Error(`Unknown ATS type: ${atsType}`);
+  }
+}
+
+/**
+ * Check if browser scraping is available
+ * (Puppeteer may not work in all environments)
+ */
+export async function isBrowserScrapingAvailable(): Promise<boolean> {
+  try {
+    await import("puppeteer-core");
+    await import("@sparticuz/chromium");
+    return true;
+  } catch {
+    return false;
   }
 }

@@ -1,0 +1,73 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { detectATSFromUrl, fetchJobs, SUPPORTED_ATS } from "@/lib/scrapers";
+
+export async function POST(req: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: { url?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const { url } = body;
+  if (!url || typeof url !== "string") {
+    return NextResponse.json({ error: "URL is required" }, { status: 400 });
+  }
+
+  // Detect ATS from URL
+  const detection = detectATSFromUrl(url);
+
+  if (!detection.detected || !detection.atsType || !detection.atsIdentifier) {
+    return NextResponse.json({
+      detected: false,
+      message: "Could not automatically detect ATS platform from this URL. Please select manually.",
+      supportedPlatforms: SUPPORTED_ATS.filter(a => a.implemented).map(a => a.label),
+    });
+  }
+
+  // Check if the ATS type is implemented
+  const atsInfo = SUPPORTED_ATS.find(a => a.value === detection.atsType);
+  if (!atsInfo?.implemented) {
+    return NextResponse.json({
+      detected: true,
+      atsType: detection.atsType,
+      atsIdentifier: detection.atsIdentifier,
+      normalizedUrl: detection.normalizedUrl,
+      implemented: false,
+      message: `Detected ${atsInfo?.label ?? detection.atsType} but scraper is not yet implemented. You can still add the company for tracking.`,
+    });
+  }
+
+  // Try to verify by fetching jobs (pass the URL for browser-based scraping)
+  let jobCount = 0;
+  let verified = false;
+  let verifyError: string | null = null;
+
+  try {
+    const jobs = await fetchJobs(detection.atsType, detection.atsIdentifier, detection.normalizedUrl);
+    jobCount = jobs.length;
+    verified = true;
+  } catch (e) {
+    verifyError = e instanceof Error ? e.message : "Failed to verify connection";
+  }
+
+  return NextResponse.json({
+    detected: true,
+    atsType: detection.atsType,
+    atsIdentifier: detection.atsIdentifier,
+    atsLabel: atsInfo.label,
+    normalizedUrl: detection.normalizedUrl,
+    implemented: true,
+    verified,
+    jobCount: verified ? jobCount : undefined,
+    verifyError: verifyError,
+    confidence: detection.confidence,
+  });
+}
