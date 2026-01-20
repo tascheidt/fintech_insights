@@ -4,7 +4,7 @@
  * Features:
  * - Personalized welcome message
  * - Companies overview with card/table toggle
- * - Weekly digests with TLDR-style headlines
+ * - Strategic highlights from company-level insights
  * - Quick stats overview
  */
 
@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { startOfWeek, subDays } from "date-fns";
 import { WelcomeMessage } from "@/components/dashboard/WelcomeMessage";
 import { CompaniesOverview, CompanyOverviewData } from "@/components/dashboard/CompaniesOverview";
-import { WeeklyDigestsList, DigestInsight } from "@/components/dashboard/WeeklyDigestsList";
+import { StrategicHighlights, StrategicHighlight } from "@/components/dashboard/StrategicHighlights";
 import { StatsCards } from "@/components/dashboard/StatsCards";
 
 export default async function DashboardPage() {
@@ -36,6 +36,7 @@ export default async function DashboardPage() {
   const now = new Date();
   const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const sevenDaysAgo = subDays(now, 7).toISOString();
+  const fourteenDaysAgo = subDays(now, 14).toISOString();
   const startOfWeekDate = startOfWeek(now, { weekStartsOn: 1 });
 
   // Fetch all data in parallel
@@ -45,7 +46,7 @@ export default async function DashboardPage() {
     { count: insightsCount },
     { count: thisWeek },
     { data: companiesRaw },
-    { data: weeklyDigestsRaw },
+    { data: companyInsightsRaw },
   ] = await Promise.all([
     // Active jobs count
     supabase
@@ -59,9 +60,9 @@ export default async function DashboardPage() {
       .select("*, companies!inner(is_active)", { count: "exact", head: true })
       .gte("first_seen_date", startOfToday.toISOString())
       .eq("companies.is_active", true),
-    // Digests count (last 7 days)
+    // Company insights count (last 7 days) - changed from weekly_digests
     supabase
-      .from("weekly_digests")
+      .from("company_insights")
       .select("*", { count: "exact", head: true })
       .gte("generated_at", sevenDaysAgo),
     // This week new jobs
@@ -84,21 +85,26 @@ export default async function DashboardPage() {
       `)
       .eq("is_active", true)
       .order("name"),
-    // Recent weekly digest company summaries (with TLDR headlines!)
+    // Strategic company insights (last 14 days) - NEW: from company_insights table
+    // Ordered by significance_score for dashboard highlights
     supabase
-      .from("weekly_digest_companies")
+      .from("company_insights")
       .select(`
         id,
+        company_id,
+        generated_at,
         headline,
-        body,
-        new_job_count,
-        created_at,
-        weekly_digests!inner(id, generated_at),
+        key_signal,
+        significance_score,
+        confidence,
+        executive_summary,
         companies!inner(id, name, slug, is_active)
       `)
       .eq("companies.is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(15),
+      .gte("generated_at", fourteenDaysAgo)
+      .order("significance_score", { ascending: false, nullsFirst: false })
+      .order("generated_at", { ascending: false })
+      .limit(10),
   ]);
 
   // Types for Supabase data
@@ -150,36 +156,39 @@ export default async function DashboardPage() {
   // Sort companies by job count descending
   companies.sort((a, b) => b.activeJobCount - a.activeJobCount);
 
-  // Types for weekly digest data
-  interface DigestCompanyRow {
+  // Count of tracked companies (for highlights header)
+  const trackedCompanyCount = companies.length;
+
+  // Types for company insight data
+  interface CompanyInsightRow {
     id: string;
-    headline: string;
-    body: string;
-    new_job_count: number;
-    created_at: string;
-    weekly_digests?: { id: string; generated_at: string }[] | { id: string; generated_at: string };
+    company_id: string;
+    generated_at: string;
+    headline: string | null;
+    key_signal: string | null;
+    significance_score: number | null;
+    confidence: "high" | "medium" | "low";
+    executive_summary: string;
     companies?: { id: string; name: string; slug: string }[] | { id: string; name: string; slug: string };
   }
 
-  // Process weekly digest data - now with TLDR headlines!
-  const digestInsights: DigestInsight[] = (weeklyDigestsRaw as DigestCompanyRow[] ?? []).map((item) => {
+  // Process company insights for strategic highlights
+  const strategicHighlights: StrategicHighlight[] = (companyInsightsRaw as CompanyInsightRow[] ?? []).map((item) => {
     const company = Array.isArray(item.companies) 
       ? item.companies[0] 
       : item.companies;
-    const digest = Array.isArray(item.weekly_digests)
-      ? item.weekly_digests[0]
-      : item.weekly_digests;
     
     return {
       id: item.id,
+      companyId: item.company_id,
       companyName: company?.name ?? "Unknown",
       companySlug: company?.slug ?? "",
-      generatedAt: digest?.generated_at ?? item.created_at,
-      // TLDR-style fields from weekly_digest_companies
+      generatedAt: item.generated_at,
       headline: item.headline,
-      whatItMeans: item.body,
-      executiveSummary: item.body, // Fallback for older display logic
-      confidence: "high" as const, // Digests don't have confidence, default to high
+      keySignal: item.key_signal,
+      significanceScore: item.significance_score,
+      confidence: item.confidence,
+      executiveSummary: item.executive_summary,
     };
   });
 
@@ -206,9 +215,12 @@ export default async function DashboardPage() {
           <CompaniesOverview companies={companies} />
         </div>
 
-        {/* Weekly Digests - Takes 1 column */}
+        {/* Strategic Highlights - Takes 1 column */}
         <div className="lg:col-span-1">
-          <WeeklyDigestsList insights={digestInsights} />
+          <StrategicHighlights 
+            insights={strategicHighlights} 
+            trackedCompanyCount={trackedCompanyCount}
+          />
         </div>
       </div>
     </div>

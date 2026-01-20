@@ -50,6 +50,11 @@ export interface CompanyInsight {
   strategicHypothesis: string;
   confidence: "high" | "medium" | "low";
 
+  // Display fields for dashboard highlights
+  headline: string | null;           // Punchy 5-8 word headline with emoji
+  significanceScore: number | null;  // 1-10 ranking for dashboard sorting
+  keySignal: string | null;          // One-liner explaining strategic signal
+
   // Function analysis
   coreFunctions: FunctionStats[];
   functionChanges: FunctionChange[];
@@ -209,6 +214,11 @@ export async function generateCompanyInsight(
     strategic_hypothesis: generatedInsight.strategicHypothesis,
     confidence: generatedInsight.confidence,
 
+    // Display fields for dashboard highlights
+    headline: generatedInsight.headline,
+    significance_score: generatedInsight.significanceScore,
+    key_signal: generatedInsight.keySignal,
+
     core_functions: context.functionBreakdown,
     function_changes: functionChanges,
 
@@ -258,6 +268,10 @@ export async function generateCompanyInsight(
     executiveSummary: generatedInsight.executiveSummary,
     strategicHypothesis: generatedInsight.strategicHypothesis,
     confidence: generatedInsight.confidence,
+    // Display fields for dashboard highlights
+    headline: generatedInsight.headline,
+    significanceScore: generatedInsight.significanceScore,
+    keySignal: generatedInsight.keySignal,
     coreFunctions: context.functionBreakdown,
     functionChanges,
     hiringTrends: insightData.hiring_trends,
@@ -291,6 +305,10 @@ interface GeneratedInsightContent {
   discrepancies: Discrepancy[];
   strategicImplications: string;
   modelReasoning: string;
+  // Display fields for dashboard highlights
+  headline: string;          // Punchy 5-8 word headline with emoji
+  significanceScore: number; // 1-10 ranking
+  keySignal: string;         // One-liner explaining strategic signal
 }
 
 const COMPANY_INSIGHT_PROMPT = `You are an elite competitive intelligence analyst specializing in fintech. Analyze this company's hiring patterns and compare them to their publicly stated strategy.
@@ -301,33 +319,57 @@ const COMPANY_INSIGHT_PROMPT = `You are an elite competitive intelligence analys
 
 ## Analysis Tasks
 
-1. **Executive Summary** (2-3 paragraphs):
+1. **Headline** (CRITICAL for dashboard display):
+   - Write a punchy 5-8 word headline with ONE emoji at the start
+   - Examples: "🎯 Koho doubles down on SMB", "🚀 Neo's engineering surge begins", "💡 Wealthsimple bets big on AI"
+   - Be specific about the strategic move, not generic "Company is hiring"
+
+2. **Key Signal** (one-liner):
+   - A brief explanation of what the headline means strategically
+   - Example: "Pivoting from consumer to small business banking"
+
+3. **Significance Score** (1-10):
+   - How noteworthy is this insight for industry observers?
+   - Scoring guide:
+     * Executive/leadership hires: +3
+     * New strategic direction detected: +3
+     * >50% hiring increase vs previous period: +2
+     * New technology/platform bet: +2
+     * Routine hiring with no major shifts: baseline 3-4
+   - Score 8-10: Major strategic shift, industry-changing
+   - Score 5-7: Notable move worth watching
+   - Score 1-4: Routine activity
+
+4. **Executive Summary** (2-3 paragraphs):
    - What do the hiring patterns reveal about this company's priorities?
    - How do they compare to their stated strategy?
    - What strategic directions can we infer?
 
-2. **Strategic Hypothesis**:
+5. **Strategic Hypothesis**:
    - What is your best hypothesis about why they're hiring this way?
    - What strategic bet are they making?
 
-3. **Alignment Analysis**:
+6. **Alignment Analysis**:
    - How well do their hiring patterns align with their stated strategy?
    - Where do they match? Where do they diverge?
 
-4. **Discrepancies** (if any):
+7. **Discrepancies** (if any):
    - Identify specific areas where hiring doesn't match stated priorities
    - Explain the potential implications
 
-5. **New Directions**:
+8. **New Directions**:
    - List any new strategic directions evident from hiring patterns
    - Focus on significant shifts from historical patterns
 
-6. **Strategic Implications**:
+9. **Strategic Implications**:
    - What does this mean for competitors?
    - What should industry observers pay attention to?
 
 Respond with JSON:
 {
+  "headline": "🎯 Punchy 5-8 word headline",
+  "key_signal": "One-liner explaining the strategic signal",
+  "significance_score": 7,
   "executive_summary": "...",
   "strategic_hypothesis": "...",
   "confidence": "high/medium/low",
@@ -350,7 +392,7 @@ async function generateInsightWithLLM(
   companyName: string,
   context: ExtendedHistoricalContext,
   research: ResearchResult,
-  companyType: CompanyType,
+  _companyType: CompanyType,
   _previousInsight: { id: string; core_functions: FunctionStats[] } | null
 ): Promise<GeneratedInsightContent> {
   const key = process.env.GEMINI_API_KEY;
@@ -392,11 +434,25 @@ async function generateInsightWithLLM(
       discrepancies: parseDiscrepancies(parsed.discrepancies),
       strategicImplications: String(parsed.strategic_implications || ""),
       modelReasoning: String(parsed.model_reasoning || ""),
+      // Display fields for dashboard highlights
+      headline: String(parsed.headline || `📊 ${companyName} hiring update`),
+      significanceScore: validateSignificanceScore(parsed.significance_score),
+      keySignal: String(parsed.key_signal || ""),
     };
   } catch (error) {
     console.error("LLM generation error:", error);
     throw new Error("Failed to generate insight with LLM");
   }
+}
+
+/**
+ * Validate significance score is within valid range (1-10)
+ */
+function validateSignificanceScore(value: unknown): number {
+  const num = typeof value === "number" ? value : parseInt(String(value), 10);
+  if (isNaN(num) || num < 1) return 5; // Default to neutral
+  if (num > 10) return 10;
+  return Math.round(num);
 }
 
 function validateConfidence(value: unknown): "high" | "medium" | "low" {
@@ -591,6 +647,10 @@ function mapDatabaseInsightToCompanyInsight(data: any): CompanyInsight {
     executiveSummary: data.executive_summary,
     strategicHypothesis: data.strategic_hypothesis,
     confidence: data.confidence,
+    // Display fields for dashboard highlights
+    headline: data.headline || null,
+    significanceScore: data.significance_score || null,
+    keySignal: data.key_signal || null,
     coreFunctions: data.core_functions || [],
     functionChanges: data.function_changes || [],
     hiringTrends: data.hiring_trends || {},
