@@ -78,10 +78,12 @@ The web app uses **Supabase Auth** with Google OAuth for single sign-on. When us
    http://localhost:3000/auth/callback
    ```
 
-3. Under **Site URL**, set your production domain:
+3. Under **Site URL**, set your production domain **WITH the https:// protocol**:
    ```
-   https://your-app-name.vercel.app
+   https://fintech-insights-xi.vercel.app
    ```
+   **CRITICAL:** The Site URL MUST include `https://` protocol. If you set it to just `fintech-insights-xi.vercel.app` (without https://), Supabase will redirect to a relative path like `/fintech-insights-xi.vercel.app` which will cause a 404 error.
+   
    (This is the default redirect destination after successful auth)
 
 4. Click **Save**
@@ -209,10 +211,23 @@ This happens when your Vercel domain is not in Supabase's allowed redirect URLs:
 1. Go to [Supabase Dashboard - Authentication Settings](https://supabase.com/dashboard/project/joqruwbipwmaysufhgyc/auth/url-configuration)
 2. Add your Vercel domain to **Redirect URLs**:
    ```
-   https://your-app-name.vercel.app/auth/callback
+   https://fintech-insights-xi.vercel.app/auth/callback
    ```
-3. Update **Site URL** to your Vercel domain
+3. Update **Site URL** to your Vercel domain **WITH https:// protocol**:
+   ```
+   https://fintech-insights-xi.vercel.app
+   ```
+   **Important:** If Site URL doesn't include `https://`, Supabase will redirect to a relative path causing a 404 error.
 4. Save and try again
+
+### Getting 404 "requested path is invalid" error after OAuth
+
+This error occurs when Supabase redirects to a relative path instead of a full URL. The fix:
+
+1. Go to [Supabase Dashboard - Authentication → URL Configuration](https://supabase.com/dashboard/project/joqruwbipwmaysufhgyc/auth/url-configuration)
+2. Check **Site URL** - it MUST be `https://fintech-insights-xi.vercel.app` (with `https://`)
+3. If it's set to `fintech-insights-xi.vercel.app` (without protocol), Supabase will redirect to `/fintech-insights-xi.vercel.app` which causes a 404
+4. Update it to include `https://` and save
 
 ## Next Steps
 

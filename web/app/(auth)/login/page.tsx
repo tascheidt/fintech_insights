@@ -7,7 +7,6 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function LoginPage() {
-  const supabase = createClient();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
@@ -19,20 +18,29 @@ export default function LoginPage() {
   }, [searchParams]);
 
   async function signInWithGoogle() {
-    const redirectTo = typeof window !== "undefined" 
-      ? `${window.location.origin}/auth/callback` 
-      : "/auth/callback";
-    
-    console.log("Initiating OAuth with redirectTo:", redirectTo);
-    
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
+    try {
+      const supabase = createClient();
+      
+      // Ensure we always use the full absolute URL for redirect
+      // Supabase uses the Site URL from dashboard config, but redirectTo should override it
+      const redirectTo = typeof window !== "undefined" 
+        ? `${window.location.protocol}//${window.location.host}/auth/callback`
+        : "/auth/callback";
+      
+      console.log("Initiating OAuth with redirectTo:", redirectTo);
+      
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      });
 
-    if (oauthError) {
-      console.error("OAuth initiation error:", oauthError);
-      setError(oauthError.message);
+      if (oauthError) {
+        console.error("OAuth initiation error:", oauthError);
+        setError(oauthError.message);
+      }
+    } catch (err) {
+      console.error("Failed to initialize Supabase client:", err);
+      setError(err instanceof Error ? err.message : "Failed to initialize authentication client");
     }
   }
 
