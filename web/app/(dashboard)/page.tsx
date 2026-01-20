@@ -4,7 +4,7 @@
  * Features:
  * - Personalized welcome message
  * - Companies overview with card/table toggle
- * - Weekly insights/digests preview
+ * - Weekly digests with TLDR-style headlines
  * - Quick stats overview
  */
 
@@ -45,7 +45,7 @@ export default async function DashboardPage() {
     { count: insightsCount },
     { count: thisWeek },
     { data: companiesRaw },
-    { data: companyInsightsRaw },
+    { data: weeklyDigestsRaw },
   ] = await Promise.all([
     // Active jobs count
     supabase
@@ -59,12 +59,11 @@ export default async function DashboardPage() {
       .select("*, companies!inner(is_active)", { count: "exact", head: true })
       .gte("first_seen_date", startOfToday.toISOString())
       .eq("companies.is_active", true),
-    // Insights count (last 7 days)
+    // Digests count (last 7 days)
     supabase
-      .from("company_insights")
-      .select("*, companies!inner(is_active)", { count: "exact", head: true })
-      .gte("generated_at", sevenDaysAgo)
-      .eq("companies.is_active", true),
+      .from("weekly_digests")
+      .select("*", { count: "exact", head: true })
+      .gte("generated_at", sevenDaysAgo),
     // This week new jobs
     supabase
       .from("job_postings")
@@ -85,18 +84,20 @@ export default async function DashboardPage() {
       `)
       .eq("is_active", true)
       .order("name"),
-    // Recent company insights for digests
+    // Recent weekly digest company summaries (with TLDR headlines!)
     supabase
-      .from("company_insights")
+      .from("weekly_digest_companies")
       .select(`
         id,
-        generated_at,
-        executive_summary,
-        confidence,
-        companies!inner(name, slug, is_active)
+        headline,
+        body,
+        new_job_count,
+        created_at,
+        weekly_digests!inner(id, generated_at),
+        companies!inner(id, name, slug, is_active)
       `)
       .eq("companies.is_active", true)
-      .order("generated_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(15),
   ]);
 
@@ -149,28 +150,36 @@ export default async function DashboardPage() {
   // Sort companies by job count descending
   companies.sort((a, b) => b.activeJobCount - a.activeJobCount);
 
-  // Types for company insights
-  interface InsightRow {
+  // Types for weekly digest data
+  interface DigestCompanyRow {
     id: string;
-    generated_at: string;
-    executive_summary: string;
-    confidence: "high" | "medium" | "low";
-    companies?: { name: string; slug: string }[] | { name: string; slug: string };
+    headline: string;
+    body: string;
+    new_job_count: number;
+    created_at: string;
+    weekly_digests?: { id: string; generated_at: string }[] | { id: string; generated_at: string };
+    companies?: { id: string; name: string; slug: string }[] | { id: string; name: string; slug: string };
   }
 
-  // Process company insights for digests
-  const digestInsights: DigestInsight[] = (companyInsightsRaw as InsightRow[] ?? []).map((insight) => {
-    const company = Array.isArray(insight.companies) 
-      ? insight.companies[0] 
-      : insight.companies;
+  // Process weekly digest data - now with TLDR headlines!
+  const digestInsights: DigestInsight[] = (weeklyDigestsRaw as DigestCompanyRow[] ?? []).map((item) => {
+    const company = Array.isArray(item.companies) 
+      ? item.companies[0] 
+      : item.companies;
+    const digest = Array.isArray(item.weekly_digests)
+      ? item.weekly_digests[0]
+      : item.weekly_digests;
     
     return {
-      id: insight.id,
+      id: item.id,
       companyName: company?.name ?? "Unknown",
       companySlug: company?.slug ?? "",
-      generatedAt: insight.generated_at,
-      executiveSummary: insight.executive_summary ?? "",
-      confidence: insight.confidence ?? "medium",
+      generatedAt: digest?.generated_at ?? item.created_at,
+      // TLDR-style fields from weekly_digest_companies
+      headline: item.headline,
+      whatItMeans: item.body,
+      executiveSummary: item.body, // Fallback for older display logic
+      confidence: "high" as const, // Digests don't have confidence, default to high
     };
   });
 
