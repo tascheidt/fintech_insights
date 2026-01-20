@@ -1,6 +1,6 @@
 # Weekly Digest TLDR-Style Redesign
 
-**Overall Progress:** `60%`
+**Overall Progress:** `80%`
 
 ## TLDR
 Restyle weekly digests (email + web) with Wealthsimple TLDR's punchy voice and clean visuals. AI generates catchy headlines, templates get a minimal redesign.
@@ -29,10 +29,10 @@ Restyle weekly digests (email + web) with Wealthsimple TLDR's punchy voice and c
   - [x] 🟩 Update insight cards to show punchy headlines
   - [x] 🟩 Add conversational footer copy
 
-- [ ] 🟥 **Step 4: Update Web Component**
-  - [ ] 🟥 Display headline instead of company name as primary text
-  - [ ] 🟥 Match email's clean visual style
-  - [ ] 🟥 Ensure emoji renders correctly
+- [x] 🟩 **Step 4: Update Web Component**
+  - [x] 🟩 Display headline instead of company name as primary text
+  - [x] 🟩 Match email's clean visual style
+  - [x] 🟩 Ensure emoji renders correctly
 
 - [ ] 🟥 **Step 5: Test & Validate**
   - [ ] 🟥 Generate test digest with new AI prompts
