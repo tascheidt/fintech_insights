@@ -95,6 +95,8 @@ export async function extractJobStructure(
     .replace("{job_title}", jobTitle)
     .replace("{description}", truncatedDescription);
 
+  let parsed: unknown = null;
+
   try {
     const genAI = new GoogleGenerativeAI(key);
 
@@ -113,7 +115,41 @@ export async function extractJobStructure(
     });
 
     const text = result.response.text()?.trim() ?? "{}";
-    const parsed = JSON.parse(text) as unknown;
+    
+    // Try to parse JSON, with fallback for malformed JSON
+    try {
+      parsed = JSON.parse(text) as unknown;
+    } catch (parseError) {
+      // Try to extract JSON from text that might have markdown code blocks or extra text
+      // First, try to find JSON in markdown code blocks
+      const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (codeBlockMatch) {
+        try {
+          parsed = JSON.parse(codeBlockMatch[1]) as unknown;
+        } catch {
+          // Fall through to next attempt
+        }
+      }
+      
+      // If that didn't work, try to find any JSON object in the text
+      if (parsed === null) {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            // Try to fix common JSON issues: trailing commas before closing braces/brackets
+            let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
+            
+            parsed = JSON.parse(jsonText) as unknown;
+          } catch {
+            console.error(`Failed to parse JSON for job "${jobTitle}" after extraction attempts`);
+            return null;
+          }
+        } else {
+          console.error(`No JSON found in response for job "${jobTitle}"`);
+          return null;
+        }
+      }
+    }
 
     // Validate with Zod schema
     const validated = JobStructureSchema.parse(parsed);
@@ -133,13 +169,16 @@ export async function extractJobStructure(
   } catch (error) {
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
-      console.error("Job structure validation error:", error.errors);
-      // Return partial data if possible
-      return extractPartialStructure(error, parsed);
+      console.error(`Job structure validation error for "${jobTitle}":`, error.errors);
+      // Return partial data if possible (parsed is guaranteed to be set here)
+      if (parsed !== null) {
+        return extractPartialStructure(error, parsed);
+      }
+      return null;
     }
 
-    // Handle other errors (API errors, JSON parse errors, etc.)
-    console.error("Job structure extraction error:", error);
+    // Handle other errors (API errors, etc.)
+    console.error(`Job structure extraction error for "${jobTitle}":`, error);
     return null;
   }
 }
