@@ -8,7 +8,7 @@
  * - Novelty detection and executive movement analysis
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 import { buildHistoricalContext, formatHistoricalContextForPrompt, type HistoricalContext } from "./context-builder";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -103,6 +103,7 @@ export interface AnalyzeJobOptions {
 /**
  * Perform web search for company strategy/news
  * Uses Gemini's Google Search tool to find recent company information
+ * Falls back gracefully if quota is exceeded or model is unavailable
  */
 async function performWebSearch(companyName: string): Promise<Array<{ title: string; snippet: string; url: string }>> {
   const key = process.env.GEMINI_API_KEY;
@@ -114,12 +115,22 @@ async function performWebSearch(companyName: string): Promise<Array<{ title: str
   try {
     const genAI = new GoogleGenerativeAI(key);
     
-    // Use a model with Google Search tool enabled
-    const model = genAI.getGenerativeModel({
-      model: "gemini-3-pro-preview",
-      // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
-      tools: [{ googleSearch: {} }],
-    });
+    // Try to use pro model with web search, but handle quota errors gracefully
+    let model: GenerativeModel;
+    try {
+      model = genAI.getGenerativeModel({
+        model: "gemini-3-pro-preview",
+        // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
+        tools: [{ googleSearch: {} }],
+      });
+    } catch (error: any) {
+      // If quota exceeded or model unavailable, skip web search
+      if (error?.status === 429 || error?.message?.includes("quota") || error?.message?.includes("limit")) {
+        console.warn(`Web search unavailable (quota/model limit): ${error.message}. Continuing without web context.`);
+        return [];
+      }
+      throw error;
+    }
 
     const searchQuery = `Recent news, strategy updates, funding, or product launches for ${companyName} fintech company in 2025 or 2026`;
     
@@ -154,7 +165,12 @@ async function performWebSearch(companyName: string): Promise<Array<{ title: str
     }
 
     return [];
-  } catch (error) {
+  } catch (error: any) {
+    // Handle quota errors gracefully
+    if (error?.status === 429 || error?.message?.includes("quota") || error?.message?.includes("limit")) {
+      console.warn(`Web search quota exceeded: ${error.message}. Continuing without web context.`);
+      return [];
+    }
     console.error("Web search error:", error);
     // Return empty array on error - analysis can continue without web context
     return [];
@@ -219,8 +235,9 @@ export async function analyzeJobAdvanced(
 
     const genAI = new GoogleGenerativeAI(key);
     
-    // Use Gemini 3 Pro with extended thinking and web search
-    const model = genAI.getGenerativeModel({
+    // Use Gemini model with fallback (pro -> flash)
+    // Try pro model first, but fallback to flash if quota exceeded
+    let model: GenerativeModel = genAI.getGenerativeModel({
       model: "gemini-3-pro-preview",
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
@@ -234,9 +251,30 @@ export async function analyzeJobAdvanced(
       },
     });
 
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    });
+    let result;
+    try {
+      result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
+    } catch (error: any) {
+      // If we get a quota error during generation, try flash model as fallback
+      if (error?.status === 429 || error?.message?.includes("quota") || error?.message?.includes("limit") || error?.message?.includes("exceeded")) {
+        console.warn(`gemini-3-pro-preview quota exceeded: ${error.message}. Falling back to gemini-3-flash-preview.`);
+        model = genAI.getGenerativeModel({
+          model: "gemini-3-flash-preview",
+          generationConfig: {
+            temperature: 0.6,
+            maxOutputTokens: 4096,
+            responseMimeType: "application/json",
+          },
+        });
+        result = await model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+        });
+      } else {
+        throw error;
+      }
+    }
 
     const text = result.response.text()?.trim() ?? "{}";
     const parsed = JSON.parse(text) as Record<string, unknown>;

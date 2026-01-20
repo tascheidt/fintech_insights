@@ -34,11 +34,62 @@ The web app uses **Supabase Auth** with Google OAuth for single sign-on. When us
 
 ## Step 2: Configure Google in Supabase
 
+**You need to configure TWO things in Supabase:**
+
+### Part A: Google Provider Settings
+
 1. Go to [Supabase Dashboard - Auth Providers](https://supabase.com/dashboard/project/joqruwbipwmaysufhgyc/auth/providers)
 2. Scroll to **Google** provider
-3. Toggle **Enabled**
-4. Paste your **Client ID** and **Client Secret**
-5. Click **Save**
+3. Click on the **Google** provider (or click "Enabled" to edit)
+4. Paste your **Client ID** from Google Cloud Console:
+   ```
+   153898442207-t1586jbc2cjjhst4jbgbm1h3l3e6hihe.apps.googleusercontent.com
+   ```
+5. Paste your **Client Secret** from Google Cloud Console
+6. Click **Save**
+
+**Note:** If Google is already enabled, you still need to verify these credentials are correct.
+
+### Part B: URL Configuration (CRITICAL - This fixes the localhost redirect issue!)
+
+## Step 2.5: Configure Redirect URLs in Supabase (IMPORTANT for Vercel)
+
+**This is critical for Vercel deployments!** After Google authenticates the user, Supabase needs to know which domains are allowed to receive the final redirect back to your app.
+
+**Why this matters:**
+- Google Cloud Console tells Google: "After auth, redirect to Supabase" ✅ (You've done this)
+- Supabase needs to know: "After I process the auth, which app domains can I redirect to?" ⚠️ (This is what you need to configure)
+
+**Steps:**
+
+1. Go to [Supabase Dashboard - Authentication → URL Configuration](https://supabase.com/dashboard/project/joqruwbipwmaysufhgyc/auth/url-configuration)
+   - In the left sidebar: Authentication → Configuration → URL Configuration
+
+2. Under **Redirect URLs**, add your Vercel domain(s):
+   ```
+   https://your-app-name.vercel.app/auth/callback
+   ```
+   If you have a custom domain:
+   ```
+   https://your-custom-domain.com/auth/callback
+   ```
+   Also add localhost for development:
+   ```
+   http://localhost:3000/auth/callback
+   ```
+
+3. Under **Site URL**, set your production domain:
+   ```
+   https://your-app-name.vercel.app
+   ```
+   (This is the default redirect destination after successful auth)
+
+4. Click **Save**
+
+**Important:** 
+- If you don't add your Vercel domain to Redirect URLs, Supabase will reject the redirect and may fall back to localhost
+- The redirect URL must match EXACTLY (including `/auth/callback` path)
+- Changes may take a few minutes to propagate
 
 ## Step 3: Test Authentication
 
@@ -149,6 +200,19 @@ WHERE email IN ('user1@example.com', 'user2@example.com');
 2. Check Supabase settings:
    - Google provider is enabled
    - Client ID and Secret are correct
+   - **Redirect URLs include your Vercel domain** (see Step 2.5 above)
+
+### Redirecting to localhost after authentication on Vercel
+
+This happens when your Vercel domain is not in Supabase's allowed redirect URLs:
+
+1. Go to [Supabase Dashboard - Authentication Settings](https://supabase.com/dashboard/project/joqruwbipwmaysufhgyc/auth/url-configuration)
+2. Add your Vercel domain to **Redirect URLs**:
+   ```
+   https://your-app-name.vercel.app/auth/callback
+   ```
+3. Update **Site URL** to your Vercel domain
+4. Save and try again
 
 ## Next Steps
 

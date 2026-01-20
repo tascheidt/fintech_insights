@@ -3,7 +3,7 @@ database:
 
 analysis:
   provider: gemini
-  model: gemini-3-flash-preview
+  model: gemini-3-flash-preview  # Always use Gemini 3 - never Gemini 2.x or older
   temperature: 0.3
   max_tokens: 65536
 

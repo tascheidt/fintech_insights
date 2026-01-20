@@ -41,7 +41,7 @@ npx tsx web/scripts/verify-migration.ts  # Verify migration
 - **Backend**: Python with Click CLI, SQLAlchemy 2.0, BeautifulSoup4
 - **Database**: Supabase (PostgreSQL) with RLS
 - **Auth**: Supabase SSR with Google OAuth
-- **AI**: Gemini 3 Flash for strategic analysis
+- **AI**: Gemini 3 Flash/Pro for strategic analysis
 - **Email**: Resend API
 - **Scraping**: Puppeteer Core (serverless) + BeautifulSoup4
 
@@ -87,3 +87,27 @@ Each company needs: `name`, `slug`, `country`, `track_for_strategy`, `ats_type`,
 1. Create scraper in `src/scrapers/` implementing `BaseScraper`
 2. Add to factory in `src/scrapers/__init__.py`
 3. For web scrapers: add to `web/lib/scrapers/`
+
+## AI Model Requirements
+
+**IMPORTANT: Always use the latest Gemini 3 models. Never use Gemini 2.x or older.**
+
+### Approved Models
+- `gemini-3-pro-preview` - For advanced analysis with web search/grounding
+- `gemini-3-flash-preview` - For fast, cost-effective analysis
+
+### Rules
+1. **Never use Gemini 2.x models** (gemini-2.0-flash, gemini-2.5-*, etc.)
+2. **Never use Gemini 1.x models** (gemini-1.5-pro, gemini-1.5-flash, etc.)
+3. All AI analysis code must use `gemini-3-flash-preview` or `gemini-3-pro-preview`
+4. Use Pro for features requiring web search/grounding tools
+5. Use Flash for standard JSON generation and analysis
+
+### Testing Models
+Run `npx tsx web/scripts/test-gemini-models.ts` to verify API key has access to required models.
+
+### Quota Errors
+If you see `limit: 0` quota errors, the API key may need:
+1. Billing enabled on the Google Cloud project
+2. Gemini API enabled in the project
+3. Access granted to preview models (request at https://ai.google.dev/)

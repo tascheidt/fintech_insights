@@ -22,13 +22,13 @@ export default async function DashboardPage() {
     { data: hiringRaw },
     { data: companyInsightsRaw },
   ] = await Promise.all([
-    supabase.from("job_postings").select("*", { count: "exact", head: true }).eq("is_active", true),
-    supabase.from("job_postings").select("*", { count: "exact", head: true }).gte("first_seen_date", startOfToday.toISOString()),
-    supabase.from("strategic_insights").select("*", { count: "exact", head: true }).gte("run_date", sevenDaysAgo),
-    supabase.from("job_postings").select("*", { count: "exact", head: true }).gte("first_seen_date", startOfWeekDate.toISOString()),
-    supabase.from("strategic_insights").select("id, category, insight_summary, job_postings(title, companies(name))").order("run_date", { ascending: false }).limit(5),
-    supabase.from("job_postings").select("companies(name)").eq("is_active", true),
-    supabase.from("company_insights").select("id, generated_at, executive_summary, confidence, companies(name, slug)").order("generated_at", { ascending: false }).limit(5),
+    supabase.from("job_postings").select("*, companies!inner(is_active)", { count: "exact", head: true }).eq("is_active", true).eq("companies.is_active", true),
+    supabase.from("job_postings").select("*, companies!inner(is_active)", { count: "exact", head: true }).gte("first_seen_date", startOfToday.toISOString()).eq("companies.is_active", true),
+    supabase.from("strategic_insights").select("*, job_postings!inner(companies!inner(is_active))", { count: "exact", head: true }).gte("run_date", sevenDaysAgo).eq("job_postings.companies.is_active", true),
+    supabase.from("job_postings").select("*, companies!inner(is_active)", { count: "exact", head: true }).gte("first_seen_date", startOfWeekDate.toISOString()).eq("companies.is_active", true),
+    supabase.from("strategic_insights").select("id, category, insight_summary, job_postings!inner(title, companies!inner(name, is_active))").eq("job_postings.companies.is_active", true).order("run_date", { ascending: false }).limit(5),
+    supabase.from("job_postings").select("companies!inner(name, is_active)").eq("is_active", true).eq("companies.is_active", true),
+    supabase.from("company_insights").select("id, generated_at, executive_summary, confidence, companies!inner(name, slug, is_active)").eq("companies.is_active", true).order("generated_at", { ascending: false }).limit(5),
   ]);
 
   const recentInsights = (recentInsightsRaw ?? []).map((i: unknown) => {

@@ -115,14 +115,16 @@ ${job.description_text || "No description available"}
 
 Your role is to answer follow-up questions about this insight, provide deeper analysis, and help the user understand the strategic implications. Use web search when needed to get the latest information about the company.`;
 
-    // Initialize Gemini with web search
+    // Initialize Gemini with fallback (pro -> flash)
     const key = process.env.GEMINI_API_KEY;
     if (!key) {
       return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
     }
 
     const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({
+    
+    // Try pro model first, fallback to flash if quota exceeded
+    let model = genAI.getGenerativeModel({
       model: "gemini-3-pro-preview",
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
@@ -140,12 +142,34 @@ Your role is to answer follow-up questions about this insight, provide deeper an
     }));
 
     // Start chat with history
-    const chat = model.startChat({
+    let chat = model.startChat({
       history: history as any,
     });
 
-    // Stream the response
-    const stream = await chat.sendMessageStream(question);
+    // Stream the response with error handling
+    let stream;
+    try {
+      stream = await chat.sendMessageStream(question);
+    } catch (error: any) {
+      // If we get a quota error during generation, try flash model as fallback
+      if (error?.status === 429 || error?.message?.includes("quota") || error?.message?.includes("limit") || error?.message?.includes("exceeded")) {
+        console.warn(`gemini-3-pro-preview quota exceeded: ${error.message}. Falling back to gemini-3-flash-preview.`);
+        model = genAI.getGenerativeModel({
+          model: "gemini-3-flash-preview",
+          systemInstruction: systemPrompt,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2048,
+          },
+        });
+        chat = model.startChat({
+          history: history as any,
+        });
+        stream = await chat.sendMessageStream(question);
+      } else {
+        throw error;
+      }
+    }
 
     // Create a readable stream for the response
     const encoder = new TextEncoder();

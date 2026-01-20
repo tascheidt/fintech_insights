@@ -16,8 +16,9 @@ export default async function JobsPage({
 
   let query = supabase
     .from("job_postings")
-    .select("id, title, department, location, is_active, first_seen_date, companies(name, slug)")
+    .select("id, title, department, location, is_active, first_seen_date, companies!inner(name, slug, is_active)")
     .eq("is_active", true)
+    .eq("companies.is_active", true)
     .order("first_seen_date", { ascending: false })
     .limit(200);
 
