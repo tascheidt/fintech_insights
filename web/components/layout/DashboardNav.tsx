@@ -1,3 +1,15 @@
+/**
+ * DashboardNav - Main navigation header for the application.
+ * 
+ * Navigation structure:
+ * - Dashboard (home) - Overview with companies and digests
+ * - Insights - Weekly strategic insights
+ * - Companies - Company list and details (includes jobs)
+ * - Admin (admin only) - System administration
+ * 
+ * Note: Jobs and Templates are now accessed through Company pages.
+ */
+
 import Link from "next/link";
 import { UserMenu } from "./UserMenu";
 
@@ -23,12 +35,6 @@ export function DashboardNav({
           </Link>
           <Link href="/companies" className="text-sm text-muted-foreground hover:text-foreground">
             Companies
-          </Link>
-          <Link href="/jobs" className="text-sm text-muted-foreground hover:text-foreground">
-            Jobs
-          </Link>
-          <Link href="/templates" className="text-sm text-muted-foreground hover:text-foreground">
-            Templates
           </Link>
           {role === "admin" && (
             <Link href="/admin" className="text-sm text-muted-foreground hover:text-foreground">

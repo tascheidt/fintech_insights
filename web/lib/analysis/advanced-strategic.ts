@@ -12,7 +12,15 @@ import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 import { buildHistoricalContext, formatHistoricalContextForPrompt, type HistoricalContext } from "./context-builder";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const ADVANCED_PROMPT = `You are an elite competitive intelligence analyst specializing in the fintech industry. Your expertise includes strategic analysis, market intelligence, and executive movement detection.
+/**
+ * Advanced analysis prompt with TLDR-style punchy voice
+ * 
+ * Key additions for TLDR style:
+ * - headline: Punchy, emoji-forward headline (e.g., "🚀 Koho bets big on small businesses!")
+ * - Conversational insight_summary in plain language
+ * - what_it_means: Plain-language takeaway for the reader
+ */
+const ADVANCED_PROMPT = `You are a sharp fintech analyst who writes like Wealthsimple's TLDR newsletter - punchy, conversational, and fun to read. You spot strategic moves in hiring patterns and explain them in plain language.
 
 ## Company Historical Context
 {historical_context}
@@ -31,35 +39,48 @@ Full Job Description:
 
 ## Your Analysis Tasks
 
-1. NOVELTY ASSESSMENT (1-10 scale):
+1. PUNCHY HEADLINE:
+   - Write a catchy, emoji-forward headline (8 words max) that captures the strategic signal
+   - Start with ONE relevant emoji that fits the vibe
+   - Use active, punchy language like TLDR newsletter does
+   - Examples: "🤖 Wealthsimple doubles down on AI", "💼 Koho bets big on small businesses!", "🚀 Neo's hiring spree continues"
+
+2. NOVELTY ASSESSMENT (1-10 scale):
    - Compare this role against the company's historical hiring patterns
    - Is this a continuation of existing strategy (1-4)?
    - Is this a new direction or pivot (7-10)?
    - Is this an expansion/scale of existing approach (5-6)?
    - Provide detailed reasoning for your score
 
-2. EXECUTIVE MOVEMENT DETECTION:
+3. EXECUTIVE MOVEMENT DETECTION:
    - Is this a leadership/C-suite/VP+ level hire?
    - Does this signal a new function, reorganization, or strategic shift?
    - What does this executive hire imply about company direction?
 
-3. STRATEGIC HYPOTHESIS:
+4. STRATEGIC HYPOTHESIS:
    - What is the most likely strategic reason for this hire?
    - How does it fit (or not fit) with recent company news and strategy?
    - What does this signal about the company's priorities?
 
-4. WEB-GROUNDED CONTEXT:
+5. WEB-GROUNDED CONTEXT:
    - How does this role correlate with recent company news, funding, product launches, or market moves?
    - Does the web context support or contradict the signals from this posting?
 
-5. CONFIDENCE & REASONING:
+6. CONFIDENCE & REASONING:
    - How confident are you in this analysis? (high/medium/low)
    - Provide detailed reasoning for your confidence level
 
+## Writing Style Rules
+- Write insight_summary in 2-3 casual, conversational sentences - like you're explaining to a smart friend
+- Avoid corporate jargon - say "betting big" not "making strategic investments"
+- what_it_means should be one plain-language takeaway a reader can immediately understand
+
 Respond with a JSON object containing:
 {
+  "headline": "🚀 Punchy 8-word-max headline with ONE emoji at start",
   "category": "one of: expansion, new-product, technology, operational, compliance, customer, data, marketing, leadership, other",
-  "insight_summary": "2-3 sentence summary of what this hire signals about company strategy",
+  "insight_summary": "2-3 casual sentences explaining what this hire signals - write like you're texting a smart friend",
+  "what_it_means": "One plain-language sentence: what should readers take away from this?",
   "strategic_signals": ["signal 1", "signal 2", "signal 3", "signal 4"],
   "is_new_direction": true or false,
   "confidence": "high, medium, or low",
@@ -72,9 +93,21 @@ Respond with a JSON object containing:
   "model_reasoning": "your detailed reasoning process and confidence assessment"
 }`;
 
+/**
+ * Result from advanced job analysis
+ * 
+ * TLDR-style additions:
+ * - headline: Punchy, emoji-forward headline for digest display
+ * - what_it_means: Plain-language takeaway for readers
+ */
 export interface AdvancedAnalyzeResult {
+  /** Punchy headline with emoji (e.g., "🚀 Koho bets big on small businesses!") */
+  headline: string;
   category: string;
+  /** Conversational 2-3 sentence summary */
   insight_summary: string;
+  /** Plain-language one-liner takeaway */
+  what_it_means: string;
   strategic_signals: string[];
   is_new_direction: boolean;
   confidence: string;
@@ -284,9 +317,14 @@ export async function analyzeJobAdvanced(
       ? Math.max(1, Math.min(10, Math.round(parsed.novelty_score)))
       : 5;
 
+    // Generate fallback headline if AI didn't provide one
+    const fallbackHeadline = `📊 ${companyName} is hiring`;
+
     return {
+      headline: String(parsed.headline ?? fallbackHeadline),
       category: String(parsed.category ?? "other"),
       insight_summary: String(parsed.insight_summary ?? ""),
+      what_it_means: String(parsed.what_it_means ?? ""),
       strategic_signals: Array.isArray(parsed.strategic_signals)
         ? (parsed.strategic_signals as string[])
         : [],

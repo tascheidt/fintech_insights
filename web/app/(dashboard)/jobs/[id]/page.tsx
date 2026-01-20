@@ -1,3 +1,11 @@
+/**
+ * Job Detail Page
+ * 
+ * Shows individual job posting details.
+ * Note: This page is kept for deep links. Jobs are now primarily accessed
+ * through company pages at /companies/[slug].
+ */
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -29,7 +37,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/jobs">← Jobs</Link>
+          <Link href={company?.slug ? `/companies/${company.slug}` : "/companies"}>
+            ← Back to {company?.name ?? "Companies"}
+          </Link>
         </Button>
       </div>
       <Card>

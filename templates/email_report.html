@@ -3,121 +3,172 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fintech Competitive Intelligence Report - {{ report_date }}</title>
+    <title>Fintech Intel - {{ report_date }}</title>
     <style>
+        /* 
+         * TLDR-Style Email Template
+         * Clean, minimal design with conversational voice
+         * Inspired by Wealthsimple's TLDR newsletter
+         */
+        
         /* Reset */
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: #f5f5f5;
-            padding: 20px;
+            line-height: 1.7;
+            color: #1a1a1a;
+            background: #ffffff;
+            padding: 0;
         }
 
         .container {
-            max-width: 800px;
+            max-width: 640px;
             margin: 0 auto;
             background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
+            padding: 40px 24px;
         }
 
-        /* Header */
+        /* Clean Header - No gradient, just typography */
         .header {
-            background: linear-gradient(135deg, #1a1a2e 0%, #4a69bd 100%);
-            color: #fff;
-            padding: 30px;
+            text-align: center;
+            padding-bottom: 32px;
+            border-bottom: 1px solid #e5e5e5;
+            margin-bottom: 32px;
         }
 
         .header h1 {
-            font-size: 1.8em;
-            font-weight: 600;
-            margin-bottom: 5px;
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
         }
 
         .header .period {
-            opacity: 0.8;
             font-size: 0.95em;
-        }
-
-        /* Summary Stats */
-        .summary-stats {
-            display: flex;
-            flex-wrap: wrap;
-            padding: 20px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #eee;
-        }
-
-        .stat-box {
-            flex: 1;
-            min-width: 120px;
-            text-align: center;
-            padding: 15px;
-        }
-
-        .stat-number {
-            font-size: 2.2em;
-            font-weight: 700;
-            color: #4a69bd;
-            line-height: 1;
-        }
-
-        .stat-label {
-            font-size: 0.85em;
             color: #666;
-            margin-top: 5px;
         }
 
-        /* Content */
-        .content {
-            padding: 30px;
+        /* Inline Summary - Replaces stat boxes */
+        .summary-line {
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+            padding: 16px 0;
+            margin-bottom: 32px;
         }
 
-        h2 {
-            color: #1a1a2e;
-            font-size: 1.3em;
-            margin: 30px 0 15px 0;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #4a69bd;
+        .summary-line .highlight {
+            font-weight: 600;
+            color: #1a1a1a;
         }
 
-        h2:first-child {
+        /* Section Headers - Clean and minimal */
+        .section-header {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin: 40px 0 20px 0;
+            padding-bottom: 8px;
+        }
+
+        .section-header:first-child {
             margin-top: 0;
         }
 
-        h3 {
-            color: #4a69bd;
-            font-size: 1.1em;
-            margin: 20px 0 10px 0;
-        }
-
-        /* Company Section */
-        .company-section {
-            background: #fff;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            margin: 15px 0;
-            overflow: hidden;
-        }
-
-        .company-header {
-            background: #f8f9fa;
-            padding: 12px 15px;
-            font-weight: 600;
-            color: #1a1a2e;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .company-header .count {
-            float: right;
-            background: #4a69bd;
-            color: #fff;
-            padding: 2px 10px;
+        /* TLDR-Style Insight Cards */
+        .insight-card {
+            background: #fafafa;
             border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+        }
+
+        .insight-card.new-direction {
+            background: #fef3f2;
+            border-left: 3px solid #ef4444;
+        }
+
+        /* Punchy Headline - The star of the show */
+        .insight-headline {
+            font-size: 1.15em;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        /* What it means - Plain language takeaway */
+        .insight-takeaway {
+            font-size: 0.95em;
+            color: #444;
+            margin-bottom: 12px;
+            font-style: italic;
+        }
+
+        .insight-summary {
+            font-size: 0.9em;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .insight-meta {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .confidence-high { background: #dcfce7; color: #166534; }
+        .confidence-medium { background: #fef9c3; color: #854d0e; }
+        .confidence-low { background: #fee2e2; color: #991b1b; }
+
+        /* Signal Tags - Smaller, more subtle */
+        .signal-tags {
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .signal-tag {
+            display: inline-block;
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            color: #555;
+        }
+
+        /* Company Postings - Cleaner layout */
+        .company-section {
+            margin: 20px 0;
+        }
+
+        .company-name {
+            font-weight: 600;
+            color: #1a1a1a;
+            font-size: 1em;
+            margin-bottom: 8px;
+        }
+
+        .company-name .count {
+            font-weight: 400;
+            color: #666;
             font-size: 0.85em;
         }
 
@@ -128,7 +179,7 @@
         }
 
         .posting-item {
-            padding: 12px 15px;
+            padding: 8px 0;
             border-bottom: 1px solid #f0f0f0;
         }
 
@@ -138,11 +189,11 @@
 
         .posting-title {
             font-weight: 500;
-            color: #1a1a2e;
+            color: #1a1a1a;
         }
 
         .posting-title a {
-            color: #4a69bd;
+            color: #2563eb;
             text-decoration: none;
         }
 
@@ -151,238 +202,203 @@
         }
 
         .posting-meta {
-            font-size: 0.85em;
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        /* Quick Stats - Inline style */
+        .quick-stats {
+            display: flex;
+            justify-content: space-around;
+            background: #fafafa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+
+        .quick-stat {
+            text-align: center;
+        }
+
+        .quick-stat-value {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+
+        .quick-stat-value.positive { color: #16a34a; }
+        .quick-stat-value.negative { color: #dc2626; }
+
+        .quick-stat-label {
+            font-size: 0.75em;
             color: #666;
-            margin-top: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 4px;
         }
 
-        /* Insights */
-        .insight-card {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-            border-left: 4px solid #4a69bd;
+        /* Conversational Footer */
+        .footer {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid #e5e5e5;
+            text-align: center;
         }
 
-        .insight-card.new-direction {
-            background: #fff5f5;
-            border-left-color: #e74c3c;
-        }
-
-        .insight-header {
-            font-weight: 600;
-            color: #1a1a2e;
+        .footer-tagline {
+            font-size: 1em;
+            color: #1a1a1a;
             margin-bottom: 8px;
         }
 
-        .insight-summary {
-            color: #555;
-            margin-bottom: 10px;
-        }
-
-        .signal-tags {
-            margin-top: 10px;
-        }
-
-        .signal-tag {
-            display: inline-block;
-            background: #e9ecef;
-            padding: 3px 10px;
-            border-radius: 15px;
-            font-size: 0.8em;
-            margin: 2px;
-            color: #555;
-        }
-
-        .confidence {
+        .footer-small {
             font-size: 0.8em;
             color: #888;
-            margin-top: 8px;
-        }
-
-        .confidence.high { color: #27ae60; }
-        .confidence.medium { color: #f39c12; }
-        .confidence.low { color: #e74c3c; }
-
-        /* Trends */
-        .trends-box {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 15px 0;
-        }
-
-        .trend-item {
-            display: inline-block;
-            margin-right: 30px;
-            margin-bottom: 10px;
-        }
-
-        .trend-value {
-            font-size: 1.5em;
-            font-weight: 600;
-            color: #4a69bd;
-        }
-
-        .trend-value.positive { color: #27ae60; }
-        .trend-value.negative { color: #e74c3c; }
-
-        .trend-label {
-            font-size: 0.85em;
-            color: #666;
-        }
-
-        /* Footer */
-        .footer {
-            background: #f8f9fa;
-            padding: 20px 30px;
-            border-top: 1px solid #eee;
-            font-size: 0.85em;
-            color: #888;
-        }
-
-        /* Category Badge */
-        .category-badge {
-            display: inline-block;
-            background: #4a69bd;
-            color: #fff;
-            padding: 3px 10px;
-            border-radius: 4px;
-            font-size: 0.8em;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
 
         /* Responsive */
-        @media (max-width: 600px) {
-            .stat-box { min-width: 50%; }
-            .summary-stats { padding: 10px; }
-            .content { padding: 20px; }
+        @media (max-width: 480px) {
+            .container { padding: 24px 16px; }
+            .quick-stats { flex-direction: column; gap: 16px; }
+            .insight-headline { font-size: 1.05em; }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Clean Header -->
         <div class="header">
-            <h1>Fintech Competitive Intelligence Report</h1>
-            <p class="period">{{ period_start }} to {{ period_end }}</p>
+            <h1>📊 Fintech Intel</h1>
+            <p class="period">{{ period_start }} → {{ period_end }}</p>
         </div>
 
-        <div class="summary-stats">
-            <div class="stat-box">
-                <div class="stat-number">{{ summary.new_postings_count }}</div>
-                <div class="stat-label">New Postings</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-number">{{ summary.closed_postings_count }}</div>
-                <div class="stat-label">Closed</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-number">{{ summary.companies_with_activity }}</div>
-                <div class="stat-label">Active Companies</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-number">{{ summary.insights_generated }}</div>
-                <div class="stat-label">Insights</div>
-            </div>
+        <!-- Inline Summary -->
+        <div class="summary-line">
+            <span class="highlight">{{ summary.new_postings_count }}</span> new postings · 
+            <span class="highlight">{{ summary.closed_postings_count }}</span> closed · 
+            <span class="highlight">{{ summary.companies_with_activity }}</span> active companies · 
+            <span class="highlight">{{ summary.insights_generated }}</span> things you should know
         </div>
 
-        <div class="content">
-            {% if new_postings_by_company %}
-            <h2>New Job Postings</h2>
-            {% for company, postings in new_postings_by_company.items() %}
-            <div class="company-section">
-                <div class="company-header">
-                    {{ company }}
-                    <span class="count">{{ postings|length }} new</span>
-                </div>
-                <ul class="posting-list">
-                    {% for posting in postings %}
-                    <li class="posting-item">
-                        <div class="posting-title">
-                            {% if posting.url %}
-                            <a href="{{ posting.url }}" target="_blank">{{ posting.title }}</a>
-                            {% else %}
-                            {{ posting.title }}
-                            {% endif %}
-                        </div>
-                        <div class="posting-meta">
-                            {% if posting.department %}{{ posting.department }} | {% endif %}
-                            {% if posting.location %}{{ posting.location }} | {% endif %}
-                            Posted: {{ posting.first_seen }}
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
+        <!-- Strategic Insights - The Main Event -->
+        {% if insights_by_category %}
+        <div class="section-header">🎯 This week's highlights</div>
+        
+        {% for category, insights in insights_by_category.items() %}
+        {% for insight in insights %}
+        <div class="insight-card {% if insight.is_new_direction %}new-direction{% endif %}">
+            <!-- Punchy TLDR-style headline -->
+            <div class="insight-headline">
+                {{ insight.headline|default(insight.company ~ " is hiring") }}
             </div>
-            {% endfor %}
-            {% endif %}
-
-            {% if insights_by_category %}
-            <h2>Strategic Insights</h2>
-            {% for category, insights in insights_by_category.items() %}
-            <h3><span class="category-badge">{{ category|replace('-', ' ')|title }}</span></h3>
-            {% for insight in insights %}
-            <div class="insight-card {% if insight.is_new_direction %}new-direction{% endif %}">
-                <div class="insight-header">
-                    {{ insight.company }} - {{ insight.title }}
-                    {% if insight.is_new_direction %}<span style="color: #e74c3c;">*New Direction*</span>{% endif %}
-                </div>
-                <div class="insight-summary">{{ insight.summary }}</div>
-                {% if insight.signals %}
-                <div class="signal-tags">
-                    {% for signal in insight.signals %}
-                    <span class="signal-tag">{{ signal }}</span>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                <div class="confidence {{ insight.confidence }}">
-                    Confidence: {{ insight.confidence|title }}
-                </div>
-            </div>
-            {% endfor %}
-            {% endfor %}
-            {% endif %}
-
-            {% if trends_30_day %}
-            <h2>30-Day Trends</h2>
-            <div class="trends-box">
-                <div class="trend-item">
-                    <div class="trend-value">{{ trends_30_day.new_postings }}</div>
-                    <div class="trend-label">New Postings</div>
-                </div>
-                <div class="trend-item">
-                    <div class="trend-value">{{ trends_30_day.closed_postings }}</div>
-                    <div class="trend-label">Closed Postings</div>
-                </div>
-                <div class="trend-item">
-                    {% if trends_30_day.net_change >= 0 %}
-                    <div class="trend-value positive">+{{ trends_30_day.net_change }}</div>
-                    {% else %}
-                    <div class="trend-value negative">{{ trends_30_day.net_change }}</div>
-                    {% endif %}
-                    <div class="trend-label">Net Change</div>
-                </div>
+            
+            <!-- Plain-language takeaway -->
+            {% if insight.what_it_means %}
+            <div class="insight-takeaway">
+                💡 {{ insight.what_it_means }}
             </div>
             {% endif %}
-
-            {% if company_stats %}
-            <h2>Current Headcount by Company</h2>
-            <div class="trends-box">
-                {% for company, stats in company_stats.items() %}
-                <div class="trend-item">
-                    <div class="trend-value">{{ stats.active }}</div>
-                    <div class="trend-label">{{ company }}</div>
-                </div>
+            
+            <!-- Summary -->
+            <div class="insight-summary">{{ insight.summary }}</div>
+            
+            <!-- Signals -->
+            {% if insight.signals %}
+            <div class="signal-tags">
+                {% for signal in insight.signals %}
+                <span class="signal-tag">{{ signal }}</span>
                 {% endfor %}
             </div>
             {% endif %}
+            
+            <!-- Meta -->
+            <div class="insight-meta">
+                <span class="confidence-badge confidence-{{ insight.confidence }}">
+                    {{ insight.confidence }} confidence
+                </span>
+                {% if insight.is_new_direction %}
+                <span style="color: #ef4444;">🔥 New direction</span>
+                {% endif %}
+            </div>
         </div>
+        {% endfor %}
+        {% endfor %}
+        {% endif %}
 
+        <!-- New Postings -->
+        {% if new_postings_by_company %}
+        <div class="section-header">📋 New job postings</div>
+        {% for company, postings in new_postings_by_company.items() %}
+        <div class="company-section">
+            <div class="company-name">
+                {{ company }} <span class="count">({{ postings|length }} new)</span>
+            </div>
+            <ul class="posting-list">
+                {% for posting in postings %}
+                <li class="posting-item">
+                    <div class="posting-title">
+                        {% if posting.url %}
+                        <a href="{{ posting.url }}" target="_blank">{{ posting.title }}</a>
+                        {% else %}
+                        {{ posting.title }}
+                        {% endif %}
+                    </div>
+                    <div class="posting-meta">
+                        {% if posting.department %}{{ posting.department }}{% endif %}
+                        {% if posting.department and posting.location %} · {% endif %}
+                        {% if posting.location %}{{ posting.location }}{% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- 30-Day Trends -->
+        {% if trends_30_day %}
+        <div class="section-header">📈 30-day snapshot</div>
+        <div class="quick-stats">
+            <div class="quick-stat">
+                <div class="quick-stat-value">{{ trends_30_day.new_postings }}</div>
+                <div class="quick-stat-label">New</div>
+            </div>
+            <div class="quick-stat">
+                <div class="quick-stat-value">{{ trends_30_day.closed_postings }}</div>
+                <div class="quick-stat-label">Closed</div>
+            </div>
+            <div class="quick-stat">
+                {% if trends_30_day.net_change >= 0 %}
+                <div class="quick-stat-value positive">+{{ trends_30_day.net_change }}</div>
+                {% else %}
+                <div class="quick-stat-value negative">{{ trends_30_day.net_change }}</div>
+                {% endif %}
+                <div class="quick-stat-label">Net</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Company Stats -->
+        {% if company_stats %}
+        <div class="section-header">🏢 Open roles by company</div>
+        <div class="quick-stats">
+            {% for company, stats in company_stats.items() %}
+            <div class="quick-stat">
+                <div class="quick-stat-value">{{ stats.active }}</div>
+                <div class="quick-stat-label">{{ company }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Conversational Footer -->
         <div class="footer">
-            <p>Generated by Fintech Job Intelligence System</p>
-            <p>This report tracks job postings from Canadian fintech competitors for strategic analysis.</p>
+            <p class="footer-tagline">That's a wrap for this week! 👋</p>
+            <p class="footer-small">
+                Fintech Intel tracks job postings from Canadian fintech companies.<br>
+                Questions? Just reply to this email.
+            </p>
         </div>
     </div>
 </body>

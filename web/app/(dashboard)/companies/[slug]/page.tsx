@@ -1,14 +1,22 @@
+/**
+ * Company Detail Page
+ * 
+ * Shows company overview, strategic insights, job postings with card/table toggle,
+ * and job history with filters.
+ */
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { EditCompanyForm } from "@/components/companies/EditCompanyForm";
 import { CompanyInsightsCard } from "@/components/companies/CompanyInsightsCard";
 import { DeleteCompanyButton } from "@/components/companies/DeleteCompanyButton";
+import { JobHistoryView, JobData } from "@/components/companies/JobHistoryView";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -27,13 +35,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     .single();
   if (error || !company) notFound();
 
-  const [{ data: jobs }, { data: latestInsight }] = await Promise.all([
+  const [{ data: jobsRaw }, { data: latestInsight }, { data: tasks }] = await Promise.all([
     supabase
       .from("job_postings")
-      .select("id, title, department, location, is_active, first_seen_date")
+      .select("id, title, department, location, is_active, first_seen_date, url")
       .eq("company_id", company.id)
-      .order("first_seen_date", { ascending: false })
-      .limit(50),
+      .order("first_seen_date", { ascending: false }),
     supabase
       .from("company_insights")
       .select("*")
@@ -41,7 +48,38 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       .order("generated_at", { ascending: false })
       .limit(1)
       .single(),
+    supabase
+      .from("job_run_tasks")
+      .select(`
+        *,
+        job_runs(
+          id,
+          job_type,
+          trigger_type,
+          started_at,
+          completed_at,
+          status
+        )
+      `)
+      .eq("company_id", company.id)
+      .order("started_at", { ascending: false })
+      .limit(50),
   ]);
+
+  // Transform jobs data for JobHistoryView
+  const jobs: JobData[] = (jobsRaw ?? []).map((j: any) => ({
+    id: j.id,
+    title: j.title,
+    department: j.department,
+    location: j.location,
+    isActive: j.is_active,
+    firstSeenDate: j.first_seen_date,
+    url: j.url,
+  }));
+
+  // Count active vs inactive jobs
+  const activeJobCount = jobs.filter(j => j.isActive).length;
+  const inactiveJobCount = jobs.filter(j => !j.isActive).length;
 
   // Get ATS label for display
   const atsLabels: Record<string, string> = {
@@ -70,11 +108,17 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="insights">Insights</TabsTrigger>
-          <TabsTrigger value="jobs">Jobs ({jobs?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="history">Job History</TabsTrigger>
+          <TabsTrigger value="jobs">
+            Active Jobs ({activeJobCount})
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            All Jobs ({jobs.length})
+          </TabsTrigger>
+          <TabsTrigger value="runs">Processing History</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
+        {/* Overview Tab */}
         <TabsContent value="overview">
           <Card>
             <CardHeader>
@@ -103,14 +147,18 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <p className="text-sm text-muted-foreground">ATS Identifier</p>
                   <p className="font-mono">{company.ats_identifier}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Jobs Tracked</p>
-                  <p className="font-semibold">{jobs?.length ?? 0}</p>
+                  <p className="text-sm text-muted-foreground">Active Jobs</p>
+                  <p className="font-semibold text-green-600">{activeJobCount}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Closed Jobs</p>
+                  <p className="font-semibold text-gray-500">{inactiveJobCount}</p>
                 </div>
                 {company.careers_url && (
                   <div>
@@ -130,6 +178,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           </Card>
         </TabsContent>
 
+        {/* Insights Tab */}
         <TabsContent value="insights">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -170,51 +219,100 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           </div>
         </TabsContent>
 
+        {/* Active Jobs Tab - With Card/Table Toggle */}
         <TabsContent value="jobs">
+          <JobHistoryView
+            jobs={jobs}
+            companySlug={company.slug}
+            initialStatus="active"
+            showHeader={true}
+          />
+        </TabsContent>
+
+        {/* All Jobs/History Tab - With Filters */}
+        <TabsContent value="history">
+          <JobHistoryView
+            jobs={jobs}
+            companySlug={company.slug}
+            initialStatus="all"
+            showHeader={true}
+            pageSize={24}
+          />
+        </TabsContent>
+
+        {/* Processing History Tab */}
+        <TabsContent value="runs">
           <Card>
             <CardHeader>
-              <h2 className="font-semibold">Job Postings</h2>
+              <h2 className="font-semibold">Processing History</h2>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>First Seen</TableHead>
-                    <TableHead></TableHead>
+                    <TableHead>Job Type</TableHead>
+                    <TableHead>Trigger</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Started</TableHead>
+                    <TableHead>Results</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(jobs ?? []).map((j) => (
-                    <TableRow key={j.id}>
-                      <TableCell>{j.title}</TableCell>
-                      <TableCell>{j.department ?? "—"}</TableCell>
-                      <TableCell>{j.location ?? "—"}</TableCell>
-                      <TableCell>
-                        {j.first_seen_date ? format(new Date(j.first_seen_date), "MMM d, yyyy") : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Link href={`/jobs/${j.id}`} className="text-primary text-sm hover:underline">
-                          View
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {(tasks ?? []).map((task: any) => {
+                    const jobRun = Array.isArray(task.job_runs) ? task.job_runs[0] : task.job_runs;
+                    return (
+                      <TableRow key={task.id}>
+                        <TableCell>
+                          <span className="capitalize">{jobRun?.job_type || "collect"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="capitalize">{jobRun?.trigger_type || "manual"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              task.status === "completed"
+                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                : task.status === "failed"
+                                ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                                : task.status === "running"
+                                ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                                : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                            }`}
+                          >
+                            {task.status}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {task.started_at
+                            ? format(new Date(task.started_at), "MMM d, yyyy HH:mm")
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {jobRun?.job_type === "collect" ? (
+                            <div className="text-sm">
+                              {task.new_jobs} new, {task.updated_jobs} updated, {task.closed_jobs} closed
+                            </div>
+                          ) : (
+                            <div className="text-sm">{task.insights_generated} insights</div>
+                          )}
+                          {task.error_message && (
+                            <div className="text-xs text-red-600 mt-1">{task.error_message}</div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
-              {(jobs ?? []).length === 0 && (
-                <p className="py-4 text-center text-muted-foreground">No jobs yet.</p>
+              {(tasks ?? []).length === 0 && (
+                <p className="py-4 text-center text-muted-foreground">No processing history yet.</p>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="history">
-          <JobHistoryTab companyId={company.id} />
-        </TabsContent>
-
+        {/* Settings Tab */}
         <TabsContent value="settings">
           <div className="space-y-6">
             <EditCompanyForm company={company} />
@@ -232,99 +330,5 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-async function JobHistoryTab({ companyId }: { companyId: string }) {
-  const supabase = await createClient();
-
-  // Get all tasks for this company
-  const { data: tasks } = await supabase
-    .from("job_run_tasks")
-    .select(`
-      *,
-      job_runs(
-        id,
-        job_type,
-        trigger_type,
-        started_at,
-        completed_at,
-        status
-      )
-    `)
-    .eq("company_id", companyId)
-    .order("started_at", { ascending: false })
-    .limit(50);
-
-  return (
-    <Card>
-      <CardHeader>
-        <h2 className="font-semibold">Processing History</h2>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Job Type</TableHead>
-              <TableHead>Trigger</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Started</TableHead>
-              <TableHead>Results</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(tasks ?? []).map((task: any) => {
-              // Supabase joins return arrays, so we need to access the first element
-              const jobRun = Array.isArray(task.job_runs) ? task.job_runs[0] : task.job_runs;
-              return (
-                <TableRow key={task.id}>
-                  <TableCell>
-                    <span className="capitalize">{jobRun?.job_type || "collect"}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="capitalize">{jobRun?.trigger_type || "manual"}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        task.status === "completed"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : task.status === "failed"
-                          ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                          : task.status === "running"
-                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                          : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
-                      }`}
-                    >
-                      {task.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {task.started_at
-                      ? format(new Date(task.started_at), "MMM d, yyyy HH:mm")
-                      : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {jobRun?.job_type === "collect" ? (
-                      <div className="text-sm">
-                        {task.new_jobs} new, {task.updated_jobs} updated, {task.closed_jobs} closed
-                      </div>
-                    ) : (
-                      <div className="text-sm">{task.insights_generated} insights</div>
-                    )}
-                    {task.error_message && (
-                      <div className="text-xs text-red-600 mt-1">{task.error_message}</div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-        {(tasks ?? []).length === 0 && (
-          <p className="py-4 text-center text-muted-foreground">No processing history yet.</p>
-        )}
-      </CardContent>
-    </Card>
   );
 }

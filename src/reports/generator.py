@@ -74,14 +74,32 @@ class ReportGenerator:
             })
 
         # Group insights by category
+        # TLDR-style additions: headline and what_it_means fields for punchy display
         insights_by_category = {}
         for insight in insights:
             category = insight.category or "other"
             if category not in insights_by_category:
                 insights_by_category[category] = []
+            
+            company_name = insight.job_posting.company.name if insight.job_posting.company else "Unknown"
+            job_title = insight.job_posting.title
+            
+            # Get TLDR-style headline (fallback to generated headline if not in DB)
+            headline = getattr(insight, 'headline', None)
+            if not headline:
+                # Generate fallback headline from company and signals
+                headline = f"📊 {company_name} is hiring"
+            
+            # Get plain-language takeaway (fallback if not in DB)
+            what_it_means = getattr(insight, 'what_it_means', None)
+            if not what_it_means:
+                what_it_means = insight.insight_summary[:100] + "..." if insight.insight_summary and len(insight.insight_summary) > 100 else insight.insight_summary
+            
             insights_by_category[category].append({
-                "company": insight.job_posting.company.name if insight.job_posting.company else "Unknown",
-                "title": insight.job_posting.title,
+                "headline": headline,  # TLDR-style punchy headline
+                "what_it_means": what_it_means,  # Plain-language takeaway
+                "company": company_name,
+                "title": job_title,
                 "summary": insight.insight_summary,
                 "signals": json.loads(insight.strategic_signals) if insight.strategic_signals else [],
                 "is_new_direction": insight.is_new_direction,
