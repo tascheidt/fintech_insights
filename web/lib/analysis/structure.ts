@@ -169,7 +169,7 @@ export async function extractJobStructure(
   } catch (error) {
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
-      console.error(`Job structure validation error for "${jobTitle}":`, error.issues || error.errors);
+      console.error(`Job structure validation error for "${jobTitle}":`, error.issues);
       // Return partial data if possible (parsed is guaranteed to be set here)
       if (parsed !== null) {
         return extractPartialStructure(error, parsed);

@@ -34,6 +34,31 @@ npx tsx web/scripts/run-migration.ts     # Run migrations
 npx tsx web/scripts/verify-migration.ts  # Verify migration
 ```
 
+## Build & Deployment
+
+### Vercel Build Requirements
+
+**IMPORTANT: Always run `npm run build` locally before pushing to catch TypeScript errors.**
+
+Vercel runs strict TypeScript checking during builds. Common issues:
+
+1. **Type Errors**: Vercel's TypeScript compiler is stricter than local dev. Always verify types:
+   - Use correct property names (e.g., `ZodError.issues`, not `ZodError.errors`)
+   - Ensure all imports are typed correctly
+   - Check that optional chaining/nullish coalescing is used appropriately
+
+2. **Pre-deployment Checklist**:
+   ```bash
+   cd web
+   npm run build  # Must pass before pushing
+   npm run lint   # Check for linting issues
+   ```
+
+3. **Common TypeScript Mistakes**:
+   - Accessing non-existent properties on types (e.g., `error.errors` on `ZodError` - use `error.issues`)
+   - Missing type assertions or guards
+   - Incorrect generic type parameters
+
 ## Architecture
 
 ### Tech Stack
@@ -51,7 +76,7 @@ npx tsx web/scripts/verify-migration.ts  # Verify migration
 
 **API Routes**: Next.js API routes at `/web/app/api/` handle CRUD and cron jobs. All use Zod validation.
 
-**Auth Middleware** (`web/middleware.ts`): Protects all routes except `/login`, `/api`, `/auth`.
+**Auth Proxy** (`web/proxy.ts`): Protects all routes except `/login`, `/api`, `/auth`. Uses Next.js 16 proxy convention (runs in Node.js runtime).
 
 **Component Structure**:
 - `/web/components/ui/` - shadcn/ui primitives
