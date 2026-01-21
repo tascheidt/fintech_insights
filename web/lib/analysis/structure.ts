@@ -76,11 +76,13 @@ Respond ONLY with valid JSON matching this structure:
  * 
  * @param jobTitle - The job title
  * @param description - The full job description text
+ * @param retryCount - Internal retry counter (default: 0)
  * @returns Structured job data or null if extraction fails
  */
 export async function extractJobStructure(
   jobTitle: string,
-  description: string
+  description: string,
+  retryCount: number = 0
 ): Promise<JobStructureForDB | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
@@ -114,18 +116,38 @@ export async function extractJobStructure(
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
 
-    const text = result.response.text()?.trim() ?? "{}";
+    const text = result.response.text()?.trim() ?? "";
     
+    // Log response for debugging (truncated to avoid log spam)
+    if (!text || text.length === 0) {
+      console.warn(`Empty response from Gemini for job "${jobTitle}"`);
+      
+      // Retry logic: attempt up to 2 retries for empty responses
+      if (retryCount < 2) {
+        console.log(`Retrying extraction for job "${jobTitle}" due to empty response (attempt ${retryCount + 2}/3)`);
+        // Wait a bit before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        return extractJobStructure(jobTitle, description, retryCount + 1);
+      }
+      
+      return null;
+    }
+
     // Try to parse JSON, with fallback for malformed JSON
     try {
       parsed = JSON.parse(text) as unknown;
     } catch (parseError) {
+      // Log the actual response for debugging (first 200 chars)
+      const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
+      console.warn(`JSON parse failed for job "${jobTitle}". Response preview: ${responsePreview}`);
+      
       // Try to extract JSON from text that might have markdown code blocks or extra text
       // First, try to find JSON in markdown code blocks
       const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
       if (codeBlockMatch) {
         try {
           parsed = JSON.parse(codeBlockMatch[1]) as unknown;
+          console.log(`Successfully extracted JSON from markdown code block for job "${jobTitle}"`);
         } catch {
           // Fall through to next attempt
         }
@@ -140,12 +162,30 @@ export async function extractJobStructure(
             let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
             
             parsed = JSON.parse(jsonText) as unknown;
-          } catch {
-            console.error(`Failed to parse JSON for job "${jobTitle}" after extraction attempts`);
+            console.log(`Successfully parsed JSON after fixing trailing commas for job "${jobTitle}"`);
+          } catch (fixError) {
+            console.error(`Failed to parse JSON for job "${jobTitle}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
+            // Log the problematic JSON snippet for debugging
+            if (jsonMatch[0].length < 500) {
+              console.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
+            }
             return null;
           }
         } else {
-          console.error(`No JSON found in response for job "${jobTitle}"`);
+          console.error(`No JSON found in response for job "${jobTitle}". Response length: ${text.length}, Preview: ${responsePreview}`);
+          // Log full response if it's short enough to be useful
+          if (text.length < 500) {
+            console.error(`Full response: ${text}`);
+          }
+          
+          // Retry logic: attempt up to 2 retries for empty/malformed responses
+          if (retryCount < 2) {
+            console.log(`Retrying extraction for job "${jobTitle}" (attempt ${retryCount + 2}/3)`);
+            // Wait a bit before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+            return extractJobStructure(jobTitle, description, retryCount + 1);
+          }
+          
           return null;
         }
       }
@@ -179,6 +219,25 @@ export async function extractJobStructure(
 
     // Handle other errors (API errors, etc.)
     console.error(`Job structure extraction error for "${jobTitle}":`, error);
+    
+    // Retry logic for API errors (rate limits, network issues, etc.)
+    if (retryCount < 2 && error instanceof Error) {
+      const errorMessage = error.message.toLowerCase();
+      // Retry on rate limit, network, or transient errors
+      if (
+        errorMessage.includes('rate limit') ||
+        errorMessage.includes('network') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('503') ||
+        errorMessage.includes('429')
+      ) {
+        console.log(`Retrying extraction for job "${jobTitle}" due to ${errorMessage} (attempt ${retryCount + 2}/3)`);
+        // Wait before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
+        return extractJobStructure(jobTitle, description, retryCount + 1);
+      }
+    }
+    
     return null;
   }
 }

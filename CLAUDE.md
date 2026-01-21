@@ -94,6 +94,7 @@ Vercel runs strict TypeScript checking during builds. Common issues:
 ### Cron Jobs (Vercel)
 - Daily 6 AM: `/api/cron/collect` - Collect jobs and analyze
 - Weekly Monday 8 AM: `/api/cron/report` - Generate reports
+- Never create more than two cron jobs
 
 ## Configuration
 

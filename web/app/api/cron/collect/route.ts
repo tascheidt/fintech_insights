@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded } from "@/lib/jobs";
+import { requireCronAuth } from "@/lib/cron/auth";
 
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Validate cron authentication
+  const authError = requireCronAuth(req);
+  if (authError) {
+    return authError;
   }
+
+  console.log("Cron job started: collect", {
+    timestamp: new Date().toISOString(),
+    path: req.nextUrl.pathname,
+  });
 
   const supabase = createAdminClient();
 

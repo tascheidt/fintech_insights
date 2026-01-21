@@ -18,6 +18,7 @@ import {
 } from "@/lib/analysis/company-insights";
 import { getWeeklyData, generateWeeklyReport, WeeklyDigest } from "@/lib/analysis/digest";
 import { WeeklyDigestEmail } from "@/lib/email/templates/weekly-digest";
+import { requireCronAuth } from "@/lib/cron/auth";
 
 export const maxDuration = 300; // Increased to handle company insights and AI generation
 
@@ -139,10 +140,16 @@ async function insertCompanySummaries(digestId: string, digest: WeeklyDigest): P
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Validate cron authentication
+  const authError = requireCronAuth(req);
+  if (authError) {
+    return authError;
   }
+
+  console.log("Cron job started: report", {
+    timestamp: new Date().toISOString(),
+    path: req.nextUrl.pathname,
+  });
 
   const supabase = createAdminClient();
   
