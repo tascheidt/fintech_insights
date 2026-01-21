@@ -19,7 +19,6 @@ import {
   Briefcase,
   MapPin,
   Calendar,
-  Clock,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -29,7 +28,6 @@ import {
   NotionCard,
   NotionCardContent,
   NotionCardTitle,
-  NotionCardDescription,
   NotionCardFooter,
   NotionCardTag,
 } from "@/components/ui/notion-card";
