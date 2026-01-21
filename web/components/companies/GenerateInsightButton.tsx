@@ -69,7 +69,7 @@ export function GenerateInsightButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Generate Insight</Button>
+        <Button className="min-h-[44px]">Generate Insight</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

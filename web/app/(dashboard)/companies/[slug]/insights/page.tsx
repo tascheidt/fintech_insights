@@ -43,14 +43,16 @@ export default async function CompanyInsightsPage({
         </Button>
       </div>
 
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Strategic Insights</h1>
           <p className="text-muted-foreground mt-1">
             Company-level analysis of {company.name}&apos;s hiring patterns
           </p>
         </div>
-        <GenerateInsightButton companyId={company.id} companyName={company.name} />
+        <div className="self-start sm:self-auto">
+          <GenerateInsightButton companyId={company.id} companyName={company.name} />
+        </div>
       </div>
 
       {/* Latest Insight Summary */}
@@ -73,10 +75,10 @@ export default async function CompanyInsightsPage({
               {insights.slice(1).map((insight) => (
                 <div
                   key={insight.id}
-                  className="flex items-start justify-between p-4 border rounded-lg"
+                  className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4 border rounded-lg"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                           insight.confidence === "high"
@@ -95,7 +97,7 @@ export default async function CompanyInsightsPage({
                     </div>
                     <p className="text-sm line-clamp-2">{insight.executive_summary}</p>
                   </div>
-                  <Button variant="ghost" size="sm" asChild className="ml-4">
+                  <Button variant="ghost" size="sm" asChild className="self-start sm:self-auto min-h-[44px]">
                     <Link href={`/companies/${company.slug}/insights/${insight.id}`}>
                       View →
                     </Link>

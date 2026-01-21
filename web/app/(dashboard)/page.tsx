@@ -193,7 +193,7 @@ export default async function DashboardPage() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Welcome Message */}
       <WelcomeMessage
         userName={profile?.full_name}
@@ -208,14 +208,14 @@ export default async function DashboardPage() {
         thisWeek={thisWeek ?? 0}
       />
 
-      {/* Main Content Grid */}
-      <div className="grid gap-8 lg:grid-cols-3">
-        {/* Companies Overview - Takes 2 columns */}
+      {/* Main Content Grid - Stacks on mobile, 2/1 split on desktop */}
+      <div className="flex flex-col gap-6 sm:gap-8 lg:grid lg:grid-cols-3">
+        {/* Companies Overview - Takes 2 columns on desktop */}
         <div className="lg:col-span-2">
           <CompaniesOverview companies={companies} />
         </div>
 
-        {/* Strategic Highlights - Takes 1 column */}
+        {/* Strategic Highlights - Takes 1 column on desktop */}
         <div className="lg:col-span-1">
           <StrategicHighlights 
             insights={strategicHighlights} 

@@ -104,19 +104,21 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         </Button>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="insights">Insights</TabsTrigger>
-          <TabsTrigger value="jobs">
-            Active Jobs ({activeJobCount})
-          </TabsTrigger>
-          <TabsTrigger value="history">
-            All Jobs ({jobs.length})
-          </TabsTrigger>
-          <TabsTrigger value="runs">Processing History</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
+        <div className="overflow-x-auto">
+          <TabsList className="w-full min-w-max sm:w-fit">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="insights">Insights</TabsTrigger>
+            <TabsTrigger value="jobs">
+              Active Jobs ({activeJobCount})
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              All Jobs ({jobs.length})
+            </TabsTrigger>
+            <TabsTrigger value="runs">Processing</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Overview Tab */}
         <TabsContent value="overview">
@@ -147,10 +149,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <p className="text-sm text-muted-foreground">ATS Identifier</p>
-                  <p className="font-mono">{company.ats_identifier}</p>
+                  <p className="font-mono text-sm break-all">{company.ats_identifier}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Active Jobs</p>
@@ -167,7 +169,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                       href={company.careers_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-primary hover:underline text-sm truncate block"
+                      className="text-primary hover:underline text-sm truncate block break-all"
                     >
                       {company.careers_url}
                     </a>
@@ -181,14 +183,14 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         {/* Insights Tab */}
         <TabsContent value="insights">
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h2 className="font-semibold">Strategic Insights</h2>
                 <p className="text-sm text-muted-foreground">
                   Company-level analysis of hiring patterns
                 </p>
               </div>
-              <Button asChild>
+              <Button asChild className="self-start sm:self-auto">
                 <Link href={`/companies/${company.slug}/insights`}>View All Insights →</Link>
               </Button>
             </div>
@@ -247,16 +249,17 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               <h2 className="font-semibold">Processing History</h2>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Job Type</TableHead>
-                    <TableHead>Trigger</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Started</TableHead>
-                    <TableHead>Results</TableHead>
-                  </TableRow>
-                </TableHeader>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job Type</TableHead>
+                      <TableHead>Trigger</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="hidden sm:table-cell">Started</TableHead>
+                      <TableHead>Results</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {(tasks ?? []).map((task: any) => {
                     const jobRun = Array.isArray(task.job_runs) ? task.job_runs[0] : task.job_runs;
@@ -283,7 +286,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                             {task.status}
                           </span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           {task.started_at
                             ? format(new Date(task.started_at), "MMM d, yyyy HH:mm")
                             : "—"}
@@ -305,6 +308,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                   })}
                 </TableBody>
               </Table>
+              </div>
               {(tasks ?? []).length === 0 && (
                 <p className="py-4 text-center text-muted-foreground">No processing history yet.</p>
               )}
