@@ -128,7 +128,7 @@ export function StrategicHighlights({
  */
 function HighlightsHeader({ trackedCompanyCount }: { trackedCompanyCount: number }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
       <div>
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-amber-500" />
@@ -140,7 +140,7 @@ function HighlightsHeader({ trackedCompanyCount }: { trackedCompanyCount: number
       </div>
       <Link
         href="/insights"
-        className="text-sm text-primary hover:underline flex items-center gap-1"
+        className="text-sm text-primary hover:underline flex items-center gap-1 self-start sm:self-auto"
       >
         View all <ChevronRight className="h-3 w-3" />
       </Link>

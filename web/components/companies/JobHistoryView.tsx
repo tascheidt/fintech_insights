@@ -19,7 +19,6 @@ import {
   Briefcase,
   MapPin,
   Calendar,
-  Clock,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -29,7 +28,6 @@ import {
   NotionCard,
   NotionCardContent,
   NotionCardTitle,
-  NotionCardDescription,
   NotionCardFooter,
   NotionCardTag,
 } from "@/components/ui/notion-card";
@@ -187,55 +185,58 @@ export function JobHistoryView({
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search jobs..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 min-h-[44px]"
           />
         </div>
 
-        {/* Status filter */}
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Filters row */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Status filter */}
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+            <SelectTrigger className="w-full sm:w-[140px] min-h-[44px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
 
-        {/* Time filter */}
-        <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Time" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Time</SelectItem>
-            <SelectItem value="7days">Last 7 Days</SelectItem>
-            <SelectItem value="30days">Last 30 Days</SelectItem>
-            <SelectItem value="90days">Last 90 Days</SelectItem>
-            <SelectItem value="6months">Last 6 Months</SelectItem>
-            <SelectItem value="1year">Last Year</SelectItem>
-          </SelectContent>
-        </Select>
+          {/* Time filter */}
+          <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
+            <SelectTrigger className="w-full sm:w-[140px] min-h-[44px]">
+              <SelectValue placeholder="Time" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="7days">Last 7 Days</SelectItem>
+              <SelectItem value="30days">Last 30 Days</SelectItem>
+              <SelectItem value="90days">Last 90 Days</SelectItem>
+              <SelectItem value="6months">Last 6 Months</SelectItem>
+              <SelectItem value="1year">Last Year</SelectItem>
+            </SelectContent>
+          </Select>
 
-        {/* Clear filters */}
-        {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters}>
-            <X className="h-4 w-4 mr-1" />
-            Clear
-          </Button>
-        )}
+          {/* Clear filters */}
+          {hasFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="min-h-[44px]">
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          )}
 
-        {/* View toggle (if no header) */}
-        {!showHeader && <ViewToggle view={view} onViewChange={setView} />}
+          {/* View toggle (if no header) */}
+          {!showHeader && <ViewToggle view={view} onViewChange={setView} />}
+        </div>
       </div>
 
       {/* Content */}
@@ -256,27 +257,29 @@ export function JobHistoryView({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
           <p className="text-sm text-muted-foreground">
             Page {currentPage} of {totalPages}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
+              className="flex-1 sm:flex-initial min-h-[44px]"
             >
               <ChevronLeft className="h-4 w-4" />
-              Previous
+              <span className="hidden sm:inline">Previous</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
+              className="flex-1 sm:flex-initial min-h-[44px]"
             >
-              Next
+              <span className="hidden sm:inline">Next</span>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -291,7 +294,7 @@ export function JobHistoryView({
  */
 function JobsCardView({ jobs }: { jobs: JobData[] }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       {jobs.map((job) => (
         <Link key={job.id} href={`/jobs/${job.id}`}>
           <NotionCard className="h-full">
@@ -352,14 +355,14 @@ function JobsCardView({ jobs }: { jobs: JobData[] }) {
  */
 function JobsTableView({ jobs }: { jobs: JobData[] }) {
   return (
-    <div className="rounded-lg border">
+    <div className="rounded-lg border overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Title</TableHead>
-            <TableHead>Department</TableHead>
-            <TableHead>Location</TableHead>
-            <TableHead>First Seen</TableHead>
+            <TableHead className="hidden sm:table-cell">Department</TableHead>
+            <TableHead className="hidden md:table-cell">Location</TableHead>
+            <TableHead className="hidden md:table-cell">First Seen</TableHead>
             <TableHead>Status</TableHead>
             <TableHead></TableHead>
           </TableRow>
@@ -368,9 +371,9 @@ function JobsTableView({ jobs }: { jobs: JobData[] }) {
           {jobs.map((job) => (
             <TableRow key={job.id}>
               <TableCell className="font-medium">{job.title}</TableCell>
-              <TableCell>{job.department ?? "—"}</TableCell>
-              <TableCell>{job.location ?? "—"}</TableCell>
-              <TableCell>
+              <TableCell className="hidden sm:table-cell">{job.department ?? "—"}</TableCell>
+              <TableCell className="hidden md:table-cell">{job.location ?? "—"}</TableCell>
+              <TableCell className="hidden md:table-cell">
                 {job.firstSeenDate
                   ? format(new Date(job.firstSeenDate), "MMM d, yyyy")
                   : "—"}
@@ -390,7 +393,7 @@ function JobsTableView({ jobs }: { jobs: JobData[] }) {
               <TableCell>
                 <Link
                   href={`/jobs/${job.id}`}
-                  className="text-primary text-sm hover:underline"
+                  className="text-primary text-sm hover:underline whitespace-nowrap"
                 >
                   View →
                 </Link>

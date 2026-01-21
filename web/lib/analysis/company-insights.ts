@@ -422,8 +422,72 @@ async function generateInsightWithLLM(
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
 
-    const text = result.response.text()?.trim() ?? "{}";
-    const parsed = JSON.parse(text);
+    const text = result.response.text()?.trim() ?? "";
+
+    // Handle empty response
+    if (!text || text.length === 0) {
+      console.warn(`Empty response from Gemini for company insight generation: ${companyName}`);
+      throw new Error("Empty response from LLM");
+    }
+
+    let parsed: Record<string, unknown> | null = null;
+
+    // Try to parse JSON, with fallback for malformed JSON
+    try {
+      parsed = JSON.parse(text) as Record<string, unknown>;
+    } catch (parseError) {
+      // Log the actual response for debugging (first 200 chars)
+      const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
+      console.warn(`JSON parse failed for company insight "${companyName}". Response preview: ${responsePreview}`);
+      
+      // Try to extract JSON from text that might have markdown code blocks or extra text
+      // First, try to find JSON in markdown code blocks
+      const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (codeBlockMatch) {
+        try {
+          parsed = JSON.parse(codeBlockMatch[1]) as Record<string, unknown>;
+          console.log(`Successfully extracted JSON from markdown code block for company insight "${companyName}"`);
+        } catch {
+          // Fall through to next attempt
+        }
+      }
+      
+      // If that didn't work, try to find any JSON object in the text
+      if (parsed === null) {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            // Try to fix common JSON issues: trailing commas before closing braces/brackets
+            let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
+            
+            parsed = JSON.parse(jsonText) as Record<string, unknown>;
+            console.log(`Successfully parsed JSON after fixing trailing commas for company insight "${companyName}"`);
+          } catch (fixError) {
+            console.error(`Failed to parse JSON for company insight "${companyName}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
+            // Log the problematic JSON snippet for debugging
+            if (jsonMatch[0].length < 500) {
+              console.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
+            }
+            // Log full response if it's short enough to be useful
+            if (text.length < 1000) {
+              console.error(`Full response: ${text}`);
+            }
+            throw new Error(`Failed to parse JSON response: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
+          }
+        } else {
+          console.error(`No JSON found in response for company insight "${companyName}". Response length: ${text.length}, Preview: ${responsePreview}`);
+          // Log full response if it's short enough to be useful
+          if (text.length < 1000) {
+            console.error(`Full response: ${text}`);
+          }
+          throw new Error("No JSON found in LLM response");
+        }
+      }
+    }
+
+    if (!parsed) {
+      throw new Error("Failed to parse LLM response");
+    }
 
     return {
       executiveSummary: String(parsed.executive_summary || ""),
@@ -441,7 +505,7 @@ async function generateInsightWithLLM(
     };
   } catch (error) {
     console.error("LLM generation error:", error);
-    throw new Error("Failed to generate insight with LLM");
+    throw new Error(`Failed to generate insight with LLM: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

@@ -157,7 +157,7 @@ function CompaniesTableView({ companies }: { companies: CompanyOverviewData[] })
   }
 
   return (
-    <div className="rounded-lg border">
+    <div className="rounded-lg border overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -165,7 +165,7 @@ function CompaniesTableView({ companies }: { companies: CompanyOverviewData[] })
             <TableHead>Country</TableHead>
             <TableHead className="text-right">Active Jobs</TableHead>
             <TableHead>ATS</TableHead>
-            <TableHead>Recent Activity</TableHead>
+            <TableHead className="hidden sm:table-cell">Recent Activity</TableHead>
             <TableHead></TableHead>
           </TableRow>
         </TableHeader>
@@ -174,7 +174,7 @@ function CompaniesTableView({ companies }: { companies: CompanyOverviewData[] })
             <TableRow key={company.id}>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <span className="font-medium">{company.name}</span>
                   {company.trackForStrategy && (
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
@@ -192,13 +192,13 @@ function CompaniesTableView({ companies }: { companies: CompanyOverviewData[] })
                   {company.atsType}
                 </span>
               </TableCell>
-              <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+              <TableCell className="hidden sm:table-cell max-w-xs truncate text-sm text-muted-foreground">
                 {company.recentHighlight || "—"}
               </TableCell>
               <TableCell>
                 <Link
                   href={`/companies/${company.slug}`}
-                  className="text-primary text-sm hover:underline"
+                  className="text-primary text-sm hover:underline whitespace-nowrap"
                 >
                   View →
                 </Link>

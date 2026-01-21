@@ -68,8 +68,15 @@ export interface DeepResearchOptions {
 
 /**
  * Detect if a company is public or private
+ * 
+ * @param companyName - The company name to check
+ * @param retryCount - Internal retry counter (default: 0)
+ * @returns Company type information
  */
-export async function detectCompanyType(companyName: string): Promise<CompanyType> {
+export async function detectCompanyType(
+  companyName: string,
+  retryCount: number = 0
+): Promise<CompanyType> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     console.warn("GEMINI_API_KEY not configured, assuming private company");
@@ -100,17 +107,132 @@ Respond with JSON:
 Only say high confidence if you are certain. Most fintech startups are private.`;
 
     const result = await model.generateContent(prompt);
-    const text = result.response.text()?.trim() ?? "{}";
-    const parsed = JSON.parse(text);
+    const text = result.response.text()?.trim() ?? "";
+
+    // Handle empty response
+    if (!text || text.length === 0) {
+      console.warn(`Empty response from Gemini for company type detection: ${companyName}`);
+      
+      // Retry logic: attempt up to 2 retries for empty responses
+      if (retryCount < 2) {
+        console.log(`Retrying company type detection for "${companyName}" due to empty response (attempt ${retryCount + 2}/3)`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        return detectCompanyType(companyName, retryCount + 1);
+      }
+      
+      return { isPublic: false, confidence: "low" };
+    }
+
+    let parsed: Record<string, unknown> | null = null;
+
+    // Try to parse JSON, with fallback for malformed JSON
+    try {
+      parsed = JSON.parse(text) as Record<string, unknown>;
+    } catch (parseError) {
+      // Log the actual response for debugging (first 200 chars)
+      const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
+      console.warn(`JSON parse failed for company type detection "${companyName}". Response preview: ${responsePreview}`);
+      
+      // Try to extract JSON from text that might have markdown code blocks or extra text
+      // First, try to find JSON in markdown code blocks
+      const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (codeBlockMatch) {
+        try {
+          parsed = JSON.parse(codeBlockMatch[1]) as Record<string, unknown>;
+          console.log(`Successfully extracted JSON from markdown code block for company type "${companyName}"`);
+        } catch {
+          // Fall through to next attempt
+        }
+      }
+      
+      // If that didn't work, try to find any JSON object in the text
+      if (parsed === null) {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            // Try to fix common JSON issues: trailing commas before closing braces/brackets
+            let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
+            
+            parsed = JSON.parse(jsonText) as Record<string, unknown>;
+            console.log(`Successfully parsed JSON after fixing trailing commas for company type "${companyName}"`);
+          } catch (fixError) {
+            console.error(`Failed to parse JSON for company type "${companyName}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
+            // Log the problematic JSON snippet for debugging
+            if (jsonMatch[0].length < 500) {
+              console.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
+            }
+            
+            // Retry logic: attempt up to 2 retries for malformed JSON
+            if (retryCount < 2) {
+              console.log(`Retrying company type detection for "${companyName}" due to JSON parsing failure (attempt ${retryCount + 2}/3)`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+              return detectCompanyType(companyName, retryCount + 1);
+            }
+            
+            return { isPublic: false, confidence: "low" };
+          }
+        } else {
+          console.error(`No JSON found in response for company type "${companyName}". Response length: ${text.length}, Preview: ${responsePreview}`);
+          // Log full response if it's short enough to be useful
+          if (text.length < 500) {
+            console.error(`Full response: ${text}`);
+          }
+          
+          // Retry logic: attempt up to 2 retries for empty/malformed responses
+          if (retryCount < 2) {
+            console.log(`Retrying company type detection for "${companyName}" due to no JSON found (attempt ${retryCount + 2}/3)`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+            return detectCompanyType(companyName, retryCount + 1);
+          }
+          
+          return { isPublic: false, confidence: "low" };
+        }
+      }
+    }
+
+    // Validate and return parsed data
+    if (!parsed) {
+      return { isPublic: false, confidence: "low" };
+    }
+
+    // Type-safe extraction with proper type guards
+    const stockSymbol = typeof parsed.stockSymbol === "string" && parsed.stockSymbol.trim() 
+      ? parsed.stockSymbol.trim() 
+      : undefined;
+    const exchange = typeof parsed.exchange === "string" && parsed.exchange.trim()
+      ? parsed.exchange.trim()
+      : undefined;
+    const confidence = typeof parsed.confidence === "string" && 
+      ["high", "medium", "low"].includes(parsed.confidence)
+      ? parsed.confidence as "high" | "medium" | "low"
+      : "low";
 
     return {
       isPublic: Boolean(parsed.isPublic),
-      stockSymbol: parsed.stockSymbol || undefined,
-      exchange: parsed.exchange || undefined,
-      confidence: parsed.confidence || "low",
+      stockSymbol,
+      exchange,
+      confidence,
     };
   } catch (error) {
     console.error("Error detecting company type:", error);
+    
+    // Retry logic for API errors (rate limits, network issues, etc.)
+    if (retryCount < 2 && error instanceof Error) {
+      const errorMessage = error.message.toLowerCase();
+      // Retry on rate limit, network, or transient errors
+      if (
+        errorMessage.includes('rate limit') ||
+        errorMessage.includes('network') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('503') ||
+        errorMessage.includes('429')
+      ) {
+        console.log(`Retrying company type detection for "${companyName}" due to ${errorMessage} (attempt ${retryCount + 2}/3)`);
+        await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
+        return detectCompanyType(companyName, retryCount + 1);
+      }
+    }
+    
     return { isPublic: false, confidence: "low" };
   }
 }
@@ -425,12 +547,73 @@ Only include fields where you found actual data. Sources:
 ${sourceText}`;
 
     const result = await model.generateContent(prompt);
-    const text = result.response.text()?.trim() ?? "{}";
-    const parsed = JSON.parse(text);
+    const text = result.response.text()?.trim() ?? "";
+
+    // Handle empty response
+    if (!text || text.length === 0) {
+      console.warn(`Empty response from Gemini for financial context extraction: ${companyName}`);
+      return null;
+    }
+
+    let parsed: Record<string, unknown> | null = null;
+
+    // Try to parse JSON, with fallback for malformed JSON
+    try {
+      parsed = JSON.parse(text) as Record<string, unknown>;
+    } catch (parseError) {
+      // Log the actual response for debugging (first 200 chars)
+      const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
+      console.warn(`JSON parse failed for financial context "${companyName}". Response preview: ${responsePreview}`);
+      
+      // Try to extract JSON from text that might have markdown code blocks or extra text
+      // First, try to find JSON in markdown code blocks
+      const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (codeBlockMatch) {
+        try {
+          parsed = JSON.parse(codeBlockMatch[1]) as Record<string, unknown>;
+          console.log(`Successfully extracted JSON from markdown code block for financial context "${companyName}"`);
+        } catch {
+          // Fall through to next attempt
+        }
+      }
+      
+      // If that didn't work, try to find any JSON object in the text
+      if (parsed === null) {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            // Try to fix common JSON issues: trailing commas before closing braces/brackets
+            let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
+            
+            parsed = JSON.parse(jsonText) as Record<string, unknown>;
+            console.log(`Successfully parsed JSON after fixing trailing commas for financial context "${companyName}"`);
+          } catch (fixError) {
+            console.error(`Failed to parse JSON for financial context "${companyName}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
+            // Log the problematic JSON snippet for debugging
+            if (jsonMatch[0].length < 500) {
+              console.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
+            }
+            return null;
+          }
+        } else {
+          console.error(`No JSON found in response for financial context "${companyName}". Response length: ${text.length}, Preview: ${responsePreview}`);
+          // Log full response if it's short enough to be useful
+          if (text.length < 500) {
+            console.error(`Full response: ${text}`);
+          }
+          return null;
+        }
+      }
+    }
 
     // Only return if we found something meaningful
-    if (parsed.recentFunding?.amount || parsed.publicFinancials?.revenue || parsed.analystSentiment) {
-      return parsed as FinancialContext;
+    if (parsed && (parsed.recentFunding || parsed.publicFinancials || parsed.analystSentiment)) {
+      const recentFunding = parsed.recentFunding as Record<string, unknown> | undefined;
+      const publicFinancials = parsed.publicFinancials as Record<string, unknown> | undefined;
+      
+      if (recentFunding?.amount || publicFinancials?.revenue || parsed.analystSentiment) {
+        return parsed as FinancialContext;
+      }
     }
     return null;
   } catch (error) {
