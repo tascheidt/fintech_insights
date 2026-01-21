@@ -195,11 +195,23 @@ Only say high confidence if you are certain. Most fintech startups are private.`
       return { isPublic: false, confidence: "low" };
     }
 
+    // Type-safe extraction with proper type guards
+    const stockSymbol = typeof parsed.stockSymbol === "string" && parsed.stockSymbol.trim() 
+      ? parsed.stockSymbol.trim() 
+      : undefined;
+    const exchange = typeof parsed.exchange === "string" && parsed.exchange.trim()
+      ? parsed.exchange.trim()
+      : undefined;
+    const confidence = typeof parsed.confidence === "string" && 
+      ["high", "medium", "low"].includes(parsed.confidence)
+      ? parsed.confidence as "high" | "medium" | "low"
+      : "low";
+
     return {
       isPublic: Boolean(parsed.isPublic),
-      stockSymbol: parsed.stockSymbol || undefined,
-      exchange: parsed.exchange || undefined,
-      confidence: parsed.confidence || "low",
+      stockSymbol,
+      exchange,
+      confidence,
     };
   } catch (error) {
     console.error("Error detecting company type:", error);
