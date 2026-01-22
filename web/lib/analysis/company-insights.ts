@@ -126,170 +126,220 @@ export async function generateCompanyInsight(
   const researchDepth = options.researchDepth ?? "deep";
   const compareToPrevious = options.compareToPrevious ?? true;
 
-  // Step 1: Check for recent insight (rate limiting)
-  if (!options.forceRegenerate) {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  // Track if we acquired a lock so we can release it in finally block
+  let lockAcquired = false;
 
-    const { data: recentInsight } = await supabase
-      .from("company_insights")
-      .select("id, generated_at")
-      .eq("company_id", companyId)
-      .gte("generated_at", sevenDaysAgo.toISOString())
-      .order("generated_at", { ascending: false })
-      .limit(1)
-      .single();
+  try {
+    // Step 0: Acquire processing lock to prevent concurrent generation
+    // This must happen BEFORE any other checks to prevent race conditions
+    if (!options.forceRegenerate) {
+      const lockExpiresAt = new Date();
+      lockExpiresAt.setHours(lockExpiresAt.getHours() + 1); // Lock expires in 1 hour
 
-    if (recentInsight) {
-      throw new Error(
-        `Recent insight exists (generated ${new Date(recentInsight.generated_at).toLocaleDateString()}). Use forceRegenerate to override.`
-      );
+      const { error: lockError } = await supabase
+        .from("insight_generation_locks")
+        .insert({
+          company_id: companyId,
+          locked_at: new Date().toISOString(),
+          expires_at: lockExpiresAt.toISOString(),
+        });
+
+      // If lock already exists, another process is generating an insight
+      if (lockError) {
+        // Check if it's a unique constraint violation (lock exists)
+        if (lockError.code === "23505") {
+          throw new Error(
+            `Insight generation already in progress for ${companyName}. Please wait for it to complete.`
+          );
+        }
+        throw new Error(`Failed to acquire processing lock: ${lockError.message}`);
+      }
+      lockAcquired = true;
+    }
+
+    // Step 1: Check for recent insight (rate limiting) - double-check after acquiring lock
+    if (!options.forceRegenerate) {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const { data: recentInsight } = await supabase
+        .from("company_insights")
+        .select("id, generated_at")
+        .eq("company_id", companyId)
+        .gte("generated_at", sevenDaysAgo.toISOString())
+        .order("generated_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (recentInsight) {
+        throw new Error(
+          `Recent insight exists (generated ${new Date(recentInsight.generated_at).toLocaleDateString()}). Use forceRegenerate to override.`
+        );
     }
   }
 
-  // Step 2: Get previous insight for comparison
-  type PreviousInsightData = { id: string; core_functions: FunctionStats[] };
-  let previousInsight: PreviousInsightData | null = null;
-  if (compareToPrevious) {
-    const { data } = await supabase
-      .from("company_insights")
-      .select("id, core_functions")
-      .eq("company_id", companyId)
-      .order("generated_at", { ascending: false })
-      .limit(1)
-      .single();
-    
-    if (data) {
-      previousInsight = {
-        id: data.id as string,
-        core_functions: (data.core_functions as FunctionStats[]) || [],
-      };
+    // Step 2: Get previous insight for comparison
+    type PreviousInsightData = { id: string; core_functions: FunctionStats[] };
+    let previousInsight: PreviousInsightData | null = null;
+    if (compareToPrevious) {
+      const { data } = await supabase
+        .from("company_insights")
+        .select("id, core_functions")
+        .eq("company_id", companyId)
+        .order("generated_at", { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (data) {
+        previousInsight = {
+          id: data.id as string,
+          core_functions: (data.core_functions as FunctionStats[]) || [],
+        };
+      }
     }
+
+    // Step 3: Build extended historical context (reuses context-builder.ts)
+    console.log(`Building historical context for ${companyName}...`);
+    const context = await buildExtendedHistoricalContext(companyId, periodDays);
+
+    // Step 4: Detect company type (public vs private)
+    console.log(`Detecting company type for ${companyName}...`);
+    const companyType = await detectCompanyType(companyName);
+
+    // Step 5: Perform deep research
+    console.log(`Performing ${researchDepth} research for ${companyName}...`);
+    const research = await performDeepResearch(companyName, {
+      isPublic: companyType.isPublic,
+      depth: researchDepth,
+    });
+
+    // Step 6: Generate insight via LLM
+    console.log(`Generating strategic insight for ${companyName}...`);
+    const generatedInsight = await generateInsightWithLLM(
+      companyName,
+      context,
+      research,
+      companyType,
+      previousInsight
+    );
+
+    // Step 7: Calculate function changes
+    const functionChanges = calculateFunctionChanges(
+      context.functionBreakdown,
+      previousInsight?.core_functions || []
+    );
+
+    // Step 8: Calculate total cost estimate
+    const llmCost = 0.05; // Estimated cost for LLM generation
+    const totalCost = research.estimatedCost + llmCost;
+
+    // Step 9: Store the insight
+    const now = new Date();
+    const insightData = {
+      company_id: companyId,
+      analysis_period_start: context.periodStart.toISOString(),
+      analysis_period_end: context.periodEnd.toISOString(),
+      generated_at: now.toISOString(),
+
+      executive_summary: generatedInsight.executiveSummary,
+      strategic_hypothesis: generatedInsight.strategicHypothesis,
+      confidence: generatedInsight.confidence,
+
+      // Display fields for dashboard highlights
+      headline: generatedInsight.headline,
+      significance_score: generatedInsight.significanceScore,
+      key_signal: generatedInsight.keySignal,
+
+      core_functions: context.functionBreakdown,
+      function_changes: functionChanges,
+
+      hiring_trends: {
+        byDepartment: context.hiringTrends,
+        byFunction: context.functionTrends,
+        executives: context.recentExecutiveHires,
+      },
+      new_directions: generatedInsight.newDirections,
+
+      is_public_company: companyType.isPublic,
+      stated_strategy: research.statedStrategy,
+      financial_context: research.financialContext || {},
+      analyst_reports: [],
+      research_sources: research.sources,
+      research_quality_score: research.qualityScore,
+
+      alignment_analysis: generatedInsight.alignmentAnalysis,
+      discrepancies: generatedInsight.discrepancies,
+      strategic_implications: generatedInsight.strategicImplications,
+
+      model_reasoning: generatedInsight.modelReasoning,
+      research_depth: researchDepth,
+      previous_insight_id: previousInsight?.id || null,
+      generation_cost_estimate: totalCost,
+    };
+
+    const { data: inserted, error } = await supabase
+      .from("company_insights")
+      .insert(insightData)
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("Error storing company insight:", error);
+      throw new Error(`Failed to store insight: ${error.message}`);
+    }
+
+    console.log(`Company insight generated successfully in ${Date.now() - startTime}ms`);
+
+    // Release lock on successful completion
+    if (lockAcquired) {
+      await supabase
+        .from("insight_generation_locks")
+        .delete()
+        .eq("company_id", companyId);
+      lockAcquired = false;
+    }
+
+    return {
+      id: inserted.id,
+      companyId,
+      analysisPeriodStart: context.periodStart,
+      analysisPeriodEnd: context.periodEnd,
+      generatedAt: now,
+      executiveSummary: generatedInsight.executiveSummary,
+      strategicHypothesis: generatedInsight.strategicHypothesis,
+      confidence: generatedInsight.confidence,
+      // Display fields for dashboard highlights
+      headline: generatedInsight.headline,
+      significanceScore: generatedInsight.significanceScore,
+      keySignal: generatedInsight.keySignal,
+      coreFunctions: context.functionBreakdown,
+      functionChanges,
+      hiringTrends: insightData.hiring_trends,
+      newDirections: generatedInsight.newDirections,
+      isPublicCompany: companyType.isPublic,
+      statedStrategy: research.statedStrategy,
+      financialContext: research.financialContext,
+      analystReports: [],
+      researchSources: research.sources,
+      researchQualityScore: research.qualityScore,
+      alignmentAnalysis: generatedInsight.alignmentAnalysis,
+      discrepancies: generatedInsight.discrepancies,
+      strategicImplications: generatedInsight.strategicImplications,
+      modelReasoning: generatedInsight.modelReasoning,
+      researchDepth,
+      previousInsightId: previousInsight?.id || null,
+      generationCostEstimate: totalCost,
+    };
+  } catch (error) {
+    // Always release lock on error
+    if (lockAcquired) {
+      await supabase
+        .from("insight_generation_locks")
+        .delete()
+        .eq("company_id", companyId);
+    }
+    throw error;
   }
-
-  // Step 3: Build extended historical context (reuses context-builder.ts)
-  console.log(`Building historical context for ${companyName}...`);
-  const context = await buildExtendedHistoricalContext(companyId, periodDays);
-
-  // Step 4: Detect company type (public vs private)
-  console.log(`Detecting company type for ${companyName}...`);
-  const companyType = await detectCompanyType(companyName);
-
-  // Step 5: Perform deep research
-  console.log(`Performing ${researchDepth} research for ${companyName}...`);
-  const research = await performDeepResearch(companyName, {
-    isPublic: companyType.isPublic,
-    depth: researchDepth,
-  });
-
-  // Step 6: Generate insight via LLM
-  console.log(`Generating strategic insight for ${companyName}...`);
-  const generatedInsight = await generateInsightWithLLM(
-    companyName,
-    context,
-    research,
-    companyType,
-    previousInsight
-  );
-
-  // Step 7: Calculate function changes
-  const functionChanges = calculateFunctionChanges(
-    context.functionBreakdown,
-    previousInsight?.core_functions || []
-  );
-
-  // Step 8: Calculate total cost estimate
-  const llmCost = 0.05; // Estimated cost for LLM generation
-  const totalCost = research.estimatedCost + llmCost;
-
-  // Step 9: Store the insight
-  const now = new Date();
-  const insightData = {
-    company_id: companyId,
-    analysis_period_start: context.periodStart.toISOString(),
-    analysis_period_end: context.periodEnd.toISOString(),
-    generated_at: now.toISOString(),
-
-    executive_summary: generatedInsight.executiveSummary,
-    strategic_hypothesis: generatedInsight.strategicHypothesis,
-    confidence: generatedInsight.confidence,
-
-    // Display fields for dashboard highlights
-    headline: generatedInsight.headline,
-    significance_score: generatedInsight.significanceScore,
-    key_signal: generatedInsight.keySignal,
-
-    core_functions: context.functionBreakdown,
-    function_changes: functionChanges,
-
-    hiring_trends: {
-      byDepartment: context.hiringTrends,
-      byFunction: context.functionTrends,
-      executives: context.recentExecutiveHires,
-    },
-    new_directions: generatedInsight.newDirections,
-
-    is_public_company: companyType.isPublic,
-    stated_strategy: research.statedStrategy,
-    financial_context: research.financialContext || {},
-    analyst_reports: [],
-    research_sources: research.sources,
-    research_quality_score: research.qualityScore,
-
-    alignment_analysis: generatedInsight.alignmentAnalysis,
-    discrepancies: generatedInsight.discrepancies,
-    strategic_implications: generatedInsight.strategicImplications,
-
-    model_reasoning: generatedInsight.modelReasoning,
-    research_depth: researchDepth,
-    previous_insight_id: previousInsight?.id || null,
-    generation_cost_estimate: totalCost,
-  };
-
-  const { data: inserted, error } = await supabase
-    .from("company_insights")
-    .insert(insightData)
-    .select("id")
-    .single();
-
-  if (error) {
-    console.error("Error storing company insight:", error);
-    throw new Error(`Failed to store insight: ${error.message}`);
-  }
-
-  console.log(`Company insight generated successfully in ${Date.now() - startTime}ms`);
-
-  return {
-    id: inserted.id,
-    companyId,
-    analysisPeriodStart: context.periodStart,
-    analysisPeriodEnd: context.periodEnd,
-    generatedAt: now,
-    executiveSummary: generatedInsight.executiveSummary,
-    strategicHypothesis: generatedInsight.strategicHypothesis,
-    confidence: generatedInsight.confidence,
-    // Display fields for dashboard highlights
-    headline: generatedInsight.headline,
-    significanceScore: generatedInsight.significanceScore,
-    keySignal: generatedInsight.keySignal,
-    coreFunctions: context.functionBreakdown,
-    functionChanges,
-    hiringTrends: insightData.hiring_trends,
-    newDirections: generatedInsight.newDirections,
-    isPublicCompany: companyType.isPublic,
-    statedStrategy: research.statedStrategy,
-    financialContext: research.financialContext,
-    analystReports: [],
-    researchSources: research.sources,
-    researchQualityScore: research.qualityScore,
-    alignmentAnalysis: generatedInsight.alignmentAnalysis,
-    discrepancies: generatedInsight.discrepancies,
-    strategicImplications: generatedInsight.strategicImplications,
-    modelReasoning: generatedInsight.modelReasoning,
-    researchDepth,
-    previousInsightId: previousInsight?.id || null,
-    generationCostEstimate: totalCost,
-  };
 }
 
 // ============================================================================
@@ -622,7 +672,11 @@ export async function getNextCompanyForInsight(): Promise<{
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+  // Clean up expired locks first
+  await supabase.rpc("cleanup_expired_insight_locks");
+
   // Get companies with track_for_strategy = true that don't have a recent insight
+  // Exclude companies that are currently being processed (have active locks)
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
@@ -633,8 +687,21 @@ export async function getNextCompanyForInsight(): Promise<{
     return null;
   }
 
-  // Check each company for recent insights
+  // Get active locks to exclude locked companies
+  const { data: activeLocks } = await supabase
+    .from("insight_generation_locks")
+    .select("company_id")
+    .gt("expires_at", new Date().toISOString());
+
+  const lockedCompanyIds = new Set((activeLocks ?? []).map((lock) => lock.company_id));
+
+  // Check each company for recent insights and active locks
   for (const company of companies) {
+    // Skip if company is currently being processed
+    if (lockedCompanyIds.has(company.id)) {
+      continue;
+    }
+
     const { data: recentInsight } = await supabase
       .from("company_insights")
       .select("id")
@@ -648,7 +715,7 @@ export async function getNextCompanyForInsight(): Promise<{
     }
   }
 
-  return null; // All companies have recent insights
+  return null; // All companies have recent insights or are being processed
 }
 
 /**
