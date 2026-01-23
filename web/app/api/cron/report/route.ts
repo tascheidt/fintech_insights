@@ -27,14 +27,14 @@ export const maxDuration = 300; // Increased to handle company insights and AI g
  * Creates a weekly_digests row and weekly_digest_companies rows for each company.
  * 
  * @param digest - The generated weekly digest
- * @param emailSent - Whether the email was sent successfully
- * @param recipient - Email recipient (if sent)
+ * @param emailSent - Whether emails were sent successfully
+ * @param recipientCount - Number of recipients (if sent)
  * @returns The created digest ID
  */
 async function saveDigestToDatabase(
   digest: WeeklyDigest,
   emailSent: boolean,
-  recipient: string | null
+  recipientCount: number | null
 ): Promise<string | null> {
   const supabase = createAdminClient();
   
@@ -49,7 +49,7 @@ async function saveDigestToDatabase(
         total_jobs: digest.total_jobs,
         total_companies: digest.total_companies,
         email_sent: emailSent,
-        email_recipient: recipient,
+        email_recipient: recipientCount ? `${recipientCount} users` : null,
         email_sent_at: emailSent ? new Date().toISOString() : null,
       })
       .select("id")
@@ -75,7 +75,7 @@ async function saveDigestToDatabase(
               total_jobs: digest.total_jobs,
               total_companies: digest.total_companies,
               email_sent: emailSent,
-              email_recipient: recipient,
+              email_recipient: recipientCount ? `${recipientCount} users` : null,
               email_sent_at: emailSent ? new Date().toISOString() : null,
             })
             .eq("id", existing.id);
@@ -136,6 +136,45 @@ async function insertCompanySummaries(digestId: string, digest: WeeklyDigest): P
 
   if (summaryError) {
     console.error("Error saving company summaries:", summaryError);
+  }
+}
+
+/**
+ * Chunks an array into smaller arrays of specified size
+ */
+function chunk<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
+
+/**
+ * Tracks email delivery status in the database
+ */
+async function trackDeliveries(
+  digestId: string,
+  deliveries: Array<{ user_id: string; email: string; status: "sent" | "failed"; error_message?: string }>
+): Promise<void> {
+  const supabase = createAdminClient();
+  
+  if (deliveries.length === 0) return;
+
+  const deliveryRecords = deliveries.map((delivery) => ({
+    digest_id: digestId,
+    user_id: delivery.user_id,
+    email: delivery.email,
+    status: delivery.status,
+    error_message: delivery.error_message || null,
+  }));
+
+  const { error } = await supabase
+    .from("weekly_digest_deliveries")
+    .insert(deliveryRecords);
+
+  if (error) {
+    console.error("Error tracking deliveries:", error);
   }
 }
 
@@ -207,41 +246,139 @@ export async function GET(req: NextRequest) {
     const digest = await generateWeeklyReport(weeklyData);
     console.log(`Generated digest with ${digest.total_jobs} total jobs`);
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fintech-insights.vercel.app";
-    const to = process.env.REPORT_EMAIL || process.env.ADMIN_EMAIL;
-    const from = process.env.RESEND_FROM || "onboarding@resend.dev";
-    const resendKey = process.env.RESEND_API_KEY;
-
-    let emailSent = false;
-    if (resendKey && to) {
-      try {
-        const resend = new Resend(resendKey);
-        
-        // Send email using React Email template
-        await resend.emails.send({
-          from,
-          to,
-          subject: `Fintech Insights TLDR – ${format(new Date(), "MMM d, yyyy")}`,
-          react: WeeklyDigestEmail({ digest, appUrl }),
-        });
-        
-        emailSent = true;
-        console.log(`Weekly digest email sent to ${to}`);
-      } catch (e) {
-        console.error("Resend error:", e);
-        // Don't fail the whole job if email fails - still save to DB
-      }
-    } else {
-      console.warn("Email not sent: RESEND_API_KEY or REPORT_EMAIL not configured");
-    }
-
-    // Save digest to database for web UI display
+    // Save digest to database first (before sending emails)
     console.log("Saving digest to database...");
     const savedDigestId = await saveDigestToDatabase(
       digest, 
-      emailSent, 
-      emailSent ? (to ?? null) : null
+      false, // Will update after emails are sent
+      null
     );
+
+    if (!savedDigestId) {
+      throw new Error("Failed to save digest to database");
+    }
+
+    // Fetch users who have opted in to weekly digest emails
+    // Default is opt-out model: weekly_digest is true by default (null = enabled)
+    console.log("Fetching users with weekly digest enabled...");
+    const { data: users, error: usersError } = await supabase
+      .from("profiles")
+      .select("id, email, email_preferences");
+
+    if (usersError) {
+      console.error("Error fetching users:", usersError);
+      throw new Error(`Failed to fetch users: ${usersError.message}`);
+    }
+
+    // Filter users: include if email_preferences is null (default true) or weekly_digest is true
+    const optedInUsers = (users || [])
+      .filter((u) => {
+        if (!u.email) return false;
+        
+        // If email_preferences is null, default is true (opted in)
+        if (!u.email_preferences) return true;
+        
+        // Check if weekly_digest is explicitly set to true
+        const weeklyDigest = u.email_preferences?.weekly_digest;
+        return weeklyDigest === true || weeklyDigest === "true";
+      })
+      .map((u) => ({ id: u.id, email: u.email }));
+
+    console.log(`Found ${optedInUsers.length} users opted in to weekly digest`);
+
+    // Send emails using Resend Batch API
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fintech-insights.vercel.app";
+    const from = process.env.RESEND_FROM || "onboarding@resend.dev";
+    const resendKey = process.env.RESEND_API_KEY;
+    const subject = `Fintech Insights TLDR – ${format(new Date(), "MMM d, yyyy")}`;
+
+    let emailSent = false;
+    let successCount = 0;
+    let failureCount = 0;
+    const deliveryTracking: Array<{ user_id: string; email: string; status: "sent" | "failed"; error_message?: string }> = [];
+
+    if (resendKey && optedInUsers.length > 0) {
+      try {
+        const resend = new Resend(resendKey);
+        
+        // Chunk users into batches of 100 (Resend batch limit)
+        const userChunks = chunk(optedInUsers, 100);
+        console.log(`Sending emails in ${userChunks.length} batch(es) of up to 100 users each`);
+
+        // Process each chunk
+        for (let chunkIndex = 0; chunkIndex < userChunks.length; chunkIndex++) {
+          const chunk = userChunks[chunkIndex];
+          console.log(`Processing batch ${chunkIndex + 1}/${userChunks.length} (${chunk.length} users)...`);
+
+          try {
+            // Prepare batch email payload
+            const batchEmails = chunk.map((user) => ({
+              from,
+              to: user.email,
+              subject,
+              react: WeeklyDigestEmail({ digest, appUrl }),
+            }));
+
+            // Send batch using Resend Batch API
+            await resend.batch.send(batchEmails);
+
+            // Track successful deliveries
+            chunk.forEach((user) => {
+              deliveryTracking.push({
+                user_id: user.id,
+                email: user.email,
+                status: "sent",
+              });
+              successCount++;
+            });
+
+            console.log(`Batch ${chunkIndex + 1} sent successfully (${chunk.length} emails)`);
+          } catch (chunkError) {
+            console.error(`Error sending batch ${chunkIndex + 1}:`, chunkError);
+            
+            // Track failed deliveries for this chunk
+            const errorMessage = chunkError instanceof Error ? chunkError.message : "Unknown error";
+            chunk.forEach((user) => {
+              deliveryTracking.push({
+                user_id: user.id,
+                email: user.email,
+                status: "failed",
+                error_message: errorMessage,
+              });
+              failureCount++;
+            });
+          }
+        }
+
+        emailSent = successCount > 0;
+        console.log(`Email sending completed: ${successCount} sent, ${failureCount} failed`);
+
+        // Track all deliveries in database
+        if (deliveryTracking.length > 0) {
+          await trackDeliveries(savedDigestId, deliveryTracking);
+        }
+
+        // Update digest record with email status
+        await supabase
+          .from("weekly_digests")
+          .update({
+            email_sent: emailSent,
+            email_recipient: emailSent ? `${successCount} users` : null,
+            email_sent_at: emailSent ? new Date().toISOString() : null,
+          })
+          .eq("id", savedDigestId);
+
+      } catch (e) {
+        console.error("Resend batch error:", e);
+        // Don't fail the whole job if email fails - digest is already saved
+      }
+    } else {
+      if (!resendKey) {
+        console.warn("Email not sent: RESEND_API_KEY not configured");
+      } else if (optedInUsers.length === 0) {
+        console.log("No users opted in to weekly digest emails");
+      }
+    }
 
     // Update cron log with success
     if (cronLogId) {
@@ -261,7 +398,8 @@ export async function GET(req: NextRequest) {
               headline: c.ai_commentary.headline,
             })),
             emailSent,
-            recipient: emailSent ? to : null,
+            recipients: emailSent ? successCount : 0,
+            failures: failureCount,
             companyInsight: companyInsightResult,
           },
         })
@@ -271,6 +409,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       sent: emailSent,
+      emailsSent: successCount,
+      emailsFailed: failureCount,
+      totalRecipients: optedInUsers.length,
       digestId: savedDigestId,
       digest: {
         totalJobs: digest.total_jobs,

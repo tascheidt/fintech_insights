@@ -1,14 +1,23 @@
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
+import { EmailPreferences } from "@/components/settings/EmailPreferences";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("email, full_name, role").eq("id", user?.id ?? "").single();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("email, full_name, role, email_preferences")
+    .eq("id", user?.id ?? "")
+    .single();
+
+  // Get current email preferences (default to true if null)
+  const weeklyDigestEnabled = profile?.email_preferences?.weekly_digest ?? true;
 
   return (
     <div className="space-y-6 max-w-xl">
       <h1 className="text-3xl font-bold">Settings</h1>
+      
       <Card>
         <CardHeader>
           <h2 className="font-semibold">Profile</h2>
@@ -19,6 +28,8 @@ export default async function SettingsPage() {
           <p><span className="text-muted-foreground">Role:</span> {profile?.role ?? "—"}</p>
         </CardContent>
       </Card>
+
+      <EmailPreferences initialWeeklyDigest={weeklyDigestEnabled === true || weeklyDigestEnabled === "true"} />
     </div>
   );
 }
