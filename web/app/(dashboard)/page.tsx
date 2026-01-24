@@ -1,8 +1,7 @@
 /**
  * Dashboard Page - Main entry point after login.
- * 
+ *
  * Features:
- * - Personalized welcome message
  * - Companies overview with card/table toggle
  * - Strategic highlights from company-level insights
  * - Quick stats overview
@@ -10,27 +9,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { startOfWeek, subDays } from "date-fns";
-import { WelcomeMessage } from "@/components/dashboard/WelcomeMessage";
 import { CompaniesOverview, CompanyOverviewData } from "@/components/dashboard/CompaniesOverview";
 import { StrategicHighlights, StrategicHighlight } from "@/components/dashboard/StrategicHighlights";
 import { StatsCards } from "@/components/dashboard/StatsCards";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-
-  // Get current user for welcome message
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Get user profile for name
-  const { data: profile } = user
-    ? await supabase
-        .from("profiles")
-        .select("full_name, email")
-        .eq("id", user.id)
-        .single()
-    : { data: null };
 
   // Date calculations
   const now = new Date();
@@ -221,12 +205,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* Welcome Message */}
-      <WelcomeMessage
-        userName={profile?.full_name}
-        userEmail={profile?.email || user?.email}
-      />
-
       {/* Quick Stats */}
       <StatsCards
         activeJobs={activeJobs ?? 0}
