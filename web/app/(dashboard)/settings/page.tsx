@@ -12,7 +12,9 @@ export default async function SettingsPage() {
     .single();
 
   // Get current email preferences (default to true if null)
-  const weeklyDigestEnabled = profile?.email_preferences?.weekly_digest ?? true;
+  // Normalize to boolean to avoid hydration mismatch (handles both boolean true and string "true")
+  const weeklyDigestPref = profile?.email_preferences?.weekly_digest ?? true;
+  const normalizedWeeklyDigest = weeklyDigestPref === true || weeklyDigestPref === "true";
 
   return (
     <div className="space-y-6 max-w-xl">
@@ -29,7 +31,7 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      <EmailPreferences initialWeeklyDigest={weeklyDigestEnabled === true || weeklyDigestEnabled === "true"} />
+      <EmailPreferences initialWeeklyDigest={normalizedWeeklyDigest} />
     </div>
   );
 }
