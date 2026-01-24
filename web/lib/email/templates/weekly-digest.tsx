@@ -63,7 +63,7 @@ function CompanySection({ company }: { company: CompanyWeeklySummary }) {
       
       {/* Stats Footer */}
       <Text style={statsLine}>
-        <span style={statLabel}>New Jobs:</span> {company.new_job_count} | 
+        <span style={statLabel}>New Jobs:</span> {String(company.new_job_count)} | 
         <span style={statLabel}> Top Tech:</span> {techList} | 
         <span style={statLabel}> Focus:</span> {primaryFocus}
       </Text>
@@ -102,11 +102,11 @@ export function WeeklyDigestEmail({ digest, appUrl = "https://fintech-insights.v
               <tbody>
                 <tr>
                   <td style={statCell}>
-                    <Text style={statNumber}>{digest.total_jobs}</Text>
+                    <Text style={statNumber}>{String(digest.total_jobs)}</Text>
                     <Text style={statDescription}>New Jobs</Text>
                   </td>
                   <td style={statCell}>
-                    <Text style={statNumber}>{digest.total_companies}</Text>
+                    <Text style={statNumber}>{String(digest.total_companies)}</Text>
                     <Text style={statDescription}>Companies</Text>
                   </td>
                 </tr>
