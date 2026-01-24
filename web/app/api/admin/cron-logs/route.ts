@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// GET /api/admin/cron-logs - Fetch recent cron execution logs
+// GET /api/admin/cron-logs - Fetch recent job execution logs
+// Uses unified job_runs table for all job tracking
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
   
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
   const jobType = searchParams.get("job_type");
   const limit = parseInt(searchParams.get("limit") ?? "20", 10);
 
+  // Query job_runs table (unified job tracking system)
   let query = supabase
     .from("job_runs")
     .select("*")
@@ -42,17 +44,25 @@ export async function GET(req: NextRequest) {
   }
 
   // Transform job_runs to match CronLog interface for backward compatibility
+  // Handles all job types: collect, analyze, report, company-insights, insight-generation
   const logs = (jobRuns || []).map((jr) => ({
     id: jr.id,
-    job_type: jr.job_type === "collect" ? "collect" : "report",
+    // Preserve actual job_type for all types (don't assume non-collect = report)
+    job_type: jr.job_type,
     started_at: jr.started_at,
     completed_at: jr.completed_at,
+    // Map job_runs status to legacy CronLog status format
     status: jr.status === "completed" ? "success" : jr.status === "failed" ? "error" : "running",
     new_jobs_count: jr.total_new_jobs,
     closed_jobs_count: jr.total_closed_jobs,
     insights_generated: jr.total_insights,
     companies_processed: jr.total_companies,
     error_message: jr.error_message,
+    // Include additional fields for enhanced visibility
+    trigger_type: jr.trigger_type,
+    scope: jr.scope,
+    company_id: jr.company_id,
+    details: jr.details,
   }));
 
   return NextResponse.json({ logs });

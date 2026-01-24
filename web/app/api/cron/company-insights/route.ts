@@ -13,6 +13,8 @@ export const maxDuration = 300; // 5 minutes max
  * 
  * Processes one company at a time to avoid timeouts.
  * Should be called multiple times if there are many companies.
+ * 
+ * Uses job_runs table for unified job tracking (not cron_logs).
  */
 export async function GET(req: NextRequest) {
   // Verify cron secret
@@ -26,6 +28,21 @@ export async function GET(req: NextRequest) {
 
   // Check if a specific company was requested
   const companyId = req.nextUrl.searchParams.get("companyId");
+
+  // Create job_runs entry for tracking (unified job tracking system)
+  const { data: jobRun } = await supabase
+    .from("job_runs")
+    .insert({
+      job_type: "company-insights",
+      trigger_type: "cron",
+      scope: companyId ? "single" : "all",
+      company_id: companyId || null,
+      status: "running",
+      started_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  const jobRunId = jobRun?.id;
 
   try {
     let company: { id: string; name: string } | null = null;
@@ -45,15 +62,22 @@ export async function GET(req: NextRequest) {
     }
 
     if (!company) {
-      // Log completion
-      await supabase.from("cron_logs").insert({
-        job_type: "company-insights",
-        status: "success",
-        details: {
-          message: "All companies have recent insights",
-          triggerType: "cron",
-        },
-      });
+      // Update job_runs with completion (no companies needed processing)
+      if (jobRunId) {
+        await supabase
+          .from("job_runs")
+          .update({
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            total_companies: 0,
+            total_insights: 0,
+            details: {
+              message: "All companies have recent insights",
+              triggerType: "cron",
+            },
+          })
+          .eq("id", jobRunId);
+      }
 
       return NextResponse.json({
         success: true,
@@ -73,20 +97,28 @@ export async function GET(req: NextRequest) {
 
     const duration = Date.now() - startTime;
 
-    // Log success
-    await supabase.from("cron_logs").insert({
-      job_type: "company-insights",
-      status: "success",
-      details: {
-        companyId: company.id,
-        companyName: company.name,
-        insightId: insight.id,
-        triggerType: "cron",
-        duration,
-        estimatedCost: insight.generationCostEstimate,
-        researchQualityScore: insight.researchQualityScore,
-      },
-    });
+    // Update job_runs with success (unified job tracking)
+    if (jobRunId) {
+      await supabase
+        .from("job_runs")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          company_id: company.id,
+          total_companies: 1,
+          total_insights: 1,
+          details: {
+            companyId: company.id,
+            companyName: company.name,
+            insightId: insight.id,
+            triggerType: "cron",
+            duration,
+            estimatedCost: insight.generationCostEstimate,
+            researchQualityScore: insight.researchQualityScore,
+          },
+        })
+        .eq("id", jobRunId);
+    }
 
     // Check if there are more companies to process
     const nextCompany = await getNextCompanyForInsight();
@@ -105,17 +137,22 @@ export async function GET(req: NextRequest) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Company insights cron error:", error);
 
-    // Log failure
-    await supabase.from("cron_logs").insert({
-      job_type: "company-insights",
-      status: "error",
-      error_message: errorMessage,
-      details: {
-        companyId: companyId || null,
-        triggerType: "cron",
-        duration: Date.now() - startTime,
-      },
-    });
+    // Update job_runs with failure (unified job tracking)
+    if (jobRunId) {
+      await supabase
+        .from("job_runs")
+        .update({
+          status: "failed",
+          completed_at: new Date().toISOString(),
+          error_message: errorMessage,
+          details: {
+            companyId: companyId || null,
+            triggerType: "cron",
+            duration: Date.now() - startTime,
+          },
+        })
+        .eq("id", jobRunId);
+    }
 
     return NextResponse.json(
       { error: errorMessage },

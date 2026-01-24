@@ -39,7 +39,7 @@
 
 **To verify they're running:**
 1. Check Vercel function logs around scheduled times
-2. Check database `cron_logs` table for new entries:
+2. Check database `job_runs` table for new entries (unified job tracking):
 
 ```sql
 SELECT 
@@ -48,10 +48,11 @@ SELECT
   status,
   started_at,
   completed_at,
-  new_jobs_count,
-  closed_jobs_count,
+  total_new_jobs,
+  total_closed_jobs,
+  total_insights,
   error_message
-FROM cron_logs
+FROM job_runs
 ORDER BY started_at DESC
 LIMIT 10;
 ```
@@ -100,7 +101,7 @@ After changing, commit and push to trigger a new deployment.
 ✅ Cron jobs appear in Vercel dashboard
 ✅ Manual trigger via dashboard works
 ✅ Function logs show successful execution
-✅ Database `cron_logs` table has entries
+✅ Database `job_runs` table has entries
 ✅ Jobs run automatically at scheduled times
 
 ## All Set!

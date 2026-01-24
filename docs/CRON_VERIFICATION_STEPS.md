@@ -71,10 +71,11 @@ Your manual curl test succeeded! This confirms:
 
 ## Step 5: Monitor Execution
 
-### Check Database for Cron Logs
+### Check Database for Job Runs
 
 ```sql
 -- Run in Supabase SQL Editor
+-- Uses unified job_runs table for all job tracking
 SELECT 
   id,
   job_type,
@@ -82,9 +83,10 @@ SELECT
   started_at,
   completed_at,
   error_message,
-  new_jobs_count,
-  closed_jobs_count
-FROM cron_logs
+  total_new_jobs,
+  total_closed_jobs,
+  total_insights
+FROM job_runs
 ORDER BY started_at DESC
 LIMIT 10;
 ```
@@ -102,7 +104,7 @@ Once everything is configured correctly:
 1. **Vercel automatically triggers** cron jobs at scheduled times
 2. **Vercel adds** `Authorization: Bearer <CRON_SECRET>` header automatically
 3. **Your endpoint validates** the authentication
-4. **Job executes** and creates entries in `cron_logs` table
+4. **Job executes** and creates entries in `job_runs` table
 5. **Logs appear** in Vercel function logs
 
 ## Troubleshooting
@@ -141,6 +143,6 @@ After verifying CRON_SECRET is set in Vercel:
 1. Go to **Cron Jobs** tab
 2. Click **Run Now** on `/api/cron/collect`
 3. Check function logs for successful execution
-4. Check database `cron_logs` table for new entry
+4. Check database `job_runs` table for new entry
 
 If this works, your cron jobs are fully configured! 🎉
