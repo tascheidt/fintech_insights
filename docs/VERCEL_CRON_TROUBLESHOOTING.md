@@ -134,16 +134,17 @@ Check your application's logging system (e.g., Supabase logs, external logging s
 
 ### Check Database
 
-Cron jobs create entries in the `cron_logs` table:
+Cron jobs create entries in the `job_runs` table (unified job tracking):
 ```sql
-SELECT * FROM cron_logs 
+SELECT * FROM job_runs 
 ORDER BY started_at DESC 
 LIMIT 10;
 ```
 
 This shows:
 - When jobs ran
-- Success/failure status
+- Job type (collect, report, company-insights, etc.)
+- Success/failure status (completed, failed, running)
 - Error messages
 - Execution statistics
 

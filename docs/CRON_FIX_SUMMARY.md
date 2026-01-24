@@ -95,8 +95,8 @@ git push origin main
 
 4. **Check Database**:
    ```sql
-   -- Run in Supabase SQL Editor
-   SELECT * FROM cron_logs 
+   -- Run in Supabase SQL Editor (uses unified job_runs table)
+   SELECT * FROM job_runs 
    ORDER BY started_at DESC 
    LIMIT 10;
    ```
