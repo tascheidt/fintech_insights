@@ -55,7 +55,7 @@ import { Button } from "@/components/ui/button";
 export interface JobData {
   id: string;
   title: string;
-  department: string | null;
+  standardized_department: string | null; // Use standardized_department, never raw department
   location: string | null;
   isActive: boolean;
   firstSeenDate: string | null;
@@ -165,7 +165,7 @@ export function JobHistoryView({
       result = result.filter(
         (j) =>
           j.title.toLowerCase().includes(query) ||
-          j.department?.toLowerCase().includes(query) ||
+          j.standardized_department?.toLowerCase().includes(query) ||
           j.location?.toLowerCase().includes(query) ||
           j.companyName?.toLowerCase().includes(query)
       );
@@ -384,10 +384,10 @@ function JobsCardView({ jobs }: { jobs: JobData[] }) {
 
               {/* Details */}
               <div className="space-y-1 mt-3">
-                {job.department && (
+                {job.standardized_department && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Briefcase className="h-3 w-3" />
-                    <span>{job.department}</span>
+                    <span>{job.standardized_department}</span>
                   </div>
                 )}
                 {job.location && (
@@ -461,7 +461,7 @@ function JobsTableView({ jobs }: { jobs: JobData[] }) {
                   )}
                 </TableCell>
               )}
-              <TableCell className="hidden sm:table-cell">{job.department ?? "—"}</TableCell>
+              <TableCell className="hidden sm:table-cell">{job.standardized_department ?? "—"}</TableCell>
               <TableCell className="hidden md:table-cell">{job.location ?? "—"}</TableCell>
               <TableCell className="hidden md:table-cell">
                 {job.firstSeenDate

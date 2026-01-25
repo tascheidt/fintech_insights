@@ -50,7 +50,7 @@ export interface AnalyzeResult {
 
 export async function analyzeJob(
   companyName: string,
-  job: { title: string; department?: string | null; location?: string | null; description_text?: string | null }
+  job: { title: string; standardized_department?: string | null; location?: string | null; description_text?: string | null }
 ): Promise<AnalyzeResult | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
@@ -60,7 +60,7 @@ export async function analyzeJob(
 
   const prompt = PROMPT.replace("{company_name}", companyName)
     .replace("{job_title}", job.title)
-    .replace("{department}", job.department ?? "Not specified")
+    .replace("{department}", job.standardized_department ?? "Not specified")
     .replace("{location}", job.location ?? "Not specified")
     .replace("{description}", (job.description_text ?? "").slice(0, 8000) || "No description available");
 
