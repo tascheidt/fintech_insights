@@ -448,13 +448,19 @@ function JobsTableView({ jobs }: { jobs: JobData[] }) {
             <TableHead className="hidden md:table-cell">Location</TableHead>
             <TableHead className="hidden md:table-cell">First Seen</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {jobs.map((job) => (
             <TableRow key={job.id}>
-              <TableCell className="font-medium">{job.title}</TableCell>
+              <TableCell className="font-medium">
+                <Link
+                  href={`/jobs/${job.id}`}
+                  className="text-primary hover:underline"
+                >
+                  {job.title}
+                </Link>
+              </TableCell>
               {hasCompanyInfo && (
                 <TableCell className="hidden sm:table-cell">
                   {job.companySlug ? (
@@ -490,14 +496,6 @@ function JobsTableView({ jobs }: { jobs: JobData[] }) {
                 >
                   {job.isActive ? "Active" : "Closed"}
                 </span>
-              </TableCell>
-              <TableCell>
-                <Link
-                  href={`/jobs/${job.id}`}
-                  className="text-primary text-sm hover:underline"
-                >
-                  View →
-                </Link>
               </TableCell>
             </TableRow>
           ))}
