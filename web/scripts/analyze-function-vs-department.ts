@@ -11,7 +11,7 @@
  */
 
 import { createAdminClient } from "../lib/supabase/admin";
-import { quickCategorize, getCategoryLabel, getCategoryGroup, type RoleCategory } from "../lib/analysis/function-categories";
+import { quickCategorize, getCategoryLabel, getCategoryGroup, ROLE_CATEGORIES, type RoleCategory } from "../lib/analysis/function-categories";
 
 async function main() {
   console.log("🔍 Analyzing Function Categories vs Standardized Department\n");
@@ -24,10 +24,10 @@ async function main() {
 
   const supabase = createAdminClient();
 
-  // Fetch jobs with both title and standardized_department
+  // Fetch jobs with title, standardized_department, and function_category
   let query = supabase
     .from("job_postings")
-    .select("id, title, standardized_department")
+    .select("id, title, standardized_department, function_category")
     .not("standardized_department", "is", null)
     .neq("standardized_department", "");
 
@@ -55,8 +55,12 @@ async function main() {
   console.log(`📊 Analyzing ${jobsToAnalyze.length} job(s)\n`);
 
   // Categorize each job by function
+  // Use stored function_category if available, otherwise compute with quickCategorize
   const analyzed = jobsToAnalyze.map(job => {
-    const functionCategory = quickCategorize(job.title);
+    // Prefer stored function_category (AI-extracted), fallback to quickCategorize for comparison
+    const functionCategory = (job.function_category && ROLE_CATEGORIES.includes(job.function_category as RoleCategory))
+      ? (job.function_category as RoleCategory)
+      : quickCategorize(job.title);
     const functionLabel = getCategoryLabel(functionCategory);
     const functionGroup = getCategoryGroup(functionCategory);
     
@@ -67,6 +71,7 @@ async function main() {
       functionCategory,
       functionLabel,
       functionGroup,
+      hasStoredCategory: !!job.function_category,
     };
   });
 
