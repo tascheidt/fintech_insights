@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SystemStats } from "@/components/admin/SystemStats";
-import { JobScheduleSettings } from "@/components/admin/JobScheduleSettings";
-import { CronLogsTable } from "@/components/admin/CronLogsTable";
+import { JobsTabContent } from "@/components/admin/JobsTabContent";
+import { parseCronExpression } from "@/lib/utils/cron";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -25,103 +26,64 @@ export default async function AdminPage() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  // Fetch current settings
-  const { data: settingsData } = await supabase
-    .from("system_settings")
-    .select("*");
+  // Read vercel.json to get cron schedules
+  // process.cwd() is already the web directory when running Next.js
+  const vercelConfigPath = join(process.cwd(), "vercel.json");
+  const vercelConfig = JSON.parse(readFileSync(vercelConfigPath, "utf-8"));
+  
+  const schedules = vercelConfig.crons.map((cron: { path: string; schedule: string }) => ({
+    path: cron.path,
+    schedule: cron.schedule,
+    name: cron.path === "/api/cron/collect" ? "Collection" : "Reports",
+    readable: parseCronExpression(cron.schedule),
+  }));
 
-  // Transform settings to key-value map
-  const settings = (settingsData ?? []).reduce((acc, s) => {
-    acc[s.setting_key] = {
-      value: s.setting_value,
-      description: s.description,
-      updated_at: s.updated_at,
-    };
-    return acc;
-  }, {} as Record<string, { value: unknown; description: string; updated_at: string }>);
+  const collectionSchedule = schedules.find((s: { path: string }) => s.path === "/api/cron/collect");
+  const reportSchedule = schedules.find((s: { path: string }) => s.path === "/api/cron/report");
+
+  // Fetch last run information
+  const { data: lastCollect } = await supabase
+    .from("job_runs")
+    .select("completed_at, total_new_jobs")
+    .eq("job_type", "collect")
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: lastReport } = await supabase
+    .from("job_runs")
+    .select("completed_at")
+    .eq("job_type", "report")
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <p className="text-muted-foreground mt-1">
-          Manage system settings, monitor job executions, and configure schedules
+          Monitor job executions and manage users
         </p>
       </div>
 
-      {/* System Stats Overview */}
-      <SystemStats />
-
       {/* Main Content Tabs */}
-      <Tabs defaultValue="schedules" className="space-y-4">
+      <Tabs defaultValue="jobs" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="schedules">Job Schedules</TabsTrigger>
-          <TabsTrigger value="history">Execution History</TabsTrigger>
+          <TabsTrigger value="jobs">Jobs</TabsTrigger>
           <TabsTrigger value="users">User Management</TabsTrigger>
         </TabsList>
 
-        {/* Job Schedules Tab */}
-        <TabsContent value="schedules" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Schedule Settings */}
-            <div className="lg:col-span-2">
-              <JobScheduleSettings initialSettings={settings} />
-            </div>
-
-            {/* Schedule Info Sidebar */}
-            <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <h3 className="font-semibold">About Job Schedules</h3>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground space-y-3">
-                  <p>
-                    Jobs are scheduled using Vercel Cron. The actual execution times are defined in 
-                    <code className="mx-1 px-1 py-0.5 bg-muted rounded text-xs">vercel.json</code>.
-                  </p>
-                  <p>
-                    Settings saved here are stored for reference and can be used to configure 
-                    job behavior. To change the actual schedule, update the cron expressions in 
-                    your Vercel configuration.
-                  </p>
-                  <div className="pt-3 border-t space-y-2">
-                    <p className="font-medium text-foreground">Current Schedules:</p>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-blue-500" />
-                        <span>Collection: Daily at 6:00 AM UTC</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-purple-500" />
-                        <span>Reports: Monday at 8:00 AM UTC</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <h3 className="font-semibold">Cron Expression Reference</h3>
-                </CardHeader>
-                <CardContent className="text-sm space-y-2">
-                  <div className="font-mono text-xs bg-muted p-3 rounded space-y-1">
-                    <p># Daily at 6 AM UTC</p>
-                    <p className="text-primary">0 6 * * *</p>
-                    <p className="mt-2"># Every Monday at 8 AM UTC</p>
-                    <p className="text-primary">0 8 * * 1</p>
-                    <p className="mt-2"># Every 6 hours</p>
-                    <p className="text-primary">0 */6 * * *</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* Execution History Tab */}
-        <TabsContent value="history">
-          <CronLogsTable />
+        {/* Jobs Tab */}
+        <TabsContent value="jobs">
+          <JobsTabContent
+            collectionSchedule={collectionSchedule}
+            reportSchedule={reportSchedule}
+            lastCollect={lastCollect}
+            lastReport={lastReport}
+          />
         </TabsContent>
 
         {/* User Management Tab */}

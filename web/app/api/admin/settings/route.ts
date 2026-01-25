@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+// Default descriptions for known system settings (matches migration seed data)
+const DEFAULT_DESCRIPTIONS: Record<string, string> = {
+  job_collection: "Job collection cron schedule",
+  weekly_report: "Weekly report email schedule",
+  analysis_settings: "Strategic analysis configuration",
+  notification_settings: "Notification preferences",
+};
 
 // GET /api/admin/settings - Fetch all system settings
 export async function GET() {
@@ -70,19 +79,53 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Missing key or value" }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  // First check if the setting exists (using user session - respects RLS)
+  const { data: existing, error: checkError } = await supabase
     .from("system_settings")
-    .update({ 
-      setting_value: value,
-      updated_by: user.id,
-    })
+    .select("id, description")
     .eq("setting_key", key)
-    .select()
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (checkError) {
+    return NextResponse.json({ error: checkError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, setting: data });
+  if (existing) {
+    // Row exists - update it using user session (respects RLS)
+    const { data: updated, error: updateError } = await supabase
+      .from("system_settings")
+      .update({ 
+        setting_value: value,
+        updated_by: user.id,
+      })
+      .eq("setting_key", key)
+      .select()
+      .single();
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, setting: updated });
+  } else {
+    // Row doesn't exist - insert it using admin client (bypasses RLS)
+    // Still track the actual user in updated_by
+    const adminSupabase = createAdminClient();
+    const { data: inserted, error: insertError } = await adminSupabase
+      .from("system_settings")
+      .insert({
+        setting_key: key,
+        setting_value: value,
+        updated_by: user.id, // Track the actual user who created it
+        description: DEFAULT_DESCRIPTIONS[key] ?? "",
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, setting: inserted });
+  }
 }

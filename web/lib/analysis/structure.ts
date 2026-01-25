@@ -134,7 +134,7 @@ export async function extractJobStructure(
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.2, // Lower temperature for more consistent extraction
-        maxOutputTokens: 4096, // Increased to handle longer responses with arrays (tech_stack, keywords)
+        maxOutputTokens: 64000, // Increased to handle longer responses and prevent truncation
         responseMimeType: "application/json",
       },
     });
@@ -184,10 +184,9 @@ export async function extractJobStructure(
       if (parsed === null) {
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
+          let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
+          
           try {
-            // Try to fix common JSON issues: trailing commas before closing braces/brackets
-            let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
-            
             // If JSON appears truncated (ends mid-field), try to close it gracefully
             // Check if it ends with incomplete string/array/object
             if (!jsonText.trim().endsWith('}')) {
@@ -216,23 +215,52 @@ export async function extractJobStructure(
             parsed = JSON.parse(jsonText) as unknown;
             console.log(`Successfully parsed JSON after fixing for job "${jobTitle}"`);
           } catch (fixError) {
-            // If still failing, check if response was truncated (common with token limits)
-            const isTruncated = text.length > 1800 || text.match(/"[^"]*$/); // Likely truncated if near limit or ends mid-string
+            // Check if response was truncated (common with token limits)
+            // Detect truncation: ends mid-string, mid-array, or incomplete object
+            const endsMidString = jsonText.match(/"[^"]*$/);
+            const endsMidArray = (jsonText.match(/\[/g) || []).length > (jsonText.match(/\]/g) || []).length;
+            const endsMidObject = (jsonText.match(/\{/g) || []).length > (jsonText.match(/\}/g) || []).length;
+            const isTruncated = endsMidString || endsMidArray || endsMidObject || text.length > 3000;
             
             if (isTruncated && retryCount < 2) {
               console.warn(`Response appears truncated for job "${jobTitle}". Retrying with shorter description...`);
-              // Retry with shorter description to reduce input tokens
-              const shorterDescription = description.slice(0, 6000);
+              // Retry with progressively shorter description to reduce input tokens
+              const shorterDescription = description.slice(0, Math.max(4000, 8000 - (retryCount * 2000)));
               await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
               return extractJobStructure(jobTitle, shorterDescription, rawDepartment, retryCount + 1);
             }
             
-            console.error(`Failed to parse JSON for job "${jobTitle}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
-            // Log the problematic JSON snippet for debugging
-            if (jsonMatch[0].length < 500) {
-              console.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
+            // If not truncated or retries exhausted, try to extract partial data from what we have
+            // This is a last resort - try to salvage what we can
+            try {
+              // Try to extract just the essential fields even if JSON is incomplete
+              const partialMatch = jsonText.match(/"summary":\s*"([^"]*)"/);
+              if (partialMatch) {
+                console.warn(`Using partial extraction for job "${jobTitle}" - some fields may be missing`);
+                // Return a minimal valid structure with what we can extract
+                // This allows the job to be saved even if extraction wasn't perfect
+                parsed = {
+                  summary: partialMatch[1],
+                  seniority_level: jsonText.match(/"seniority_level":\s*"([^"]*)"/)?.[1] || null,
+                  standardized_department: jsonText.match(/"standardized_department":\s*"([^"]*)"/)?.[1] || null,
+                  salary: null,
+                  tech_stack: [],
+                  keywords: [],
+                  location_structured: null,
+                  function_category: null,
+                };
+              } else {
+                throw fixError; // Re-throw if we can't extract anything
+              }
+            } catch {
+              // Final fallback: log and return null
+              console.error(`Failed to parse JSON for job "${jobTitle}" after all extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
+              // Only log problematic JSON snippet if it's reasonably short
+              if (jsonMatch[0].length < 500) {
+                console.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
+              }
+              return null;
             }
-            return null;
           }
         } else {
           console.error(`No JSON found in response for job "${jobTitle}". Response length: ${text.length}, Preview: ${responsePreview}`);
