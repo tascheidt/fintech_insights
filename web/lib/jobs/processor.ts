@@ -271,16 +271,16 @@ export async function runIngestStage(
     }
 
     // Wait for all Silver Layer extractions to complete (or fail gracefully)
-    // This runs in parallel but doesn't block ingestion completion
+    // Extractions run in parallel but must complete before ingestion is marked as done
+    // This ensures department, location, and function_category fields are populated
     if (extractionPromises.length > 0) {
-      Promise.allSettled(extractionPromises).then((results) => {
-        const failed = results.filter((r) => r.status === 'rejected').length;
-        if (failed > 0) {
-          console.warn(
-            `Silver Layer extraction: ${failed} of ${extractionPromises.length} jobs failed`
-          );
-        }
-      });
+      const results = await Promise.allSettled(extractionPromises);
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed > 0) {
+        console.warn(
+          `Silver Layer extraction: ${failed} of ${extractionPromises.length} jobs failed`
+        );
+      }
     }
 
     // Mark jobs as closed if no longer in feed
