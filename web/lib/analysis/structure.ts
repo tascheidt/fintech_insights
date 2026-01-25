@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
+import { ROLE_CATEGORIES, type RoleCategory } from "./function-categories";
 
 /**
  * Job Structure Extractor
@@ -37,6 +38,7 @@ export const JobStructureSchema = z.object({
   tech_stack: z.array(z.string()).describe("Array of specific technologies, frameworks, tools, or platforms mentioned"),
   keywords: z.array(z.string()).describe("Array of relevant keywords, skills, domains, topics, or concepts. Should be broader than tech_stack and include business domains, methodologies, and role-related terms"),
   standardized_department: z.string().describe("Standardized department name (e.g., 'Engineering', 'Sales', 'Marketing', 'Product', 'Operations')"),
+  function_category: z.enum(ROLE_CATEGORIES as [RoleCategory, ...RoleCategory[]]).describe("Function category (role specialization) - what the person does, not where they sit in the org. Must be one of the predefined ROLE_CATEGORIES."),
   location: LocationSchema,
 });
 
@@ -48,6 +50,7 @@ export interface JobStructureForDB extends Omit<JobStructure, "salary" | "locati
   salary_max: number | null;
   salary_currency: string;
   keywords: string[]; // Explicitly include keywords
+  function_category: RoleCategory;
   location_structured: {
     city: string | null;
     state: string | null;
@@ -87,7 +90,15 @@ Extract and return a JSON object with:
    - Common values: "Engineering", "Sales", "Marketing", "Product", "Operations", "Finance", "Legal", "HR", "Customer Success", "Support"
    - Normalize variations (e.g., "Engineering" not "Software Engineering" or "Tech")
    - If raw department is invalid (cookie/privacy text), ignore it and extract from description
-7. **location**: Structured location object extracted from description
+7. **function_category**: Function category (role specialization) - what the person actually does
+   - Must be one of: {categories}
+   - This represents the FUNCTION/SKILL specialization, not the organizational department
+   - Examples: "engineering-backend" (backend engineering function), "product-management" (product management function), "marketing-growth" (growth marketing function)
+   - Key distinction: standardized_department = where they sit (org structure), function_category = what they do (skills/role)
+   - Analyze the job title AND description to determine the actual function/specialization
+   - If a role is ambiguous (e.g., "Product Engineer"), use the description to determine if it's engineering (technical) or product (strategic)
+   - Return "other" only if truly cannot be categorized into any of the predefined categories
+8. **location**: Structured location object extracted from description
    - Look for location information in the description (e.g., "Location(s): Canada : Ontario : Toronto" or "Toronto, Ontario, Canada")
    - Extract city, state/province, and country separately
    - Format as: {"city": "Toronto", "state": "Ontario", "country": "Canada", "formatted": "Toronto, Ontario, Canada"}
@@ -103,6 +114,7 @@ Respond ONLY with valid JSON matching this structure:
   "tech_stack": ["React", "TypeScript", "AWS"],
   "keywords": ["fintech", "payments", "API development", "microservices", "agile"],
   "standardized_department": "Engineering",
+  "function_category": "engineering-backend",
   "location": {"city": "Toronto", "state": "Ontario", "country": "Canada", "formatted": "Toronto, Ontario, Canada"} or null
 }`;
 
@@ -133,7 +145,8 @@ export async function extractJobStructure(
   const prompt = EXTRACTION_PROMPT
     .replace("{job_title}", jobTitle)
     .replace("{raw_department}", rawDepartment || "null or empty")
-    .replace("{description}", truncatedDescription);
+    .replace("{description}", truncatedDescription)
+    .replace("{categories}", ROLE_CATEGORIES.join(", "));
 
   let parsed: unknown = null;
 
@@ -242,6 +255,7 @@ export async function extractJobStructure(
       tech_stack: validated.tech_stack,
       keywords: validated.keywords || [],
       standardized_department: validated.standardized_department,
+      function_category: validated.function_category,
       location_structured: validated.location,
     };
 
@@ -312,6 +326,9 @@ function extractPartialStructure(
         typeof parsedObj.standardized_department === "string"
           ? parsedObj.standardized_department
           : "",
+      function_category: isValidRoleCategory(parsedObj.function_category)
+        ? (parsedObj.function_category as RoleCategory)
+        : "other", // Safe default
       location_structured: extractLocation(parsedObj.location),
     };
 
@@ -336,6 +353,13 @@ function isValidSeniority(value: unknown): value is JobStructure["seniority_leve
     "executive",
   ];
   return typeof value === "string" && validLevels.includes(value);
+}
+
+/**
+ * Check if a value is a valid role category
+ */
+function isValidRoleCategory(value: unknown): value is RoleCategory {
+  return typeof value === "string" && ROLE_CATEGORIES.includes(value as RoleCategory);
 }
 
 /**
