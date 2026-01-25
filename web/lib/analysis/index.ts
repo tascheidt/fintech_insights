@@ -7,7 +7,6 @@ export {
 } from "./advanced-strategic";
 export {
   categorizePosting,
-  quickCategorize,
   ROLE_CATEGORIES,
   type JobCategoryResult,
   type RoleCategory,
@@ -32,7 +31,6 @@ export {
 } from "./context-builder";
 export {
   ROLE_CATEGORIES as FUNCTION_CATEGORIES,
-  quickCategorize as quickCategorizeFunction,
   getCategoryGroup,
   getCategoryLabel,
   categorizeJobs,
