@@ -789,6 +789,7 @@ export async function scrapeDayforceWithBrowser(
           break; // Exit retry loop
         }
       }
+      } // Close for loop
 
       return jobsWithDescriptions;
     } finally {
