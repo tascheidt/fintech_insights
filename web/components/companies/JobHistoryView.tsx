@@ -12,6 +12,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { format, subDays, subMonths } from "date-fns";
 import {
@@ -51,16 +52,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { getCategoryLabel } from "@/lib/analysis/function-categories";
 
 /** Job posting data structure */
 export interface JobData {
   id: string;
   title: string;
-  department: string | null;
+  standardized_department: string | null; // Use standardized_department, never raw department
+  function_category: string | null; // Function category (role specialization)
   location: string | null;
   isActive: boolean;
   firstSeenDate: string | null;
   url: string | null;
+  companyName?: string;
+  companySlug?: string;
 }
 
 interface JobHistoryViewProps {
@@ -89,15 +94,36 @@ export function JobHistoryView({
   initialStatus = "all",
   pageSize = 12,
 }: JobHistoryViewProps) {
-  const [view, setView] = useViewPreference(`jobs-${companySlug}`, "card");
+  const [view, setView] = useViewPreference(`jobs-${companySlug}`, "table");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(initialStatus);
   const [timeFilter, setTimeFilter] = React.useState<TimeFilter>("all");
+  const [companyFilter, setCompanyFilter] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
+
+  // Extract unique companies for filter (only when viewing all companies)
+  const availableCompanies = React.useMemo(() => {
+    if (companySlug !== "all") return [];
+    const companies = new Map<string, { slug: string; name: string }>();
+    jobs.forEach((job) => {
+      if (job.companySlug && job.companyName) {
+        companies.set(job.companySlug, {
+          slug: job.companySlug,
+          name: job.companyName,
+        });
+      }
+    });
+    return Array.from(companies.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [jobs, companySlug]);
 
   // Filter jobs based on current filters
   const filteredJobs = React.useMemo(() => {
     let result = [...jobs];
+
+    // Company filter (only when viewing all companies)
+    if (companySlug === "all" && companyFilter !== "all") {
+      result = result.filter((j) => j.companySlug === companyFilter);
+    }
 
     // Status filter
     if (statusFilter === "active") {
@@ -143,13 +169,16 @@ export function JobHistoryView({
       result = result.filter(
         (j) =>
           j.title.toLowerCase().includes(query) ||
-          j.department?.toLowerCase().includes(query) ||
-          j.location?.toLowerCase().includes(query)
+          j.standardized_department?.toLowerCase().includes(query) ||
+          j.function_category?.toLowerCase().includes(query) ||
+          (j.function_category && getCategoryLabel(j.function_category as any).toLowerCase().includes(query)) ||
+          j.location?.toLowerCase().includes(query) ||
+          j.companyName?.toLowerCase().includes(query)
       );
     }
 
     return result;
-  }, [jobs, statusFilter, timeFilter, searchQuery]);
+  }, [jobs, companySlug, companyFilter, statusFilter, timeFilter, searchQuery]);
 
   // Pagination
   const totalPages = Math.ceil(filteredJobs.length / pageSize);
@@ -161,13 +190,18 @@ export function JobHistoryView({
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, timeFilter, searchQuery]);
+  }, [statusFilter, timeFilter, companyFilter, searchQuery]);
 
-  const hasFilters = statusFilter !== "all" || timeFilter !== "all" || searchQuery.trim();
+  const hasFilters = 
+    statusFilter !== "all" || 
+    timeFilter !== "all" || 
+    (companySlug === "all" && companyFilter !== "all") ||
+    searchQuery.trim();
 
   const clearFilters = () => {
     setStatusFilter("all");
     setTimeFilter("all");
+    setCompanyFilter("all");
     setSearchQuery("");
   };
 
@@ -199,9 +233,26 @@ export function JobHistoryView({
           />
         </div>
 
+        {/* Company filter (only when viewing all companies) */}
+        {companySlug === "all" && availableCompanies.length > 0 && (
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-full sm:w-[160px] min-h-[44px]">
+              <SelectValue placeholder="Company" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Companies</SelectItem>
+              {availableCompanies.map((company) => (
+                <SelectItem key={company.slug} value={company.slug}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         {/* Status filter */}
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-full sm:w-[140px] min-h-[44px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -213,7 +264,7 @@ export function JobHistoryView({
 
         {/* Time filter */}
         <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-full sm:w-[140px] min-h-[44px]">
             <SelectValue placeholder="Time" />
           </SelectTrigger>
           <SelectContent>
@@ -290,6 +341,9 @@ export function JobHistoryView({
  * Card view for jobs
  */
 function JobsCardView({ jobs }: { jobs: JobData[] }) {
+  const hasCompanyInfo = jobs.some((j) => j.companyName);
+  const router = useRouter();
+  
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {jobs.map((job) => (
@@ -301,19 +355,46 @@ function JobsCardView({ jobs }: { jobs: JobData[] }) {
                 <NotionCardTitle className="flex-1">{job.title}</NotionCardTitle>
                 <span
                   className={cn(
-                    "flex-shrink-0 w-2 h-2 rounded-full mt-1.5",
+                    "shrink-0 w-2 h-2 rounded-full mt-1.5",
                     job.isActive ? "bg-green-500" : "bg-gray-400"
                   )}
                   title={job.isActive ? "Active" : "Inactive"}
                 />
               </div>
 
+              {/* Company (if available) */}
+              {hasCompanyInfo && job.companyName && (
+                <div className="mt-2">
+                  {job.companySlug ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        router.push(`/companies/${job.companySlug}`);
+                      }}
+                      className="text-xs text-primary hover:underline font-medium text-left"
+                    >
+                      {job.companyName}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{job.companyName}</span>
+                  )}
+                </div>
+              )}
+
               {/* Details */}
               <div className="space-y-1 mt-3">
-                {job.department && (
+                {job.standardized_department && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Briefcase className="h-3 w-3" />
-                    <span>{job.department}</span>
+                    <span>{job.standardized_department}</span>
+                  </div>
+                )}
+                {job.function_category && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Briefcase className="h-3 w-3" />
+                    <span>{getCategoryLabel(job.function_category as any)}</span>
                   </div>
                 )}
                 {job.location && (
@@ -351,15 +432,21 @@ function JobsCardView({ jobs }: { jobs: JobData[] }) {
  * Table view for jobs
  */
 function JobsTableView({ jobs }: { jobs: JobData[] }) {
+  const hasCompanyInfo = jobs.some((j) => j.companyName);
+  
   return (
     <div className="rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Title</TableHead>
-            <TableHead>Department</TableHead>
-            <TableHead>Location</TableHead>
-            <TableHead>First Seen</TableHead>
+            {hasCompanyInfo && (
+              <TableHead className="hidden sm:table-cell">Company</TableHead>
+            )}
+            <TableHead className="hidden sm:table-cell">Department</TableHead>
+            <TableHead className="hidden sm:table-cell">Function</TableHead>
+            <TableHead className="hidden md:table-cell">Location</TableHead>
+            <TableHead className="hidden md:table-cell">First Seen</TableHead>
             <TableHead>Status</TableHead>
             <TableHead></TableHead>
           </TableRow>
@@ -368,9 +455,26 @@ function JobsTableView({ jobs }: { jobs: JobData[] }) {
           {jobs.map((job) => (
             <TableRow key={job.id}>
               <TableCell className="font-medium">{job.title}</TableCell>
-              <TableCell>{job.department ?? "—"}</TableCell>
-              <TableCell>{job.location ?? "—"}</TableCell>
-              <TableCell>
+              {hasCompanyInfo && (
+                <TableCell className="hidden sm:table-cell">
+                  {job.companySlug ? (
+                    <Link
+                      href={`/companies/${job.companySlug}`}
+                      className="text-primary hover:underline"
+                    >
+                      {job.companyName ?? "—"}
+                    </Link>
+                  ) : (
+                    job.companyName ?? "—"
+                  )}
+                </TableCell>
+              )}
+              <TableCell className="hidden sm:table-cell">{job.standardized_department ?? "—"}</TableCell>
+              <TableCell className="hidden sm:table-cell">
+                {job.function_category ? getCategoryLabel(job.function_category as any) : "—"}
+              </TableCell>
+              <TableCell className="hidden md:table-cell">{job.location ?? "—"}</TableCell>
+              <TableCell className="hidden md:table-cell">
                 {job.firstSeenDate
                   ? format(new Date(job.firstSeenDate), "MMM d, yyyy")
                   : "—"}

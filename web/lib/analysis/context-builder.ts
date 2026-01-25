@@ -14,7 +14,7 @@ export interface HistoricalContext {
 }
 
 export interface HiringTrend {
-  department: string | null;
+  standardized_department: string | null;
   trend: "increasing" | "decreasing" | "stable" | "new";
   jobCount: number;
   description: string;
@@ -22,13 +22,13 @@ export interface HiringTrend {
 
 export interface ExecutiveHire {
   title: string;
-  department: string | null;
+  standardized_department: string | null;
   firstSeenDate: string;
   description: string;
 }
 
 export interface DepartmentStats {
-  department: string | null;
+  standardized_department: string | null;
   count: number;
   percentage: number;
 }
@@ -47,7 +47,7 @@ export async function buildHistoricalContext(
   // Fetch all active jobs from the period
   const { data: jobs } = await supabase
     .from("job_postings")
-    .select("id, title, department, first_seen_date, is_active")
+    .select("id, title, standardized_department, first_seen_date, is_active")
     .eq("company_id", companyId)
     .gte("first_seen_date", cutoffDate.toISOString())
     .order("first_seen_date", { ascending: false });
@@ -82,7 +82,7 @@ export async function buildHistoricalContext(
  * Detect hiring trends by department
  */
 export function detectHiringTrends(
-  jobs: Array<{ department: string | null; first_seen_date: string }>,
+  jobs: Array<{ standardized_department: string | null; first_seen_date: string }>,
   days: number
 ): HiringTrend[] {
   const now = new Date();
@@ -91,7 +91,7 @@ export function detectHiringTrends(
   // Group by department
   const byDept = new Map<string | null, Array<{ first_seen_date: string }>>();
   for (const job of jobs) {
-    const dept = job.department || "Unspecified";
+    const dept = job.standardized_department || "Unspecified";
     if (!byDept.has(dept)) {
       byDept.set(dept, []);
     }
@@ -124,7 +124,7 @@ export function detectHiringTrends(
     }
 
     trends.push({
-      department: dept === "Unspecified" ? null : dept,
+      standardized_department: dept === "Unspecified" ? null : dept,
       trend,
       jobCount: deptJobs.length,
       description,
@@ -138,7 +138,7 @@ export function detectHiringTrends(
  * Extract recent executive/leadership hires
  */
 export function getRecentExecutiveHires(
-  jobs: Array<{ title: string; department: string | null; first_seen_date: string }>
+  jobs: Array<{ title: string; standardized_department: string | null; first_seen_date: string }>
 ): ExecutiveHire[] {
   const executiveKeywords = [
     "chief",
@@ -167,9 +167,9 @@ export function getRecentExecutiveHires(
     if (isExecutive) {
       executives.push({
         title: job.title,
-        department: job.department,
+        standardized_department: job.standardized_department,
         firstSeenDate: job.first_seen_date,
-        description: `${job.title}${job.department ? ` in ${job.department}` : ""}`,
+        description: `${job.title}${job.standardized_department ? ` in ${job.standardized_department}` : ""}`,
       });
     }
   }
@@ -185,19 +185,19 @@ export function getRecentExecutiveHires(
  * Get department breakdown statistics
  */
 export function getDepartmentBreakdown(
-  jobs: Array<{ department: string | null }>
+  jobs: Array<{ standardized_department: string | null }>
 ): DepartmentStats[] {
   const counts = new Map<string | null, number>();
   const total = jobs.length;
 
   for (const job of jobs) {
-    const dept = job.department || null;
+    const dept = job.standardized_department || null;
     counts.set(dept, (counts.get(dept) || 0) + 1);
   }
 
   return Array.from(counts.entries())
     .map(([dept, count]) => ({
-      department: dept,
+      standardized_department: dept,
       count,
       percentage: total > 0 ? Math.round((count / total) * 100) : 0,
     }))
@@ -223,14 +223,14 @@ function buildSummaryText(
   if (departments.length > 0) {
     const topDepts = departments.slice(0, 3);
     parts.push(
-      `Top departments: ${topDepts.map((d) => `${d.department || "Unspecified"} (${d.count})`).join(", ")}.`
+      `Top departments: ${topDepts.map((d) => `${d.standardized_department || "Unspecified"} (${d.count})`).join(", ")}.`
     );
   }
 
   const increasing = trends.filter((t) => t.trend === "increasing");
   if (increasing.length > 0) {
     parts.push(
-      `Growing areas: ${increasing.map((t) => t.department || "Unspecified").join(", ")}.`
+      `Growing areas: ${increasing.map((t) => t.standardized_department || "Unspecified").join(", ")}.`
     );
   }
 
@@ -253,7 +253,7 @@ export function formatHistoricalContextForPrompt(context: HistoricalContext): st
   if (context.hiringTrends.length > 0) {
     text += `### Hiring Trends by Department:\n`;
     for (const trend of context.hiringTrends.slice(0, 10)) {
-      text += `- ${trend.department || "Unspecified"}: ${trend.description}\n`;
+      text += `- ${trend.standardized_department || "Unspecified"}: ${trend.description}\n`;
     }
     text += `\n`;
   }
@@ -323,7 +323,7 @@ export async function buildExtendedHistoricalContext(
   // Fetch current period jobs
   const { data: currentJobs } = await supabase
     .from("job_postings")
-    .select("id, title, department, first_seen_date, is_active")
+    .select("id, title, standardized_department, function_category, first_seen_date, is_active")
     .eq("company_id", companyId)
     .gte("first_seen_date", periodStart.toISOString())
     .order("first_seen_date", { ascending: false });
@@ -331,7 +331,7 @@ export async function buildExtendedHistoricalContext(
   // Fetch previous period jobs for trend comparison
   const { data: previousJobs } = await supabase
     .from("job_postings")
-    .select("id, title, department, first_seen_date, is_active")
+    .select("id, title, standardized_department, function_category, first_seen_date, is_active")
     .eq("company_id", companyId)
     .gte("first_seen_date", previousPeriodStart.toISOString())
     .lt("first_seen_date", periodStart.toISOString())
@@ -473,14 +473,14 @@ function buildExtendedSummaryText(
   if (departments.length > 0) {
     const topDepts = departments.slice(0, 3);
     parts.push(
-      `Top departments: ${topDepts.map((d) => `${d.department || "Unspecified"} (${d.count})`).join(", ")}.`
+      `Top departments: ${topDepts.map((d) => `${d.standardized_department || "Unspecified"} (${d.count})`).join(", ")}.`
     );
   }
 
   // Growing areas
   const increasing = trends.filter((t) => t.trend === "increasing");
   if (increasing.length > 0) {
-    parts.push(`Growing areas: ${increasing.map((t) => t.department || "Unspecified").join(", ")}.`);
+    parts.push(`Growing areas: ${increasing.map((t) => t.standardized_department || "Unspecified").join(", ")}.`);
   }
 
   // Executives

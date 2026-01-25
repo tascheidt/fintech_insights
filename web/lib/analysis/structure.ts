@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
+import { ROLE_CATEGORIES, type RoleCategory } from "./function-categories";
 
 /**
  * Job Structure Extractor
@@ -8,9 +9,17 @@ import { z } from "zod";
  * Provides standardized fields for job_postings table.
  */
 
+// Zod schema for structured location
+const LocationSchema = z.object({
+  city: z.string().nullable().describe("City name (e.g., 'Toronto', 'New York', 'London')"),
+  state: z.string().nullable().describe("State, province, or region (e.g., 'Ontario', 'California', 'England')"),
+  country: z.string().nullable().describe("Country name (e.g., 'Canada', 'United States', 'United Kingdom')"),
+  formatted: z.string().nullable().describe("Formatted location string (e.g., 'Toronto, Ontario, Canada' or 'Toronto, Canada' if state is null)"),
+}).nullable().describe("Structured location extracted from description. Look for 'Location(s):' section. Return null if not found.");
+
 // Zod schema for job structure extraction
 export const JobStructureSchema = z.object({
-  summary: z.string().describe("2-3 sentence summary of the job role"),
+  summary: z.string().describe("2-3 sentence summary of what this role entails"),
   seniority_level: z.enum([
     "intern",
     "junior",
@@ -26,41 +35,52 @@ export const JobStructureSchema = z.object({
     max: z.number().int().positive().nullable(),
     currency: z.string().default("USD"),
   }).nullable().describe("Salary range if found in description, null otherwise"),
-  tech_stack: z.array(z.string()).describe("Array of technologies, frameworks, or tools mentioned"),
+  tech_stack: z.array(z.string()).describe("Array of specific technologies, frameworks, tools, or platforms mentioned"),
+  keywords: z.array(z.string()).describe("Array of relevant keywords, skills, domains, topics, or concepts. Should be broader than tech_stack and include business domains, methodologies, and role-related terms"),
   standardized_department: z.string().describe("Standardized department name (e.g., 'Engineering', 'Sales', 'Marketing', 'Product', 'Operations')"),
+  function_category: z.enum(ROLE_CATEGORIES as unknown as [RoleCategory, ...RoleCategory[]]).describe("Function category (role specialization) - what the person does, not where they sit in the org. Must be one of the predefined ROLE_CATEGORIES. Use 'other' if cannot be categorized."),
+  location: LocationSchema,
 });
 
 export type JobStructure = z.infer<typeof JobStructureSchema>;
 
 // Extended type for database insertion (flattened salary fields)
-export interface JobStructureForDB extends Omit<JobStructure, "salary"> {
+export interface JobStructureForDB extends Omit<JobStructure, "salary" | "location"> {
   salary_min: number | null;
   salary_max: number | null;
   salary_currency: string;
+  keywords: string[]; // Explicitly include keywords
+  function_category: RoleCategory; // Always one of ROLE_CATEGORIES, "other" for uncategorized
+  location_structured: {
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    formatted: string | null;
+  } | null;
 }
 
 const EXTRACTION_PROMPT = `Analyze this job description and extract the following structured data.
 
 Job Title: {job_title}
+Raw Department (from ATS): {raw_department}
+Note: The raw department may be empty, null, or contain invalid data (e.g., cookie banners). Use it as a hint if it appears valid, but extract the correct standardized department from the description.
 
 Job Description:
 {description}
 
+IMPORTANT: Always extract location from the job description. Look for location information in sections like "Location(s):", "Location:", or within the job details. The description is the source of truth for location data.
+
 Extract and return a JSON object with:
-1. **summary**: A concise 2-3 sentence summary of what this role entails
+1. **summary**: A concise 2-3 sentence summary (max 300 chars)
 2. **seniority_level**: One of: intern, junior, mid, senior, staff, principal, lead, executive
-   - Look at the job title and description for indicators (e.g., "Senior", "Principal", "Lead", "VP", "Director")
-   - If unclear, infer from requirements (years of experience, scope of responsibility)
-3. **salary**: Object with min, max (integers), and currency (default "USD")
-   - Extract salary range if mentioned (e.g., "$120k-150k", "$100,000 - $130,000")
-   - Return null if no salary information found
-4. **tech_stack**: Array of specific technologies, frameworks, tools, or platforms mentioned
-   - Examples: ["React", "Python", "AWS", "PostgreSQL", "Docker", "Kubernetes"]
-   - Be specific and extract actual tech names, not generic terms
-   - Include programming languages, frameworks, databases, cloud services, etc.
-5. **standardized_department**: Standardized department name
-   - Common values: "Engineering", "Sales", "Marketing", "Product", "Operations", "Finance", "Legal", "HR", "Customer Success", "Support"
-   - Normalize variations (e.g., "Engineering" not "Software Engineering" or "Tech")
+3. **salary**: Object with min, max (integers), currency (default "USD"), or null
+4. **tech_stack**: Array of specific technologies (max 15 items, most important first)
+5. **keywords**: Array of relevant keywords/skills/domains (max 20 items, most important first)
+6. **standardized_department**: One of: Engineering, Sales, Marketing, Product, Operations, Finance, Legal, HR, Customer Success, Support
+7. **function_category**: Must be one of: {categories}
+   - Edge Cases: SQL/ETL→engineering-data, Excel/Accounting→finance-accounting, Risk Modeling→data-science, Fraud Ops→fraud-trust-safety, Compliance Ops→compliance, Legal→legal, Support→customer-support-cx, Success→account-management-customer-success
+   - Return "other" only if truly uncategorizable
+8. **location**: Object with city, state, country, formatted (all nullable), or null
 
 Respond ONLY with valid JSON matching this structure:
 {
@@ -68,7 +88,10 @@ Respond ONLY with valid JSON matching this structure:
   "seniority_level": "senior",
   "salary": {"min": 120000, "max": 150000, "currency": "USD"} or null,
   "tech_stack": ["React", "TypeScript", "AWS"],
-  "standardized_department": "Engineering"
+  "keywords": ["fintech", "payments", "API development", "microservices", "agile"],
+  "standardized_department": "Engineering",
+  "function_category": "engineering-backend",
+  "location": {"city": "Toronto", "state": "Ontario", "country": "Canada", "formatted": "Toronto, Ontario, Canada"} or null
 }`;
 
 /**
@@ -76,12 +99,14 @@ Respond ONLY with valid JSON matching this structure:
  * 
  * @param jobTitle - The job title
  * @param description - The full job description text
+ * @param rawDepartment - Optional raw department value from scraper (may be invalid)
  * @param retryCount - Internal retry counter (default: 0)
  * @returns Structured job data or null if extraction fails
  */
 export async function extractJobStructure(
   jobTitle: string,
   description: string,
+  rawDepartment?: string | null,
   retryCount: number = 0
 ): Promise<JobStructureForDB | null> {
   const key = process.env.GEMINI_API_KEY;
@@ -95,7 +120,9 @@ export async function extractJobStructure(
 
   const prompt = EXTRACTION_PROMPT
     .replace("{job_title}", jobTitle)
-    .replace("{description}", truncatedDescription);
+    .replace("{raw_department}", rawDepartment || "null or empty")
+    .replace("{description}", truncatedDescription)
+    .replace("{categories}", ROLE_CATEGORIES.join(", "));
 
   let parsed: unknown = null;
 
@@ -127,7 +154,7 @@ export async function extractJobStructure(
         console.log(`Retrying extraction for job "${jobTitle}" due to empty response (attempt ${retryCount + 2}/3)`);
         // Wait a bit before retrying (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-        return extractJobStructure(jobTitle, description, retryCount + 1);
+        return extractJobStructure(jobTitle, description, rawDepartment, retryCount + 1);
       }
       
       return null;
@@ -136,7 +163,7 @@ export async function extractJobStructure(
     // Try to parse JSON, with fallback for malformed JSON
     try {
       parsed = JSON.parse(text) as unknown;
-    } catch (parseError) {
+    } catch {
       // Log the actual response for debugging (first 200 chars)
       const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
       console.warn(`JSON parse failed for job "${jobTitle}". Response preview: ${responsePreview}`);
@@ -161,9 +188,45 @@ export async function extractJobStructure(
             // Try to fix common JSON issues: trailing commas before closing braces/brackets
             let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
             
+            // If JSON appears truncated (ends mid-field), try to close it gracefully
+            // Check if it ends with incomplete string/array/object
+            if (!jsonText.trim().endsWith('}')) {
+              // Try to close incomplete arrays/objects
+              const openBraces = (jsonText.match(/\{/g) || []).length;
+              const closeBraces = (jsonText.match(/\}/g) || []).length;
+              const openBrackets = (jsonText.match(/\[/g) || []).length;
+              const closeBrackets = (jsonText.match(/\]/g) || []).length;
+              
+              // Close incomplete strings (if we're in the middle of a string value)
+              if (jsonText.match(/"[^"]*$/)) {
+                jsonText = jsonText.replace(/("[^"]*)$/, '$1"');
+              }
+              
+              // Close incomplete arrays
+              for (let i = closeBrackets; i < openBrackets; i++) {
+                jsonText += ']';
+              }
+              
+              // Close incomplete objects
+              for (let i = closeBraces; i < openBraces; i++) {
+                jsonText += '}';
+              }
+            }
+            
             parsed = JSON.parse(jsonText) as unknown;
-            console.log(`Successfully parsed JSON after fixing trailing commas for job "${jobTitle}"`);
+            console.log(`Successfully parsed JSON after fixing for job "${jobTitle}"`);
           } catch (fixError) {
+            // If still failing, check if response was truncated (common with token limits)
+            const isTruncated = text.length > 1800 || text.match(/"[^"]*$/); // Likely truncated if near limit or ends mid-string
+            
+            if (isTruncated && retryCount < 2) {
+              console.warn(`Response appears truncated for job "${jobTitle}". Retrying with shorter description...`);
+              // Retry with shorter description to reduce input tokens
+              const shorterDescription = description.slice(0, 6000);
+              await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+              return extractJobStructure(jobTitle, shorterDescription, rawDepartment, retryCount + 1);
+            }
+            
             console.error(`Failed to parse JSON for job "${jobTitle}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
             // Log the problematic JSON snippet for debugging
             if (jsonMatch[0].length < 500) {
@@ -183,7 +246,7 @@ export async function extractJobStructure(
             console.log(`Retrying extraction for job "${jobTitle}" (attempt ${retryCount + 2}/3)`);
             // Wait a bit before retrying (exponential backoff)
             await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-            return extractJobStructure(jobTitle, description, retryCount + 1);
+            return extractJobStructure(jobTitle, description, rawDepartment, retryCount + 1);
           }
           
           return null;
@@ -202,7 +265,10 @@ export async function extractJobStructure(
       salary_max: validated.salary?.max ?? null,
       salary_currency: validated.salary?.currency ?? "USD",
       tech_stack: validated.tech_stack,
+      keywords: validated.keywords || [],
       standardized_department: validated.standardized_department,
+      function_category: validated.function_category,
+      location_structured: validated.location,
     };
 
     return dbStructure;
@@ -234,7 +300,7 @@ export async function extractJobStructure(
         console.log(`Retrying extraction for job "${jobTitle}" due to ${errorMessage} (attempt ${retryCount + 2}/3)`);
         // Wait before retrying (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
-        return extractJobStructure(jobTitle, description, retryCount + 1);
+        return extractJobStructure(jobTitle, description, rawDepartment, retryCount + 1);
       }
     }
     
@@ -265,10 +331,17 @@ function extractPartialStructure(
       tech_stack: Array.isArray(parsedObj.tech_stack)
         ? (parsedObj.tech_stack as string[])
         : [],
+      keywords: Array.isArray(parsedObj.keywords)
+        ? (parsedObj.keywords as string[])
+        : [],
       standardized_department:
         typeof parsedObj.standardized_department === "string"
           ? parsedObj.standardized_department
           : "",
+      function_category: isValidRoleCategory(parsedObj.function_category)
+        ? (parsedObj.function_category as RoleCategory)
+        : "other", // Use "other" for uncategorized jobs
+      location_structured: extractLocation(parsedObj.location),
     };
 
     return partial;
@@ -292,6 +365,13 @@ function isValidSeniority(value: unknown): value is JobStructure["seniority_leve
     "executive",
   ];
   return typeof value === "string" && validLevels.includes(value);
+}
+
+/**
+ * Check if a value is a valid role category
+ */
+function isValidRoleCategory(value: unknown): value is RoleCategory {
+  return typeof value === "string" && ROLE_CATEGORIES.includes(value as RoleCategory);
 }
 
 /**
@@ -327,6 +407,133 @@ function extractCurrency(salary: unknown): string {
   const currency = salaryObj.currency;
 
   return typeof currency === "string" ? currency : "USD";
+}
+
+/**
+ * Extract location from parsed object
+ */
+function extractLocation(location: unknown): {
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  formatted: string | null;
+} | null {
+  if (!location || typeof location !== "object") {
+    return null;
+  }
+
+  const locationObj = location as Record<string, unknown>;
+  
+  return {
+    city: typeof locationObj.city === "string" ? locationObj.city : locationObj.city === null ? null : null,
+    state: typeof locationObj.state === "string" ? locationObj.state : locationObj.state === null ? null : null,
+    country: typeof locationObj.country === "string" ? locationObj.country : locationObj.country === null ? null : null,
+    formatted: typeof locationObj.formatted === "string" ? locationObj.formatted : locationObj.formatted === null ? null : null,
+  };
+}
+
+/**
+ * Validate if a department value is valid (not cookie/privacy-related text)
+ * 
+ * @param department - The department value to validate
+ * @returns true if valid, false if invalid
+ */
+export function isValidDepartment(department: string | null | undefined): boolean {
+  if (!department || department.trim().length === 0) {
+    return false;
+  }
+  
+  const lower = department.toLowerCase().trim();
+  
+  // Reject cookie/privacy-related text
+  const badKeywords = [
+    'cookie', 'cookies', 'accept', 'decline', 'preferences',
+    'privacy', 'policy', 'gdpr', 'consent', 'manage',
+    'necessary', 'analytics', 'marketing', 'functional',
+    'settings', 'preferences', 'all cookies', 'essential',
+    'strictly necessary', 'performance', 'targeting'
+  ];
+  
+  if (badKeywords.some(keyword => lower.includes(keyword))) {
+    return false;
+  }
+  
+  // Reject very short or very long values (likely not a department)
+  if (lower.length < 2 || lower.length > 100) {
+    return false;
+  }
+  
+  // Reject common non-department text patterns
+  const nonDepartmentPatterns = [
+    /^click/i,
+    /^read more/i,
+    /^learn more/i,
+    /^apply/i,
+    /^view/i,
+    /^see/i,
+  ];
+  
+  if (nonDepartmentPatterns.some(pattern => pattern.test(lower))) {
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Validate if a location value is valid (not placeholder/search text)
+ * 
+ * @param location - The location value to validate
+ * @returns true if valid, false if invalid/placeholder
+ */
+export function isValidLocation(location: string | null | undefined): boolean {
+  if (!location || location.trim().length === 0) {
+    return false;
+  }
+  
+  const lower = location.toLowerCase().trim();
+  
+  // Reject placeholder/search text
+  const placeholderPatterns = [
+    'search by location',
+    'select location',
+    'choose location',
+    'location search',
+    'filter by location',
+    'all locations',
+    'any location',
+    'multiple locations',
+    'various locations',
+    'location tbd',
+    'to be determined',
+    'multiple locations available',
+    'various locations available',
+    'location to be determined',
+  ];
+  
+  if (placeholderPatterns.some(pattern => lower.includes(pattern))) {
+    return false;
+  }
+  
+  // Reject very short values (likely not a location)
+  if (lower.length < 2) {
+    return false;
+  }
+  
+  // Reject common non-location text patterns
+  const nonLocationPatterns = [
+    /^click/i,
+    /^select/i,
+    /^choose/i,
+    /^filter/i,
+    /^search/i,
+  ];
+  
+  if (nonLocationPatterns.some(pattern => pattern.test(lower))) {
+    return false;
+  }
+  
+  return true;
 }
 
 /**

@@ -42,7 +42,7 @@ export async function POST(
         job_postings!job_posting_id(
           id,
           title,
-          department,
+          standardized_department,
           location,
           description_text,
           companies(id, name)
@@ -98,7 +98,7 @@ export async function POST(
 ## Current Insight Context
 Company: ${company.name}
 Job Title: ${job.title}
-Department: ${job.department || "Not specified"}
+Department: ${job.standardized_department || "Not specified"}
 Location: ${job.location || "Not specified"}
 
 Original Insight Summary: ${(insight as any).insight_summary || "N/A"}

@@ -230,6 +230,84 @@ class TangerineScraper(BaseScraper):
             logger.error(f"[{self.company_name}] Error fetching jobs: {e}")
             return []
 
+    def _extract_location_from_description(self, url: str) -> Optional[str]:
+        """Fetch job details page and extract location from description.
+        
+        Looks for "Location(s):" pattern in the job description HTML/text.
+        Returns extracted location string or None if not found.
+        """
+        try:
+            if not url:
+                return None
+            
+            # Fetch the job details page
+            response = requests.get(url, timeout=30, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            })
+            
+            if response.status_code != 200:
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for location in various patterns
+            # Pattern 1: "Location(s): Canada : Ontario : Toronto"
+            location_patterns = [
+                r"Location\(s\):\s*([^\n]+)",
+                r"Location:\s*([^\n]+)",
+                r"Locations?:\s*([^\n]+)",
+            ]
+            
+            # Search in text content
+            text_content = soup.get_text()
+            for pattern in location_patterns:
+                match = re.search(pattern, text_content, re.IGNORECASE)
+                if match:
+                    location_text = match.group(1).strip()
+                    # Clean up the location text
+                    # Format: "Canada : Ontario : Toronto" -> "Toronto, Ontario, Canada"
+                    parts = [p.strip() for p in location_text.split(":")]
+                    if len(parts) >= 3:
+                        # Reverse order: city, state, country
+                        city = parts[-1] if parts[-1] else None
+                        state = parts[-2] if len(parts) >= 2 and parts[-2] else None
+                        country = parts[-3] if len(parts) >= 3 and parts[-3] else None
+                        
+                        # Build formatted location
+                        formatted_parts = []
+                        if city:
+                            formatted_parts.append(city)
+                        if state:
+                            formatted_parts.append(state)
+                        if country:
+                            formatted_parts.append(country)
+                        
+                        if formatted_parts:
+                            return ", ".join(formatted_parts)
+                    elif location_text:
+                        # Return as-is if format is different
+                        return location_text
+            
+            # Pattern 2: Look for location in structured data attributes or specific divs
+            location_divs = soup.find_all(['div', 'span', 'p'], 
+                                         string=re.compile(r'Location', re.IGNORECASE))
+            for div in location_divs:
+                text = div.get_text()
+                # Check if it contains location info (not just the word "Location")
+                if ":" in text and len(text) > 15:
+                    match = re.search(r"Location[^:]*:\s*([^\n]+)", text, re.IGNORECASE)
+                    if match:
+                        location_text = match.group(1).strip()
+                        # Skip placeholder text
+                        if location_text.lower() not in ["search by location", "select location"]:
+                            return location_text
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"[{self.company_name}] Error extracting location from description: {e}")
+            return None
+
     def _parse_workday_job(self, job: dict) -> Optional[JobData]:
         """Parse a Workday job posting."""
         try:
@@ -245,7 +323,16 @@ class TangerineScraper(BaseScraper):
                 external_id = external_path.split("/")[-1] if external_path else job.get("title", "")
 
             title = job.get("title", "")
-            location = job.get("locationsText", "")
+            
+            # Build URL first (needed for location extraction)
+            external_path = job.get("externalPath", "")
+            url = f"https://scotiabank.wd3.myworkdayjobs.com/scotiabankcareers{external_path}" if external_path else ""
+            
+            # Try to extract location from description page first
+            # Fallback to API location if extraction fails
+            api_location = job.get("locationsText", "")
+            extracted_location = self._extract_location_from_description(url)
+            location = extracted_location if extracted_location else api_location
 
             # Get posted date
             posted_date = None
@@ -257,10 +344,6 @@ class TangerineScraper(BaseScraper):
                             posted_date = datetime.strptime(date_match.group(1), "%B %d, %Y")
                         except ValueError:
                             pass
-
-            # Build URL
-            external_path = job.get("externalPath", "")
-            url = f"https://scotiabank.wd3.myworkdayjobs.com/scotiabankcareers{external_path}" if external_path else ""
 
             return JobData(
                 external_id=external_id,

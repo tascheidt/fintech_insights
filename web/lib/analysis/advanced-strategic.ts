@@ -125,7 +125,7 @@ export interface AnalyzeJobOptions {
   companyName: string;
   job: {
     title: string;
-    department?: string | null;
+    standardized_department?: string | null;
     location?: string | null;
     description_text?: string | null;
   };
@@ -262,7 +262,7 @@ export async function analyzeJobAdvanced(
       .replace("{web_context}", webText)
       .replace("{company_name}", companyName)
       .replace("{job_title}", job.title)
-      .replace("{department}", job.department ?? "Not specified")
+      .replace("{department}", job.standardized_department ?? "Not specified")
       .replace("{location}", job.location ?? "Not specified")
       .replace("{description}", fullDescription);
 
@@ -353,7 +353,7 @@ export async function analyzeJobsAdvanced(
   jobs: Array<{
     id: string;
     title: string;
-    department?: string | null;
+    standardized_department?: string | null;
     location?: string | null;
     description_text?: string | null;
   }>
@@ -371,7 +371,7 @@ export async function analyzeJobsAdvanced(
       companyName,
       job: {
         title: job.title,
-        department: job.department,
+        standardized_department: job.standardized_department,
         location: job.location,
         description_text: job.description_text,
       },
