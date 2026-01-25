@@ -83,6 +83,11 @@ export interface WeeklyDigest {
   total_jobs: number;
   total_companies: number;
   companies: CompanyWeeklySummary[];
+  /** 
+   * AI-generated global summary synthesizing trends across all companies.
+   * May be null if generation fails (we prefer omission over generic fallback).
+   */
+  global_summary: TLDRCommentary | null;
 }
 
 /**
@@ -114,6 +119,7 @@ export async function getWeeklyData(daysBack: number = 7): Promise<Map<string, C
   const cutoffIso = cutoffDate.toISOString();
 
   // Query job postings with company data
+  // Only include companies that are active and tracked for strategy
   const { data: jobs, error } = await supabase
     .from("job_postings")
     .select(`
@@ -131,11 +137,15 @@ export async function getWeeklyData(daysBack: number = 7): Promise<Map<string, C
       companies!inner (
         id,
         name,
-        slug
+        slug,
+        is_active,
+        track_for_strategy
       )
     `)
     .gte("first_seen_date", cutoffIso)
     .eq("is_active", true)
+    .eq("companies.is_active", true)
+    .eq("companies.track_for_strategy", true)
     .order("first_seen_date", { ascending: false });
 
   if (error) {
@@ -292,12 +302,26 @@ function getDefaultTLDR(companyName: string, jobCount: number): TLDRCommentary {
 }
 
 /**
+ * Clean JSON text by removing markdown code blocks
+ */
+function cleanJsonText(text: string): string {
+  let cleaned = text.trim();
+  // Remove markdown code blocks
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  }
+  return cleaned.trim();
+}
+
+/**
  * Parse AI response into TLDRCommentary
  */
 function parseTLDRResponse(text: string, companyName: string, jobCount: number): TLDRCommentary {
   try {
-    // Try to parse as JSON directly
-    const parsed = JSON.parse(text);
+    // Clean and parse JSON
+    const cleaned = cleanJsonText(text);
+    const parsed = JSON.parse(cleaned);
+    
     if (parsed.headline && parsed.body) {
       return {
         headline: String(parsed.headline).slice(0, 100),
@@ -351,13 +375,13 @@ async function generateCompanyCommentary(
   try {
     const genAI = new GoogleGenerativeAI(key);
     
-    // Use Gemini 3 Pro for strategic analysis with JSON mode
+    // Use Gemini 3 Flash Preview as Pro is currently returning empty responses
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.7, // Slightly higher for more creative output
-        maxOutputTokens: 512,
-        responseMimeType: "application/json",
+        maxOutputTokens: 64000, // Increased to prevent cutoff
+        // responseMimeType: "application/json", // Removed as it causes issues with preview models
       },
     });
 
@@ -368,35 +392,165 @@ async function generateCompanyCommentary(
     const text = result.response.text()?.trim() || "{}";
     return parseTLDRResponse(text, companyName, jobCount);
   } catch (error: unknown) {
-    // Handle quota errors gracefully - fallback to flash model
+    // Handle quota errors gracefully
     const err = error as { status?: number; message?: string };
     if (err?.status === 429 || err?.message?.includes("quota") || err?.message?.includes("limit")) {
-      console.warn(`Gemini Pro quota exceeded, falling back to Flash: ${err.message}`);
-      try {
-        const genAI = new GoogleGenerativeAI(key);
-        const flashModel = genAI.getGenerativeModel({
-          model: "gemini-3-flash-preview",
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 512,
-            responseMimeType: "application/json",
-          },
-        });
-
-        const result = await flashModel.generateContent({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-        });
-
-        const text = result.response.text()?.trim() || "{}";
-        return parseTLDRResponse(text, companyName, jobCount);
-      } catch (flashError) {
-        console.error("Flash model also failed:", flashError);
-        return getDefaultTLDR(companyName, jobCount);
-      }
+      console.warn(`Gemini quota exceeded: ${err.message}`);
+      return getDefaultTLDR(companyName, jobCount);
     }
     
     console.error(`AI commentary error for ${companyName}:`, error);
     return getDefaultTLDR(companyName, jobCount);
+  }
+}
+
+// ============================================================================
+// Global Summary - Cross-Company Trend Analysis
+// ============================================================================
+
+/**
+ * Prompt for generating a global summary that synthesizes trends across all companies.
+ * This is the "TL;DR of TL;DRs" - a high-level view of what's happening in the market.
+ */
+const GLOBAL_SUMMARY_PROMPT = `You are the witty, insightful Editor of "Fintech Insights TLDR". Your style is punchy, conversational, and smart (modeled after Wealthsimple's TLDR newsletter). Avoid corporate jargon.
+
+You've just finished analyzing this week's hiring data from {company_count} fintech companies ({total_jobs} total new jobs). Here's what each company is doing:
+
+{company_summaries}
+
+## Your Task:
+Write a single GLOBAL TLDR that captures the *overall theme* of this week's fintech hiring. Look for patterns:
+- Are multiple companies hiring for the same skills (AI, crypto, compliance)?
+- Is there a sector-wide shift (more backend, less frontend)?
+- Any notable contrasts (one company scaling while others are quiet)?
+
+**Output a JSON object with exactly these fields:**
+{
+  "headline": "A punchy 4-6 word headline capturing the week's theme with ONE relevant emoji at the start (e.g., '🤖 AI hiring heats up' or '🔒 Everyone wants compliance')",
+  "body": "2-3 sentences synthesizing the key trend(s). Be specific about what you're seeing. Example: 'Three companies dropped AI/ML roles this week—Wealthsimple, Stripe, and Neo. Looks like everyone's racing to ship LLM features before Q2. Meanwhile, crypto hiring is dead quiet.'"
+}
+
+**Guidelines:**
+- Focus on cross-company patterns, not individual company news
+- Be specific about the trend you're identifying
+- Make it valuable for someone who only has 10 seconds
+- If there's no clear theme, note the diversity instead
+
+Respond with ONLY valid JSON, no markdown formatting.`;
+
+/**
+ * Build a condensed summary of each company for the global summary prompt.
+ */
+function buildCompanySummariesForGlobalPrompt(companies: CompanyWeeklySummary[]): string {
+  return companies
+    .map((c) => {
+      const topDepts = Object.entries(c.departments)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2)
+        .map(([d]) => d)
+        .join(", ") || "Various";
+      const tech = c.dominant_tech.slice(0, 3).join(", ") || "Various";
+      return `- **${c.company_name}**: ${c.new_job_count} jobs | Focus: ${topDepts} | Tech: ${tech} | "${c.ai_commentary.headline}"`;
+    })
+    .join("\n");
+}
+
+/**
+ * Generate a global summary that synthesizes trends across all companies.
+ * Returns null if generation fails (we prefer omission over generic fallback).
+ * 
+ * @param companies - Array of company summaries with their AI commentary
+ * @param totalJobs - Total number of new jobs across all companies
+ * @returns TLDRCommentary or null if generation fails
+ */
+async function generateGlobalSummary(
+  companies: CompanyWeeklySummary[],
+  totalJobs: number
+): Promise<TLDRCommentary | null> {
+  // Skip if no companies or very few jobs (not enough signal)
+  if (companies.length === 0 || totalJobs < 3) {
+    console.log("Skipping global summary: insufficient data");
+    return null;
+  }
+
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    console.warn("GEMINI_API_KEY not configured, skipping global summary");
+    return null;
+  }
+
+  const companySummaries = buildCompanySummariesForGlobalPrompt(companies);
+  const prompt = GLOBAL_SUMMARY_PROMPT
+    .replace("{company_count}", String(companies.length))
+    .replace("{total_jobs}", String(totalJobs))
+    .replace("{company_summaries}", companySummaries);
+
+  try {
+    const genAI = new GoogleGenerativeAI(key);
+    
+    // Use Gemini 3 Flash Preview as Pro is currently returning empty responses
+    const model = genAI.getGenerativeModel({
+      model: "gemini-3-flash-preview",
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 64000, // Increased significantly to prevent cutoff
+        // responseMimeType: "application/json", // Removed as it causes issues with preview models
+      },
+    });
+
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+
+    const text = result.response.text()?.trim() || "{}";
+    
+    // Parse the response
+    try {
+      const cleaned = cleanJsonText(text);
+      const parsed = JSON.parse(cleaned);
+      if (parsed.headline && parsed.body) {
+        console.log("Generated global summary successfully");
+        return {
+          headline: String(parsed.headline).slice(0, 120),
+          body: String(parsed.body).slice(0, 600),
+        };
+      } else {
+        console.warn("Global summary missing required fields:", { 
+          hasHeadline: !!parsed.headline, 
+          hasBody: !!parsed.body,
+          keys: Object.keys(parsed)
+        });
+      }
+    } catch (parseError) {
+      console.warn("Global summary JSON parse failed, trying regex extraction. Raw response:", text.substring(0, 500));
+      // Try regex extraction as fallback
+      const headlineMatch = text.match(/"headline":\s*"([^"]+)"/);
+      const bodyMatch = text.match(/"body":\s*"([^"]+)"/);
+      if (headlineMatch && bodyMatch) {
+        console.log("Global summary extracted via regex");
+        return {
+          headline: headlineMatch[1].slice(0, 120),
+          body: bodyMatch[1].slice(0, 600),
+        };
+      } else {
+        console.warn("Global summary regex extraction also failed", {
+          headlineMatch: !!headlineMatch,
+          bodyMatch: !!bodyMatch
+        });
+      }
+    }
+    
+    console.warn("Global summary parsing failed, omitting section. Raw response length:", text.length);
+    return null;
+  } catch (error: unknown) {
+    // Handle quota errors
+    const err = error as { status?: number; message?: string };
+    if (err?.status === 429 || err?.message?.includes("quota") || err?.message?.includes("limit")) {
+      console.warn(`Gemini quota exceeded for global summary: ${err.message}`);
+    } else {
+      console.error("Global summary generation failed:", error);
+    }
+    return null;
   }
 }
 
@@ -474,6 +628,10 @@ export async function generateWeeklyReport(
   // Calculate totals
   const totalJobs = companies.reduce((sum, c) => sum + c.new_job_count, 0);
 
+  // Generate global summary (second AI pass to synthesize cross-company trends)
+  console.log("Generating global summary...");
+  const global_summary = await generateGlobalSummary(companies, totalJobs);
+
   return {
     week_start: weekStart.toISOString(),
     week_end: now.toISOString(),
@@ -481,6 +639,7 @@ export async function generateWeeklyReport(
     total_jobs: totalJobs,
     total_companies: companies.length,
     companies,
+    global_summary,
   };
 }
 
