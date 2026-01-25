@@ -30,9 +30,9 @@ companies:
     slug: questrade
     country: CA
     track_for_strategy: true
-    ats_type: custom
-    ats_identifier: questrade
-    careers_url: https://www.questrade.com/about-us/careers
+    ats_type: dayforce
+    ats_identifier: qfg
+    careers_url: https://jobs.dayforcehcm.com/en-US/qfg/CANDIDATEPORTAL
 
   - name: Tangerine
     slug: tangerine
