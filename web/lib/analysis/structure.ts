@@ -43,7 +43,7 @@ export const JobStructureSchema = z.object({
 export type JobStructure = z.infer<typeof JobStructureSchema>;
 
 // Extended type for database insertion (flattened salary fields)
-export interface JobStructureForDB extends Omit<JobStructure, "salary"> {
+export interface JobStructureForDB extends Omit<JobStructure, "salary" | "location"> {
   salary_min: number | null;
   salary_max: number | null;
   salary_currency: string;

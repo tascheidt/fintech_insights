@@ -104,7 +104,7 @@ async function main() {
       const normalizedTitle = normalizeJobTitle(job.title);
 
       // Validate and clean department field - set to null if invalid
-      const cleanedDepartment = isValidDepartment(jobWithFields?.department)
+      const cleanedDepartment = jobWithFields && isValidDepartment(jobWithFields.department)
         ? jobWithFields.department
         : null;
 
@@ -125,7 +125,7 @@ async function main() {
       }
       
       // Validate scraper-provided location - if invalid, use AI-extracted or null
-      const cleanedLocation = isValidLocation(jobWithFields?.location) ? jobWithFields.location : null;
+      const cleanedLocation = jobWithFields && isValidLocation(jobWithFields.location) ? jobWithFields.location : null;
       const finalLocation = formattedLocation || cleanedLocation || null;
 
       // Update the job with extracted structure
