@@ -3,11 +3,10 @@
  * 
  * Navigation structure:
  * - Dashboard (home) - Overview with companies and digests
+ * - Jobs - All job postings across companies
+ * - Companies - Company list and details
  * - Insights - Weekly strategic insights
- * - Companies - Company list and details (includes jobs)
  * - Admin (admin only) - System administration
- * 
- * Note: Jobs and Templates are now accessed through Company pages.
  * 
  * Mobile: Shows hamburger menu on small screens, hides desktop nav links.
  */
@@ -38,8 +37,9 @@ export function DashboardNav({
 
   const navLinks = [
     { href: "/", label: "Dashboard" },
-    { href: "/insights", label: "Insights" },
+    { href: "/jobs", label: "Jobs" },
     { href: "/companies", label: "Companies" },
+    { href: "/insights", label: "Insights" },
     ...(role === "admin" ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 

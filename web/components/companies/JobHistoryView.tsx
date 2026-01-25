@@ -12,6 +12,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { format, subDays, subMonths } from "date-fns";
 import {
@@ -59,6 +60,8 @@ export interface JobData {
   isActive: boolean;
   firstSeenDate: string | null;
   url: string | null;
+  companyName?: string;
+  companySlug?: string;
 }
 
 interface JobHistoryViewProps {
@@ -87,15 +90,36 @@ export function JobHistoryView({
   initialStatus = "all",
   pageSize = 12,
 }: JobHistoryViewProps) {
-  const [view, setView] = useViewPreference(`jobs-${companySlug}`, "card");
+  const [view, setView] = useViewPreference(`jobs-${companySlug}`, "table");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(initialStatus);
   const [timeFilter, setTimeFilter] = React.useState<TimeFilter>("all");
+  const [companyFilter, setCompanyFilter] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
+
+  // Extract unique companies for filter (only when viewing all companies)
+  const availableCompanies = React.useMemo(() => {
+    if (companySlug !== "all") return [];
+    const companies = new Map<string, { slug: string; name: string }>();
+    jobs.forEach((job) => {
+      if (job.companySlug && job.companyName) {
+        companies.set(job.companySlug, {
+          slug: job.companySlug,
+          name: job.companyName,
+        });
+      }
+    });
+    return Array.from(companies.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [jobs, companySlug]);
 
   // Filter jobs based on current filters
   const filteredJobs = React.useMemo(() => {
     let result = [...jobs];
+
+    // Company filter (only when viewing all companies)
+    if (companySlug === "all" && companyFilter !== "all") {
+      result = result.filter((j) => j.companySlug === companyFilter);
+    }
 
     // Status filter
     if (statusFilter === "active") {
@@ -142,12 +166,13 @@ export function JobHistoryView({
         (j) =>
           j.title.toLowerCase().includes(query) ||
           j.department?.toLowerCase().includes(query) ||
-          j.location?.toLowerCase().includes(query)
+          j.location?.toLowerCase().includes(query) ||
+          j.companyName?.toLowerCase().includes(query)
       );
     }
 
     return result;
-  }, [jobs, statusFilter, timeFilter, searchQuery]);
+  }, [jobs, companySlug, companyFilter, statusFilter, timeFilter, searchQuery]);
 
   // Pagination
   const totalPages = Math.ceil(filteredJobs.length / pageSize);
@@ -159,13 +184,18 @@ export function JobHistoryView({
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, timeFilter, searchQuery]);
+  }, [statusFilter, timeFilter, companyFilter, searchQuery]);
 
-  const hasFilters = statusFilter !== "all" || timeFilter !== "all" || searchQuery.trim();
+  const hasFilters = 
+    statusFilter !== "all" || 
+    timeFilter !== "all" || 
+    (companySlug === "all" && companyFilter !== "all") ||
+    searchQuery.trim();
 
   const clearFilters = () => {
     setStatusFilter("all");
     setTimeFilter("all");
+    setCompanyFilter("all");
     setSearchQuery("");
   };
 
@@ -199,6 +229,23 @@ export function JobHistoryView({
 
         {/* Filters row */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* Company filter (only when viewing all companies) */}
+          {companySlug === "all" && availableCompanies.length > 0 && (
+            <Select value={companyFilter} onValueChange={setCompanyFilter}>
+              <SelectTrigger className="w-full sm:w-[160px] min-h-[44px]">
+                <SelectValue placeholder="Company" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Companies</SelectItem>
+                {availableCompanies.map((company) => (
+                  <SelectItem key={company.slug} value={company.slug}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           {/* Status filter */}
           <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
             <SelectTrigger className="w-full sm:w-[140px] min-h-[44px]">
@@ -293,6 +340,9 @@ export function JobHistoryView({
  * Card view for jobs
  */
 function JobsCardView({ jobs }: { jobs: JobData[] }) {
+  const hasCompanyInfo = jobs.some((j) => j.companyName);
+  const router = useRouter();
+  
   return (
     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       {jobs.map((job) => (
@@ -304,12 +354,33 @@ function JobsCardView({ jobs }: { jobs: JobData[] }) {
                 <NotionCardTitle className="flex-1">{job.title}</NotionCardTitle>
                 <span
                   className={cn(
-                    "flex-shrink-0 w-2 h-2 rounded-full mt-1.5",
+                    "shrink-0 w-2 h-2 rounded-full mt-1.5",
                     job.isActive ? "bg-green-500" : "bg-gray-400"
                   )}
                   title={job.isActive ? "Active" : "Inactive"}
                 />
               </div>
+
+              {/* Company (if available) */}
+              {hasCompanyInfo && job.companyName && (
+                <div className="mt-2">
+                  {job.companySlug ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        router.push(`/companies/${job.companySlug}`);
+                      }}
+                      className="text-xs text-primary hover:underline font-medium text-left"
+                    >
+                      {job.companyName}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{job.companyName}</span>
+                  )}
+                </div>
+              )}
 
               {/* Details */}
               <div className="space-y-1 mt-3">
@@ -354,12 +425,17 @@ function JobsCardView({ jobs }: { jobs: JobData[] }) {
  * Table view for jobs
  */
 function JobsTableView({ jobs }: { jobs: JobData[] }) {
+  const hasCompanyInfo = jobs.some((j) => j.companyName);
+  
   return (
     <div className="rounded-lg border overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Title</TableHead>
+            {hasCompanyInfo && (
+              <TableHead className="hidden sm:table-cell">Company</TableHead>
+            )}
             <TableHead className="hidden sm:table-cell">Department</TableHead>
             <TableHead className="hidden md:table-cell">Location</TableHead>
             <TableHead className="hidden md:table-cell">First Seen</TableHead>
@@ -371,6 +447,20 @@ function JobsTableView({ jobs }: { jobs: JobData[] }) {
           {jobs.map((job) => (
             <TableRow key={job.id}>
               <TableCell className="font-medium">{job.title}</TableCell>
+              {hasCompanyInfo && (
+                <TableCell className="hidden sm:table-cell">
+                  {job.companySlug ? (
+                    <Link
+                      href={`/companies/${job.companySlug}`}
+                      className="text-primary hover:underline"
+                    >
+                      {job.companyName ?? "—"}
+                    </Link>
+                  ) : (
+                    job.companyName ?? "—"
+                  )}
+                </TableCell>
+              )}
               <TableCell className="hidden sm:table-cell">{job.department ?? "—"}</TableCell>
               <TableCell className="hidden md:table-cell">{job.location ?? "—"}</TableCell>
               <TableCell className="hidden md:table-cell">

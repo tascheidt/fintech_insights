@@ -39,21 +39,6 @@ export function ViewToggle({ view, onViewChange, className }: ViewToggleProps) {
     >
       <button
         type="button"
-        onClick={() => onViewChange("card")}
-        className={cn(
-          "inline-flex items-center justify-center p-2 rounded-md",
-          "text-sm font-medium transition-all",
-          view === "card"
-            ? "bg-background text-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-        )}
-        aria-label="Card view"
-        aria-pressed={view === "card"}
-      >
-        <LayoutGrid className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
         onClick={() => onViewChange("table")}
         className={cn(
           "inline-flex items-center justify-center p-2 rounded-md",
@@ -66,6 +51,21 @@ export function ViewToggle({ view, onViewChange, className }: ViewToggleProps) {
         aria-pressed={view === "table"}
       >
         <List className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => onViewChange("card")}
+        className={cn(
+          "inline-flex items-center justify-center p-2 rounded-md",
+          "text-sm font-medium transition-all",
+          view === "card"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+        )}
+        aria-label="Card view"
+        aria-pressed={view === "card"}
+      >
+        <LayoutGrid className="h-4 w-4" />
       </button>
     </div>
   );
