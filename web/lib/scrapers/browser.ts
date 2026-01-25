@@ -312,23 +312,249 @@ export async function scrapeDayforceWithBrowser(
       const jobsWithDescriptions: JobData[] = [];
       
       for (const jobLink of jobLinks) {
-        try {
-          await page.goto(jobLink.url, {
-            waitUntil: "networkidle2",
-            timeout: 20000,
-          });
+        let retryCount = 0;
+        const maxRetries = 2;
+        let jobDetails: any = null;
+        let extractionSuccess = false;
 
-          // Wait for job description to load
+        while (retryCount <= maxRetries && !extractionSuccess) {
+          try {
+            if (retryCount > 0) {
+              console.log(`  Retrying extraction (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+              await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before retry
+            }
+
+            await page.goto(jobLink.url, {
+              waitUntil: "networkidle2",
+              timeout: 20000,
+            });
+
+          // Wait for job content container to appear first
           await page.waitForSelector(
-            '[class*="description"], [class*="Description"], .jobDescription, #jobDescription, main, [role="main"]',
-            { timeout: 10000 }
+            '[test-id="job-details-dayforce-jobs"]',
+            { timeout: 15000 }
           ).catch(() => {
-            // Description might be in different format
+            // Fallback to generic selectors if test-id doesn't exist
+            return page.waitForSelector(
+              'main, [role="main"]',
+              { timeout: 10000 }
+            );
+          }).catch(() => {
+            // Container might not exist, continue anyway
           });
 
-          // Extract full job details
+          // Wait for loading spinner to disappear (both globally and inside container)
+          // This is critical - the container appears before content loads
+          await page.waitForFunction(
+            () => {
+              const globalSpinner = document.querySelector('.ant-spin-spinning');
+              const container = document.querySelector('[test-id="job-details-dayforce-jobs"]') || document.querySelector('main');
+              const containerSpinner = container?.querySelector('.ant-spin-spinning');
+              return !globalSpinner && !containerSpinner;
+            },
+            { timeout: 20000 }
+          ).catch(() => {
+            // Spinner might not exist or already gone, continue
+          });
+
+          // Wait for actual content to appear (not just the container)
+          // Check for job description content or JSON data
+          await page.waitForFunction(
+            () => {
+              // Check if JSON data is available
+              const nextDataScript = document.querySelector('#__NEXT_DATA__');
+              if (nextDataScript) {
+                try {
+                  const nextData = JSON.parse(nextDataScript.textContent || '{}');
+                  const jobData = nextData?.props?.pageProps?.jobData || 
+                                 nextData?.props?.pageProps?.dehydratedState?.queries?.find((q: any) => 
+                                   q?.queryKey?.[0] === 'jobs' || 
+                                   q?.state?.data?.jobData
+                                 )?.state?.data?.jobData;
+                  if (jobData?.jobPostingContent?.jobDescription) {
+                    const desc = jobData.jobPostingContent.jobDescription;
+                    if (desc && desc.length > 200) {
+                      return true;
+                    }
+                  }
+                } catch (e) {
+                  // JSON parsing failed, check DOM instead
+                }
+              }
+              
+              // Check DOM for actual content (not just spinner)
+              const container = document.querySelector('[test-id="job-details-dayforce-jobs"]') || document.querySelector('main');
+              if (container) {
+                const spinner = container.querySelector('.ant-spin-spinning');
+                if (spinner) return false; // Still loading
+                
+                // Check for actual text content
+                const text = container.textContent || '';
+                // Should have substantial text content (more than just UI elements)
+                if (text.length > 500) {
+                  // Make sure it's not just loading text
+                  const lowerText = text.toLowerCase();
+                  if (!lowerText.includes('loading') && !lowerText.includes('spinning')) {
+                    return true;
+                  }
+                }
+              }
+              
+              return false;
+            },
+            { timeout: 30000 }
+          ).catch(() => {
+            // Content might not load, but continue to try extraction anyway
+            console.warn('Timeout waiting for content, proceeding with extraction');
+          });
+
+          // Additional wait for React hydration to complete
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          // Extract full job details (JSON first, then DOM fallback)
           const jobDetails = await page.evaluate((linkTitle, linkId) => {
-            // Extract description HTML - try multiple selectors
+            // Try JSON extraction first (most reliable for Next.js apps)
+            const nextDataScript = document.querySelector('#__NEXT_DATA__');
+            if (nextDataScript) {
+              try {
+                const nextData = JSON.parse(nextDataScript.textContent || '{}');
+                
+                // Try multiple paths to find jobData (based on actual Questrade structure)
+                let jobData = null;
+                
+                // Path 1: Direct jobData in pageProps
+                if (nextData?.props?.pageProps?.jobData) {
+                  jobData = nextData.props.pageProps.jobData;
+                }
+                // Path 2: In dehydratedState queries (most common for Next.js)
+                else if (nextData?.props?.pageProps?.dehydratedState?.queries) {
+                  const queries = nextData.props.pageProps.dehydratedState.queries;
+                  // Search for query with 'jobs' in queryKey or jobData in state.data
+                  for (const query of queries) {
+                    if (query?.state?.data?.jobData) {
+                      jobData = query.state.data.jobData;
+                      break;
+                    }
+                    // Also check queryKey for 'jobs'
+                    if (Array.isArray(query?.queryKey) && 
+                        (query.queryKey[0] === 'jobs' || query.queryKey.includes('jobs')) &&
+                        query?.state?.data?.jobData) {
+                      jobData = query.state.data.jobData;
+                      break;
+                    }
+                  }
+                  // Fallback: try index 1 (common pattern)
+                  if (!jobData && queries[1]?.state?.data?.jobData) {
+                    jobData = queries[1].state.data.jobData;
+                  }
+                }
+                
+                if (jobData?.jobPostingContent) {
+                  const content = jobData.jobPostingContent;
+                  const descriptionHtml = [
+                    content.jobDescriptionHeader || '',
+                    content.jobDescription || '',
+                    content.jobDescriptionFooter || ''
+                  ].filter(Boolean).join('\n');
+                  
+                  // Convert HTML to text
+                  const tempDiv = document.createElement('div');
+                  tempDiv.innerHTML = descriptionHtml;
+                  const descriptionText = tempDiv.textContent?.trim() || 
+                                         descriptionHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                  
+                  // Validate content - ensure we have actual job description
+                  if (descriptionHtml.length > 200 && descriptionText.length > 200) {
+                    // Check that it's not just loading spinner HTML
+                    if (!descriptionHtml.includes('ant-spin-spinning') && 
+                        !descriptionHtml.includes('ant-spin-dot')) {
+                      
+                      // Extract location from postingLocations
+                      const locations = jobData.postingLocations || [];
+                      const location = locations.length > 0 
+                        ? locations.map((loc: any) => 
+                            loc.formattedAddress || 
+                            [loc.cityName, loc.stateCode, loc.isoCountryCode].filter(Boolean).join(', ')
+                          ).join('; ')
+                        : '';
+                      
+                      // Extract department from jobPostingAttributes
+                      const jobFunction = jobData.jobPostingAttributes?.find((attr: any) => 
+                        attr.name === 'JobFunction' || attr.name === 'JobFamily'
+                      );
+                      const department = jobFunction?.value || jobData.jobFamily || '';
+                      
+                      // Extract posted date
+                      const postedDate = jobData.postingStartTimestampUTC || 
+                                       jobData.createdTimestampUTC || 
+                                       '';
+                      
+                      // Extract employment type
+                      const payType = jobData.jobPostingAttributes?.find((attr: any) => 
+                        attr.name === 'PayType'
+                      );
+                      const employmentType = payType?.value || '';
+                      
+                      return {
+                        id: linkId,
+                        title: linkTitle,
+                        url: window.location.href,
+                        descriptionHtml,
+                        descriptionText,
+                        location,
+                        department,
+                        postedDate,
+                        employmentType,
+                      };
+                    }
+                  }
+                }
+              } catch (e) {
+                // JSON parsing failed, fall through to DOM extraction
+                // Note: console.error in page.evaluate won't show in Node.js logs
+              }
+            }
+            
+            // Fallback: DOM extraction (improved with validation)
+            // First verify container exists and spinner is gone
+            const jobContainer = document.querySelector('[test-id="job-details-dayforce-jobs"]') || 
+                                document.querySelector('main, [role="main"]');
+            
+            if (!jobContainer) {
+              // No container found, return minimal data
+              return {
+                id: linkId,
+                title: linkTitle,
+                url: window.location.href,
+                descriptionHtml: '',
+                descriptionText: '',
+                location: '',
+                department: '',
+                postedDate: '',
+                employmentType: '',
+              };
+            }
+
+            // Verify spinner is not present before extracting
+            const spinner = jobContainer.querySelector('.ant-spin-spinning, .ant-spin-dot');
+            if (spinner) {
+              // Spinner still present - content hasn't loaded yet
+              // Return empty to signal we need to wait longer
+              return {
+                id: linkId,
+                title: linkTitle,
+                url: window.location.href,
+                descriptionHtml: '',
+                descriptionText: '',
+                location: '',
+                department: '',
+                postedDate: '',
+                employmentType: '',
+                _error: 'Spinner still present in container',
+              };
+            }
+
+            // Extract description HTML - try multiple selectors within container
             const descSelectors = [
               '[class*="description"]',
               '[class*="Description"]',
@@ -336,37 +562,60 @@ export async function scrapeDayforceWithBrowser(
               '#jobDescription',
               '[id*="description"]',
               '[id*="Description"]',
-              'main [class*="content"]',
-              '[role="main"]',
-              'main',
+              '[class*="content"]',
+              '[class*="Content"]',
             ];
 
             let descriptionHtml = '';
             let descriptionText = '';
 
             for (const selector of descSelectors) {
-              const descEl = document.querySelector(selector);
+              const descEl = jobContainer.querySelector(selector);
               if (descEl) {
-                // Try to find the actual description content
-                const content = descEl.querySelector('[class*="description"], [class*="Description"], [class*="content"], [class*="Content"]') || descEl;
-                descriptionHtml = content.innerHTML || '';
-                descriptionText = content.textContent?.trim() || '';
-                if (descriptionHtml.length > 200 && descriptionText.length > 200) break;
+                // Remove spinner elements if present
+                const spinner = descEl.querySelector('.ant-spin-spinning, .ant-spin-dot');
+                if (spinner) spinner.remove();
+                
+                descriptionHtml = descEl.innerHTML || '';
+                descriptionText = descEl.textContent?.trim() || '';
+                
+                // Validate content - ensure it's not just loading HTML
+                if (descriptionHtml.length > 200 && 
+                    descriptionText.length > 200 &&
+                    !descriptionHtml.includes('ant-spin-spinning') &&
+                    !descriptionHtml.includes('ant-spin-dot')) {
+                  break;
+                }
               }
             }
 
-            // If no description found, try to get main content area
+            // If no description found, try to get content from container itself
             if (!descriptionHtml || descriptionHtml.length < 200) {
-              const mainEl = document.querySelector('main, [role="main"], [class*="main"], [class*="Main"]');
-              if (mainEl) {
-                // Remove navigation, header, footer, and other non-content elements
-                const toRemove = mainEl.querySelectorAll('nav, header, footer, [class*="nav"], [class*="Nav"], [class*="header"], [class*="Header"], [class*="footer"], [class*="Footer"], [class*="breadcrumb"], [class*="Breadcrumb"]');
-                toRemove.forEach(el => el.remove());
-                
-                // Try to find the job description section
-                const descSection = mainEl.querySelector('[class*="description"], [class*="Description"], [class*="content"], [class*="Content"], [class*="detail"], [class*="Detail"]') || mainEl;
-                descriptionHtml = descSection.innerHTML || '';
-                descriptionText = descSection.textContent?.trim() || '';
+              // Remove navigation, header, footer, and spinner elements
+              const toRemove = jobContainer.querySelectorAll(
+                'nav, header, footer, [class*="nav"], [class*="Nav"], ' +
+                '[class*="header"], [class*="Header"], [class*="footer"], ' +
+                '[class*="Footer"], [class*="breadcrumb"], [class*="Breadcrumb"], ' +
+                '.ant-spin-spinning, .ant-spin-dot'
+              );
+              toRemove.forEach(el => el.remove());
+              
+              // Try to find the job description section
+              const descSection = jobContainer.querySelector(
+                '[class*="description"], [class*="Description"], ' +
+                '[class*="content"], [class*="Content"], ' +
+                '[class*="detail"], [class*="Detail"]'
+              ) || jobContainer;
+              
+              descriptionHtml = descSection.innerHTML || '';
+              descriptionText = descSection.textContent?.trim() || '';
+              
+              // Final validation
+              if (descriptionHtml.includes('ant-spin-spinning') || 
+                  descriptionHtml.includes('ant-spin-dot') ||
+                  descriptionText.length < 200) {
+                descriptionHtml = '';
+                descriptionText = '';
               }
             }
 
@@ -380,7 +629,7 @@ export async function scrapeDayforceWithBrowser(
             ];
             let location = '';
             for (const selector of locationSelectors) {
-              const locEl = document.querySelector(selector);
+              const locEl = jobContainer.querySelector(selector) || document.querySelector(selector);
               if (locEl) {
                 location = locEl.textContent?.trim() || '';
                 if (location) break;
@@ -396,7 +645,7 @@ export async function scrapeDayforceWithBrowser(
             ];
             let department = '';
             for (const selector of deptSelectors) {
-              const deptEl = document.querySelector(selector);
+              const deptEl = jobContainer.querySelector(selector) || document.querySelector(selector);
               if (deptEl) {
                 department = deptEl.textContent?.trim() || '';
                 if (department) break;
@@ -412,7 +661,7 @@ export async function scrapeDayforceWithBrowser(
             ];
             let postedDate = '';
             for (const selector of dateSelectors) {
-              const dateEl = document.querySelector(selector);
+              const dateEl = jobContainer.querySelector(selector) || document.querySelector(selector);
               if (dateEl) {
                 postedDate = dateEl.textContent?.trim() || '';
                 if (postedDate) break;
@@ -430,7 +679,7 @@ export async function scrapeDayforceWithBrowser(
             ];
             let employmentType = '';
             for (const selector of typeSelectors) {
-              const typeEl = document.querySelector(selector);
+              const typeEl = jobContainer.querySelector(selector) || document.querySelector(selector);
               if (typeEl) {
                 employmentType = typeEl.textContent?.trim() || '';
                 if (employmentType) break;
@@ -450,8 +699,28 @@ export async function scrapeDayforceWithBrowser(
             };
           }, jobLink.title, jobLink.id);
 
-          // Only add if we got a description
-          if (jobDetails.descriptionHtml && jobDetails.descriptionHtml.length > 100) {
+          // Check if extraction failed due to spinner or empty content
+          if (jobDetails._error === 'Spinner still present in container' || 
+              (!jobDetails.descriptionHtml || jobDetails.descriptionHtml.length < 200)) {
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`  ⚠️  Extraction returned empty/spinner content, retrying...`);
+              continue; // Retry the loop
+            } else {
+              console.log(`  ⚠️  Extraction failed after ${maxRetries + 1} attempts`);
+            }
+          }
+
+          // Validate content - ensure we have actual job description, not loading HTML
+          const hasValidDescription = jobDetails.descriptionHtml && 
+                                     jobDetails.descriptionHtml.length > 200 &&
+                                     jobDetails.descriptionText && 
+                                     jobDetails.descriptionText.length > 200 &&
+                                     !jobDetails.descriptionHtml.includes('ant-spin-spinning') &&
+                                     !jobDetails.descriptionHtml.includes('ant-spin-dot') &&
+                                     !jobDetails._error; // No extraction errors
+
+          if (hasValidDescription) {
             jobsWithDescriptions.push({
               external_id: jobDetails.id,
               title: jobDetails.title,
@@ -472,7 +741,19 @@ export async function scrapeDayforceWithBrowser(
               })() : null,
               url: jobDetails.url,
             });
+            extractionSuccess = true; // Mark as successful
+            break; // Success, exit retry loop
           } else {
+            // Check if we should retry
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`  ⚠️  Invalid description extracted, retrying... (HTML: ${jobDetails.descriptionHtml?.length || 0}, Text: ${jobDetails.descriptionText?.length || 0})`);
+              continue; // Retry the loop
+            }
+            
+            // Log warning if we couldn't get a valid description after retries
+            console.warn(`Could not extract valid description for job ${jobLink.url} after ${maxRetries + 1} attempts. HTML length: ${jobDetails.descriptionHtml?.length || 0}, Text length: ${jobDetails.descriptionText?.length || 0}`);
+            
             // Still add the job even without description (better than nothing)
             jobsWithDescriptions.push({
               external_id: jobDetails.id,
@@ -480,7 +761,7 @@ export async function scrapeDayforceWithBrowser(
               department: jobDetails.department || null,
               team: null,
               location: jobDetails.location || null,
-              location_type: jobDetails.location ? detectLocationType(jobDetails.location, "") : null,
+              location_type: jobDetails.location ? detectLocationType(jobDetails.location, jobDetails.descriptionText || "") : null,
               description_html: jobDetails.descriptionHtml || null,
               description_text: jobDetails.descriptionText || null,
               commitment: normalizeCommitment(jobDetails.employmentType || "") || "full-time",
@@ -494,10 +775,18 @@ export async function scrapeDayforceWithBrowser(
               })() : null,
               url: jobDetails.url,
             });
+            extractionSuccess = true; // Mark as done (even if failed) to exit loop
+            break; // Exit retry loop even if failed
           }
         } catch (error) {
-          console.error(`Error scraping job ${jobLink.url}:`, error);
-          // Continue with next job even if one fails
+          if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`  ⚠️  Error during extraction, retrying...: ${error instanceof Error ? error.message : String(error)}`);
+            continue; // Retry the loop
+          }
+          console.error(`Error scraping job ${jobLink.url} after ${maxRetries + 1} attempts:`, error);
+          extractionSuccess = true; // Mark as done to exit loop
+          break; // Exit retry loop
         }
       }
 
