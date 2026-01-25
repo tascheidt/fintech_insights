@@ -11,7 +11,7 @@
  */
 
 import { createAdminClient } from "../lib/supabase/admin";
-import { quickCategorize, getCategoryLabel, getCategoryGroup, ROLE_CATEGORIES, type RoleCategory } from "../lib/analysis/function-categories";
+import { getCategoryLabel, getCategoryGroup, ROLE_CATEGORIES, type RoleCategory } from "../lib/analysis/function-categories";
 
 async function main() {
   console.log("🔍 Analyzing Function Categories vs Standardized Department\n");
@@ -47,20 +47,26 @@ async function main() {
     process.exit(0);
   }
 
+  // Filter to only jobs with valid function_category (required for analysis)
+  const jobsWithCategory = jobs.filter(
+    (job) => job.function_category && ROLE_CATEGORIES.includes(job.function_category as RoleCategory)
+  );
+
+  if (jobsWithCategory.length === 0) {
+    console.log("⚠️  No jobs found with valid function_category");
+    process.exit(0);
+  }
+
   // Sample if requested
   const jobsToAnalyze = sampleSize 
-    ? jobs.sort(() => Math.random() - 0.5).slice(0, sampleSize)
-    : jobs;
+    ? jobsWithCategory.sort(() => Math.random() - 0.5).slice(0, sampleSize)
+    : jobsWithCategory;
 
-  console.log(`📊 Analyzing ${jobsToAnalyze.length} job(s)\n`);
+  console.log(`📊 Analyzing ${jobsToAnalyze.length} job(s) with function_category\n`);
 
-  // Categorize each job by function
-  // Use stored function_category if available, otherwise compute with quickCategorize
+  // Categorize each job by function using stored function_category
   const analyzed = jobsToAnalyze.map(job => {
-    // Prefer stored function_category (AI-extracted), fallback to quickCategorize for comparison
-    const functionCategory = (job.function_category && ROLE_CATEGORIES.includes(job.function_category as RoleCategory))
-      ? (job.function_category as RoleCategory)
-      : quickCategorize(job.title);
+    const functionCategory = job.function_category as RoleCategory;
     const functionLabel = getCategoryLabel(functionCategory);
     const functionGroup = getCategoryGroup(functionCategory);
     
@@ -71,7 +77,6 @@ async function main() {
       functionCategory,
       functionLabel,
       functionGroup,
-      hasStoredCategory: !!job.function_category,
     };
   });
 
