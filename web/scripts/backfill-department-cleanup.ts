@@ -1,14 +1,21 @@
 #!/usr/bin/env npx tsx
 /**
- * Backfill Silver Layer Data
+ * Backfill Department Cleanup and Re-processing
  * 
- * Extracts and populates Silver Layer structured data for existing jobs
- * that don't have it yet. Uses the existing extractJobStructure function.
+ * Re-processes jobs with invalid department values (cookie/privacy text) to:
+ * 1. Clean invalid department values (set to null)
+ * 2. Extract keywords (if missing)
+ * 3. Update standardized_department
  * 
  * Usage:
- *   npx tsx --env-file=.env.local web/scripts/backfill-silver-layer.ts
- *   # Or with limit:
- *   npx tsx --env-file=.env.local web/scripts/backfill-silver-layer.ts --limit=50
+ *   # From project root:
+ *   npx tsx --env-file=.env.local web/scripts/backfill-department-cleanup.ts
+ *   # Or from web directory:
+ *   npx tsx --env-file=.env.local scripts/backfill-department-cleanup.ts
+ *   
+ *   # With options:
+ *   npx tsx --env-file=.env.local web/scripts/backfill-department-cleanup.ts --limit=50
+ *   npx tsx --env-file=.env.local web/scripts/backfill-department-cleanup.ts --invalid-only
  */
 
 import { createAdminClient } from "../lib/supabase/admin";
@@ -20,8 +27,9 @@ async function main() {
   // Parse command line arguments
   const limitArg = process.argv.find((arg) => arg.startsWith("--limit="));
   const limit = limitArg ? parseInt(limitArg.split("=")[1], 10) : undefined;
+  const invalidOnly = process.argv.includes("--invalid-only");
 
-  console.log("🔄 Backfilling Silver Layer Data\n");
+  console.log("🔄 Backfilling Department Cleanup and Re-processing\n");
   console.log("═".repeat(70));
 
   // Check for API key
@@ -33,12 +41,10 @@ async function main() {
     process.exit(1);
   }
 
-  // Find jobs that need Silver Layer data
-  // Jobs where tech_stack is null or empty array
+  // Find jobs that need processing
   let query = supabase
     .from("job_postings")
-    .select("id, title, description_text")
-    .or("tech_stack.is.null,tech_stack.eq.[]")
+    .select("id, title, description_text, department, location, keywords, standardized_department, location_structured")
     .not("description_text", "is", null)
     .neq("description_text", "")
     .order("first_seen_date", { ascending: false });
@@ -55,38 +61,66 @@ async function main() {
   }
 
   if (!jobs || jobs.length === 0) {
-    console.log("✅ No jobs need backfilling - all jobs already have Silver Layer data!");
+    console.log("✅ No jobs found!");
     return;
   }
 
-  console.log(`📋 Found ${jobs.length} job(s) that need Silver Layer data\n`);
+  // Filter jobs that need processing
+  let jobsToProcess = jobs;
+  if (invalidOnly) {
+    jobsToProcess = jobs.filter((job) => !isValidDepartment(job.department));
+    console.log(`📋 Found ${jobsToProcess.length} job(s) with invalid department values\n`);
+  } else {
+    // Process all jobs that either:
+    // 1. Have invalid department values, OR
+    // 2. Missing keywords, OR
+    // 3. Missing standardized_department
+    jobsToProcess = jobs.filter(
+      (job) =>
+        !isValidDepartment(job.department) ||
+        !job.keywords ||
+        (Array.isArray(job.keywords) && job.keywords.length === 0) ||
+        !job.standardized_department
+    );
+    console.log(`📋 Found ${jobsToProcess.length} job(s) that need processing\n`);
+  }
+
+  if (jobsToProcess.length === 0) {
+    console.log("✅ No jobs need processing - all jobs are clean!");
+    return;
+  }
 
   let processed = 0;
   let succeeded = 0;
   let failed = 0;
+  let cleaned = 0;
   const errors: Array<{ id: string; title: string; error: string }> = [];
 
   // Process each job
-  for (const job of jobs) {
+  for (const job of jobsToProcess) {
     processed++;
-    const progress = `[${processed}/${jobs.length}]`;
+    const progress = `[${processed}/${jobsToProcess.length}]`;
+    const hasInvalidDept = !isValidDepartment(job.department);
+    const needsKeywords = !job.keywords || (Array.isArray(job.keywords) && job.keywords.length === 0);
+    const needsStandardizedDept = !job.standardized_department;
 
     console.log(`${progress} Processing: ${job.title}`);
+    if (hasInvalidDept) {
+      console.log(`  ⚠️  Invalid department: "${job.department}"`);
+    }
+    if (needsKeywords) {
+      console.log(`  ⚠️  Missing keywords`);
+    }
+    if (needsStandardizedDept) {
+      console.log(`  ⚠️  Missing standardized_department`);
+    }
 
     try {
-      // Fetch raw department and location for context
-      const { data: jobWithFields } = await supabase
-        .from("job_postings")
-        .select("department, location")
-        .eq("id", job.id)
-        .single();
-
-      // Use the existing extractJobStructure function (pass raw department)
-      // Location will be extracted from description by AI
+      // Extract structured data (pass raw department as context)
       const structure = await extractJobStructure(
         job.title,
         job.description_text || "",
-        jobWithFields?.department
+        job.department
       );
 
       if (!structure) {
@@ -104,9 +138,10 @@ async function main() {
       const normalizedTitle = normalizeJobTitle(job.title);
 
       // Validate and clean department field - set to null if invalid
-      const cleanedDepartment = jobWithFields && isValidDepartment(jobWithFields.department)
-        ? jobWithFields.department
-        : null;
+      const cleanedDepartment = isValidDepartment(job.department) ? job.department : null;
+      if (hasInvalidDept && cleanedDepartment === null) {
+        cleaned++;
+      }
 
       // Handle location: use AI-extracted structured location
       const locationStructured = structure.location_structured;
@@ -125,7 +160,7 @@ async function main() {
       }
       
       // Validate scraper-provided location - if invalid, use AI-extracted or null
-      const cleanedLocation = jobWithFields && isValidLocation(jobWithFields.location) ? jobWithFields.location : null;
+      const cleanedLocation = isValidLocation(job.location) ? job.location : null;
       const finalLocation = formattedLocation || cleanedLocation || null;
 
       // Update the job with extracted structure
@@ -160,7 +195,20 @@ async function main() {
         continue;
       }
 
-      console.log(`  ✅ Extracted: ${structure.seniority_level}, ${structure.tech_stack.length} techs, ${structure.standardized_department}`);
+      const updates: string[] = [];
+      if (hasInvalidDept && cleanedDepartment === null) {
+        updates.push("cleaned department");
+      }
+      if (needsKeywords && structure.keywords && structure.keywords.length > 0) {
+        updates.push(`added ${structure.keywords.length} keywords`);
+      }
+      if (needsStandardizedDept && structure.standardized_department) {
+        updates.push(`set standardized_department: ${structure.standardized_department}`);
+      }
+
+      console.log(
+        `  ✅ ${updates.length > 0 ? updates.join(", ") : "Updated"} | ${structure.seniority_level}, ${structure.tech_stack.length} techs`
+      );
       succeeded++;
 
       // Small delay to avoid rate limiting
@@ -184,6 +232,7 @@ async function main() {
   console.log(`  Total processed: ${processed}`);
   console.log(`  ✅ Succeeded: ${succeeded}`);
   console.log(`  ❌ Failed: ${failed}`);
+  console.log(`  🧹 Department values cleaned: ${cleaned}`);
 
   if (errors.length > 0) {
     console.log("\n⚠️  Errors:");

@@ -4,7 +4,7 @@ import { triggerScrapeWorkflow } from "@/lib/github";
 import type { Browser } from "puppeteer-core";
 import type { Company, IngestResult } from "./types";
 import { updateTaskProgress } from "./progress";
-import { extractJobStructure, normalizeJobTitle } from "@/lib/analysis/structure";
+import { extractJobStructure, normalizeJobTitle, isValidDepartment, isValidLocation } from "@/lib/analysis/structure";
 
 /**
  * Stage 1: Scrape - Fetch raw data from ATS
@@ -79,7 +79,9 @@ export async function runScrapeStage(
 async function extractAndUpdateStructure(
   jobId: string,
   jobTitle: string,
-  description: string
+  description: string,
+  rawDepartment?: string | null,
+  rawLocation?: string | null
 ): Promise<void> {
   const supabase = createAdminClient();
 
@@ -89,8 +91,9 @@ async function extractAndUpdateStructure(
   }
 
   try {
-    // Extract structured data
-    const structure = await extractJobStructure(jobTitle, description);
+    // Extract structured data (pass raw department as context)
+    // Always extract location from description - description is source of truth
+    const structure = await extractJobStructure(jobTitle, description, rawDepartment);
 
     if (!structure) {
       // Extraction failed, but continue - we'll still have the raw data
@@ -99,6 +102,34 @@ async function extractAndUpdateStructure(
 
     // Normalize title
     const normalizedTitle = normalizeJobTitle(jobTitle);
+
+    // Validate and clean department field - set to null if invalid
+    const cleanedDepartment = isValidDepartment(rawDepartment) ? rawDepartment : null;
+
+    // Handle location: always use AI-extracted location from description
+    // Validate scraper-provided location - if invalid, set to null
+    const cleanedLocation = isValidLocation(rawLocation) ? rawLocation : null;
+    
+    // Use structured location from AI extraction (always from description)
+    const locationStructured = structure.location_structured;
+    
+    // Generate formatted location string from structured data
+    // Prefer AI-extracted formatted string, fallback to generating from components
+    let formattedLocation: string | null = null;
+    if (locationStructured?.formatted) {
+      formattedLocation = locationStructured.formatted;
+    } else if (locationStructured) {
+      // Generate formatted string from components
+      const parts: string[] = [];
+      if (locationStructured.city) parts.push(locationStructured.city);
+      if (locationStructured.state) parts.push(locationStructured.state);
+      if (locationStructured.country) parts.push(locationStructured.country);
+      formattedLocation = parts.length > 0 ? parts.join(', ') : null;
+    }
+    
+    // If no AI-extracted location, use cleaned scraper location (if valid)
+    // Otherwise set to null
+    const finalLocation = formattedLocation || cleanedLocation || null;
 
     // Update job posting with extracted structure
     await supabase
@@ -110,9 +141,15 @@ async function extractAndUpdateStructure(
         salary_max: structure.salary_max,
         salary_currency: structure.salary_currency,
         tech_stack: structure.tech_stack,
-        keywords: [], // Keywords extraction can be added later if needed
+        keywords: structure.keywords || [],
         standardized_department: structure.standardized_department,
         normalized_title: normalizedTitle,
+        // Clean invalid department values (set to null)
+        department: cleanedDepartment,
+        // Store structured location (always from AI extraction)
+        location_structured: locationStructured,
+        // Use formatted location from structured data, or cleaned scraper location, or null
+        location: finalLocation,
       })
       .eq('id', jobId);
   } catch (error) {
@@ -172,6 +209,9 @@ export async function runIngestStage(
 
       if (existingId) {
         // Update existing job
+        // Note: location will be updated by extractAndUpdateStructure with validated/AI-extracted value
+        // For now, validate scraper location and set to null if invalid (will be replaced by AI extraction)
+        const validatedLocation = isValidLocation(row.location) ? row.location : null;
         await supabase
           .from('job_postings')
           .update({
@@ -179,7 +219,7 @@ export async function runIngestStage(
             description_html: row.description_html,
             description_text: row.description_text,
             department: row.department,
-            location: row.location,
+            location: validatedLocation, // Temporary - will be replaced by AI extraction
             location_type: row.location_type,
             commitment: row.commitment,
             url: row.url,
@@ -189,9 +229,10 @@ export async function runIngestStage(
         updatedJobs++;
 
         // Queue Silver Layer extraction for updated jobs
+        // Pass raw location for validation (AI will extract from description)
         if (row.description_text) {
           extractionPromises.push(
-            extractAndUpdateStructure(existingId, job.title, row.description_text)
+            extractAndUpdateStructure(existingId, job.title, row.description_text, row.department, row.location)
           );
         }
       } else {
@@ -213,9 +254,10 @@ export async function runIngestStage(
           }
 
           // Queue Silver Layer extraction for new jobs
+          // Pass raw location for validation (AI will extract from description)
           if (row.description_text) {
             extractionPromises.push(
-              extractAndUpdateStructure(inserted.id, job.title, row.description_text)
+              extractAndUpdateStructure(inserted.id, job.title, row.description_text, row.department, row.location)
             );
           }
         }

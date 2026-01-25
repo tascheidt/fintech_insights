@@ -31,7 +31,7 @@ export async function runAnalyzeStage(
       // Get job posting details
       const { data: jobPosting } = await supabase
         .from('job_postings')
-        .select('id, title, department, location, description_text')
+        .select('id, title, standardized_department, location, description_text')
         .eq('id', jobId)
         .single();
 
@@ -49,7 +49,7 @@ export async function runAnalyzeStage(
         companyName: company.name,
         job: {
           title: jobPosting.title,
-          department: jobPosting.department,
+          standardized_department: jobPosting.standardized_department,
           location: jobPosting.location,
           description_text: jobPosting.description_text,
         },

@@ -165,6 +165,23 @@ export async function POST(
     }
   }
 
+  // Create job_runs entry for tracking (unified job tracking system)
+  const adminSupabase = createAdminClient();
+  const { data: jobRun } = await adminSupabase
+    .from("job_runs")
+    .insert({
+      job_type: "insight-generation",
+      trigger_type: "manual",
+      triggered_by: user.id,
+      scope: "single",
+      company_id: company.id,
+      status: "running",
+      started_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  const jobRunId = jobRun?.id;
+
   try {
     const insight = await generateCompanyInsight(company.id, company.name, {
       periodDays: periodDays ?? 90,
@@ -172,39 +189,49 @@ export async function POST(
       forceRegenerate: canForce,
     });
 
-    // Log the generation to cron_logs for cost tracking
-    const adminSupabase = createAdminClient();
-    await adminSupabase.from("cron_logs").insert({
-      job_type: "company-insight-generation",
-      status: "success",
-      details: {
-        companyId: company.id,
-        companyName: company.name,
-        insightId: insight.id,
-        triggeredBy: user.id,
-        triggerType: "on-demand",
-        estimatedCost: insight.generationCostEstimate,
-        researchQualityScore: insight.researchQualityScore,
-      },
-    });
+    // Update job_runs with success (unified job tracking)
+    if (jobRunId) {
+      await adminSupabase
+        .from("job_runs")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          total_companies: 1,
+          total_insights: 1,
+          details: {
+            companyId: company.id,
+            companyName: company.name,
+            insightId: insight.id,
+            triggeredBy: user.id,
+            triggerType: "on-demand",
+            estimatedCost: insight.generationCostEstimate,
+            researchQualityScore: insight.researchQualityScore,
+          },
+        })
+        .eq("id", jobRunId);
+    }
 
     return NextResponse.json({ insight }, { status: 201 });
   } catch (error) {
     console.error("Error generating company insight:", error);
 
-    // Log the failure
-    const adminSupabase = createAdminClient();
-    await adminSupabase.from("cron_logs").insert({
-      job_type: "company-insight-generation",
-      status: "error",
-      error_message: error instanceof Error ? error.message : "Unknown error",
-      details: {
-        companyId: company.id,
-        companyName: company.name,
-        triggeredBy: user.id,
-        triggerType: "on-demand",
-      },
-    });
+    // Update job_runs with failure (unified job tracking)
+    if (jobRunId) {
+      await adminSupabase
+        .from("job_runs")
+        .update({
+          status: "failed",
+          completed_at: new Date().toISOString(),
+          error_message: error instanceof Error ? error.message : "Unknown error",
+          details: {
+            companyId: company.id,
+            companyName: company.name,
+            triggeredBy: user.id,
+            triggerType: "on-demand",
+          },
+        })
+        .eq("id", jobRunId);
+    }
 
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to generate insight" },

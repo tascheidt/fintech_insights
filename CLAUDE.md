@@ -90,6 +90,55 @@ Vercel runs strict TypeScript checking during builds. Common issues:
 - `strategic_insights` - AI-generated analysis
 - `posting_events` - Timeline tracking
 - `job_templates` - Categorized templates
+- `job_runs` - Unified job tracking for all scheduled/manual jobs
+
+### Job Tracking (IMPORTANT)
+
+**All scheduled jobs and manual operations MUST use the `job_runs` table for tracking.**
+
+The `cron_logs` table has been deprecated and removed. Never reference or use `cron_logs`.
+
+#### Valid job_types
+- `collect` - Job scraping/collection
+- `analyze` - AI analysis of job postings
+- `report` - Weekly digest generation
+- `company-insights` - Scheduled company insight generation
+- `insight-generation` - Manual company insight generation
+
+#### Status values
+- `pending` - Job queued but not started
+- `running` - Job currently executing
+- `completed` - Job finished successfully
+- `failed` - Job finished with error
+- `cancelled` - Job was cancelled
+
+#### Example: Logging a job run
+```typescript
+// Create job run entry at start
+const { data: jobRun } = await supabase
+  .from("job_runs")
+  .insert({
+    job_type: "report",           // One of the valid types above
+    trigger_type: "cron",         // 'cron' | 'manual' | 'admin'
+    scope: "all",                 // 'all' | 'single'
+    status: "running",
+    started_at: new Date().toISOString(),
+  })
+  .select("id")
+  .single();
+
+// Update on completion
+await supabase
+  .from("job_runs")
+  .update({
+    status: "completed",          // or "failed"
+    completed_at: new Date().toISOString(),
+    total_companies: 5,
+    total_insights: 5,
+    details: { /* job-specific metadata */ },
+  })
+  .eq("id", jobRun.id);
+```
 
 ### Cron Jobs (Vercel)
 - Daily 6 AM: `/api/cron/collect` - Collect jobs and analyze

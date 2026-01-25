@@ -38,7 +38,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const [{ data: jobsRaw }, { data: latestInsight }, { data: tasks }] = await Promise.all([
     supabase
       .from("job_postings")
-      .select("id, title, department, location, is_active, first_seen_date, url")
+      .select("id, title, standardized_department, location, is_active, first_seen_date, url")
       .eq("company_id", company.id)
       .order("first_seen_date", { ascending: false }),
     supabase
@@ -70,7 +70,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const jobs: JobData[] = (jobsRaw ?? []).map((j: any) => ({
     id: j.id,
     title: j.title,
-    department: j.department,
+    standardized_department: j.standardized_department,
     location: j.location,
     isActive: j.is_active,
     firstSeenDate: j.first_seen_date,

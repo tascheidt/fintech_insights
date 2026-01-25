@@ -19,7 +19,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   const { data: job, error } = await supabase
     .from("job_postings")
-    .select("*, companies(id, name, slug)")
+    .select("*, companies(id, name, slug), standardized_department")
     .eq("id", id)
     .single();
 
@@ -48,7 +48,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <p className="text-muted-foreground">
             <Link href={`/companies/${company?.slug ?? ""}`} className="hover:underline">{company?.name ?? "Unknown"}</Link>
             {" · "}
-            {(job as { department?: string }).department ?? "—"}
+            {(job as { standardized_department?: string }).standardized_department ?? "—"}
             {" · "}
             {(job as { location?: string }).location ?? "—"}
           </p>

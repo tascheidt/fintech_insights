@@ -192,17 +192,19 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminClient();
   
-  // Create cron log entry
-  const { data: cronLog } = await supabase
-    .from("cron_logs")
+  // Create job_runs entry for tracking (unified job tracking system)
+  const { data: jobRun } = await supabase
+    .from("job_runs")
     .insert({
       job_type: "report",
+      trigger_type: "cron",
+      scope: "all",
       status: "running",
       started_at: new Date().toISOString(),
     })
     .select("id")
     .single();
-  const cronLogId = cronLog?.id;
+  const jobRunId = jobRun?.id;
 
   try {
     // First, generate company insights (process one company per week)
@@ -380,14 +382,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Update cron log with success
-    if (cronLogId) {
+    // Update job_runs with success (unified job tracking)
+    if (jobRunId) {
       await supabase
-        .from("cron_logs")
+        .from("job_runs")
         .update({
-          status: "success",
+          status: "completed",
           completed_at: new Date().toISOString(),
-          insights_generated: digest.total_companies,
+          total_companies: digest.total_companies,
+          total_insights: digest.total_companies,
           details: { 
             totalJobs: digest.total_jobs,
             totalCompanies: digest.total_companies,
@@ -403,7 +406,7 @@ export async function GET(req: NextRequest) {
             companyInsight: companyInsightResult,
           },
         })
-        .eq("id", cronLogId);
+        .eq("id", jobRunId);
     }
 
     return NextResponse.json({ 
@@ -426,16 +429,16 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Report cron error:", error);
-    // Update cron log with error
-    if (cronLogId) {
+    // Update job_runs with error (unified job tracking)
+    if (jobRunId) {
       await supabase
-        .from("cron_logs")
+        .from("job_runs")
         .update({
-          status: "error",
+          status: "failed",
           completed_at: new Date().toISOString(),
           error_message: error instanceof Error ? error.message : "Unknown error",
         })
-        .eq("id", cronLogId);
+        .eq("id", jobRunId);
     }
     throw error;
   }
