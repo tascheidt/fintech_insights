@@ -312,22 +312,11 @@ export async function scrapeDayforceWithBrowser(
       const jobsWithDescriptions: JobData[] = [];
       
       for (const jobLink of jobLinks) {
-        let retryCount = 0;
-        const maxRetries = 2;
-        let jobDetails: any = null;
-        let extractionSuccess = false;
-
-        while (retryCount <= maxRetries && !extractionSuccess) {
-          try {
-            if (retryCount > 0) {
-              console.log(`  Retrying extraction (attempt ${retryCount + 1}/${maxRetries + 1})...`);
-              await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before retry
-            }
-
-            await page.goto(jobLink.url, {
-              waitUntil: "networkidle2",
-              timeout: 20000,
-            });
+        try {
+          await page.goto(jobLink.url, {
+            waitUntil: "networkidle2",
+            timeout: 20000,
+          });
 
           // Wait for job content container to appear first
           await page.waitForSelector(
@@ -539,7 +528,7 @@ export async function scrapeDayforceWithBrowser(
             const spinner = jobContainer.querySelector('.ant-spin-spinning, .ant-spin-dot');
             if (spinner) {
               // Spinner still present - content hasn't loaded yet
-              // Return empty to signal we need to wait longer
+              // Return empty description
               return {
                 id: linkId,
                 title: linkTitle,
@@ -550,7 +539,6 @@ export async function scrapeDayforceWithBrowser(
                 department: '',
                 postedDate: '',
                 employmentType: '',
-                _error: 'Spinner still present in container',
               };
             }
 
@@ -699,26 +687,13 @@ export async function scrapeDayforceWithBrowser(
             };
           }, jobLink.title, jobLink.id);
 
-          // Check if extraction failed due to spinner or empty content
-          if (jobDetails._error === 'Spinner still present in container' || 
-              (!jobDetails.descriptionHtml || jobDetails.descriptionHtml.length < 200)) {
-            if (retryCount < maxRetries) {
-              retryCount++;
-              console.log(`  ⚠️  Extraction returned empty/spinner content, retrying...`);
-              continue; // Retry the loop
-            } else {
-              console.log(`  ⚠️  Extraction failed after ${maxRetries + 1} attempts`);
-            }
-          }
-
           // Validate content - ensure we have actual job description, not loading HTML
           const hasValidDescription = jobDetails.descriptionHtml && 
                                      jobDetails.descriptionHtml.length > 200 &&
                                      jobDetails.descriptionText && 
                                      jobDetails.descriptionText.length > 200 &&
                                      !jobDetails.descriptionHtml.includes('ant-spin-spinning') &&
-                                     !jobDetails.descriptionHtml.includes('ant-spin-dot') &&
-                                     !jobDetails._error; // No extraction errors
+                                     !jobDetails.descriptionHtml.includes('ant-spin-dot');
 
           if (hasValidDescription) {
             jobsWithDescriptions.push({
@@ -741,18 +716,9 @@ export async function scrapeDayforceWithBrowser(
               })() : null,
               url: jobDetails.url,
             });
-            extractionSuccess = true; // Mark as successful
-            break; // Success, exit retry loop
           } else {
-            // Check if we should retry
-            if (retryCount < maxRetries) {
-              retryCount++;
-              console.log(`  ⚠️  Invalid description extracted, retrying... (HTML: ${jobDetails.descriptionHtml?.length || 0}, Text: ${jobDetails.descriptionText?.length || 0})`);
-              continue; // Retry the loop
-            }
-            
-            // Log warning if we couldn't get a valid description after retries
-            console.warn(`Could not extract valid description for job ${jobLink.url} after ${maxRetries + 1} attempts. HTML length: ${jobDetails.descriptionHtml?.length || 0}, Text length: ${jobDetails.descriptionText?.length || 0}`);
+            // Log warning if we couldn't get a valid description
+            console.warn(`Could not extract valid description for job ${jobLink.url}. HTML length: ${jobDetails.descriptionHtml?.length || 0}, Text length: ${jobDetails.descriptionText?.length || 0}`);
             
             // Still add the job even without description (better than nothing)
             jobsWithDescriptions.push({
@@ -775,21 +741,12 @@ export async function scrapeDayforceWithBrowser(
               })() : null,
               url: jobDetails.url,
             });
-            extractionSuccess = true; // Mark as done (even if failed) to exit loop
-            break; // Exit retry loop even if failed
           }
         } catch (error) {
-          if (retryCount < maxRetries) {
-            retryCount++;
-            console.log(`  ⚠️  Error during extraction, retrying...: ${error instanceof Error ? error.message : String(error)}`);
-            continue; // Retry the loop
-          }
-          console.error(`Error scraping job ${jobLink.url} after ${maxRetries + 1} attempts:`, error);
-          extractionSuccess = true; // Mark as done to exit loop
-          break; // Exit retry loop
+          console.error(`Error scraping job ${jobLink.url}:`, error);
+          // Continue with next job even if one fails
         }
       }
-      } // Close for loop
 
       return jobsWithDescriptions;
     } finally {
