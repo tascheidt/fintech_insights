@@ -73,7 +73,7 @@ function NotionCardContent({ className, ...props }: React.ComponentProps<"div">)
   return (
     <div
       data-slot="notion-card-content"
-      className={cn("flex flex-col gap-2 p-3 sm:p-4", className)}
+      className={cn("flex flex-col gap-2 p-4", className)}
       {...props}
     />
   );

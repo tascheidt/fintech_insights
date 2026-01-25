@@ -37,7 +37,7 @@ export function CompanyInsightsCard({
   return (
     <Card className={isLatest ? "border-primary" : ""}>
       <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="flex items-start justify-between">
           <div>
             <h2 className="font-semibold">
               {isLatest ? "Latest Insight" : "Strategic Insight"}
@@ -47,7 +47,7 @@ export function CompanyInsightsCard({
               {format(new Date(insight.analysis_period_end), "MMM d, yyyy")}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                 insight.confidence === "high"
@@ -121,11 +121,11 @@ export function CompanyInsightsCard({
         )}
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2 border-t">
+        <div className="flex items-center justify-between pt-2 border-t">
           <span className="text-xs text-muted-foreground">
             Generated {format(new Date(insight.generated_at), "MMM d, yyyy HH:mm")}
           </span>
-          <Button variant="outline" size="sm" asChild className="self-start sm:self-auto min-h-[44px]">
+          <Button variant="outline" size="sm" asChild>
             <Link href={`/companies/${companySlug}/insights/${insight.id}`}>
               View Details →
             </Link>

@@ -87,7 +87,6 @@ export default async function DashboardPage() {
       .order("name"),
     // Strategic company insights (last 14 days) - NEW: from company_insights table
     // Ordered by significance_score for dashboard highlights
-    // Fetch more than needed to deduplicate by company_id (show only most recent per company)
     supabase
       .from("company_insights")
       .select(`
@@ -105,7 +104,7 @@ export default async function DashboardPage() {
       .gte("generated_at", fourteenDaysAgo)
       .order("significance_score", { ascending: false, nullsFirst: false })
       .order("generated_at", { ascending: false })
-      .limit(50), // Fetch more to allow deduplication
+      .limit(10),
   ]);
 
   // Types for Supabase data
@@ -174,53 +173,27 @@ export default async function DashboardPage() {
   }
 
   // Process company insights for strategic highlights
-  // Deduplicate by company_id - keep only the most recent insight per company
-  const insightsMap = new Map<string, CompanyInsightRow>();
-  for (const item of (companyInsightsRaw as CompanyInsightRow[] ?? [])) {
-    const existing = insightsMap.get(item.company_id);
-    if (!existing) {
-      insightsMap.set(item.company_id, item);
-    } else {
-      // Keep the one with higher significance_score, or more recent if scores are equal
-      const existingScore = existing.significance_score ?? 0;
-      const itemScore = item.significance_score ?? 0;
-      if (itemScore > existingScore || 
-          (itemScore === existingScore && new Date(item.generated_at) > new Date(existing.generated_at))) {
-        insightsMap.set(item.company_id, item);
-      }
-    }
-  }
-
-  // Convert to array and sort by significance_score, limit to top 10
-  const strategicHighlights: StrategicHighlight[] = Array.from(insightsMap.values())
-    .sort((a, b) => {
-      const scoreA = a.significance_score ?? 0;
-      const scoreB = b.significance_score ?? 0;
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      return new Date(b.generated_at).getTime() - new Date(a.generated_at).getTime();
-    })
-    .slice(0, 10)
-    .map((item) => {
-      const company = Array.isArray(item.companies) 
-        ? item.companies[0] 
-        : item.companies;
-      
-      return {
-        id: item.id,
-        companyId: item.company_id,
-        companyName: company?.name ?? "Unknown",
-        companySlug: company?.slug ?? "",
-        generatedAt: item.generated_at,
-        headline: item.headline,
-        keySignal: item.key_signal,
-        significanceScore: item.significance_score,
-        confidence: item.confidence,
-        executiveSummary: item.executive_summary,
-      };
-    });
+  const strategicHighlights: StrategicHighlight[] = (companyInsightsRaw as CompanyInsightRow[] ?? []).map((item) => {
+    const company = Array.isArray(item.companies) 
+      ? item.companies[0] 
+      : item.companies;
+    
+    return {
+      id: item.id,
+      companyId: item.company_id,
+      companyName: company?.name ?? "Unknown",
+      companySlug: company?.slug ?? "",
+      generatedAt: item.generated_at,
+      headline: item.headline,
+      keySignal: item.key_signal,
+      significanceScore: item.significance_score,
+      confidence: item.confidence,
+      executiveSummary: item.executive_summary,
+    };
+  });
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-8">
       {/* Welcome Message */}
       <WelcomeMessage
         userName={profile?.full_name}
@@ -235,14 +208,14 @@ export default async function DashboardPage() {
         thisWeek={thisWeek ?? 0}
       />
 
-      {/* Main Content Grid - Stacks on mobile, 2/1 split on desktop */}
-      <div className="flex flex-col gap-6 sm:gap-8 lg:grid lg:grid-cols-3">
-        {/* Companies Overview - Takes 2 columns on desktop */}
+      {/* Main Content Grid */}
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* Companies Overview - Takes 2 columns */}
         <div className="lg:col-span-2">
           <CompaniesOverview companies={companies} />
         </div>
 
-        {/* Strategic Highlights - Takes 1 column on desktop */}
+        {/* Strategic Highlights - Takes 1 column */}
         <div className="lg:col-span-1">
           <StrategicHighlights 
             insights={strategicHighlights} 
