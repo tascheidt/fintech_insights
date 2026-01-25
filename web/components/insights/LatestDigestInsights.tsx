@@ -83,24 +83,24 @@ export function LatestDigestInsights({ insights, className }: LatestDigestInsigh
   return (
     <div className={cn("space-y-4", className)}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Latest Strategic Insights</h2>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mt-1">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
             <Calendar className="h-4 w-4" />
             <span>{formattedDate}</span>
-            <span className="hidden sm:inline">·</span>
+            <span>·</span>
             <span>{relativeTime}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm self-start sm:self-auto">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm">
           <Sparkles className="h-4 w-4" />
           <span>{insights.length} companies analyzed</span>
         </div>
       </div>
 
       {/* Insights grid */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {insights.map((insight) => (
           <InsightCard key={insight.id} insight={insight} />
         ))}

@@ -145,7 +145,7 @@ export function DigestArchive({ insights, className }: DigestArchiveProps) {
               <button
                 type="button"
                 onClick={() => toggleWeek(weekKey)}
-                className="w-full flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors text-left min-h-[44px]"
+                className="w-full flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors text-left"
               >
                 <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
                   <Calendar className="h-5 w-5 text-muted-foreground" />
@@ -173,7 +173,7 @@ export function DigestArchive({ insights, className }: DigestArchiveProps) {
               {/* Week content */}
               {isExpanded && (
                 <div className="border-t p-4 bg-muted/20">
-                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {digest.insights.map((insight) => (
                       <ArchivedInsightCard key={insight.id} insight={insight} />
                     ))}

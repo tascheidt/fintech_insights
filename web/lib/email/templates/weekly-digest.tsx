@@ -10,7 +10,7 @@ import {
   Link,
   Hr,
 } from "@react-email/components";
-import type { WeeklyDigest, CompanyWeeklySummary } from "@/lib/analysis/digest";
+import type { WeeklyDigest, CompanyWeeklySummary, TLDRCommentary } from "@/lib/analysis/digest";
 
 interface WeeklyDigestEmailProps {
   digest: WeeklyDigest;
@@ -37,6 +37,23 @@ function getPrimaryFocus(departments: Record<string, number>): string {
   // Sort by count and take top department
   entries.sort((a, b) => b[1] - a[1]);
   return entries[0][0];
+}
+
+/**
+ * Global summary section - the "TL;DR of TL;DRs"
+ * Displays cross-company trend analysis at the top of the email
+ */
+function GlobalSummarySection({ summary }: { summary: TLDRCommentary }) {
+  return (
+    <Section style={globalSummarySection}>
+      <Heading as="h2" style={globalHeadline}>
+        {summary.headline}
+      </Heading>
+      <Text style={globalBody}>
+        {summary.body}
+      </Text>
+    </Section>
+  );
 }
 
 /**
@@ -95,6 +112,11 @@ export function WeeklyDigestEmail({ digest, appUrl = "https://fintech-insights.v
               {dateRange}
             </Text>
           </Section>
+
+          {/* Global Summary - Cross-company trend analysis */}
+          {digest.global_summary && (
+            <GlobalSummarySection summary={digest.global_summary} />
+          )}
 
           {/* Summary Stats */}
           <Section style={summarySection}>
@@ -182,6 +204,30 @@ const subtitle: React.CSSProperties = {
   color: "#6b7280",
   fontSize: "14px",
   margin: "0",
+};
+
+const globalSummarySection: React.CSSProperties = {
+  padding: "0 40px 24px",
+  backgroundColor: "#f0f7ff",
+  borderRadius: "8px",
+  margin: "0 20px 24px",
+};
+
+const globalHeadline: React.CSSProperties = {
+  color: "#1a1a2e",
+  fontSize: "22px",
+  fontWeight: "700",
+  lineHeight: "1.3",
+  margin: "16px 0 12px",
+  textAlign: "center" as const,
+};
+
+const globalBody: React.CSSProperties = {
+  color: "#4b5563",
+  fontSize: "15px",
+  lineHeight: "1.6",
+  margin: "0 0 8px",
+  textAlign: "center" as const,
 };
 
 const summarySection: React.CSSProperties = {

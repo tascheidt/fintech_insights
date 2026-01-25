@@ -131,7 +131,7 @@ Your role is to answer follow-up questions about this insight, provide deeper an
       systemInstruction: systemPrompt,
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 64000,
       },
     });
 
@@ -159,7 +159,7 @@ Your role is to answer follow-up questions about this insight, provide deeper an
           systemInstruction: systemPrompt,
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 64000,
           },
         });
         chat = model.startChat({

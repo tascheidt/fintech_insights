@@ -276,7 +276,7 @@ export async function analyzeJobAdvanced(
       tools: [{ googleSearch: {} }],
       generationConfig: {
         temperature: 0.6,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 64000,
         responseMimeType: "application/json",
         // Extended thinking configuration for deep reasoning
         // Note: The exact parameter name may vary - check latest Gemini API docs
@@ -297,7 +297,7 @@ export async function analyzeJobAdvanced(
           model: "gemini-3-flash-preview",
           generationConfig: {
             temperature: 0.6,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 64000,
             responseMimeType: "application/json",
           },
         });

@@ -89,7 +89,7 @@ export async function detectCompanyType(
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 256,
+        maxOutputTokens: 64000,
         responseMimeType: "application/json",
       },
     });
@@ -466,7 +466,7 @@ async function extractStatedStrategy(
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 64000,
       },
     });
 
@@ -517,7 +517,7 @@ async function extractFinancialContext(
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 512,
+        maxOutputTokens: 64000,
         responseMimeType: "application/json",
       },
     });

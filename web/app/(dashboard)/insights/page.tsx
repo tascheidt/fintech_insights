@@ -135,11 +135,11 @@ export default async function InsightsPage() {
   );
 
   return (
-    <div className="space-y-6 sm:space-y-10">
+    <div className="space-y-10">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold">Weekly Insights</h1>
-        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+        <h1 className="text-3xl font-bold">Weekly Insights</h1>
+        <p className="text-muted-foreground mt-1">
           Strategic analysis of hiring patterns across tracked companies
         </p>
       </div>
