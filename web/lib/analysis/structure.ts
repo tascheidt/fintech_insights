@@ -134,7 +134,7 @@ export async function extractJobStructure(
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.2, // Lower temperature for more consistent extraction
-        maxOutputTokens: 4096, // Increased to handle longer responses with arrays (tech_stack, keywords)
+        maxOutputTokens: 64000,
         responseMimeType: "application/json",
       },
     });

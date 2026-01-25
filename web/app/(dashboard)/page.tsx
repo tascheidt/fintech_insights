@@ -113,7 +113,7 @@ export default async function DashboardPage() {
   const companies = transformCompanyData(companiesRaw as CompanyRow[]);
   const strategicHighlights = transformStrategicHighlights(companyInsightsRaw as CompanyInsightRow[]);
   const trackedCompanyCount = companies.length;
-  
+
   // Prepare simple company list for filter
   const companyList = (companiesRaw as CompanyRow[] ?? []).map(c => ({ id: c.id, name: c.name }));
 
@@ -132,7 +132,7 @@ export default async function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-3">
         {/* Posting Velocity - Takes 2/3 width */}
         <PostingTrendChart data={postingTrends} />
-        
+
         {/* Function Mix - Takes 1/3 width */}
         <FunctionBreakdownContainer rawData={rawFunctionData} companies={companyList} />
       </div>
@@ -141,8 +141,8 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-6 sm:gap-8 lg:grid lg:grid-cols-2">
         {/* Strategic Highlights - Promoted to equal footing */}
         <div className="lg:col-span-1">
-          <StrategicHighlights 
-            insights={strategicHighlights} 
+          <StrategicHighlights
+            insights={strategicHighlights}
             trackedCompanyCount={trackedCompanyCount}
           />
         </div>

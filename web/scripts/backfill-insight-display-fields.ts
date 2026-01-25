@@ -88,7 +88,7 @@ async function generateDisplayFields(
     model: "gemini-3-flash-preview",
     generationConfig: {
       temperature: 0.5,
-      maxOutputTokens: 256,
+      maxOutputTokens: 64000,
       responseMimeType: "application/json",
     },
   });
