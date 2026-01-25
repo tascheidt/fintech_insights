@@ -42,8 +42,13 @@ export async function triggerScrapeWorkflow(companyId: string, taskId?: string):
     throw new Error(error);
   }
 
+  // GitHub API expects workflow file path relative to .github/workflows/
+  // Can use filename, workflow ID, or full path
   const workflowFile = "scrape-heavy.yml";
   const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`;
+  
+  // Log the URL being used for debugging
+  console.log(`🔍 Triggering workflow at: ${url}`);
 
   const payload: {
     ref: string;
@@ -65,6 +70,9 @@ export async function triggerScrapeWorkflow(companyId: string, taskId?: string):
 
   try {
     console.log(`🚀 Triggering GitHub Actions workflow for company: ${companyId}`);
+    console.log(`   Repository: ${owner}/${repo}`);
+    console.log(`   Workflow: ${workflowFile}`);
+    console.log(`   Branch: ${payload.ref}`);
     
     const response = await fetch(url, {
       method: "POST",
@@ -88,7 +96,15 @@ export async function triggerScrapeWorkflow(companyId: string, taskId?: string):
         errorMessage = errorText || `HTTP ${response.status} ${response.statusText}`;
       }
 
-      const fullError = `Failed to trigger workflow: ${errorMessage}`;
+      // Provide helpful debugging information for common errors
+      let debugInfo = "";
+      if (response.status === 404) {
+        debugInfo = `\n   Troubleshooting:\n   - Verify repository name: ${owner}/${repo}\n   - Check workflow file exists: .github/workflows/${workflowFile}\n   - Ensure workflow is in the default branch (${payload.ref})\n   - Verify GitHub token has 'actions:write' permission`;
+      } else if (response.status === 403) {
+        debugInfo = `\n   Troubleshooting:\n   - Verify GitHub token has 'actions:write' permission\n   - Check token hasn't expired\n   - Ensure repository access is granted`;
+      }
+
+      const fullError = `Failed to trigger workflow: ${errorMessage}${debugInfo}`;
       console.error(`❌ ${fullError}`);
       console.error(`   Status: ${response.status}`);
       console.error(`   URL: ${url}`);

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { formatDistanceToNow, format } from "date-fns";
 
 interface CronLog {
@@ -21,7 +20,6 @@ interface CronLog {
 export function CronLogsTable() {
   const [logs, setLogs] = useState<CronLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [triggering, setTriggering] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "collect" | "report">("all");
 
   const fetchLogs = async () => {
@@ -42,25 +40,6 @@ export function CronLogsTable() {
   useEffect(() => {
     fetchLogs();
   }, [filter]);
-
-  const triggerJob = async (jobType: "collect" | "report") => {
-    setTriggering(jobType);
-    try {
-      const res = await fetch("/api/admin/trigger", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_type: jobType }),
-      });
-      if (res.ok) {
-        // Refresh logs after a short delay
-        setTimeout(fetchLogs, 2000);
-      }
-    } catch (e) {
-      console.error("Failed to trigger job:", e);
-    } finally {
-      setTriggering(null);
-    }
-  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -111,43 +90,9 @@ export function CronLogsTable() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <div>
-          <h3 className="font-semibold">Job Execution History</h3>
-          <CardDescription>Recent cron job runs and their results</CardDescription>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => triggerJob("collect")}
-            disabled={triggering !== null}
-          >
-            {triggering === "collect" ? (
-              <>
-                <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                Running...
-              </>
-            ) : (
-              "Run Collection"
-            )}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => triggerJob("report")}
-            disabled={triggering !== null}
-          >
-            {triggering === "report" ? (
-              <>
-                <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                Running...
-              </>
-            ) : (
-              "Send Report"
-            )}
-          </Button>
-        </div>
+      <CardHeader>
+        <h3 className="font-semibold">Job Execution History</h3>
+        <CardDescription>Recent cron job runs and their results</CardDescription>
       </CardHeader>
       <CardContent>
         {/* Filter tabs */}
