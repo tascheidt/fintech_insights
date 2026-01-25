@@ -1,18 +1,26 @@
 #!/usr/bin/env npx tsx
 /**
- * Backfill Silver Layer Data
+ * Backfill Location Cleanup and Re-processing
  * 
- * Extracts and populates Silver Layer structured data for existing jobs
- * that don't have it yet. Uses the existing extractJobStructure function.
+ * Re-processes jobs with invalid location values (placeholder text like "Search by Location") to:
+ * 1. Extract structured location from descriptions using AI
+ * 2. Clean invalid location values (set to null)
+ * 3. Update location_structured JSONB field
+ * 4. Generate formatted location string from structured data
  * 
  * Usage:
- *   npx tsx --env-file=.env.local web/scripts/backfill-silver-layer.ts
- *   # Or with limit:
- *   npx tsx --env-file=.env.local web/scripts/backfill-silver-layer.ts --limit=50
+ *   # From project root:
+ *   npx tsx --env-file=web/.env.local web/scripts/backfill-location-cleanup.ts
+ *   # Or from web directory:
+ *   npx tsx --env-file=.env.local scripts/backfill-location-cleanup.ts
+ *   
+ *   # With options:
+ *   npx tsx --env-file=web/.env.local web/scripts/backfill-location-cleanup.ts --limit=50
+ *   npx tsx --env-file=web/.env.local web/scripts/backfill-location-cleanup.ts --invalid-only
  */
 
 import { createAdminClient } from "../lib/supabase/admin";
-import { extractJobStructure, normalizeJobTitle, isValidDepartment, isValidLocation } from "../lib/analysis/structure";
+import { extractJobStructure, normalizeJobTitle, isValidLocation } from "../lib/analysis/structure";
 
 async function main() {
   const supabase = createAdminClient();
@@ -20,8 +28,9 @@ async function main() {
   // Parse command line arguments
   const limitArg = process.argv.find((arg) => arg.startsWith("--limit="));
   const limit = limitArg ? parseInt(limitArg.split("=")[1], 10) : undefined;
+  const invalidOnly = process.argv.includes("--invalid-only");
 
-  console.log("🔄 Backfilling Silver Layer Data\n");
+  console.log("🔄 Backfilling Location Cleanup and Re-processing\n");
   console.log("═".repeat(70));
 
   // Check for API key
@@ -33,12 +42,10 @@ async function main() {
     process.exit(1);
   }
 
-  // Find jobs that need Silver Layer data
-  // Jobs where tech_stack is null or empty array
+  // Find jobs that need processing
   let query = supabase
     .from("job_postings")
-    .select("id, title, description_text")
-    .or("tech_stack.is.null,tech_stack.eq.[]")
+    .select("id, title, description_text, location, location_structured")
     .not("description_text", "is", null)
     .neq("description_text", "")
     .order("first_seen_date", { ascending: false });
@@ -55,38 +62,59 @@ async function main() {
   }
 
   if (!jobs || jobs.length === 0) {
-    console.log("✅ No jobs need backfilling - all jobs already have Silver Layer data!");
+    console.log("✅ No jobs found!");
     return;
   }
 
-  console.log(`📋 Found ${jobs.length} job(s) that need Silver Layer data\n`);
+  // Filter jobs that need processing
+  let jobsToProcess = jobs;
+  if (invalidOnly) {
+    jobsToProcess = jobs.filter((job) => !isValidLocation(job.location));
+    console.log(`📋 Found ${jobsToProcess.length} job(s) with invalid location values\n`);
+  } else {
+    // Process all jobs that either:
+    // 1. Have invalid location values, OR
+    // 2. Missing location_structured
+    jobsToProcess = jobs.filter(
+      (job) =>
+        !isValidLocation(job.location) ||
+        !job.location_structured
+    );
+    console.log(`📋 Found ${jobsToProcess.length} job(s) that need processing\n`);
+  }
+
+  if (jobsToProcess.length === 0) {
+    console.log("✅ No jobs need processing - all jobs are clean!");
+    return;
+  }
 
   let processed = 0;
   let succeeded = 0;
   let failed = 0;
+  let cleaned = 0;
   const errors: Array<{ id: string; title: string; error: string }> = [];
 
   // Process each job
-  for (const job of jobs) {
+  for (const job of jobsToProcess) {
     processed++;
-    const progress = `[${processed}/${jobs.length}]`;
+    const progress = `[${processed}/${jobsToProcess.length}]`;
+    const hasInvalidLocation = !isValidLocation(job.location);
+    const needsLocationStructured = !job.location_structured;
 
     console.log(`${progress} Processing: ${job.title}`);
+    if (hasInvalidLocation) {
+      console.log(`  ⚠️  Invalid location: "${job.location}"`);
+    }
+    if (needsLocationStructured) {
+      console.log(`  ⚠️  Missing location_structured`);
+    }
 
     try {
-      // Fetch raw department and location for context
-      const { data: jobWithFields } = await supabase
-        .from("job_postings")
-        .select("department, location")
-        .eq("id", job.id)
-        .single();
-
-      // Use the existing extractJobStructure function (pass raw department)
-      // Location will be extracted from description by AI
+      // Extract structured data (always extract location from description)
       const structure = await extractJobStructure(
         job.title,
         job.description_text || "",
-        jobWithFields?.department
+        undefined // No raw department needed for location extraction
       );
 
       if (!structure) {
@@ -99,14 +127,6 @@ async function main() {
         });
         continue;
       }
-
-      // Normalize title using existing function
-      const normalizedTitle = normalizeJobTitle(job.title);
-
-      // Validate and clean department field - set to null if invalid
-      const cleanedDepartment = isValidDepartment(jobWithFields?.department)
-        ? jobWithFields.department
-        : null;
 
       // Handle location: use AI-extracted structured location
       const locationStructured = structure.location_structured;
@@ -125,24 +145,17 @@ async function main() {
       }
       
       // Validate scraper-provided location - if invalid, use AI-extracted or null
-      const cleanedLocation = isValidLocation(jobWithFields?.location) ? jobWithFields.location : null;
+      const cleanedLocation = isValidLocation(job.location) ? job.location : null;
       const finalLocation = formattedLocation || cleanedLocation || null;
+      
+      if (hasInvalidLocation && finalLocation !== job.location) {
+        cleaned++;
+      }
 
-      // Update the job with extracted structure
+      // Update the job with extracted location structure
       const { error: updateError } = await supabase
         .from("job_postings")
         .update({
-          summary: structure.summary,
-          seniority_level: structure.seniority_level,
-          salary_min: structure.salary_min,
-          salary_max: structure.salary_max,
-          salary_currency: structure.salary_currency,
-          tech_stack: structure.tech_stack,
-          keywords: structure.keywords || [],
-          standardized_department: structure.standardized_department,
-          normalized_title: normalizedTitle,
-          // Clean invalid department values (set to null)
-          department: cleanedDepartment,
           // Store structured location and update formatted location
           location_structured: locationStructured,
           location: finalLocation,
@@ -160,7 +173,21 @@ async function main() {
         continue;
       }
 
-      console.log(`  ✅ Extracted: ${structure.seniority_level}, ${structure.tech_stack.length} techs, ${structure.standardized_department}`);
+      const updates: string[] = [];
+      if (hasInvalidLocation && finalLocation !== job.location) {
+        updates.push(`cleaned location: "${job.location}" -> ${finalLocation ? `"${finalLocation}"` : "null"}`);
+      }
+      if (needsLocationStructured && locationStructured) {
+        const locParts: string[] = [];
+        if (locationStructured.city) locParts.push(locationStructured.city);
+        if (locationStructured.state) locParts.push(locationStructured.state);
+        if (locationStructured.country) locParts.push(locationStructured.country);
+        updates.push(`added location_structured: ${locParts.join(', ') || 'null'}`);
+      }
+
+      console.log(
+        `  ✅ ${updates.length > 0 ? updates.join(", ") : "Updated"}`
+      );
       succeeded++;
 
       // Small delay to avoid rate limiting
@@ -184,6 +211,7 @@ async function main() {
   console.log(`  Total processed: ${processed}`);
   console.log(`  ✅ Succeeded: ${succeeded}`);
   console.log(`  ❌ Failed: ${failed}`);
+  console.log(`  🧹 Location values cleaned: ${cleaned}`);
 
   if (errors.length > 0) {
     console.log("\n⚠️  Errors:");

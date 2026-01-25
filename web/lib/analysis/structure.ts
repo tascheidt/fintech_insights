@@ -8,9 +8,17 @@ import { z } from "zod";
  * Provides standardized fields for job_postings table.
  */
 
+// Zod schema for structured location
+const LocationSchema = z.object({
+  city: z.string().nullable().describe("City name (e.g., 'Toronto', 'New York', 'London')"),
+  state: z.string().nullable().describe("State, province, or region (e.g., 'Ontario', 'California', 'England')"),
+  country: z.string().nullable().describe("Country name (e.g., 'Canada', 'United States', 'United Kingdom')"),
+  formatted: z.string().nullable().describe("Formatted location string (e.g., 'Toronto, Ontario, Canada' or 'Toronto, Canada' if state is null)"),
+}).nullable().describe("Structured location extracted from description. Look for 'Location(s):' section. Return null if not found.");
+
 // Zod schema for job structure extraction
 export const JobStructureSchema = z.object({
-  summary: z.string().describe("2-3 sentence summary of the job role"),
+  summary: z.string().describe("2-3 sentence summary of what this role entails"),
   seniority_level: z.enum([
     "intern",
     "junior",
@@ -26,8 +34,10 @@ export const JobStructureSchema = z.object({
     max: z.number().int().positive().nullable(),
     currency: z.string().default("USD"),
   }).nullable().describe("Salary range if found in description, null otherwise"),
-  tech_stack: z.array(z.string()).describe("Array of technologies, frameworks, or tools mentioned"),
+  tech_stack: z.array(z.string()).describe("Array of specific technologies, frameworks, tools, or platforms mentioned"),
+  keywords: z.array(z.string()).describe("Array of relevant keywords, skills, domains, topics, or concepts. Should be broader than tech_stack and include business domains, methodologies, and role-related terms"),
   standardized_department: z.string().describe("Standardized department name (e.g., 'Engineering', 'Sales', 'Marketing', 'Product', 'Operations')"),
+  location: LocationSchema,
 });
 
 export type JobStructure = z.infer<typeof JobStructureSchema>;
@@ -37,14 +47,25 @@ export interface JobStructureForDB extends Omit<JobStructure, "salary"> {
   salary_min: number | null;
   salary_max: number | null;
   salary_currency: string;
+  keywords: string[]; // Explicitly include keywords
+  location_structured: {
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    formatted: string | null;
+  } | null;
 }
 
 const EXTRACTION_PROMPT = `Analyze this job description and extract the following structured data.
 
 Job Title: {job_title}
+Raw Department (from ATS): {raw_department}
+Note: The raw department may be empty, null, or contain invalid data (e.g., cookie banners). Use it as a hint if it appears valid, but extract the correct standardized department from the description.
 
 Job Description:
 {description}
+
+IMPORTANT: Always extract location from the job description. Look for location information in sections like "Location(s):", "Location:", or within the job details. The description is the source of truth for location data.
 
 Extract and return a JSON object with:
 1. **summary**: A concise 2-3 sentence summary of what this role entails
@@ -58,9 +79,21 @@ Extract and return a JSON object with:
    - Examples: ["React", "Python", "AWS", "PostgreSQL", "Docker", "Kubernetes"]
    - Be specific and extract actual tech names, not generic terms
    - Include programming languages, frameworks, databases, cloud services, etc.
-5. **standardized_department**: Standardized department name
+5. **keywords**: Array of relevant keywords, skills, domains, topics, or concepts
+   - Should be broader than tech_stack and include: business domains (e.g., "fintech", "payments", "compliance"), methodologies (e.g., "agile", "scrum"), role-related terms (e.g., "leadership", "strategy", "analytics"), and important concepts
+   - Can overlap with tech_stack but should include non-technical terms
+   - Examples: ["fintech", "payments", "API development", "microservices", "agile", "leadership", "compliance", "risk management"]
+6. **standardized_department**: Standardized department name
    - Common values: "Engineering", "Sales", "Marketing", "Product", "Operations", "Finance", "Legal", "HR", "Customer Success", "Support"
    - Normalize variations (e.g., "Engineering" not "Software Engineering" or "Tech")
+   - If raw department is invalid (cookie/privacy text), ignore it and extract from description
+7. **location**: Structured location object extracted from description
+   - Look for location information in the description (e.g., "Location(s): Canada : Ontario : Toronto" or "Toronto, Ontario, Canada")
+   - Extract city, state/province, and country separately
+   - Format as: {"city": "Toronto", "state": "Ontario", "country": "Canada", "formatted": "Toronto, Ontario, Canada"}
+   - If state/province is not available: {"city": "Toronto", "state": null, "country": "Canada", "formatted": "Toronto, Canada"}
+   - If only country is available: {"city": null, "state": null, "country": "Canada", "formatted": "Canada"}
+   - Return null if no location information is found in the description
 
 Respond ONLY with valid JSON matching this structure:
 {
@@ -68,7 +101,9 @@ Respond ONLY with valid JSON matching this structure:
   "seniority_level": "senior",
   "salary": {"min": 120000, "max": 150000, "currency": "USD"} or null,
   "tech_stack": ["React", "TypeScript", "AWS"],
-  "standardized_department": "Engineering"
+  "keywords": ["fintech", "payments", "API development", "microservices", "agile"],
+  "standardized_department": "Engineering",
+  "location": {"city": "Toronto", "state": "Ontario", "country": "Canada", "formatted": "Toronto, Ontario, Canada"} or null
 }`;
 
 /**
@@ -76,12 +111,14 @@ Respond ONLY with valid JSON matching this structure:
  * 
  * @param jobTitle - The job title
  * @param description - The full job description text
+ * @param rawDepartment - Optional raw department value from scraper (may be invalid)
  * @param retryCount - Internal retry counter (default: 0)
  * @returns Structured job data or null if extraction fails
  */
 export async function extractJobStructure(
   jobTitle: string,
   description: string,
+  rawDepartment?: string | null,
   retryCount: number = 0
 ): Promise<JobStructureForDB | null> {
   const key = process.env.GEMINI_API_KEY;
@@ -95,6 +132,7 @@ export async function extractJobStructure(
 
   const prompt = EXTRACTION_PROMPT
     .replace("{job_title}", jobTitle)
+    .replace("{raw_department}", rawDepartment || "null or empty")
     .replace("{description}", truncatedDescription);
 
   let parsed: unknown = null;
@@ -127,7 +165,7 @@ export async function extractJobStructure(
         console.log(`Retrying extraction for job "${jobTitle}" due to empty response (attempt ${retryCount + 2}/3)`);
         // Wait a bit before retrying (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-        return extractJobStructure(jobTitle, description, retryCount + 1);
+        return extractJobStructure(jobTitle, description, rawDepartment, retryCount + 1);
       }
       
       return null;
@@ -183,7 +221,7 @@ export async function extractJobStructure(
             console.log(`Retrying extraction for job "${jobTitle}" (attempt ${retryCount + 2}/3)`);
             // Wait a bit before retrying (exponential backoff)
             await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-            return extractJobStructure(jobTitle, description, retryCount + 1);
+            return extractJobStructure(jobTitle, description, rawDepartment, retryCount + 1);
           }
           
           return null;
@@ -202,7 +240,9 @@ export async function extractJobStructure(
       salary_max: validated.salary?.max ?? null,
       salary_currency: validated.salary?.currency ?? "USD",
       tech_stack: validated.tech_stack,
+      keywords: validated.keywords || [],
       standardized_department: validated.standardized_department,
+      location_structured: validated.location,
     };
 
     return dbStructure;
@@ -234,7 +274,7 @@ export async function extractJobStructure(
         console.log(`Retrying extraction for job "${jobTitle}" due to ${errorMessage} (attempt ${retryCount + 2}/3)`);
         // Wait before retrying (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
-        return extractJobStructure(jobTitle, description, retryCount + 1);
+        return extractJobStructure(jobTitle, description, rawDepartment, retryCount + 1);
       }
     }
     
@@ -265,10 +305,14 @@ function extractPartialStructure(
       tech_stack: Array.isArray(parsedObj.tech_stack)
         ? (parsedObj.tech_stack as string[])
         : [],
+      keywords: Array.isArray(parsedObj.keywords)
+        ? (parsedObj.keywords as string[])
+        : [],
       standardized_department:
         typeof parsedObj.standardized_department === "string"
           ? parsedObj.standardized_department
           : "",
+      location_structured: extractLocation(parsedObj.location),
     };
 
     return partial;
@@ -327,6 +371,133 @@ function extractCurrency(salary: unknown): string {
   const currency = salaryObj.currency;
 
   return typeof currency === "string" ? currency : "USD";
+}
+
+/**
+ * Extract location from parsed object
+ */
+function extractLocation(location: unknown): {
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  formatted: string | null;
+} | null {
+  if (!location || typeof location !== "object") {
+    return null;
+  }
+
+  const locationObj = location as Record<string, unknown>;
+  
+  return {
+    city: typeof locationObj.city === "string" ? locationObj.city : locationObj.city === null ? null : null,
+    state: typeof locationObj.state === "string" ? locationObj.state : locationObj.state === null ? null : null,
+    country: typeof locationObj.country === "string" ? locationObj.country : locationObj.country === null ? null : null,
+    formatted: typeof locationObj.formatted === "string" ? locationObj.formatted : locationObj.formatted === null ? null : null,
+  };
+}
+
+/**
+ * Validate if a department value is valid (not cookie/privacy-related text)
+ * 
+ * @param department - The department value to validate
+ * @returns true if valid, false if invalid
+ */
+export function isValidDepartment(department: string | null | undefined): boolean {
+  if (!department || department.trim().length === 0) {
+    return false;
+  }
+  
+  const lower = department.toLowerCase().trim();
+  
+  // Reject cookie/privacy-related text
+  const badKeywords = [
+    'cookie', 'cookies', 'accept', 'decline', 'preferences',
+    'privacy', 'policy', 'gdpr', 'consent', 'manage',
+    'necessary', 'analytics', 'marketing', 'functional',
+    'settings', 'preferences', 'all cookies', 'essential',
+    'strictly necessary', 'performance', 'targeting'
+  ];
+  
+  if (badKeywords.some(keyword => lower.includes(keyword))) {
+    return false;
+  }
+  
+  // Reject very short or very long values (likely not a department)
+  if (lower.length < 2 || lower.length > 100) {
+    return false;
+  }
+  
+  // Reject common non-department text patterns
+  const nonDepartmentPatterns = [
+    /^click/i,
+    /^read more/i,
+    /^learn more/i,
+    /^apply/i,
+    /^view/i,
+    /^see/i,
+  ];
+  
+  if (nonDepartmentPatterns.some(pattern => pattern.test(lower))) {
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Validate if a location value is valid (not placeholder/search text)
+ * 
+ * @param location - The location value to validate
+ * @returns true if valid, false if invalid/placeholder
+ */
+export function isValidLocation(location: string | null | undefined): boolean {
+  if (!location || location.trim().length === 0) {
+    return false;
+  }
+  
+  const lower = location.toLowerCase().trim();
+  
+  // Reject placeholder/search text
+  const placeholderPatterns = [
+    'search by location',
+    'select location',
+    'choose location',
+    'location search',
+    'filter by location',
+    'all locations',
+    'any location',
+    'multiple locations',
+    'various locations',
+    'location tbd',
+    'to be determined',
+    'multiple locations available',
+    'various locations available',
+    'location to be determined',
+  ];
+  
+  if (placeholderPatterns.some(pattern => lower.includes(pattern))) {
+    return false;
+  }
+  
+  // Reject very short values (likely not a location)
+  if (lower.length < 2) {
+    return false;
+  }
+  
+  // Reject common non-location text patterns
+  const nonLocationPatterns = [
+    /^click/i,
+    /^select/i,
+    /^choose/i,
+    /^filter/i,
+    /^search/i,
+  ];
+  
+  if (nonLocationPatterns.some(pattern => pattern.test(lower))) {
+    return false;
+  }
+  
+  return true;
 }
 
 /**
