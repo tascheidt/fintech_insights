@@ -17,7 +17,7 @@ export default async function JobsPage() {
   // Fetch all jobs with company information
   const { data: jobsRaw } = await supabase
     .from("job_postings")
-    .select("id, title, standardized_department, location, is_active, first_seen_date, url, companies(id, name, slug)")
+    .select("id, title, standardized_department, function_category, location, is_active, first_seen_date, url, companies(id, name, slug)")
     .order("first_seen_date", { ascending: false });
 
   // Transform jobs data for JobHistoryView
@@ -27,6 +27,7 @@ export default async function JobsPage() {
       id: j.id,
       title: j.title,
       standardized_department: j.standardized_department,
+      function_category: j.function_category,
       location: j.location,
       isActive: j.is_active,
       firstSeenDate: j.first_seen_date,

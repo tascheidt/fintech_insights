@@ -4,37 +4,66 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
  * Job Categorizer for Template Library
  * 
  * Logic ported from src/analysis/categorizer.py to TypeScript for Vercel deployment.
- * Uses regex heuristics for quick categorization and Gemini 3 Flash for deep analysis/extraction.
+ * Uses Gemini 3 Flash for AI-based categorization and template extraction.
  */
 
-// Common role categories in fintech (matching python source)
+// Fintech-specific role categories (must match function-categories.ts)
+// Updated to 45 categories across 7 groups for better fintech competitive intelligence
 export const ROLE_CATEGORIES = [
+  // Group 1: Engineering (10 categories)
   "engineering-backend",
   "engineering-frontend",
   "engineering-fullstack",
   "engineering-mobile",
   "engineering-data",
-  "engineering-ml",
-  "engineering-devops",
+  "engineering-ai-ml",
+  "engineering-platform-sre-devops",
   "engineering-security",
   "engineering-qa",
+  "engineering-management",
+  // Group 2: Product & Design (5 categories)
   "product-management",
-  "product-design",
+  "product-design-ux",
   "product-research",
-  "marketing-growth",
-  "marketing-product",
-  "marketing-content",
-  "marketing-brand",
-  "sales",
-  "customer-success",
+  "technical-program-management",
+  "technical-writing",
+  // Group 3: Data & Analytics (3 categories)
+  "data-science",
+  "data-analytics-bi",
+  "analytics-engineering",
+  // Group 4: Risk, Legal & Compliance (6 categories)
+  "compliance",
+  "aml-financial-crime",
+  "fraud-trust-safety",
+  "legal",
+  "regulatory-affairs",
+  "risk-management",
+  // Group 5: Go-To-Market (8 categories)
+  "sales-account-executives",
+  "account-management-customer-success",
   "customer-support",
-  "operations",
-  "finance",
-  "legal-compliance",
-  "hr-people",
-  "data-analytics",
-  "risk",
-  "leadership",
+  "business-development-partnerships",
+  "solutions-engineering",
+  "revenue-operations",
+  "marketing-growth-performance",
+  "marketing-product-brand",
+  "developer-relations",
+  // Group 6: Finance & Strategy (5 categories)
+  "finance-accounting",
+  "strategic-finance-fpa",
+  "capital-markets-treasury",
+  "corporate-development-strategy",
+  "investor-relations",
+  // Group 7: Operations & People (8 categories)
+  "customer-support-cx",
+  "customer-operations",
+  "people-ops-hr",
+  "talent-acquisition-recruiting",
+  "it-internal-systems",
+  "business-operations",
+  "executive-leadership",
+  "administrative",
+  // Other
   "other"
 ] as const;
 
@@ -54,12 +83,72 @@ export interface JobCategoryResult {
   quality_score: number; // 1-5
 }
 
-const CATEGORIZATION_PROMPT = `Analyze this job posting and categorize it for a job template library.
+const CATEGORIZATION_PROMPT = `Analyze this fintech job posting and categorize it using the fintech-specific taxonomy.
 
 Job Title: {job_title}
 Company: {company_name}
 Description:
 {description}
+
+**Available Categories (45 total, organized into 7 groups):**
+
+**Group 1: Engineering** (10 categories)
+- engineering-backend, engineering-frontend, engineering-fullstack, engineering-mobile
+- engineering-data, engineering-ai-ml, engineering-platform-sre-devops
+- engineering-security, engineering-qa, engineering-management
+
+**Group 2: Product & Design** (5 categories)
+- product-management, product-design-ux, product-research
+- technical-program-management, technical-writing
+
+**Group 3: Data & Analytics** (3 categories)
+- data-science, data-analytics-bi, analytics-engineering
+
+**Group 4: Risk, Legal & Compliance** (6 categories)
+- compliance, aml-financial-crime, fraud-trust-safety
+- legal, regulatory-affairs, risk-management
+
+**Group 5: Go-To-Market** (8 categories)
+- sales-account-executives, account-management-customer-success, customer-support
+- business-development-partnerships, solutions-engineering, revenue-operations
+- marketing-growth-performance, marketing-product-brand, developer-relations
+
+**Group 6: Finance & Strategy** (5 categories)
+- finance-accounting, strategic-finance-fpa, capital-markets-treasury
+- corporate-development-strategy, investor-relations
+
+**Group 7: Operations & People** (8 categories)
+- customer-support-cx, customer-operations, people-ops-hr
+- talent-acquisition-recruiting, it-internal-systems, business-operations
+- executive-leadership, administrative
+
+**Other:** other
+
+**Edge Case Rules (CRITICAL for accuracy):**
+- SQL/Data Pipelines/ETL → engineering-data (Data Engineering), NOT data-analytics-bi
+- Excel/Financial Modeling/Accounting → finance-accounting, NOT data-analytics-bi
+- Product Engineer → engineering-fullstack (if technical) OR product-management (if strategic/PM-focused)
+- Marketing Engineer → engineering-frontend or engineering-fullstack (technical role), NOT marketing
+- Platform Engineering/SRE → engineering-platform-sre-devops (distinct from generic DevOps in mature fintechs)
+- Risk Modeling/Credit Scoring → data-science (predictive modeling), NOT risk-management
+- Fraud Detection Operations → fraud-trust-safety, NOT risk-management
+- Compliance Operations/KYC Review → compliance, NOT legal
+- Legal Counsel/Contracts → legal, NOT compliance
+- Data Science (ML models for risk/credit) → data-science, NOT engineering-ai-ml
+- Analytics Engineering (dbt, data modeling) → analytics-engineering, NOT engineering-data
+- Customer Support (tickets/calls) → customer-support-cx, NOT account-management-customer-success
+- Customer Success (retention/upsell) → account-management-customer-success, NOT customer-support-cx
+
+**Key Distinctions:**
+- Platform/SRE/DevOps: Infrastructure, cloud, reliability (engineering-platform-sre-devops)
+- Data Engineering: Pipelines, warehousing, ETL (engineering-data)
+- Data Science: Predictive modeling, ML for business (data-science)
+- Data Analytics/BI: Reporting, dashboards, analysis (data-analytics-bi)
+- Analytics Engineering: dbt, data modeling, transformation (analytics-engineering)
+- Compliance: KYC, KYB, regulatory operations (compliance)
+- Legal: Corporate counsel, contracts, litigation (legal)
+- Risk Management: Credit risk, market risk, liquidity (risk-management)
+- Fraud/Trust & Safety: Fraud detection, trust operations (fraud-trust-safety)
 
 Provide analysis in JSON format:
 {
@@ -83,50 +172,6 @@ Quality scoring guide:
 
 Respond ONLY with valid JSON.`;
 
-/**
- * Quick categorization based on job title alone (no API call).
- */
-export function quickCategorize(jobTitle: string): RoleCategory {
-  const titleLower = jobTitle.toLowerCase();
-
-  // Engineering categories
-  if (["backend", "server", "api"].some(w => titleLower.includes(w))) return "engineering-backend";
-  if (["frontend", "front-end", "ui ", "react", "vue", "angular"].some(w => titleLower.includes(w))) return "engineering-frontend";
-  if (["full stack", "fullstack", "full-stack"].some(w => titleLower.includes(w))) return "engineering-fullstack";
-  if (["mobile", "ios", "android", "swift", "kotlin"].some(w => titleLower.includes(w))) return "engineering-mobile";
-  if (["data engineer", "etl", "pipeline"].some(w => titleLower.includes(w))) return "engineering-data";
-  if (["machine learning", "ml ", "ai ", "deep learning"].some(w => titleLower.includes(w))) return "engineering-ml";
-  if (["devops", "sre", "infrastructure", "platform", "cloud"].some(w => titleLower.includes(w))) return "engineering-devops";
-  if (["security", "infosec", "cybersecurity"].some(w => titleLower.includes(w))) return "engineering-security";
-  if (["qa ", "quality", "test engineer", "sdet"].some(w => titleLower.includes(w))) return "engineering-qa";
-  if (["software", "engineer", "developer"].some(w => titleLower.includes(w)) && !["data", "ml", "ai"].some(w => titleLower.includes(w))) return "engineering-fullstack";
-
-  // Product categories
-  if (["product manager", "product lead", "pm ", "product owner"].some(w => titleLower.includes(w))) return "product-management";
-  if (["product design", "ux ", "ui/ux", "user experience"].some(w => titleLower.includes(w))) return "product-design";
-  if (["user research", "ux research"].some(w => titleLower.includes(w))) return "product-research";
-
-  // Marketing categories
-  if (["growth", "acquisition", "performance marketing"].some(w => titleLower.includes(w))) return "marketing-growth";
-  if (["product market", "pmm"].some(w => titleLower.includes(w))) return "marketing-product";
-  if (["content", "copywriter", "editorial"].some(w => titleLower.includes(w))) return "marketing-content";
-  if (["brand", "creative"].some(w => titleLower.includes(w))) return "marketing-brand";
-  if (titleLower.includes("marketing")) return "marketing-growth";
-
-  // Other categories
-  if (["sales", "account executive", "business development", "bdm"].some(w => titleLower.includes(w))) return "sales";
-  if (["customer success", "csm"].some(w => titleLower.includes(w))) return "customer-success";
-  if (["support", "customer service"].some(w => titleLower.includes(w))) return "customer-support";
-  if (["operations", "ops "].some(w => titleLower.includes(w))) return "operations";
-  if (["finance", "accounting", "controller"].some(w => titleLower.includes(w))) return "finance";
-  if (["legal", "compliance", "regulatory"].some(w => titleLower.includes(w))) return "legal-compliance";
-  if (["hr ", "people", "recruiter", "talent"].some(w => titleLower.includes(w))) return "hr-people";
-  if (["analyst", "analytics", "data scientist", "bi "].some(w => titleLower.includes(w))) return "data-analytics";
-  if (["risk", "fraud"].some(w => titleLower.includes(w))) return "risk";
-  if (["vp ", "director", "head of", "chief", "cto", "cfo", "ceo"].some(w => titleLower.includes(w))) return "leadership";
-
-  return "other";
-}
 
 /**
  * Categorize a job posting and extract template sections using Gemini 3.

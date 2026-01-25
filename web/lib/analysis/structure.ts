@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
+import { ROLE_CATEGORIES, type RoleCategory } from "./function-categories";
 
 /**
  * Job Structure Extractor
@@ -37,6 +38,7 @@ export const JobStructureSchema = z.object({
   tech_stack: z.array(z.string()).describe("Array of specific technologies, frameworks, tools, or platforms mentioned"),
   keywords: z.array(z.string()).describe("Array of relevant keywords, skills, domains, topics, or concepts. Should be broader than tech_stack and include business domains, methodologies, and role-related terms"),
   standardized_department: z.string().describe("Standardized department name (e.g., 'Engineering', 'Sales', 'Marketing', 'Product', 'Operations')"),
+  function_category: z.enum(ROLE_CATEGORIES as unknown as [RoleCategory, ...RoleCategory[]]).describe("Function category (role specialization) - what the person does, not where they sit in the org. Must be one of the predefined ROLE_CATEGORIES. Use 'other' if cannot be categorized."),
   location: LocationSchema,
 });
 
@@ -48,6 +50,7 @@ export interface JobStructureForDB extends Omit<JobStructure, "salary" | "locati
   salary_max: number | null;
   salary_currency: string;
   keywords: string[]; // Explicitly include keywords
+  function_category: RoleCategory; // Always one of ROLE_CATEGORIES, "other" for uncategorized
   location_structured: {
     city: string | null;
     state: string | null;
@@ -68,32 +71,16 @@ Job Description:
 IMPORTANT: Always extract location from the job description. Look for location information in sections like "Location(s):", "Location:", or within the job details. The description is the source of truth for location data.
 
 Extract and return a JSON object with:
-1. **summary**: A concise 2-3 sentence summary of what this role entails
+1. **summary**: A concise 2-3 sentence summary (max 300 chars)
 2. **seniority_level**: One of: intern, junior, mid, senior, staff, principal, lead, executive
-   - Look at the job title and description for indicators (e.g., "Senior", "Principal", "Lead", "VP", "Director")
-   - If unclear, infer from requirements (years of experience, scope of responsibility)
-3. **salary**: Object with min, max (integers), and currency (default "USD")
-   - Extract salary range if mentioned (e.g., "$120k-150k", "$100,000 - $130,000")
-   - Return null if no salary information found
-4. **tech_stack**: Array of specific technologies, frameworks, tools, or platforms mentioned
-   - Examples: ["React", "Python", "AWS", "PostgreSQL", "Docker", "Kubernetes"]
-   - Be specific and extract actual tech names, not generic terms
-   - Include programming languages, frameworks, databases, cloud services, etc.
-5. **keywords**: Array of relevant keywords, skills, domains, topics, or concepts
-   - Should be broader than tech_stack and include: business domains (e.g., "fintech", "payments", "compliance"), methodologies (e.g., "agile", "scrum"), role-related terms (e.g., "leadership", "strategy", "analytics"), and important concepts
-   - Can overlap with tech_stack but should include non-technical terms
-   - Examples: ["fintech", "payments", "API development", "microservices", "agile", "leadership", "compliance", "risk management"]
-6. **standardized_department**: Standardized department name
-   - Common values: "Engineering", "Sales", "Marketing", "Product", "Operations", "Finance", "Legal", "HR", "Customer Success", "Support"
-   - Normalize variations (e.g., "Engineering" not "Software Engineering" or "Tech")
-   - If raw department is invalid (cookie/privacy text), ignore it and extract from description
-7. **location**: Structured location object extracted from description
-   - Look for location information in the description (e.g., "Location(s): Canada : Ontario : Toronto" or "Toronto, Ontario, Canada")
-   - Extract city, state/province, and country separately
-   - Format as: {"city": "Toronto", "state": "Ontario", "country": "Canada", "formatted": "Toronto, Ontario, Canada"}
-   - If state/province is not available: {"city": "Toronto", "state": null, "country": "Canada", "formatted": "Toronto, Canada"}
-   - If only country is available: {"city": null, "state": null, "country": "Canada", "formatted": "Canada"}
-   - Return null if no location information is found in the description
+3. **salary**: Object with min, max (integers), currency (default "USD"), or null
+4. **tech_stack**: Array of specific technologies (max 15 items, most important first)
+5. **keywords**: Array of relevant keywords/skills/domains (max 20 items, most important first)
+6. **standardized_department**: One of: Engineering, Sales, Marketing, Product, Operations, Finance, Legal, HR, Customer Success, Support
+7. **function_category**: Must be one of: {categories}
+   - Edge Cases: SQL/ETL→engineering-data, Excel/Accounting→finance-accounting, Risk Modeling→data-science, Fraud Ops→fraud-trust-safety, Compliance Ops→compliance, Legal→legal, Support→customer-support-cx, Success→account-management-customer-success
+   - Return "other" only if truly uncategorizable
+8. **location**: Object with city, state, country, formatted (all nullable), or null
 
 Respond ONLY with valid JSON matching this structure:
 {
@@ -103,6 +90,7 @@ Respond ONLY with valid JSON matching this structure:
   "tech_stack": ["React", "TypeScript", "AWS"],
   "keywords": ["fintech", "payments", "API development", "microservices", "agile"],
   "standardized_department": "Engineering",
+  "function_category": "engineering-backend",
   "location": {"city": "Toronto", "state": "Ontario", "country": "Canada", "formatted": "Toronto, Ontario, Canada"} or null
 }`;
 
@@ -133,7 +121,8 @@ export async function extractJobStructure(
   const prompt = EXTRACTION_PROMPT
     .replace("{job_title}", jobTitle)
     .replace("{raw_department}", rawDepartment || "null or empty")
-    .replace("{description}", truncatedDescription);
+    .replace("{description}", truncatedDescription)
+    .replace("{categories}", ROLE_CATEGORIES.join(", "));
 
   let parsed: unknown = null;
 
@@ -145,7 +134,7 @@ export async function extractJobStructure(
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.2, // Lower temperature for more consistent extraction
-        maxOutputTokens: 2048,
+        maxOutputTokens: 4096, // Increased to handle longer responses with arrays (tech_stack, keywords)
         responseMimeType: "application/json",
       },
     });
@@ -174,7 +163,7 @@ export async function extractJobStructure(
     // Try to parse JSON, with fallback for malformed JSON
     try {
       parsed = JSON.parse(text) as unknown;
-    } catch (parseError) {
+    } catch {
       // Log the actual response for debugging (first 200 chars)
       const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
       console.warn(`JSON parse failed for job "${jobTitle}". Response preview: ${responsePreview}`);
@@ -199,9 +188,45 @@ export async function extractJobStructure(
             // Try to fix common JSON issues: trailing commas before closing braces/brackets
             let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
             
+            // If JSON appears truncated (ends mid-field), try to close it gracefully
+            // Check if it ends with incomplete string/array/object
+            if (!jsonText.trim().endsWith('}')) {
+              // Try to close incomplete arrays/objects
+              const openBraces = (jsonText.match(/\{/g) || []).length;
+              const closeBraces = (jsonText.match(/\}/g) || []).length;
+              const openBrackets = (jsonText.match(/\[/g) || []).length;
+              const closeBrackets = (jsonText.match(/\]/g) || []).length;
+              
+              // Close incomplete strings (if we're in the middle of a string value)
+              if (jsonText.match(/"[^"]*$/)) {
+                jsonText = jsonText.replace(/("[^"]*)$/, '$1"');
+              }
+              
+              // Close incomplete arrays
+              for (let i = closeBrackets; i < openBrackets; i++) {
+                jsonText += ']';
+              }
+              
+              // Close incomplete objects
+              for (let i = closeBraces; i < openBraces; i++) {
+                jsonText += '}';
+              }
+            }
+            
             parsed = JSON.parse(jsonText) as unknown;
-            console.log(`Successfully parsed JSON after fixing trailing commas for job "${jobTitle}"`);
+            console.log(`Successfully parsed JSON after fixing for job "${jobTitle}"`);
           } catch (fixError) {
+            // If still failing, check if response was truncated (common with token limits)
+            const isTruncated = text.length > 1800 || text.match(/"[^"]*$/); // Likely truncated if near limit or ends mid-string
+            
+            if (isTruncated && retryCount < 2) {
+              console.warn(`Response appears truncated for job "${jobTitle}". Retrying with shorter description...`);
+              // Retry with shorter description to reduce input tokens
+              const shorterDescription = description.slice(0, 6000);
+              await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+              return extractJobStructure(jobTitle, shorterDescription, rawDepartment, retryCount + 1);
+            }
+            
             console.error(`Failed to parse JSON for job "${jobTitle}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
             // Log the problematic JSON snippet for debugging
             if (jsonMatch[0].length < 500) {
@@ -242,6 +267,7 @@ export async function extractJobStructure(
       tech_stack: validated.tech_stack,
       keywords: validated.keywords || [],
       standardized_department: validated.standardized_department,
+      function_category: validated.function_category,
       location_structured: validated.location,
     };
 
@@ -312,6 +338,9 @@ function extractPartialStructure(
         typeof parsedObj.standardized_department === "string"
           ? parsedObj.standardized_department
           : "",
+      function_category: isValidRoleCategory(parsedObj.function_category)
+        ? (parsedObj.function_category as RoleCategory)
+        : "other", // Use "other" for uncategorized jobs
       location_structured: extractLocation(parsedObj.location),
     };
 
@@ -336,6 +365,13 @@ function isValidSeniority(value: unknown): value is JobStructure["seniority_leve
     "executive",
   ];
   return typeof value === "string" && validLevels.includes(value);
+}
+
+/**
+ * Check if a value is a valid role category
+ */
+function isValidRoleCategory(value: unknown): value is RoleCategory {
+  return typeof value === "string" && ROLE_CATEGORIES.includes(value as RoleCategory);
 }
 
 /**

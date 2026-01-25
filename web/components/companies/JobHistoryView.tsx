@@ -50,12 +50,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { getCategoryLabel } from "@/lib/analysis/function-categories";
 
 /** Job posting data structure */
 export interface JobData {
   id: string;
   title: string;
   standardized_department: string | null; // Use standardized_department, never raw department
+  function_category: string | null; // Function category (role specialization)
   location: string | null;
   isActive: boolean;
   firstSeenDate: string | null;
@@ -166,6 +168,8 @@ export function JobHistoryView({
         (j) =>
           j.title.toLowerCase().includes(query) ||
           j.standardized_department?.toLowerCase().includes(query) ||
+          j.function_category?.toLowerCase().includes(query) ||
+          (j.function_category && getCategoryLabel(j.function_category as any).toLowerCase().includes(query)) ||
           j.location?.toLowerCase().includes(query) ||
           j.companyName?.toLowerCase().includes(query)
       );
@@ -390,6 +394,12 @@ function JobsCardView({ jobs }: { jobs: JobData[] }) {
                     <span>{job.standardized_department}</span>
                   </div>
                 )}
+                {job.function_category && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Briefcase className="h-3 w-3" />
+                    <span>{getCategoryLabel(job.function_category as any)}</span>
+                  </div>
+                )}
                 {job.location && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <MapPin className="h-3 w-3" />
@@ -437,6 +447,7 @@ function JobsTableView({ jobs }: { jobs: JobData[] }) {
               <TableHead className="hidden sm:table-cell">Company</TableHead>
             )}
             <TableHead className="hidden sm:table-cell">Department</TableHead>
+            <TableHead className="hidden sm:table-cell">Function</TableHead>
             <TableHead className="hidden md:table-cell">Location</TableHead>
             <TableHead className="hidden md:table-cell">First Seen</TableHead>
             <TableHead>Status</TableHead>
@@ -462,6 +473,9 @@ function JobsTableView({ jobs }: { jobs: JobData[] }) {
                 </TableCell>
               )}
               <TableCell className="hidden sm:table-cell">{job.standardized_department ?? "—"}</TableCell>
+              <TableCell className="hidden sm:table-cell">
+                {job.function_category ? getCategoryLabel(job.function_category as any) : "—"}
+              </TableCell>
               <TableCell className="hidden md:table-cell">{job.location ?? "—"}</TableCell>
               <TableCell className="hidden md:table-cell">
                 {job.firstSeenDate

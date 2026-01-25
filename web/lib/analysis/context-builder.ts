@@ -323,7 +323,7 @@ export async function buildExtendedHistoricalContext(
   // Fetch current period jobs
   const { data: currentJobs } = await supabase
     .from("job_postings")
-    .select("id, title, standardized_department, first_seen_date, is_active")
+    .select("id, title, standardized_department, function_category, first_seen_date, is_active")
     .eq("company_id", companyId)
     .gte("first_seen_date", periodStart.toISOString())
     .order("first_seen_date", { ascending: false });
@@ -331,7 +331,7 @@ export async function buildExtendedHistoricalContext(
   // Fetch previous period jobs for trend comparison
   const { data: previousJobs } = await supabase
     .from("job_postings")
-    .select("id, title, standardized_department, first_seen_date, is_active")
+    .select("id, title, standardized_department, function_category, first_seen_date, is_active")
     .eq("company_id", companyId)
     .gte("first_seen_date", previousPeriodStart.toISOString())
     .lt("first_seen_date", periodStart.toISOString())
