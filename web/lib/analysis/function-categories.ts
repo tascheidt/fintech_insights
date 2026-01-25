@@ -229,12 +229,22 @@ export interface FunctionStats {
   percentage: number;
 }
 
-export function categorizeJobs(jobs: Array<{ title: string }>): FunctionStats[] {
+/**
+ * Categorize jobs using stored function_category if available, fallback to title-based categorization
+ */
+export function categorizeJobs(jobs: Array<{ title: string; function_category?: string | null }>): FunctionStats[] {
   const counts = new Map<RoleCategory, number>();
   const total = jobs.length;
 
   for (const job of jobs) {
-    const category = quickCategorize(job.title);
+    // Use stored function_category if available, otherwise fallback to title-based categorization
+    let category: RoleCategory;
+    if (job.function_category && ROLE_CATEGORIES.includes(job.function_category as RoleCategory)) {
+      category = job.function_category as RoleCategory;
+    } else {
+      // Fallback to title-based categorization for jobs without stored function_category
+      category = quickCategorize(job.title);
+    }
     counts.set(category, (counts.get(category) || 0) + 1);
   }
 
