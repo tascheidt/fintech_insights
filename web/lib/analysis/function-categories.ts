@@ -1,37 +1,68 @@
 /**
  * Function Categories for Job Categorization
  * 
- * Port of Python categorizer.py ROLE_CATEGORIES and quick_categorize() logic.
+ * Defines ROLE_CATEGORIES enum and utilities for analyzing hiring by function.
+ * All categorization now uses stored function_category from database (AI-extracted).
  * Used for company-level insights to analyze hiring by function.
+ * 
+ * Updated to fintech-specific taxonomy with 45 categories across 7 groups.
  */
 
 export const ROLE_CATEGORIES = [
+  // Group 1: Engineering (10 categories)
   "engineering-backend",
   "engineering-frontend",
   "engineering-fullstack",
   "engineering-mobile",
   "engineering-data",
-  "engineering-ml",
-  "engineering-devops",
+  "engineering-ai-ml",
+  "engineering-platform-sre-devops",
   "engineering-security",
   "engineering-qa",
+  "engineering-management",
+  // Group 2: Product & Design (5 categories)
   "product-management",
-  "product-design",
+  "product-design-ux",
   "product-research",
-  "marketing-growth",
-  "marketing-product",
-  "marketing-content",
-  "marketing-brand",
-  "sales",
-  "customer-success",
+  "technical-program-management",
+  "technical-writing",
+  // Group 3: Data & Analytics (3 categories)
+  "data-science",
+  "data-analytics-bi",
+  "analytics-engineering",
+  // Group 4: Risk, Legal & Compliance (6 categories)
+  "compliance",
+  "aml-financial-crime",
+  "fraud-trust-safety",
+  "legal",
+  "regulatory-affairs",
+  "risk-management",
+  // Group 5: Go-To-Market (8 categories)
+  "sales-account-executives",
+  "account-management-customer-success",
   "customer-support",
-  "operations",
-  "finance",
-  "legal-compliance",
-  "hr-people",
-  "data-analytics",
-  "risk",
-  "leadership",
+  "business-development-partnerships",
+  "solutions-engineering",
+  "revenue-operations",
+  "marketing-growth-performance",
+  "marketing-product-brand",
+  "developer-relations",
+  // Group 6: Finance & Strategy (5 categories)
+  "finance-accounting",
+  "strategic-finance-fpa",
+  "capital-markets-treasury",
+  "corporate-development-strategy",
+  "investor-relations",
+  // Group 7: Operations & People (8 categories)
+  "customer-support-cx",
+  "customer-operations",
+  "people-ops-hr",
+  "talent-acquisition-recruiting",
+  "it-internal-systems",
+  "business-operations",
+  "executive-leadership",
+  "administrative",
+  // Other
   "other",
 ] as const;
 
@@ -39,6 +70,8 @@ export type RoleCategory = (typeof ROLE_CATEGORIES)[number];
 
 /**
  * Category groups for high-level aggregation
+ * 
+ * Updated to 7 fintech-specific groups for better competitive intelligence.
  */
 export const CATEGORY_GROUPS: Record<string, RoleCategory[]> = {
   Engineering: [
@@ -47,16 +80,60 @@ export const CATEGORY_GROUPS: Record<string, RoleCategory[]> = {
     "engineering-fullstack",
     "engineering-mobile",
     "engineering-data",
-    "engineering-ml",
-    "engineering-devops",
+    "engineering-ai-ml",
+    "engineering-platform-sre-devops",
     "engineering-security",
     "engineering-qa",
+    "engineering-management",
   ],
-  Product: ["product-management", "product-design", "product-research"],
-  Marketing: ["marketing-growth", "marketing-product", "marketing-content", "marketing-brand"],
-  "Go-to-Market": ["sales", "customer-success", "customer-support"],
-  Operations: ["operations", "finance", "legal-compliance", "hr-people", "data-analytics", "risk"],
-  Leadership: ["leadership"],
+  "Product & Design": [
+    "product-management",
+    "product-design-ux",
+    "product-research",
+    "technical-program-management",
+    "technical-writing",
+  ],
+  "Data & Analytics": [
+    "data-science",
+    "data-analytics-bi",
+    "analytics-engineering",
+  ],
+  "Risk, Legal & Compliance": [
+    "compliance",
+    "aml-financial-crime",
+    "fraud-trust-safety",
+    "legal",
+    "regulatory-affairs",
+    "risk-management",
+  ],
+  "Go-To-Market": [
+    "sales-account-executives",
+    "account-management-customer-success",
+    "customer-support",
+    "business-development-partnerships",
+    "solutions-engineering",
+    "revenue-operations",
+    "marketing-growth-performance",
+    "marketing-product-brand",
+    "developer-relations",
+  ],
+  "Finance & Strategy": [
+    "finance-accounting",
+    "strategic-finance-fpa",
+    "capital-markets-treasury",
+    "corporate-development-strategy",
+    "investor-relations",
+  ],
+  "Operations & People": [
+    "customer-support-cx",
+    "customer-operations",
+    "people-ops-hr",
+    "talent-acquisition-recruiting",
+    "it-internal-systems",
+    "business-operations",
+    "executive-leadership",
+    "administrative",
+  ],
   Other: ["other"],
 };
 
@@ -72,147 +149,66 @@ export function getCategoryGroup(category: RoleCategory): string {
   return "Other";
 }
 
-/**
- * Quick categorization based on job title alone (no API call).
- * Port of Python categorizer.py quick_categorize() method.
- */
-export function quickCategorize(jobTitle: string): RoleCategory {
-  const titleLower = jobTitle.toLowerCase();
-
-  // Engineering categories
-  if (["backend", "server", "api"].some((w) => titleLower.includes(w))) {
-    return "engineering-backend";
-  }
-  if (["frontend", "front-end", "ui ", "react", "vue", "angular"].some((w) => titleLower.includes(w))) {
-    return "engineering-frontend";
-  }
-  if (["full stack", "fullstack", "full-stack"].some((w) => titleLower.includes(w))) {
-    return "engineering-fullstack";
-  }
-  if (["mobile", "ios", "android", "swift", "kotlin"].some((w) => titleLower.includes(w))) {
-    return "engineering-mobile";
-  }
-  if (["data engineer", "etl", "pipeline"].some((w) => titleLower.includes(w))) {
-    return "engineering-data";
-  }
-  if (["machine learning", "ml ", "ai ", "deep learning"].some((w) => titleLower.includes(w))) {
-    return "engineering-ml";
-  }
-  if (["devops", "sre", "infrastructure", "platform", "cloud"].some((w) => titleLower.includes(w))) {
-    return "engineering-devops";
-  }
-  if (["security", "infosec", "cybersecurity"].some((w) => titleLower.includes(w))) {
-    return "engineering-security";
-  }
-  if (["qa ", "quality", "test engineer", "sdet"].some((w) => titleLower.includes(w))) {
-    return "engineering-qa";
-  }
-  // Generic software/engineer/developer -> fullstack (if not data/ml/ai)
-  if (
-    ["software", "engineer", "developer"].some((w) => titleLower.includes(w)) &&
-    !["data", "ml", "ai"].some((w) => titleLower.includes(w))
-  ) {
-    return "engineering-fullstack";
-  }
-
-  // Product categories
-  if (["product manager", "product lead", "pm ", "product owner"].some((w) => titleLower.includes(w))) {
-    return "product-management";
-  }
-  if (["product design", "ux ", "ui/ux", "user experience"].some((w) => titleLower.includes(w))) {
-    return "product-design";
-  }
-  if (["user research", "ux research"].some((w) => titleLower.includes(w))) {
-    return "product-research";
-  }
-
-  // Marketing categories
-  if (["growth", "acquisition", "performance marketing"].some((w) => titleLower.includes(w))) {
-    return "marketing-growth";
-  }
-  if (["product market", "pmm"].some((w) => titleLower.includes(w))) {
-    return "marketing-product";
-  }
-  if (["content", "copywriter", "editorial"].some((w) => titleLower.includes(w))) {
-    return "marketing-content";
-  }
-  if (["brand", "creative"].some((w) => titleLower.includes(w))) {
-    return "marketing-brand";
-  }
-  if (titleLower.includes("marketing")) {
-    return "marketing-growth";
-  }
-
-  // Go-to-Market categories
-  if (["sales", "account executive", "business development", "bdm"].some((w) => titleLower.includes(w))) {
-    return "sales";
-  }
-  if (["customer success", "csm"].some((w) => titleLower.includes(w))) {
-    return "customer-success";
-  }
-  if (["support", "customer service"].some((w) => titleLower.includes(w))) {
-    return "customer-support";
-  }
-
-  // Operations categories
-  if (["operations", "ops "].some((w) => titleLower.includes(w))) {
-    return "operations";
-  }
-  if (["finance", "accounting", "controller"].some((w) => titleLower.includes(w))) {
-    return "finance";
-  }
-  if (["legal", "compliance", "regulatory"].some((w) => titleLower.includes(w))) {
-    return "legal-compliance";
-  }
-  if (["hr ", "people", "recruiter", "talent"].some((w) => titleLower.includes(w))) {
-    return "hr-people";
-  }
-  if (["analyst", "analytics", "data scientist", "bi "].some((w) => titleLower.includes(w))) {
-    return "data-analytics";
-  }
-  if (["risk", "fraud"].some((w) => titleLower.includes(w))) {
-    return "risk";
-  }
-
-  // Leadership
-  if (["vp ", "director", "head of", "chief", "cto", "cfo", "ceo"].some((w) => titleLower.includes(w))) {
-    return "leadership";
-  }
-
-  return "other";
-}
 
 /**
  * Get a human-readable label for a role category
  */
 export function getCategoryLabel(category: RoleCategory): string {
   const labels: Record<RoleCategory, string> = {
+    // Engineering
     "engineering-backend": "Backend Engineering",
     "engineering-frontend": "Frontend Engineering",
     "engineering-fullstack": "Full Stack Engineering",
     "engineering-mobile": "Mobile Engineering",
     "engineering-data": "Data Engineering",
-    "engineering-ml": "Machine Learning",
-    "engineering-devops": "DevOps / SRE",
+    "engineering-ai-ml": "AI / ML Engineering",
+    "engineering-platform-sre-devops": "Platform / SRE / DevOps",
     "engineering-security": "Security Engineering",
-    "engineering-qa": "QA / Testing",
+    "engineering-qa": "QA / Test Engineering",
+    "engineering-management": "Engineering Management",
+    // Product & Design
     "product-management": "Product Management",
-    "product-design": "Product Design",
+    "product-design-ux": "Product Design / UX",
     "product-research": "User Research",
-    "marketing-growth": "Growth Marketing",
-    "marketing-product": "Product Marketing",
-    "marketing-content": "Content Marketing",
-    "marketing-brand": "Brand Marketing",
-    sales: "Sales",
-    "customer-success": "Customer Success",
+    "technical-program-management": "Technical Program Management",
+    "technical-writing": "Technical Writing",
+    // Data & Analytics
+    "data-science": "Data Science",
+    "data-analytics-bi": "Data Analytics / BI",
+    "analytics-engineering": "Analytics Engineering",
+    // Risk, Legal & Compliance
+    "compliance": "Compliance",
+    "aml-financial-crime": "AML / Financial Crime",
+    "fraud-trust-safety": "Fraud / Trust & Safety",
+    "legal": "Legal",
+    "regulatory-affairs": "Regulatory Affairs",
+    "risk-management": "Risk Management",
+    // Go-To-Market
+    "sales-account-executives": "Sales / Account Executives",
+    "account-management-customer-success": "Account Management / Customer Success",
     "customer-support": "Customer Support",
-    operations: "Operations",
-    finance: "Finance",
-    "legal-compliance": "Legal & Compliance",
-    "hr-people": "HR / People",
-    "data-analytics": "Data Analytics",
-    risk: "Risk / Fraud",
-    leadership: "Leadership",
+    "business-development-partnerships": "Business Development / Partnerships",
+    "solutions-engineering": "Solutions Engineering",
+    "revenue-operations": "Revenue Operations",
+    "marketing-growth-performance": "Marketing - Growth / Performance",
+    "marketing-product-brand": "Marketing - Product & Brand",
+    "developer-relations": "Developer Relations",
+    // Finance & Strategy
+    "finance-accounting": "Finance & Accounting",
+    "strategic-finance-fpa": "Strategic Finance / FP&A",
+    "capital-markets-treasury": "Capital Markets / Treasury",
+    "corporate-development-strategy": "Corporate Development / Strategy",
+    "investor-relations": "Investor Relations",
+    // Operations & People
+    "customer-support-cx": "Customer Support / CX",
+    "customer-operations": "Customer Operations",
+    "people-ops-hr": "People Ops / HR",
+    "talent-acquisition-recruiting": "Talent Acquisition / Recruiting",
+    "it-internal-systems": "IT / Internal Systems",
+    "business-operations": "Business Operations",
+    "executive-leadership": "Executive / Leadership",
+    "administrative": "Administrative",
+    // Other
     other: "Other",
   };
   return labels[category] || category;
@@ -230,21 +226,21 @@ export interface FunctionStats {
 }
 
 /**
- * Categorize jobs using stored function_category if available, fallback to title-based categorization
+ * Categorize jobs using stored function_category from database.
+ * Includes all jobs with valid function_category (including "other" for uncategorized).
  */
 export function categorizeJobs(jobs: Array<{ title: string; function_category?: string | null }>): FunctionStats[] {
   const counts = new Map<RoleCategory, number>();
-  const total = jobs.length;
+  
+  // Filter to only jobs with valid function_category (including "other")
+  const jobsWithCategory = jobs.filter(
+    (job) => job.function_category && ROLE_CATEGORIES.includes(job.function_category as RoleCategory)
+  );
+  
+  const total = jobsWithCategory.length;
 
-  for (const job of jobs) {
-    // Use stored function_category if available, otherwise fallback to title-based categorization
-    let category: RoleCategory;
-    if (job.function_category && ROLE_CATEGORIES.includes(job.function_category as RoleCategory)) {
-      category = job.function_category as RoleCategory;
-    } else {
-      // Fallback to title-based categorization for jobs without stored function_category
-      category = quickCategorize(job.title);
-    }
+  for (const job of jobsWithCategory) {
+    const category = job.function_category as RoleCategory;
     counts.set(category, (counts.get(category) || 0) + 1);
   }
 

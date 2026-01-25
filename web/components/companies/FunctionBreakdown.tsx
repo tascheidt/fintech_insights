@@ -16,11 +16,12 @@ interface FunctionBreakdownProps {
 
 const GROUP_COLORS: Record<string, string> = {
   Engineering: "bg-blue-500",
-  Product: "bg-purple-500",
-  Marketing: "bg-pink-500",
-  "Go-to-Market": "bg-green-500",
-  Operations: "bg-yellow-500",
-  Leadership: "bg-red-500",
+  "Product & Design": "bg-purple-500",
+  "Data & Analytics": "bg-indigo-500",
+  "Risk, Legal & Compliance": "bg-red-500",
+  "Go-To-Market": "bg-green-500",
+  "Finance & Strategy": "bg-yellow-500",
+  "Operations & People": "bg-orange-500",
   Other: "bg-gray-500",
 };
 
