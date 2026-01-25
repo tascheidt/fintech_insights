@@ -15,7 +15,7 @@ export default async function InsightDetailPage({ params }: { params: Promise<{ 
     .select(`
       *,
       job_postings!job_posting_id(
-        id, title, department, location, url,
+        id, title, department, standardized_department, location, url,
         description_text,
         companies(id, name, slug)
       )
@@ -25,7 +25,7 @@ export default async function InsightDetailPage({ params }: { params: Promise<{ 
 
   if (error || !insight) notFound();
 
-  const jp = (insight as { job_postings?: { title: string; department?: string; location?: string; url?: string; description_text?: string; companies?: { name: string; slug: string } } })?.job_postings;
+  const jp = (insight as { job_postings?: { title: string; department?: string; standardized_department?: string; location?: string; url?: string; description_text?: string; companies?: { name: string; slug: string } } })?.job_postings;
   const company = jp?.companies;
   const signals = (insight as { strategic_signals?: string[] }).strategic_signals;
   const signalsList = Array.isArray(signals) ? signals : [];
@@ -179,7 +179,7 @@ export default async function InsightDetailPage({ params }: { params: Promise<{ 
         <Card>
           <CardHeader>
             <h2 className="font-semibold">Job Details</h2>
-            {jp.department && <p className="text-sm text-muted-foreground">{jp.department}</p>}
+            {jp.standardized_department && <p className="text-sm text-muted-foreground">{jp.standardized_department}</p>}
             {jp.location && <p className="text-sm text-muted-foreground">{jp.location}</p>}
           </CardHeader>
           <CardContent className="space-y-4">
