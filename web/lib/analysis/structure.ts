@@ -38,7 +38,7 @@ export const JobStructureSchema = z.object({
   tech_stack: z.array(z.string()).describe("Array of specific technologies, frameworks, tools, or platforms mentioned"),
   keywords: z.array(z.string()).describe("Array of relevant keywords, skills, domains, topics, or concepts. Should be broader than tech_stack and include business domains, methodologies, and role-related terms"),
   standardized_department: z.string().describe("Standardized department name (e.g., 'Engineering', 'Sales', 'Marketing', 'Product', 'Operations')"),
-  function_category: z.enum(ROLE_CATEGORIES as [RoleCategory, ...RoleCategory[]]).describe("Function category (role specialization) - what the person does, not where they sit in the org. Must be one of the predefined ROLE_CATEGORIES."),
+  function_category: z.enum(ROLE_CATEGORIES as unknown as [RoleCategory, ...RoleCategory[]]).describe("Function category (role specialization) - what the person does, not where they sit in the org. Must be one of the predefined ROLE_CATEGORIES."),
   location: LocationSchema,
 });
 
