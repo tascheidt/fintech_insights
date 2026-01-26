@@ -64,7 +64,7 @@ Add or modify companies to track by editing `config/companies.yaml`. Each compan
 - `name`: Display name
 - `slug`: URL-safe identifier
 - `country`: Country code (CA, UK, US)
-- `track_for_strategy`: Whether to include in strategic analysis
+- `is_active`: Whether the company is actively being tracked
 - `ats_type`: Platform type (lever, greenhouse, workable, custom)
 - `ats_identifier`: Company's identifier on the ATS platform
 
@@ -220,7 +220,7 @@ The Gemini AI categorizes postings into:
 The company may have changed ATS platforms or identifiers. Check their careers page directly.
 
 ### No Insights Generated
-Ensure `GEMINI_API_KEY` is set correctly in `.env` and the company has `track_for_strategy: true`.
+Ensure `GEMINI_API_KEY` is set correctly in `.env` and the company has `is_active: true`.
 
 ### Email Not Sending
 Verify SMTP credentials. For Gmail, use an App Password with 2FA enabled.

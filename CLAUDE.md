@@ -8,6 +8,9 @@ Fintech Job Intelligence System - a competitive intelligence platform tracking j
 - **Python CLI backend** (`/src`): Scraping, analysis, and reporting
 - **Next.js web app** (`/web`): Dashboard hosted on Vercel
 
+## Project Asthetic 
+"Notion-sytle" - Clean white or very subtle off-white/light gray theme with clean, high contrast typography, or a refined dark theme if strictly required
+
 ## Common Commands
 
 ### Web App (Next.js)
@@ -142,13 +145,13 @@ await supabase
 
 ### Cron Jobs (Vercel)
 - Daily 6 AM: `/api/cron/collect` - Collect jobs and analyze
-- Weekly Monday 8 AM: `/api/cron/report` - Generate reports
+- Weekly Monday 5 AM: `/api/cron/report` - Generate reports
 - Never create more than two cron jobs
 
 ## Configuration
 
 ### Company Config (`config/companies.yaml`)
-Each company needs: `name`, `slug`, `country`, `track_for_strategy`, `ats_type`, `ats_identifier`
+Each company needs: `name`, `slug`, `country`, `ats_type`, `ats_identifier`
 
 ### Environment Variables
 - `GEMINI_API_KEY` - AI analysis
@@ -178,8 +181,6 @@ Each company needs: `name`, `slug`, `country`, `track_for_strategy`, `ats_type`,
 4. Use Pro for features requiring web search/grounding tools
 5. Use Flash for standard JSON generation and analysis
 
-### Testing Models
-Run `npx tsx web/scripts/test-gemini-models.ts` to verify API key has access to required models.
 
 ### Quota Errors
 If you see `limit: 0` quota errors, the API key may need:

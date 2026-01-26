@@ -249,10 +249,8 @@ export async function runIngestStage(
 
         if (inserted?.id) {
           newJobs++;
-          // Only track for analysis if company is tracked for strategy
-          if (company.track_for_strategy) {
-            newJobIds.push(inserted.id);
-          }
+          // Track all new jobs for analysis
+          newJobIds.push(inserted.id);
 
           // Queue Silver Layer extraction for new jobs
           // Pass raw location for validation (AI will extract from description)

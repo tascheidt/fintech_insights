@@ -42,7 +42,6 @@ export interface CompanyOverviewData {
   activeJobCount: number;
   recentHighlight?: string | null;
   atsType: string;
-  trackForStrategy: boolean;
 }
 
 interface CompaniesOverviewProps {
@@ -128,11 +127,6 @@ function CompaniesCardView({ companies }: { companies: CompanyOverviewData[] }) 
 
               {/* Footer with tags */}
               <NotionCardFooter className="mt-auto pt-4">
-                {company.trackForStrategy && (
-                  <NotionCardTag className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                    Strategic
-                  </NotionCardTag>
-                )}
                 <NotionCardTag>{company.atsType}</NotionCardTag>
                 <ArrowRight className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
               </NotionCardFooter>
@@ -164,7 +158,6 @@ function CompaniesTableView({ companies }: { companies: CompanyOverviewData[] })
             <TableHead>Company</TableHead>
             <TableHead>Country</TableHead>
             <TableHead className="text-right">Active Jobs</TableHead>
-            <TableHead>ATS</TableHead>
             <TableHead>Recent Activity</TableHead>
             <TableHead></TableHead>
           </TableRow>
@@ -176,21 +169,11 @@ function CompaniesTableView({ companies }: { companies: CompanyOverviewData[] })
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">{company.name}</span>
-                  {company.trackForStrategy && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                      Strategic
-                    </span>
-                  )}
                 </div>
               </TableCell>
               <TableCell>{company.country}</TableCell>
               <TableCell className="text-right font-semibold">
                 {company.activeJobCount}
-              </TableCell>
-              <TableCell>
-                <span className="text-xs text-muted-foreground capitalize">
-                  {company.atsType}
-                </span>
               </TableCell>
               <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
                 {company.recentHighlight || "—"}

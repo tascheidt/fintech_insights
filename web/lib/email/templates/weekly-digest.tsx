@@ -10,10 +10,11 @@ import {
   Link,
   Hr,
 } from "@react-email/components";
-import type { WeeklyDigest, CompanyWeeklySummary, TLDRCommentary } from "@/lib/analysis/digest";
+import type { WeeklyDigest, CompanyWeeklySummary, GlobalSummary, StrategySignal, IndustryTrend } from "@/lib/analysis/digest";
 
 interface WeeklyDigestEmailProps {
   digest: WeeklyDigest;
+  digestId: string;  // NEW - for deep linking
   appUrl?: string;
 }
 
@@ -43,12 +44,17 @@ function getPrimaryFocus(departments: Record<string, number>): string {
  * Global summary section - the "TL;DR of TL;DRs"
  * Displays cross-company trend analysis at the top of the email
  */
-function GlobalSummarySection({ summary }: { summary: TLDRCommentary }) {
+function GlobalSummarySection({ summary }: { summary: GlobalSummary }) {
   return (
     <Section style={globalSummarySection}>
       <Heading as="h2" style={globalHeadline}>
         {summary.headline}
       </Heading>
+      {summary.key_insight && (
+        <Text style={{ ...globalBody, fontWeight: "600", marginBottom: "12px" }}>
+          {summary.key_insight}
+        </Text>
+      )}
       <Text style={globalBody}>
         {summary.body}
       </Text>
@@ -59,14 +65,17 @@ function GlobalSummarySection({ summary }: { summary: TLDRCommentary }) {
 /**
  * Company section component
  */
-function CompanySection({ company }: { company: CompanyWeeklySummary }) {
+function CompanySection({ company, appUrl = "https://fintech-insights.vercel.app" }: { company: CompanyWeeklySummary; appUrl?: string }) {
   const primaryFocus = getPrimaryFocus(company.departments);
   const techList = company.dominant_tech.slice(0, 3).join(", ") || "Various";
+  const companyUrl = `${appUrl}/companies/${company.company_slug}`;
 
   return (
     <Section style={companySection}>
-      {/* Company Name */}
-      <Text style={companyName}>{company.company_name}</Text>
+      {/* Company Name - Clickable */}
+      <Link href={companyUrl} style={{ ...companyName, color: "#000", textDecoration: "none" }}>
+        {company.company_name}
+      </Link>
       
       {/* AI Headline */}
       <Heading as="h3" style={headline}>
@@ -93,9 +102,10 @@ function CompanySection({ company }: { company: CompanyWeeklySummary }) {
  * 
  * Clean, minimal design with TLDR-style AI commentary for each company
  */
-export function WeeklyDigestEmail({ digest, appUrl = "https://fintech-insights.vercel.app" }: WeeklyDigestEmailProps) {
+export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-insights.vercel.app" }: WeeklyDigestEmailProps) {
   const dateRange = formatDateRange(digest.week_start, digest.week_end);
   const previewText = `Fintech Insights: ${digest.total_jobs} new jobs across ${digest.total_companies} companies this week`;
+  const digestUrl = `${appUrl}/digests/${digestId}`;
 
   return (
     <Html>
@@ -111,6 +121,20 @@ export function WeeklyDigestEmail({ digest, appUrl = "https://fintech-insights.v
             <Text style={subtitle}>
               {dateRange}
             </Text>
+            {/* View in App Button */}
+            <Section style={{ textAlign: "center", marginTop: "20px" }}>
+              <Link href={digestUrl} style={{
+                display: "inline-block",
+                padding: "12px 24px",
+                backgroundColor: "#000",
+                color: "#fff",
+                textDecoration: "none",
+                borderRadius: "6px",
+                fontWeight: "600",
+              }}>
+                View Full Digest in App →
+              </Link>
+            </Section>
           </Section>
 
           {/* Global Summary - Cross-company trend analysis */}
@@ -136,11 +160,63 @@ export function WeeklyDigestEmail({ digest, appUrl = "https://fintech-insights.v
             </table>
           </Section>
 
+          {/* Strategy Signals - Key Differentiator */}
+          {digest.strategy_signals && Array.isArray(digest.strategy_signals) && digest.strategy_signals.length > 0 && (
+            <>
+              <Hr style={divider} />
+              <Section style={companySection}>
+                <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px" }}>
+                  🎯 Strategy Signals
+                </Heading>
+                {digest.strategy_signals.slice(0, 3).map((signal, idx) => (
+                  <div key={idx} style={{ marginBottom: "16px", paddingBottom: "16px", borderBottom: idx < Math.min(digest.strategy_signals!.length - 1, 2) ? "1px solid #e5e7eb" : "none" }}>
+                    <Text style={{ fontWeight: "600", marginBottom: "4px" }}>
+                      {signal.company}
+                    </Text>
+                    <Text style={{ fontSize: "14px", color: "#6b7280", marginBottom: "8px" }}>
+                      {signal.signal}
+                    </Text>
+                    <Text style={{ fontSize: "13px", color: "#374151" }}>
+                      {signal.interpretation}
+                    </Text>
+                  </div>
+                ))}
+                {digest.strategy_signals.length > 3 && (
+                  <Text style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px" }}>
+                    +{digest.strategy_signals.length - 3} more signals in full digest
+                  </Text>
+                )}
+              </Section>
+            </>
+          )}
+
+          {/* Industry Trends */}
+          {digest.industry_trends && Array.isArray(digest.industry_trends) && digest.industry_trends.length > 0 && (
+            <>
+              <Hr style={divider} />
+              <Section style={companySection}>
+                <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px" }}>
+                  📈 Industry Trends
+                </Heading>
+                {digest.industry_trends.slice(0, 3).map((trend, idx) => (
+                  <div key={idx} style={{ marginBottom: "12px" }}>
+                    <Text style={{ fontWeight: "600", marginBottom: "4px" }}>
+                      {trend.trend}
+                    </Text>
+                    <Text style={{ fontSize: "13px", color: "#6b7280" }}>
+                      {trend.explanation}
+                    </Text>
+                  </div>
+                ))}
+              </Section>
+            </>
+          )}
+
           <Hr style={divider} />
 
           {/* Company Sections */}
           {digest.companies.map((company) => (
-            <CompanySection key={company.company_id} company={company} />
+            <CompanySection key={company.company_id} company={company} appUrl={appUrl} />
           ))}
 
           {/* No companies message */}
@@ -157,8 +233,8 @@ export function WeeklyDigestEmail({ digest, appUrl = "https://fintech-insights.v
           {/* Footer */}
           <Section style={footer}>
             <Text style={footerText}>
-              <Link href={appUrl} style={footerLink}>
-                View full dashboard →
+              <Link href={digestUrl} style={footerLink}>
+                View full digest in app →
               </Link>
             </Text>
             <Text style={footerMuted}>

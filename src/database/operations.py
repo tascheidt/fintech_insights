@@ -47,10 +47,10 @@ class DatabaseOperations:
         with self.get_session() as session:
             return session.query(Company).all()
 
-    def get_strategic_companies(self) -> List[Company]:
-        """Get companies tracked for strategic analysis."""
+    def get_active_companies(self) -> List[Company]:
+        """Get active companies."""
         with self.get_session() as session:
-            return session.query(Company).filter_by(track_for_strategy=True).all()
+            return session.query(Company).filter_by(is_active=True).all()
 
     # Job posting operations
     def upsert_job_posting(self, company_id: int, job_data: Dict[str, Any]) -> tuple[JobPosting, bool]:
@@ -138,7 +138,7 @@ class DatabaseOperations:
                 JobPosting.first_seen_date >= since
             )
             if strategic_only:
-                query = query.join(Company).filter(Company.track_for_strategy == True)
+                query = query.join(Company).filter(Company.is_active == True)
             # Use list() to ensure all data is loaded before session closes
             return list(query.all())
 
@@ -151,7 +151,7 @@ class DatabaseOperations:
                 JobPosting.closed_date >= since
             )
             if strategic_only:
-                query = query.join(Company).filter(Company.track_for_strategy == True)
+                query = query.join(Company).filter(Company.is_active == True)
             return list(query.all())
 
     def get_postings_without_insights(self, strategic_only: bool = True) -> List[JobPosting]:
@@ -166,7 +166,7 @@ class DatabaseOperations:
                 JobPosting.is_active == True
             )
             if strategic_only:
-                query = query.join(Company).filter(Company.track_for_strategy == True)
+                query = query.join(Company).filter(Company.is_active == True)
             return list(query.all())
 
     # Strategic insight operations

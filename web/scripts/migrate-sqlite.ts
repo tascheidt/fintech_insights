@@ -39,7 +39,7 @@ async function main() {
   }
 
   const companyMap = new Map<number, string>();
-  const companies = db.prepare("SELECT * FROM companies").all() as { id: number; name: string; slug: string; country: string; track_for_strategy: number; ats_type: string; ats_identifier: string | null; careers_url: string | null; created_at: string }[];
+  const companies = db.prepare("SELECT * FROM companies").all() as { id: number; name: string; slug: string; country: string; ats_type: string; ats_identifier: string | null; careers_url: string | null; created_at: string }[];
   for (const c of companies) {
     const { data, error } = await supabase
       .from("companies")
@@ -48,7 +48,6 @@ async function main() {
         name: c.name,
         slug: c.slug,
         country: c.country,
-        track_for_strategy: Boolean(c.track_for_strategy),
         ats_type: c.ats_type,
         ats_identifier: c.ats_identifier,
         careers_url: c.careers_url,

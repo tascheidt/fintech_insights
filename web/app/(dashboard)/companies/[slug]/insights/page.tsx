@@ -18,7 +18,7 @@ export default async function CompanyInsightsPage({
   // Get company
   const { data: company, error: companyError } = await supabase
     .from("companies")
-    .select("id, name, slug, track_for_strategy")
+    .select("id, name, slug")
     .eq("slug", slug)
     .eq("is_active", true)
     .single();
@@ -116,12 +116,6 @@ export default async function CompanyInsightsPage({
                 Generate your first strategic insight to analyze {company.name}&apos;s
                 hiring patterns.
               </p>
-              {!company.track_for_strategy && (
-                <p className="text-sm text-amber-600 dark:text-amber-400">
-                  Note: Enable &quot;Track for Strategy&quot; in company settings for automatic
-                  weekly insights.
-                </p>
-              )}
             </div>
           </CardContent>
         </Card>

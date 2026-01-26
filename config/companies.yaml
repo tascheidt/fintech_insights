@@ -1,9 +1,8 @@
 companies:
-  # Canadian Fintechs - Track for strategic intelligence
+  # Canadian Fintechs
   - name: Wealthsimple
     slug: wealthsimple
     country: CA
-    track_for_strategy: true
     ats_type: lever
     ats_identifier: wealthsimple
     careers_url: https://www.wealthsimple.com/en-ca/careers
@@ -12,7 +11,6 @@ companies:
   # - name: Koho
   #   slug: koho
   #   country: CA
-  #   track_for_strategy: true
   #   ats_type: lever
   #   ats_identifier: koho
   #   careers_url: https://www.koho.ca/careers/
@@ -21,7 +19,6 @@ companies:
   # - name: Neo Financial
   #   slug: neo-financial
   #   country: CA
-  #   track_for_strategy: true
   #   ats_type: lever
   #   ats_identifier: neofinancial
   #   careers_url: https://www.neofinancial.com/careers
@@ -29,7 +26,6 @@ companies:
   - name: Questrade
     slug: questrade
     country: CA
-    track_for_strategy: true
     ats_type: dayforce
     ats_identifier: qfg
     careers_url: https://jobs.dayforcehcm.com/en-US/qfg/CANDIDATEPORTAL
@@ -37,16 +33,14 @@ companies:
   - name: Tangerine
     slug: tangerine
     country: CA
-    track_for_strategy: true
     ats_type: workday
     ats_identifier: tangerine
     careers_url: https://jobs.tangerine.ca/
 
-  # International Fintechs - Job templates only (no strategic tracking)
+  # International Fintechs
   - name: Monzo
     slug: monzo
     country: UK
-    track_for_strategy: false
     ats_type: greenhouse
     ats_identifier: monzo
     careers_url: https://monzo.com/careers/
@@ -55,7 +49,6 @@ companies:
   # - name: Revolut
   #   slug: revolut
   #   country: UK
-  #   track_for_strategy: false
   #   ats_type: greenhouse
   #   ats_identifier: revolut
   #   careers_url: https://www.revolut.com/careers/
@@ -63,7 +56,6 @@ companies:
   - name: Starling Bank
     slug: starling
     country: UK
-    track_for_strategy: false
     ats_type: workable
     ats_identifier: starling-bank
     careers_url: https://www.starlingbank.com/careers/

@@ -1,7 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/collect", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/report", "schedule": "0 8 * * 1" }
+    { "path": "/api/cron/report", "schedule": "0 6 * * 1" }
   ],
   "functions": {
     "app/api/cron/collect/route.ts": {

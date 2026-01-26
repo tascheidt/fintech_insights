@@ -45,7 +45,6 @@ export function AddCompanyForm() {
   const [name, setName] = useState("");
   const [careersUrl, setCareersUrl] = useState("");
   const [country, setCountry] = useState("");
-  const [trackForStrategy, setTrackForStrategy] = useState(false);
 
   // Detection state
   const [detection, setDetection] = useState<DetectionResult | null>(null);
@@ -146,7 +145,6 @@ export function AddCompanyForm() {
           country,
           atsType,
           atsIdentifier,
-          trackForStrategy,
           careersUrl: (detection?.normalizedUrl ?? careersUrl) || undefined,
         }),
       });
@@ -337,17 +335,6 @@ export function AddCompanyForm() {
                 <option value="UK">United Kingdom</option>
                 <option value="US">United States</option>
               </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Track for Strategic Analysis</label>
-              <div className="mt-1">
-                <input
-                  type="checkbox"
-                  checked={trackForStrategy}
-                  onChange={(e) => setTrackForStrategy(e.target.checked)}
-                />
-                <span className="ml-2 text-sm">Yes</span>
-              </div>
             </div>
           </div>
 

@@ -27,7 +27,6 @@ interface Company {
   ats_type: string;
   ats_identifier: string;
   careers_url?: string | null;
-  track_for_strategy: boolean;
   is_active: boolean;
 }
 
@@ -56,7 +55,6 @@ export function EditCompanyForm({ company }: { company: Company }) {
   const [name, setName] = useState(company.name);
   const [careersUrl, setCareersUrl] = useState(company.careers_url ?? "");
   const [country, setCountry] = useState(company.country);
-  const [trackForStrategy, setTrackForStrategy] = useState(company.track_for_strategy);
   const [isActive, setIsActive] = useState(company.is_active);
 
   // ATS settings
@@ -151,7 +149,6 @@ export function EditCompanyForm({ company }: { company: Company }) {
           country,
           atsType,
           atsIdentifier,
-          trackForStrategy,
           careersUrl: (detection?.normalizedUrl ?? careersUrl) || null,
           isActive,
         }),
@@ -175,7 +172,6 @@ export function EditCompanyForm({ company }: { company: Company }) {
     atsType !== company.ats_type ||
     atsIdentifier !== company.ats_identifier ||
     careersUrl !== (company.careers_url ?? "") ||
-    trackForStrategy !== company.track_for_strategy ||
     isActive !== company.is_active;
 
   return (
@@ -320,18 +316,6 @@ export function EditCompanyForm({ company }: { company: Company }) {
                 <option value="UK">United Kingdom</option>
                 <option value="US">United States</option>
               </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Strategic Analysis</label>
-              <div className="mt-2">
-                <input
-                  type="checkbox"
-                  checked={trackForStrategy}
-                  onChange={(e) => setTrackForStrategy(e.target.checked)}
-                  id="trackForStrategy"
-                />
-                <label htmlFor="trackForStrategy" className="ml-2 text-sm">Track for strategic insights</label>
-              </div>
             </div>
             <div>
               <label className="text-sm font-medium">Status</label>

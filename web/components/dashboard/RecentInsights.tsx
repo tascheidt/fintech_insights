@@ -16,7 +16,7 @@ export function RecentInsights({ insights }: { insights: Insight[] }) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <h2 className="text-lg font-semibold">Recent Insights</h2>
-        <Link href="/insights" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/digests" className="text-sm text-muted-foreground hover:text-foreground">
           View All →
         </Link>
       </CardHeader>
@@ -27,7 +27,7 @@ export function RecentInsights({ insights }: { insights: Insight[] }) {
           <ul className="space-y-3">
             {insights.map((i) => (
               <li key={i.id}>
-                <Link href={`/insights/${i.id}`} className="block hover:underline">
+                <Link href="/digests" className="block hover:underline">
                   <span className="font-medium">
                     {i.job_posting?.company?.name ?? "Unknown"} | {i.job_posting?.title}
                   </span>

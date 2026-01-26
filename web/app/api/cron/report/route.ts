@@ -48,6 +48,10 @@ async function saveDigestToDatabase(
         generated_at: digest.generated_at,
         total_jobs: digest.total_jobs,
         total_companies: digest.total_companies,
+        global_summary: digest.global_summary,
+        industry_trends: digest.industry_trends,
+        strategy_signals: digest.strategy_signals,
+        notable_movements: digest.notable_movements,
         email_sent: emailSent,
         email_recipient: recipientCount ? `${recipientCount} users` : null,
         email_sent_at: emailSent ? new Date().toISOString() : null,
@@ -74,6 +78,10 @@ async function saveDigestToDatabase(
               generated_at: digest.generated_at,
               total_jobs: digest.total_jobs,
               total_companies: digest.total_companies,
+              global_summary: digest.global_summary,
+              industry_trends: digest.industry_trends,
+              strategy_signals: digest.strategy_signals,
+              notable_movements: digest.notable_movements,
               email_sent: emailSent,
               email_recipient: recipientCount ? `${recipientCount} users` : null,
               email_sent_at: emailSent ? new Date().toISOString() : null,
@@ -318,7 +326,7 @@ export async function GET(req: NextRequest) {
               from,
               to: user.email,
               subject,
-              react: WeeklyDigestEmail({ digest, appUrl }),
+              react: WeeklyDigestEmail({ digest, digestId: savedDigestId, appUrl }),
             }));
 
             // Send batch using Resend Batch API

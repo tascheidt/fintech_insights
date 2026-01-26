@@ -20,7 +20,6 @@ const updateSchema = z.object({
     "custom",
   ]).optional(),
   atsIdentifier: z.string().min(1).optional(),
-  trackForStrategy: z.boolean().optional(),
   careersUrl: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
 });
@@ -117,9 +116,6 @@ export async function PATCH(
   }
   if (parsed.data.atsIdentifier !== undefined) {
     updates.ats_identifier = parsed.data.atsIdentifier;
-  }
-  if (parsed.data.trackForStrategy !== undefined) {
-    updates.track_for_strategy = parsed.data.trackForStrategy;
   }
   if (parsed.data.careersUrl !== undefined) {
     updates.careers_url = parsed.data.careersUrl || null;
