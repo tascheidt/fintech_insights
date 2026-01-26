@@ -61,6 +61,17 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       .single(),
   ]);
 
+  // Transform digestSummary to match DigestSummary interface
+  // Supabase returns joined relations as arrays, so we need to extract the first element
+  const transformedDigestSummary = digestSummary
+    ? {
+        ...digestSummary,
+        weekly_digests: Array.isArray(digestSummary.weekly_digests)
+          ? digestSummary.weekly_digests[0]
+          : digestSummary.weekly_digests,
+      }
+    : null;
+
   // Transform jobs data for JobHistoryView
   const jobs: JobData[] = (jobsRaw ?? []).map((j: any) => ({
     id: j.id,
@@ -156,7 +167,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
           {/* Weekly Digest Summary with expandable 90-day insights */}
           <CompanyDigestSummary
-            digestSummary={digestSummary}
+            digestSummary={transformedDigestSummary}
             insight={latestInsight}
             companyId={company.id}
             companyName={company.name}

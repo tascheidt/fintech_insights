@@ -28,6 +28,7 @@ async function main() {
     
     const browser = await puppeteer.launch({
       args: chromium.args,
+      // @ts-expect-error - defaultViewport exists at runtime but types may be outdated
       defaultViewport: chromium.defaultViewport,
       executablePath,
       headless: true,

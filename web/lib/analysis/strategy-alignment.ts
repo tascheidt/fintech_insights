@@ -40,7 +40,7 @@ export async function analyzeStrategyAlignment(
   // Analyze hiring patterns
   const departments = companyData.jobs
     .map(j => j.standardized_department)
-    .filter(Boolean);
+    .filter((dept): dept is string => dept !== null && dept !== undefined);
   const topDepartment = departments.reduce((acc, dept) => {
     acc[dept] = (acc[dept] || 0) + 1;
     return acc;

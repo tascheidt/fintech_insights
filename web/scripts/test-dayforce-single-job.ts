@@ -27,6 +27,7 @@ async function main() {
     
     const browser = await puppeteer.launch({
       args: chromium.args,
+      // @ts-expect-error - defaultViewport exists at runtime but types may be outdated
       defaultViewport: chromium.defaultViewport,
       executablePath,
       headless: true,
@@ -252,25 +253,32 @@ async function main() {
       console.log("═".repeat(70));
       console.log(JSON.stringify(jobDetails, null, 2));
       
-      if (jobDetails.error) {
+      if ('error' in jobDetails && jobDetails.error) {
         console.log(`\n❌ Error: ${jobDetails.error}`);
-      } else if (jobDetails.hasSpinner) {
+      } else if ('hasSpinner' in jobDetails && jobDetails.hasSpinner) {
         console.log(`\n⚠️  WARNING: Extracted HTML contains loading spinner!`);
-      } else if (jobDetails.htmlLength > 200 && jobDetails.textLength > 200) {
-        console.log(`\n✅ SUCCESS: Extracted valid description!`);
-        console.log(`   Source: ${jobDetails.source}`);
-        console.log(`   HTML Length: ${jobDetails.htmlLength}`);
-        console.log(`   Text Length: ${jobDetails.textLength}`);
-        if (jobDetails.title) {
-          console.log(`   Title: ${jobDetails.title}`);
-        }
-        if (jobDetails.location) {
-          console.log(`   Location: ${jobDetails.location}`);
+      } else if ('htmlLength' in jobDetails && 'textLength' in jobDetails && 
+                 typeof jobDetails.htmlLength === 'number' && typeof jobDetails.textLength === 'number') {
+        const htmlLength = jobDetails.htmlLength;
+        const textLength = jobDetails.textLength;
+        if (htmlLength > 200 && textLength > 200) {
+          console.log(`\n✅ SUCCESS: Extracted valid description!`);
+          console.log(`   Source: ${jobDetails.source}`);
+          console.log(`   HTML Length: ${htmlLength}`);
+          console.log(`   Text Length: ${textLength}`);
+          if ('title' in jobDetails && jobDetails.title) {
+            console.log(`   Title: ${jobDetails.title}`);
+          }
+          if ('location' in jobDetails && jobDetails.location) {
+            console.log(`   Location: ${jobDetails.location}`);
+          }
+        } else {
+          console.log(`\n⚠️  WARNING: Description too short or empty`);
+          console.log(`   HTML Length: ${htmlLength}`);
+          console.log(`   Text Length: ${textLength}`);
         }
       } else {
-        console.log(`\n⚠️  WARNING: Description too short or empty`);
-        console.log(`   HTML Length: ${jobDetails.htmlLength}`);
-        console.log(`   Text Length: ${jobDetails.textLength}`);
+        console.log(`\n⚠️  WARNING: Unable to extract description details`);
       }
 
       await page.close();

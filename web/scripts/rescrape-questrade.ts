@@ -92,14 +92,16 @@ async function main() {
     console.log(`  Job Run ID: ${jobRunId}`);
     console.log(`  Status: ${result.status}`);
     if (result.stats) {
-      console.log(`  Companies Processed: ${result.stats.companiesProcessed || 0}`);
-      console.log(`  Jobs Scraped: ${result.stats.jobsScraped || 0}`);
-      console.log(`  Jobs Ingested: ${result.stats.jobsIngested || 0}`);
-      console.log(`  New Jobs: ${result.stats.newJobs || 0}`);
-      console.log(`  Updated Jobs: ${result.stats.updatedJobs || 0}`);
+      console.log(`  Total Companies: ${result.stats.totalCompanies || 0}`);
+      console.log(`  Completed Companies: ${result.stats.completedCompanies || 0}`);
+      console.log(`  Failed Companies: ${result.stats.failedCompanies || 0}`);
+      console.log(`  New Jobs: ${result.stats.totalNewJobs || 0}`);
+      console.log(`  Updated Jobs: ${result.stats.totalUpdatedJobs || 0}`);
+      console.log(`  Closed Jobs: ${result.stats.totalClosedJobs || 0}`);
+      console.log(`  Insights Generated: ${result.stats.totalInsights || 0}`);
     }
-    if (result.error) {
-      console.log(`  Error: ${result.error}`);
+    if (result.status === "failed") {
+      console.log(`  ⚠️  Job failed - check logs for details`);
     }
 
     // Auto-trigger analysis job if there are new jobs

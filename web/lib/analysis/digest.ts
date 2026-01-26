@@ -147,7 +147,7 @@ export interface WeeklyDigest {
 /**
  * Intermediate structure for organizing data by company
  */
-interface CompanyJobData {
+export interface CompanyJobData {
   company_id: string;
   company_name: string;
   company_slug: string;

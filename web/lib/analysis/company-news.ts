@@ -48,6 +48,7 @@ export async function fetchCompanyNewsContext(
     // Use Gemini 3 Pro with grounding for web search
     const model = genAI.getGenerativeModel({
       model: "gemini-3-pro-preview",
+      // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }], // Enable grounding
       generationConfig: {
         temperature: 0.3, // Lower temperature for more factual extraction
