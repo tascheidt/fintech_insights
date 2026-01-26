@@ -663,24 +663,28 @@ function calculateFunctionChanges(
 
 /**
  * Get the next company that needs insight generation
+ * 
+ * Uses a 90-day threshold: only regenerates insights for companies
+ * whose most recent insight is older than 90 days.
  */
 export async function getNextCompanyForInsight(): Promise<{
   id: string;
   name: string;
 } | null> {
   const supabase = createAdminClient();
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  
+  // Insights are refreshed every 90 days
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
   // Clean up expired locks first
   await supabase.rpc("cleanup_expired_insight_locks");
 
-  // Get companies with track_for_strategy = true that don't have a recent insight
+  // Get active companies that don't have a recent insight
   // Exclude companies that are currently being processed (have active locks)
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
-    .eq("track_for_strategy", true)
     .eq("is_active", true);
 
   if (!companies || companies.length === 0) {
@@ -695,7 +699,7 @@ export async function getNextCompanyForInsight(): Promise<{
 
   const lockedCompanyIds = new Set((activeLocks ?? []).map((lock) => lock.company_id));
 
-  // Check each company for recent insights and active locks
+  // Check each company for recent insights (within 90 days) and active locks
   for (const company of companies) {
     // Skip if company is currently being processed
     if (lockedCompanyIds.has(company.id)) {
@@ -706,7 +710,7 @@ export async function getNextCompanyForInsight(): Promise<{
       .from("company_insights")
       .select("id")
       .eq("company_id", company.id)
-      .gte("generated_at", sevenDaysAgo.toISOString())
+      .gte("generated_at", ninetyDaysAgo.toISOString())
       .limit(1)
       .single();
 
@@ -715,7 +719,7 @@ export async function getNextCompanyForInsight(): Promise<{
     }
   }
 
-  return null; // All companies have recent insights or are being processed
+  return null; // All companies have recent insights (within 90 days) or are being processed
 }
 
 /**

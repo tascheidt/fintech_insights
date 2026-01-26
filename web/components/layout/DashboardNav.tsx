@@ -5,7 +5,7 @@
  * - Dashboard (home) - Overview with companies and digests
  * - Jobs - All job postings across companies
  * - Companies - Company list and details
- * - Insights - Weekly strategic insights
+ * - Weekly Digests - Historical weekly intelligence reports
  * - Admin (admin only) - System administration
  * 
  * Mobile: Shows hamburger menu on small screens, hides desktop nav links.
@@ -39,7 +39,7 @@ export function DashboardNav({
     { href: "/", label: "Dashboard" },
     { href: "/jobs", label: "Jobs" },
     { href: "/companies", label: "Companies" },
-    { href: "/insights", label: "Insights" },
+    { href: "/digests", label: "Weekly Digests" },
     ...(role === "admin" ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 

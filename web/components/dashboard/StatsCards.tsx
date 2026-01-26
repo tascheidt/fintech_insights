@@ -53,7 +53,7 @@ export function StatsCards({
     { 
       label: "Insights", 
       value: insightsCount,
-      href: "/insights"
+      href: "/digests"
     },
     { 
       label: "New This Week", 

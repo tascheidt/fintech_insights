@@ -8,7 +8,6 @@ export interface CompanyRow {
   slug: string;
   country: string;
   ats_type: string;
-  track_for_strategy: boolean;
   job_postings?: JobPostingRow[];
 }
 
@@ -28,6 +27,15 @@ export interface CompanyInsightRow {
   significance_score: number | null;
   confidence: "high" | "medium" | "low";
   executive_summary: string;
+  companies?: { id: string; name: string; slug: string }[] | { id: string; name: string; slug: string };
+}
+
+export interface DigestCompanyRow {
+  id: string;
+  company_id: string;
+  headline: string;
+  body: string;
+  new_job_count: number;
   companies?: { id: string; name: string; slug: string }[] | { id: string; name: string; slug: string };
 }
 
@@ -58,7 +66,6 @@ export function transformCompanyData(companiesRaw: CompanyRow[] | null): Company
       activeJobCount,
       recentHighlight,
       atsType: company.ats_type,
-      trackForStrategy: company.track_for_strategy,
     };
   });
 
@@ -115,4 +122,43 @@ export function transformStrategicHighlights(insightsRaw: CompanyInsightRow[] | 
         executiveSummary: item.executive_summary,
       };
     });
+}
+
+/**
+ * Transforms weekly digest company summaries into strategic highlights format
+ * Matches the format used in the weekly digest "Company Highlights" section
+ */
+export function transformDigestHighlights(
+  digestData: { digest: { generated_at: string; week_start: string; week_end: string }; companies: DigestCompanyRow[] } | null
+): StrategicHighlight[] {
+  if (!digestData || !digestData.companies || digestData.companies.length === 0) {
+    return [];
+  }
+
+  const { digest, companies } = digestData;
+
+  return companies.map((item) => {
+    const company = Array.isArray(item.companies) 
+      ? item.companies[0] 
+      : item.companies;
+
+    // Extract first sentence from body for keySignal fallback
+    const firstSentence = item.body.split(".")[0].trim();
+    const keySignal = firstSentence.length > 0 && firstSentence.length < 150 
+      ? firstSentence + (item.body.includes(".") ? "." : "")
+      : item.body.slice(0, 150) + (item.body.length > 150 ? "..." : "");
+
+    return {
+      id: item.id,
+      companyId: item.company_id,
+      companyName: company?.name ?? "Unknown",
+      companySlug: company?.slug ?? "",
+      generatedAt: digest.generated_at,
+      headline: item.headline,
+      keySignal: keySignal,
+      significanceScore: null, // Digest summaries don't have significance scores
+      confidence: "medium" as const, // Default confidence for digest summaries
+      executiveSummary: item.body,
+    };
+  });
 }

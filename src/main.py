@@ -117,7 +117,6 @@ def collect(ctx, company, analyze, categorize):
             "name": company_config["name"],
             "slug": company_config["slug"],
             "country": company_config["country"],
-            "track_for_strategy": company_config.get("track_for_strategy", False),
             "ats_type": company_config["ats_type"],
             "ats_identifier": company_config.get("ats_identifier"),
             "careers_url": company_config.get("careers_url")
@@ -173,12 +172,12 @@ def collect(ctx, company, analyze, categorize):
             analyzer = StrategicAnalyzer()
 
             for item in new_postings:
-                # Only analyze strategic companies
+                # Analyze all active companies
                 company_config = next(
                     (c for c in config["companies"] if c["name"] == item["company_name"]),
                     None
                 )
-                if not company_config or not company_config.get("track_for_strategy"):
+                if not company_config:
                     continue
 
                 posting = item["posting"]
@@ -354,7 +353,6 @@ def init(ctx):
             "name": company_config["name"],
             "slug": company_config["slug"],
             "country": company_config["country"],
-            "track_for_strategy": company_config.get("track_for_strategy", False),
             "ats_type": company_config["ats_type"],
             "ats_identifier": company_config.get("ats_identifier"),
             "careers_url": company_config.get("careers_url")

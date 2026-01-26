@@ -5,7 +5,7 @@
  * - Interactive stats cards with drill-down
  * - Trend visualizations (Posting velocity & Function mix)
  * - Companies overview with card/table toggle
- * - Strategic highlights from company-level insights
+ * - Strategic highlights from most recent weekly digest
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -16,7 +16,7 @@ import { StatsCards } from "@/components/dashboard/StatsCards";
 import { PostingTrendChart } from "@/components/dashboard/charts/PostingTrendChart";
 import { FunctionBreakdownContainer } from "@/components/dashboard/charts/FunctionBreakdownContainer";
 import { getPostingTrends, getRawFunctionData } from "@/lib/dashboard-queries";
-import { transformCompanyData, transformStrategicHighlights, CompanyRow, CompanyInsightRow } from "@/lib/dashboard-transformers";
+import { transformCompanyData, transformDigestHighlights, CompanyRow, DigestCompanyRow } from "@/lib/dashboard-transformers";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -53,7 +53,7 @@ export default async function DashboardPage() {
       .select("*, companies!inner(is_active)", { count: "exact", head: true })
       .gte("first_seen_date", startOfToday.toISOString())
       .eq("companies.is_active", true),
-    // Company insights count (last 7 days)
+    // Company insights count (last 7 days) - kept for stats
     supabase
       .from("company_insights")
       .select("*", { count: "exact", head: true })
@@ -80,30 +80,47 @@ export default async function DashboardPage() {
         slug,
         country,
         ats_type,
-        track_for_strategy,
         job_postings!left(id, is_active, title, first_seen_date)
       `)
       .eq("is_active", true)
       .order("name"),
-    // Strategic company insights (last 14 days)
-    supabase
-      .from("company_insights")
-      .select(`
-        id,
-        company_id,
-        generated_at,
-        headline,
-        key_signal,
-        significance_score,
-        confidence,
-        executive_summary,
-        companies!inner(id, name, slug, is_active)
-      `)
-      .eq("companies.is_active", true)
-      .gte("generated_at", fourteenDaysAgo)
-      .order("significance_score", { ascending: false, nullsFirst: false })
-      .order("generated_at", { ascending: false })
-      .limit(50),
+    // Most recent weekly digest and company summaries
+    (async () => {
+      // Get most recent digest by week_start
+      const { data: latestDigest } = await supabase
+        .from("weekly_digests")
+        .select("id, generated_at, week_start, week_end")
+        .order("week_start", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!latestDigest) {
+        return { data: null };
+      }
+
+      // Get company summaries for this digest, filtered by active companies
+      const { data: digestCompanies } = await supabase
+        .from("weekly_digest_companies")
+        .select(`
+          id,
+          company_id,
+          headline,
+          body,
+          new_job_count,
+          companies!inner(id, name, slug, is_active)
+        `)
+        .eq("digest_id", latestDigest.id)
+        .eq("companies.is_active", true)
+        .order("new_job_count", { ascending: false });
+
+      // Return with digest metadata
+      return {
+        data: {
+          digest: latestDigest,
+          companies: digestCompanies || [],
+        },
+      };
+    })(),
     // New Trend Data
     getPostingTrends(90), // Last 3 months
     getRawFunctionData(90), // Last 3 months raw data for client-side filtering
@@ -111,7 +128,8 @@ export default async function DashboardPage() {
 
   // Transform data
   const companies = transformCompanyData(companiesRaw as CompanyRow[]);
-  const strategicHighlights = transformStrategicHighlights(companyInsightsRaw as CompanyInsightRow[]);
+  const digestResponse = companyInsightsRaw as { digest: { generated_at: string; week_start: string; week_end: string }; companies: DigestCompanyRow[] } | null;
+  const strategicHighlights = transformDigestHighlights(digestResponse);
   const trackedCompanyCount = companies.length;
 
   // Prepare simple company list for filter

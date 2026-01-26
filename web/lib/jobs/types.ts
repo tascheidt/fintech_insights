@@ -66,7 +66,6 @@ export interface Company {
   ats_type: string;
   ats_identifier: string | null;
   careers_url: string | null;
-  track_for_strategy: boolean;
   is_active: boolean;
 }
 

@@ -20,7 +20,6 @@ const bodySchema = z.object({
     "custom",
   ]),
   atsIdentifier: z.string().min(1),
-  trackForStrategy: z.boolean().optional().default(false),
   careersUrl: z.string().optional(),
 });
 
@@ -77,7 +76,6 @@ export async function POST(req: Request) {
         .update({
           name: parsed.data.name,
           country: parsed.data.country,
-          track_for_strategy: parsed.data.trackForStrategy,
           ats_type: parsed.data.atsType,
           ats_identifier: parsed.data.atsIdentifier,
           careers_url: parsed.data.careersUrl || null,
@@ -99,7 +97,6 @@ export async function POST(req: Request) {
         name: parsed.data.name,
         slug,
         country: parsed.data.country,
-        track_for_strategy: parsed.data.trackForStrategy,
         ats_type: parsed.data.atsType,
         ats_identifier: parsed.data.atsIdentifier,
         careers_url: parsed.data.careersUrl || null,

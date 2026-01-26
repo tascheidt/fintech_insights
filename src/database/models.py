@@ -30,7 +30,6 @@ class Company(Base):
     name = Column(String(255), nullable=False)
     slug = Column(String(100), unique=True, nullable=False)
     country = Column(String(10), nullable=False)  # CA, UK, US, etc.
-    track_for_strategy = Column(Boolean, default=False)
     ats_type = Column(String(50), nullable=False)  # lever, greenhouse, workable, custom
     ats_identifier = Column(String(255))
     careers_url = Column(String(500))

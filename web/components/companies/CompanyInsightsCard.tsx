@@ -1,9 +1,16 @@
 "use client";
 
+/**
+ * CompanyInsightsCard - Display-only card for 90-day company insights
+ * 
+ * Shows the full insight content without expand/collapse.
+ * Used in the insights history page to display past analyses.
+ */
+
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import { ExternalLink } from "lucide-react";
 
 interface CompanyInsight {
   id: string;
@@ -40,7 +47,7 @@ export function CompanyInsightsCard({
         <div className="flex items-start justify-between">
           <div>
             <h2 className="font-semibold">
-              {isLatest ? "Latest Insight" : "Strategic Insight"}
+              {isLatest ? "Latest Strategic Insight" : "Strategic Insight"}
             </h2>
             <p className="text-sm text-muted-foreground">
               {format(new Date(insight.analysis_period_start), "MMM d")} -{" "}
@@ -73,7 +80,7 @@ export function CompanyInsightsCard({
           <h3 className="text-sm font-medium text-muted-foreground mb-1">
             Executive Summary
           </h3>
-          <p className="text-sm line-clamp-4">{insight.executive_summary}</p>
+          <p className="text-sm">{insight.executive_summary}</p>
         </div>
 
         {/* Strategic Hypothesis */}
@@ -81,7 +88,7 @@ export function CompanyInsightsCard({
           <h3 className="text-sm font-medium text-muted-foreground mb-1">
             Strategic Hypothesis
           </h3>
-          <p className="text-sm line-clamp-3">{insight.strategic_hypothesis}</p>
+          <p className="text-sm">{insight.strategic_hypothesis}</p>
         </div>
 
         {/* Top Functions */}
@@ -125,11 +132,13 @@ export function CompanyInsightsCard({
           <span className="text-xs text-muted-foreground">
             Generated {format(new Date(insight.generated_at), "MMM d, yyyy HH:mm")}
           </span>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/companies/${companySlug}/insights/${insight.id}`}>
-              View Details →
-            </Link>
-          </Button>
+          <Link 
+            href={`/companies/${companySlug}/insights/${insight.id}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+          >
+            View full details
+            <ExternalLink className="h-3 w-3" />
+          </Link>
         </div>
       </CardContent>
     </Card>
