@@ -3,9 +3,13 @@
  * 
  * Uses Gemini 3 Pro with Google Search grounding to fetch recent company news,
  * stated strategy, and other external context for digest generation.
+ * 
+ * Results are cached in the database for 7 days to avoid expensive real-time
+ * lookups during weekly digest generation.
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface NewsItem {
   headline: string;
@@ -23,23 +27,191 @@ export interface CompanyNewsContext {
 }
 
 /**
- * Fetch company news context using web search
- * Results are cached for 7 days to avoid redundant searches
+ * Database row type for company_news_cache table
+ */
+interface CompanyNewsCacheRow {
+  id: string;
+  company_id: string;
+  company_name: string;
+  recent_news: NewsItem[];
+  stated_strategy: string | null;
+  funding_news: string | null;
+  product_launches: string[];
+  leadership_changes: NewsItem[];
+  fetched_at: string;
+  expires_at: string;
+}
+
+/**
+ * Returns an empty news context for a company (used as fallback)
+ */
+export function emptyNewsContext(companyName: string): CompanyNewsContext {
+  return {
+    companyName,
+    recentNews: [],
+    statedStrategy: null,
+    fundingNews: null,
+    productLaunches: [],
+    leadershipChanges: [],
+  };
+}
+
+// ============================================================================
+// Cache Functions
+// ============================================================================
+
+/**
+ * Get cached news for a single company
+ */
+export async function getCachedNews(companyId: string): Promise<CompanyNewsContext | null> {
+  const supabase = createAdminClient();
+  
+  const { data, error } = await supabase
+    .from("company_news_cache")
+    .select("*")
+    .eq("company_id", companyId)
+    .gt("expires_at", new Date().toISOString())
+    .single();
+  
+  if (error || !data) {
+    return null;
+  }
+  
+  const row = data as CompanyNewsCacheRow;
+  return {
+    companyName: row.company_name,
+    recentNews: row.recent_news || [],
+    statedStrategy: row.stated_strategy,
+    fundingNews: row.funding_news,
+    productLaunches: row.product_launches || [],
+    leadershipChanges: row.leadership_changes || [],
+  };
+}
+
+/**
+ * Get cached news for multiple companies in one query
+ */
+export async function batchGetCachedNews(
+  companyIds: string[]
+): Promise<Map<string, CompanyNewsContext>> {
+  if (companyIds.length === 0) {
+    return new Map();
+  }
+  
+  const supabase = createAdminClient();
+  
+  const { data, error } = await supabase
+    .from("company_news_cache")
+    .select("*")
+    .in("company_id", companyIds)
+    .gt("expires_at", new Date().toISOString());
+  
+  const result = new Map<string, CompanyNewsContext>();
+  
+  if (error || !data) {
+    return result;
+  }
+  
+  for (const row of data as CompanyNewsCacheRow[]) {
+    result.set(row.company_id, {
+      companyName: row.company_name,
+      recentNews: row.recent_news || [],
+      statedStrategy: row.stated_strategy,
+      fundingNews: row.funding_news,
+      productLaunches: row.product_launches || [],
+      leadershipChanges: row.leadership_changes || [],
+    });
+  }
+  
+  return result;
+}
+
+/**
+ * Save news context to cache (upsert)
+ */
+export async function saveToNewsCache(
+  companyId: string,
+  companyName: string,
+  context: CompanyNewsContext
+): Promise<void> {
+  const supabase = createAdminClient();
+  
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7); // 7 day TTL
+  
+  const { error } = await supabase
+    .from("company_news_cache")
+    .upsert({
+      company_id: companyId,
+      company_name: companyName,
+      recent_news: context.recentNews,
+      stated_strategy: context.statedStrategy,
+      funding_news: context.fundingNews,
+      product_launches: context.productLaunches,
+      leadership_changes: context.leadershipChanges,
+      fetched_at: new Date().toISOString(),
+      expires_at: expiresAt.toISOString(),
+    }, {
+      onConflict: "company_id",
+    });
+  
+  if (error) {
+    console.error(`Failed to cache news for ${companyName}:`, error);
+  }
+}
+
+// ============================================================================
+// Main Fetch Function
+// ============================================================================
+
+export interface FetchNewsOptions {
+  forceRefresh?: boolean;
+}
+
+/**
+ * Fetch company news context with caching support.
+ * 
+ * If companyId is provided, checks cache first and returns cached data if valid.
+ * Otherwise fetches fresh data from Gemini Pro + Google Search.
+ * 
+ * @param companyName - The company name to search for
+ * @param companyId - Optional company UUID for cache lookup/storage
+ * @param options - Options like forceRefresh to bypass cache
  */
 export async function fetchCompanyNewsContext(
-  companyName: string
+  companyName: string,
+  companyId?: string,
+  options?: FetchNewsOptions
 ): Promise<CompanyNewsContext> {
+  // 1. Check cache if companyId provided and not forcing refresh
+  if (companyId && !options?.forceRefresh) {
+    const cached = await getCachedNews(companyId);
+    if (cached) {
+      console.log(`Using cached news for ${companyName}`);
+      return cached;
+    }
+  }
+  
+  // 2. Fetch fresh from Gemini
+  const context = await fetchFreshNewsContext(companyName);
+  
+  // 3. Save to cache if companyId provided
+  if (companyId) {
+    await saveToNewsCache(companyId, companyName, context);
+  }
+  
+  return context;
+}
+
+/**
+ * Fetch fresh news context from Gemini Pro with Google Search grounding.
+ * This is the expensive operation (~45-90s) that we want to cache.
+ */
+async function fetchFreshNewsContext(companyName: string): Promise<CompanyNewsContext> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     console.warn("GEMINI_API_KEY not configured, skipping company news search");
-    return {
-      companyName,
-      recentNews: [],
-      statedStrategy: null,
-      fundingNews: null,
-      productLaunches: [],
-      leadershipChanges: [],
-    };
+    return emptyNewsContext(companyName);
   }
 
   try {
@@ -127,14 +299,7 @@ If information is not available, use null or empty arrays.
       };
     } catch (parseError) {
       console.warn(`Failed to parse company news JSON for ${companyName}:`, parseError);
-      return {
-        companyName,
-        recentNews: [],
-        statedStrategy: null,
-        fundingNews: null,
-        productLaunches: [],
-        leadershipChanges: [],
-      };
+      return emptyNewsContext(companyName);
     }
   } catch (error: unknown) {
     // Handle quota errors and other failures gracefully
@@ -146,13 +311,6 @@ If information is not available, use null or empty arrays.
     }
     
     // Return empty context on failure
-    return {
-      companyName,
-      recentNews: [],
-      statedStrategy: null,
-      fundingNews: null,
-      productLaunches: [],
-      leadershipChanges: [],
-    };
+    return emptyNewsContext(companyName);
   }
 }

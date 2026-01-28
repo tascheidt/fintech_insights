@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded } from "@/lib/jobs";
+import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies } from "@/lib/jobs";
 import { requireCronAuth } from "@/lib/cron/auth";
 
 export const maxDuration = 300;
@@ -40,6 +40,13 @@ export async function GET(req: NextRequest) {
 
   // Phase 2: Analysis (auto-triggered if there are new jobs to analyze)
   await triggerAnalysisJobIfNeeded(jobRunId);
+
+  // Phase 3: News cache refresh (async, non-blocking)
+  // Pre-warms the cache for weekly digest generation
+  refreshNewsCacheForActiveCompanies(jobRunId, {
+    parallelism: 2,
+    skipIfCached: true,
+  }).catch((err) => console.error("News cache refresh error:", err));
 
   return NextResponse.json({
     success: true,

@@ -7,7 +7,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchCompanyNewsContext } from "./company-news";
+import { batchGetCachedNews, emptyNewsContext } from "./company-news";
 import { analyzeStrategyAlignment } from "./strategy-alignment";
 
 // ============================================================================
@@ -412,7 +412,7 @@ export async function detectIndustryTrends(
 // AI Analyst Function - TLDR Style
 // ============================================================================
 
-const TLDR_PROMPT = `You are the witty, insightful Editor of "Fintech Insights TLDR". Your style is punchy, conversational, and smart (modeled after Wealthsimple's TLDR newsletter). Avoid corporate jargon. Use emojis effectively.
+const TLDR_PROMPT = `You are the witty, insightful Editor of "Fintech Insights TLDR". Your style is punchy, conversational, and smart. Avoid corporate jargon. Use emojis effectively.
 
 ## Company: {company_name}
 
@@ -464,35 +464,6 @@ Write a TLDR-style update that reveals the STRATEGIC MOVE behind these hires.
 Respond with ONLY valid JSON, no markdown.`;
 
 /**
- * Default TLDR commentary when AI is unavailable
- * Uses job count to create a semi-interesting fallback
- */
-function getDefaultTLDR(companyName: string, jobCount: number): TLDRCommentary {
-  // Create tiered fallback headlines based on volume
-  if (jobCount >= 50) {
-    return {
-      headline: `🚀 ${companyName} goes big`,
-      body: `${companyName} dropped ${jobCount} new roles this week. That's not a hiring push—that's a hiring blitz. Something big is brewing.`,
-    };
-  } else if (jobCount >= 20) {
-    return {
-      headline: `📈 ${companyName} scales up`,
-      body: `${companyName} posted ${jobCount} new roles this week. That's serious expansion mode. Check the breakdown to see where they're investing.`,
-    };
-  } else if (jobCount >= 10) {
-    return {
-      headline: `🏗️ ${companyName} builds momentum`,
-      body: `${companyName} added ${jobCount} new positions this week. Steady growth across the team.`,
-    };
-  } else {
-    return {
-      headline: `📊 ${companyName} adds talent`,
-      body: `${companyName} posted ${jobCount} new role${jobCount === 1 ? "" : "s"} this week. Targeted hiring for key positions.`,
-    };
-  }
-}
-
-/**
  * Clean JSON text by removing markdown code blocks
  */
 function cleanJsonText(text: string): string {
@@ -506,11 +477,13 @@ function cleanJsonText(text: string): string {
 
 /**
  * Parse AI response into TLDRCommentary
+ * Throws if parsing fails - we want to surface failures, not mask them.
  */
-function parseTLDRResponse(text: string, companyName: string, jobCount: number): TLDRCommentary {
+function parseTLDRResponse(text: string, companyName: string): TLDRCommentary {
+  // Try to clean and parse JSON
+  const cleaned = cleanJsonText(text);
+  
   try {
-    // Clean and parse JSON
-    const cleaned = cleanJsonText(text);
     const parsed = JSON.parse(cleaned);
     
     if (parsed.headline && parsed.body) {
@@ -520,7 +493,7 @@ function parseTLDRResponse(text: string, companyName: string, jobCount: number):
       };
     }
   } catch {
-    // If JSON parsing fails, try to extract from text
+    // If JSON parsing fails, try regex extraction as fallback
     const headlineMatch = text.match(/"headline":\s*"([^"]+)"/);
     const bodyMatch = text.match(/"body":\s*"([^"]+)"/);
     
@@ -532,12 +505,13 @@ function parseTLDRResponse(text: string, companyName: string, jobCount: number):
     }
   }
   
-  // Fallback to default
-  return getDefaultTLDR(companyName, jobCount);
+  // Parsing failed - throw so we can address the root cause
+  throw new Error(`Failed to parse TLDR response for ${companyName}. Raw response: ${text.substring(0, 200)}`);
 }
 
 /**
- * Generate TLDR-style AI commentary for a single company's weekly hiring data
+ * Generate TLDR-style AI commentary for a single company's weekly hiring data.
+ * Throws on failure - we want to surface and fix issues, not mask them with fallbacks.
  */
 async function generateCompanyCommentary(
   companyName: string,
@@ -551,8 +525,7 @@ async function generateCompanyCommentary(
 ): Promise<TLDRCommentary> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
-    console.warn("GEMINI_API_KEY not configured, skipping AI commentary");
-    return getDefaultTLDR(companyName, jobCount);
+    throw new Error("GEMINI_API_KEY not configured - cannot generate AI commentary");
   }
 
   const prompt = TLDR_PROMPT
@@ -563,36 +536,27 @@ async function generateCompanyCommentary(
     .replace("{tech_stack}", summary.dominant_tech.join(", ") || "Not specified")
     .replace("{job_titles}", summary.job_titles.slice(0, 10).join(", "));
 
-  try {
-    const genAI = new GoogleGenerativeAI(key);
-    
-    // Use Gemini 3 Flash Preview as Pro is currently returning empty responses
-    const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
-      generationConfig: {
-        temperature: 0.7, // Slightly higher for more creative output
-        maxOutputTokens: 64000, // Increased to prevent cutoff
-        // responseMimeType: "application/json", // Removed as it causes issues with preview models
-      },
-    });
+  const genAI = new GoogleGenerativeAI(key);
+  
+  // Use Gemini 3 Flash Preview
+  const model = genAI.getGenerativeModel({
+    model: "gemini-3-flash-preview",
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 64000,
+    },
+  });
 
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    });
+  const result = await model.generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+  });
 
-    const text = result.response.text()?.trim() || "{}";
-    return parseTLDRResponse(text, companyName, jobCount);
-  } catch (error: unknown) {
-    // Handle quota errors gracefully
-    const err = error as { status?: number; message?: string };
-    if (err?.status === 429 || err?.message?.includes("quota") || err?.message?.includes("limit")) {
-      console.warn(`Gemini quota exceeded: ${err.message}`);
-      return getDefaultTLDR(companyName, jobCount);
-    }
-    
-    console.error(`AI commentary error for ${companyName}:`, error);
-    return getDefaultTLDR(companyName, jobCount);
+  const text = result.response.text()?.trim();
+  if (!text) {
+    throw new Error(`Empty response from Gemini for ${companyName}`);
   }
+  
+  return parseTLDRResponse(text, companyName);
 }
 
 // ============================================================================
@@ -866,61 +830,68 @@ export async function generateWeeklyReport(
   console.log("Detecting industry trends...");
   const industry_trends = await detectIndustryTrends(weeklyData);
 
-  // Generate strategy signals and notable movements for notable companies
-  // Only process companies with significant activity (5+ jobs) to manage API costs
-  // Use original weeklyData to get CompanyJobData before it was transformed
+  // Generate strategy signals and notable movements for notable companies.
+  // Companies with 5+ jobs are considered "notable" - no artificial cap since we
+  // use cached news context (pre-computed during daily collect).
   const notableCompanyIds = companies
     .filter(c => c.new_job_count >= 5)
-    .slice(0, 10) // Limit to top 10
     .map(c => c.company_id);
-  
+
   const strategy_signals: StrategySignal[] = [];
   const notable_movements: NotableMovement[] = [];
 
   if (notableCompanyIds.length > 0) {
     console.log(`Analyzing strategy alignment for ${notableCompanyIds.length} notable companies...`);
-    
-    // Process companies sequentially to avoid rate limits
-    for (const companyId of notableCompanyIds) {
-      try {
-        const companyData = weeklyData.get(companyId);
-        if (!companyData) continue;
 
-        // Fetch company news context
-        const newsContext = await fetchCompanyNewsContext(companyData.company_name);
-        
-        // Analyze strategy alignment
-        const alignment = await analyzeStrategyAlignment(companyData, newsContext);
-        
-        if (alignment.alignment !== "unknown") {
-          strategy_signals.push({
-            company: alignment.companyName,
-            alignment: alignment.alignment,
-            signal: alignment.hiringSignal,
-            detail: `${alignment.statedStrategy} vs ${alignment.hiringSignal}`,
-            interpretation: alignment.interpretation,
-          });
+    // Batch-read all cached news in one query (fast - no AI calls)
+    const cachedNewsMap = await batchGetCachedNews(notableCompanyIds);
+    console.log(`Found cached news for ${cachedNewsMap.size}/${notableCompanyIds.length} companies`);
+
+    // Process all companies in parallel - this is fast now since we're using cached data.
+    // Strategy alignment is local logic (no AI), and news is pre-fetched.
+    const results = await Promise.all(
+      notableCompanyIds.map(async (companyId) => {
+        try {
+          const companyData = weeklyData.get(companyId);
+          if (!companyData) return null;
+
+          // Use cached news or empty context (don't do live fetch during digest)
+          const newsContext = cachedNewsMap.get(companyId) || emptyNewsContext(companyData.company_name);
+          
+          // Strategy alignment is local logic, no AI calls
+          const alignment = await analyzeStrategyAlignment(companyData, newsContext);
+          
+          // Extract notable movements from news context
+          const movements = (newsContext.leadershipChanges || []).map((change) => ({
+            type: "executive" as const,
+            company: companyData.company_name,
+            description: change.headline,
+            sourceUrl: change.sourceUrl,
+            sourceTitle: change.sourceTitle,
+          }));
+          
+          return { companyData, alignment, movements };
+        } catch (error) {
+          const companyData = weeklyData.get(companyId);
+          console.error(`Error analyzing ${companyData?.company_name || companyId}:`, error);
+          return null;
         }
+      })
+    );
 
-        // Extract notable movements from news context (with source links)
-        if (newsContext.leadershipChanges.length > 0) {
-          for (const change of newsContext.leadershipChanges) {
-            notable_movements.push({
-              type: "executive",
-              company: companyData.company_name,
-              description: change.headline,
-              sourceUrl: change.sourceUrl,
-              sourceTitle: change.sourceTitle,
-            });
-          }
-        }
-
-        // Small delay to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        const companyData = weeklyData.get(companyId);
-        console.error(`Error analyzing ${companyData?.company_name || companyId}:`, error);
-        // Continue with other companies even if one fails
+    for (const r of results) {
+      if (!r) continue;
+      if (r.alignment.alignment !== "unknown") {
+        strategy_signals.push({
+          company: r.alignment.companyName,
+          alignment: r.alignment.alignment,
+          signal: r.alignment.hiringSignal,
+          detail: `${r.alignment.statedStrategy} vs ${r.alignment.hiringSignal}`,
+          interpretation: r.alignment.interpretation,
+        });
+      }
+      for (const m of r.movements) {
+        notable_movements.push(m);
       }
     }
   }

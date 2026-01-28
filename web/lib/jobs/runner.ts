@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { processCollectionTask } from "./processor";
 import { processAnalysisTask } from "./analyzer";
 import { updateJobRunStats } from "./progress";
+import { fetchCompanyNewsContext } from "@/lib/analysis/company-news";
 import type {
   JobRunTrigger,
   JobType,
@@ -329,6 +330,103 @@ export async function triggerAnalysisJobIfNeeded(
   executeAnalysisJob(analysisJobRunId).catch(console.error);
 
   return analysisJobRunId;
+}
+
+/**
+ * Refresh news cache for companies that had new jobs in the collection run.
+ * This pre-computes the expensive Gemini + web search calls so they're ready
+ * for weekly digest generation.
+ * 
+ * @param collectionJobRunId - The collection job run ID to get active companies from
+ * @param options - Configuration options
+ */
+export async function refreshNewsCacheForActiveCompanies(
+  collectionJobRunId: string,
+  options?: {
+    /** Process companies in parallel (default: 2) */
+    parallelism?: number;
+    /** Only refresh if cache is missing or expired (default: true) */
+    skipIfCached?: boolean;
+  }
+): Promise<{ refreshed: number; skipped: number; failed: number }> {
+  const supabase = createAdminClient();
+  const parallelism = options?.parallelism ?? 2;
+  const skipIfCached = options?.skipIfCached ?? true;
+
+  // Get tasks that had new jobs from the collection run
+  const { data: tasks } = await supabase
+    .from('job_run_tasks')
+    .select('company_id, new_jobs')
+    .eq('job_run_id', collectionJobRunId)
+    .gt('new_jobs', 0);
+
+  if (!tasks || tasks.length === 0) {
+    console.log('No companies with new jobs, skipping news cache refresh');
+    return { refreshed: 0, skipped: 0, failed: 0 };
+  }
+
+  const companyIds = tasks.map((t) => t.company_id);
+
+  // Get company names
+  const { data: companies } = await supabase
+    .from('companies')
+    .select('id, name')
+    .in('id', companyIds);
+
+  if (!companies || companies.length === 0) {
+    return { refreshed: 0, skipped: 0, failed: 0 };
+  }
+
+  // Check existing cache if skipIfCached is true
+  let companiesToRefresh = companies;
+  let skippedCount = 0;
+
+  if (skipIfCached) {
+    const { data: cached } = await supabase
+      .from('company_news_cache')
+      .select('company_id')
+      .in('company_id', companyIds)
+      .gt('expires_at', new Date().toISOString());
+
+    const cachedIds = new Set((cached || []).map((c) => c.company_id));
+    companiesToRefresh = companies.filter((c) => !cachedIds.has(c.id));
+    skippedCount = companies.length - companiesToRefresh.length;
+  }
+
+  if (companiesToRefresh.length === 0) {
+    console.log(`All ${companies.length} companies have valid cache, skipping refresh`);
+    return { refreshed: 0, skipped: skippedCount, failed: 0 };
+  }
+
+  console.log(`Refreshing news cache for ${companiesToRefresh.length} companies (${skippedCount} already cached)...`);
+
+  let refreshedCount = 0;
+  let failedCount = 0;
+
+  // Process in batches for controlled parallelism
+  for (let i = 0; i < companiesToRefresh.length; i += parallelism) {
+    const batch = companiesToRefresh.slice(i, i + parallelism);
+    
+    const results = await Promise.allSettled(
+      batch.map(async (company) => {
+        console.log(`Fetching news for ${company.name}...`);
+        await fetchCompanyNewsContext(company.name, company.id, { forceRefresh: true });
+        return company.name;
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        refreshedCount++;
+      } else {
+        console.error('News cache refresh failed:', result.reason);
+        failedCount++;
+      }
+    }
+  }
+
+  console.log(`News cache refresh complete: ${refreshedCount} refreshed, ${skippedCount} skipped, ${failedCount} failed`);
+  return { refreshed: refreshedCount, skipped: skippedCount, failed: failedCount };
 }
 
 /**

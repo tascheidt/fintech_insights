@@ -215,39 +215,8 @@ export async function GET(req: NextRequest) {
   const jobRunId = jobRun?.id;
 
   try {
-    // First, generate company insights (process one company per week)
-    let companyInsightResult = null;
-    try {
-      const company = await getNextCompanyForInsight();
-      if (company) {
-        console.log(`Generating insight for ${company.name}...`);
-        const insight = await generateCompanyInsight(company.id, company.name, {
-          periodDays: 90,
-          researchDepth: "deep",
-          forceRegenerate: false,
-        });
-        companyInsightResult = {
-          success: true,
-          companyId: company.id,
-          companyName: company.name,
-          insightId: insight.id,
-        };
-      } else {
-        companyInsightResult = {
-          success: true,
-          message: "All companies have recent insights",
-        };
-      }
-    } catch (error) {
-      console.error("Error generating company insight:", error);
-      companyInsightResult = {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-      // Continue with report generation even if insight generation fails
-    }
-
-    // Generate the weekly digest with AI commentary
+    // Generate the weekly digest with AI commentary first (critical path; company
+    // insight runs after so a timeout during insight does not block digest/emails)
     console.log("Fetching weekly job data...");
     const weeklyData = await getWeeklyData(7);
     console.log(`Found ${weeklyData.size} companies with new jobs`);
@@ -388,6 +357,26 @@ export async function GET(req: NextRequest) {
       } else if (optedInUsers.length === 0) {
         console.log("No users opted in to weekly digest emails");
       }
+    }
+
+    // Generate one company insight per week (after digest/emails so timeout does not block delivery)
+    let companyInsightResult: { success: boolean; companyId?: string; companyName?: string; insightId?: string; message?: string; error?: string } | null = null;
+    try {
+      const company = await getNextCompanyForInsight();
+      if (company) {
+        console.log(`Generating insight for ${company.name}...`);
+        const insight = await generateCompanyInsight(company.id, company.name, {
+          periodDays: 90,
+          researchDepth: "deep",
+          forceRegenerate: false,
+        });
+        companyInsightResult = { success: true, companyId: company.id, companyName: company.name, insightId: insight.id };
+      } else {
+        companyInsightResult = { success: true, message: "All companies have recent insights" };
+      }
+    } catch (error) {
+      console.error("Error generating company insight:", error);
+      companyInsightResult = { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 
     // Update job_runs with success (unified job tracking)
