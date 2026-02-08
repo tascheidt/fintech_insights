@@ -179,7 +179,7 @@ async function trackDeliveries(
 
   const { error } = await supabase
     .from("weekly_digest_deliveries")
-    .insert(deliveryRecords);
+    .upsert(deliveryRecords, { onConflict: "digest_id,user_id" });
 
   if (error) {
     console.error("Error tracking deliveries:", error);
