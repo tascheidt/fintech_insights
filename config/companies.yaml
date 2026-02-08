@@ -33,9 +33,9 @@ companies:
   - name: Tangerine
     slug: tangerine
     country: CA
-    ats_type: workday
-    ats_identifier: tangerine
-    careers_url: https://jobs.tangerine.ca/
+    ats_type: scotiabank
+    ats_identifier: Tangerine
+    careers_url: https://jobs.scotiabank.com/Tangerine/search/
 
   # International Fintechs
   - name: Monzo

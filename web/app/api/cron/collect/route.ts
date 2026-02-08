@@ -17,33 +17,57 @@ export async function GET(req: NextRequest) {
     path: req.nextUrl.pathname,
   });
 
-  const supabase = createAdminClient();
+  try {
+    const supabase = createAdminClient();
 
-  // Get all active companies
-  const { data: companies } = await supabase
-    .from("companies")
-    .select("id")
-    .eq("is_active", true);
+    // Get all active companies
+    const { data: companies, error: companiesError } = await supabase
+      .from("companies")
+      .select("id, name, ats_type")
+      .eq("is_active", true);
 
-  if (!companies || companies.length === 0) {
-    return NextResponse.json({ success: true, message: "No active companies to process" });
+    if (companiesError) {
+      console.error("Failed to fetch companies:", companiesError.message);
+      return NextResponse.json(
+        { success: false, error: companiesError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!companies || companies.length === 0) {
+      return NextResponse.json({ success: true, message: "No active companies to process" });
+    }
+
+    console.log(`Processing ${companies.length} companies:`, companies.map(c => `${c.name} (${c.ats_type})`));
+
+    // Phase 1: Collection
+    const jobRunId = await createJobRun({
+      jobType: 'collect',
+      triggerType: 'cron',
+      companyIds: companies.map(c => c.id),
+    });
+
+    console.log(`Created job run: ${jobRunId}`);
+
+    const result = await executeCollectionJob(jobRunId);
+
+    console.log("Collection completed:", result.stats);
+
+    // Phase 2: Analysis (auto-triggered if there are new jobs to analyze)
+    await triggerAnalysisJobIfNeeded(jobRunId);
+
+    return NextResponse.json({
+      success: true,
+      jobRunId,
+      ...result.stats,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Cron collect failed:", errorMessage);
+
+    return NextResponse.json(
+      { success: false, error: errorMessage },
+      { status: 500 }
+    );
   }
-
-  // Phase 1: Collection
-  const jobRunId = await createJobRun({
-    jobType: 'collect',
-    triggerType: 'cron',
-    companyIds: companies.map(c => c.id),
-  });
-
-  const result = await executeCollectionJob(jobRunId);
-
-  // Phase 2: Analysis (auto-triggered if there are new jobs to analyze)
-  await triggerAnalysisJobIfNeeded(jobRunId);
-
-  return NextResponse.json({
-    success: true,
-    jobRunId,
-    ...result.stats,
-  });
 }

@@ -5,6 +5,7 @@ import { fetchGreenhouseJobs } from "./greenhouse";
 import { fetchWorkableJobs } from "./workable";
 import { fetchAshbyJobs } from "./ashby";
 import { fetchDayforceJobs } from "./dayforce";
+import { fetchScotiabankJobs } from "./scotiabank";
 
 export type { JobData } from "./types";
 export { jobToRow } from "./types";
@@ -35,6 +36,8 @@ export async function fetchJobs(
       return fetchAshbyJobs(atsIdentifier);
     case "dayforce":
       return fetchDayforceJobs(atsIdentifier, browser);
+    case "scotiabank":
+      return fetchScotiabankJobs(atsIdentifier);
     
     case "successfactors": {
       if (!careersUrl) {
