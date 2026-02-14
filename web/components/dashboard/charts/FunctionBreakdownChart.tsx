@@ -1,115 +1,80 @@
 "use client";
 
-import { useMemo } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FunctionTrend } from "@/lib/dashboard-queries";
-import { FUNCTION_GROUP_COLORS } from "@/lib/constants";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import type { DonutDataPoint } from "@/lib/dashboard-queries";
 
-export function FunctionBreakdownChart({ data, headless = false }: { data: FunctionTrend[], headless?: boolean }) {
-  // Get all unique keys from data except 'date' and 'period' to know which bars to render
-  const allKeys = useMemo(() => {
-    return data.reduce((keys, item) => {
-      Object.keys(item).forEach(key => {
-        if (key !== 'date' && key !== 'period' && !keys.includes(key)) {
-          keys.push(key);
-        }
-      });
-      return keys;
-    }, [] as string[]).sort();
-  }, [data]);
+export function FunctionBreakdownChart({
+  data,
+}: {
+  data: DonutDataPoint[];
+}) {
+  const total = data.reduce((sum, d) => sum + d.value, 0);
 
-  const ChartContent = (
-    <div className="h-[300px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
-          <XAxis 
-            dataKey="period" 
-            stroke="#888888" 
-            fontSize={12} 
-            tickLine={false} 
-            axisLine={false} 
-          />
-          <YAxis
-            stroke="#888888"
-            fontSize={12}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(value) => `${value}`}
-          />
-          <Tooltip
-            cursor={{ fill: 'transparent' }}
-            content={({ active, payload, label }) => {
-              if (active && payload && payload.length) {
-                // Calculate total for this period
-                const total = payload.reduce((sum, entry) => sum + (Number(entry.value) || 0), 0);
-                
-                return (
-                  <div className="rounded-lg border bg-background p-2 shadow-sm">
-                    <div className="mb-2 font-bold text-sm flex justify-between gap-4">
-                      <span>{label}</span>
-                      <span className="text-muted-foreground">Total: {total}</span>
-                    </div>
-                    {payload.map((entry: any) => (
-                      <div key={entry.name} className="flex items-center justify-between gap-4 text-xs">
-                        <div className="flex items-center gap-1">
-                          <div 
-                            className="h-2 w-2 rounded-full" 
-                            style={{ backgroundColor: entry.color }}
-                          />
-                          <span className="text-muted-foreground">{entry.name}</span>
-                        </div>
-                        <span className="font-mono font-medium">{entry.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              }
-              return null;
-            }}
-          />
-          <Legend 
-            wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
-            iconType="circle"
-          />
-          {allKeys.map((key) => (
-            <Bar
-              key={key}
-              dataKey={key}
-              stackId="a"
-              fill={FUNCTION_GROUP_COLORS[key as keyof typeof FUNCTION_GROUP_COLORS] || FUNCTION_GROUP_COLORS["Other"]}
-              radius={[0, 0, 0, 0]}
-              maxBarSize={50}
-            />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-
-  if (headless) {
-    return ChartContent;
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">
+        No function data available.
+      </div>
+    );
   }
 
   return (
-    <Card className="col-span-1">
-      <CardHeader>
-        <CardTitle>Function Mix</CardTitle>
-        <CardDescription>Hiring distribution by function group</CardDescription>
-      </CardHeader>
-      <CardContent className="pl-2">
-        {ChartContent}
-      </CardContent>
-    </Card>
+    <div className="flex flex-col h-[300px]">
+      <div className="flex-1 min-h-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius="55%"
+              outerRadius="85%"
+              paddingAngle={2}
+              dataKey="value"
+              stroke="none"
+            >
+              {data.map((entry, index) => (
+                <Cell key={index} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const d = payload[0].payload as DonutDataPoint;
+                  const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
+                  return (
+                    <div className="rounded-lg border bg-background p-2 shadow-sm text-sm">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: d.color }}
+                        />
+                        <span className="font-medium">{d.name}</span>
+                      </div>
+                      <p className="text-muted-foreground mt-0.5">
+                        {d.value} jobs ({pct}%)
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-2 text-xs px-2">
+        {data.map((entry) => (
+          <div key={entry.name} className="flex items-center gap-1">
+            <div
+              className="h-2 w-2 rounded-full shrink-0"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-muted-foreground">{entry.name}</span>
+            <span className="font-mono tabular-nums">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

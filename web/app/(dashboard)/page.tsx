@@ -1,174 +1,157 @@
 /**
- * Dashboard Page - Main entry point after login.
+ * Dashboard Page - Intelligence-first competitive intelligence dashboard.
  *
- * Features:
- * - Interactive stats cards with drill-down
- * - Trend visualizations (Posting velocity & Function mix)
- * - Companies overview with card/table toggle
- * - Strategic highlights from most recent weekly digest
+ * Layout:
+ * - ROW 0: Time Range Selector (right-aligned)
+ * - ROW 1: Stat Cards with sparklines
+ * - ROW 2: Weekly Intel Banner (AI digest narrative)
+ * - ROW 3: Net Hiring Flow chart (full width)
+ * - ROW 4: Competitive Matrix (2/3) + Function Mix donut (1/3)
+ * - ROW 5: Hot Roles Feed (1/2) + Strategy Signals (1/2)
  */
 
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { startOfWeek, subDays, subWeeks } from "date-fns";
-import { CompaniesOverview } from "@/components/dashboard/CompaniesOverview";
-import { StrategicHighlights } from "@/components/dashboard/StrategicHighlights";
 import { StatsCards } from "@/components/dashboard/StatsCards";
-import { PostingTrendChart } from "@/components/dashboard/charts/PostingTrendChart";
+import { TimeRangeSelector } from "@/components/dashboard/TimeRangeSelector";
+import { WeeklyIntelBanner } from "@/components/dashboard/WeeklyIntelBanner";
+import { NetHiringFlowChart } from "@/components/dashboard/charts/PostingTrendChart";
 import { FunctionBreakdownContainer } from "@/components/dashboard/charts/FunctionBreakdownContainer";
-import { getPostingTrends, getRawFunctionData } from "@/lib/dashboard-queries";
-import { transformCompanyData, transformDigestHighlights, CompanyRow, DigestCompanyRow } from "@/lib/dashboard-transformers";
+import { CompetitiveMatrix } from "@/components/dashboard/CompaniesOverview";
+import { StrategySignals } from "@/components/dashboard/StrategicHighlights";
+import { HotRolesFeed } from "@/components/dashboard/HotRolesFeed";
+import {
+  getCompanyBackfillCutoffs,
+  getPostingTrends,
+  getRawFunctionData,
+  getNetHiringFlow,
+  getCompetitiveMatrixData,
+  getLatestDigest,
+  getHotRoles,
+  getNetThisWeek,
+} from "@/lib/dashboard-queries";
 
-export default async function DashboardPage() {
+const RANGE_TO_DAYS: Record<string, number> = {
+  "2w": 14,
+  "1m": 30,
+  "3m": 90,
+  "6m": 180,
+};
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
+  const params = await searchParams;
+  const range = params.range || "3m";
+  const days = RANGE_TO_DAYS[range] ?? 90;
+
   const supabase = await createClient();
 
-  // Date calculations
-  const now = new Date();
-  const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const sevenDaysAgo = subDays(now, 7).toISOString();
-  const fourteenDaysAgo = subDays(now, 14).toISOString();
-  const startOfWeekDate = startOfWeek(now, { weekStartsOn: 1 });
-  const startOfLastWeekDate = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
+  // Fetch backfill cutoffs first (needed by most queries)
+  const cutoffs = await getCompanyBackfillCutoffs();
 
   // Fetch all data in parallel
   const [
     { count: activeJobs },
-    { count: newToday },
-    { count: insightsCount },
-    { count: thisWeek },
-    { count: lastWeek },
-    { data: companiesRaw },
-    { data: companyInsightsRaw },
+    netThisWeek,
     postingTrends,
+    netHiringFlow,
     rawFunctionData,
+    competitiveMatrix,
+    latestDigest,
+    hotRoles,
+    { data: companiesRaw },
   ] = await Promise.all([
-    // Active jobs count
+    // Active jobs count (current snapshot, no backfill filter needed)
     supabase
       .from("job_postings")
       .select("*, companies!inner(is_active)", { count: "exact", head: true })
       .eq("is_active", true)
       .eq("companies.is_active", true),
-    // New today count
-    supabase
-      .from("job_postings")
-      .select("*, companies!inner(is_active)", { count: "exact", head: true })
-      .gte("first_seen_date", startOfToday.toISOString())
-      .eq("companies.is_active", true),
-    // Company insights count (last 7 days) - kept for stats
-    supabase
-      .from("company_insights")
-      .select("*", { count: "exact", head: true })
-      .gte("generated_at", sevenDaysAgo),
-    // This week new jobs
-    supabase
-      .from("job_postings")
-      .select("*, companies!inner(is_active)", { count: "exact", head: true })
-      .gte("first_seen_date", startOfWeekDate.toISOString())
-      .eq("companies.is_active", true),
-    // Last week new jobs (for trend calculation)
-    supabase
-      .from("job_postings")
-      .select("*, companies!inner(is_active)", { count: "exact", head: true })
-      .gte("first_seen_date", startOfLastWeekDate.toISOString())
-      .lt("first_seen_date", startOfWeekDate.toISOString())
-      .eq("companies.is_active", true),
-    // All active companies with job counts
+    // Net new/closed this week
+    getNetThisWeek(cutoffs),
+    // Posting trends for sparkline
+    getPostingTrends(days, cutoffs),
+    // Net hiring flow chart data
+    getNetHiringFlow(days, cutoffs),
+    // Raw function data for donut chart
+    getRawFunctionData(days, cutoffs),
+    // Competitive matrix
+    getCompetitiveMatrixData(cutoffs),
+    // Latest digest
+    getLatestDigest(),
+    // Hot roles feed
+    getHotRoles(cutoffs),
+    // Companies for filter dropdown
     supabase
       .from("companies")
-      .select(`
-        id,
-        name,
-        slug,
-        country,
-        ats_type,
-        job_postings!left(id, is_active, title, first_seen_date)
-      `)
+      .select("id, name")
       .eq("is_active", true)
       .order("name"),
-    // Most recent weekly digest and company summaries
-    (async () => {
-      // Get most recent digest by week_start
-      const { data: latestDigest } = await supabase
-        .from("weekly_digests")
-        .select("id, generated_at, week_start, week_end")
-        .order("week_start", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (!latestDigest) {
-        return { data: null };
-      }
-
-      // Get company summaries for this digest, filtered by active companies
-      const { data: digestCompanies } = await supabase
-        .from("weekly_digest_companies")
-        .select(`
-          id,
-          company_id,
-          headline,
-          body,
-          new_job_count,
-          companies!inner(id, name, slug, is_active)
-        `)
-        .eq("digest_id", latestDigest.id)
-        .eq("companies.is_active", true)
-        .order("new_job_count", { ascending: false });
-
-      // Return with digest metadata
-      return {
-        data: {
-          digest: latestDigest,
-          companies: digestCompanies || [],
-        },
-      };
-    })(),
-    // New Trend Data
-    getPostingTrends(90), // Last 3 months
-    getRawFunctionData(90), // Last 3 months raw data for client-side filtering
   ]);
 
-  // Transform data
-  const companies = transformCompanyData(companiesRaw as CompanyRow[]);
-  const digestResponse = companyInsightsRaw as { digest: { generated_at: string; week_start: string; week_end: string }; companies: DigestCompanyRow[] } | null;
-  const strategicHighlights = transformDigestHighlights(digestResponse);
-  const trackedCompanyCount = companies.length;
+  // Compute derived values
+  const avgWeeklyVelocity =
+    postingTrends.length > 0
+      ? Math.round(
+          postingTrends.reduce((sum, t) => sum + t.count, 0) /
+            postingTrends.length
+        )
+      : 0;
 
-  // Prepare simple company list for filter
-  const companyList = (companiesRaw as CompanyRow[] ?? []).map(c => ({ id: c.id, name: c.name }));
+  const companiesTracked = companiesRaw?.length ?? 0;
+
+  // Sparkline: use last 8 weeks of posting trend data
+  const sparklineData = postingTrends.slice(-8).map((t) => t.count);
+
+  // Company list for filter
+  const companyList = (companiesRaw ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+  }));
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* Quick Stats - Interactive */}
-      <StatsCards
-        activeJobs={activeJobs ?? 0}
-        newToday={newToday ?? 0}
-        insightsCount={insightsCount ?? 0}
-        newThisWeek={thisWeek ?? 0}
-        newLastWeek={lastWeek ?? 0}
-      />
-
-      {/* Main Trends Grid */}
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Posting Velocity - Takes 2/3 width */}
-        <PostingTrendChart data={postingTrends} />
-
-        {/* Function Mix - Takes 1/3 width */}
-        <FunctionBreakdownContainer rawData={rawFunctionData} companies={companyList} />
+      {/* ROW 0: Time Range Selector */}
+      <div className="flex justify-end">
+        <Suspense fallback={null}>
+          <TimeRangeSelector currentRange={range} />
+        </Suspense>
       </div>
 
-      {/* Main Content Grid - Stacks on mobile, 50/50 split on desktop */}
-      <div className="flex flex-col gap-6 sm:gap-8 lg:grid lg:grid-cols-2">
-        {/* Strategic Highlights - Promoted to equal footing */}
-        <div className="lg:col-span-1">
-          <StrategicHighlights
-            insights={strategicHighlights}
-            trackedCompanyCount={trackedCompanyCount}
-          />
-        </div>
+      {/* ROW 1: Stat Cards */}
+      <StatsCards
+        activeJobs={activeJobs ?? 0}
+        netThisWeek={netThisWeek}
+        avgWeeklyVelocity={avgWeeklyVelocity}
+        companiesTracked={companiesTracked}
+        sparklineData={sparklineData}
+      />
 
-        {/* Companies Overview */}
-        <div className="lg:col-span-1">
-          <CompaniesOverview companies={companies} />
-        </div>
+      {/* ROW 2: Weekly Intel Banner */}
+      <WeeklyIntelBanner digest={latestDigest} />
+
+      {/* ROW 3: Net Hiring Flow Chart */}
+      <NetHiringFlowChart data={netHiringFlow} />
+
+      {/* ROW 4: Competitive Matrix (2/3) + Function Mix donut (1/3) */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <CompetitiveMatrix
+          data={competitiveMatrix}
+          className="lg:col-span-2"
+        />
+        <FunctionBreakdownContainer
+          rawData={rawFunctionData}
+          companies={companyList}
+        />
+      </div>
+
+      {/* ROW 5: Hot Roles Feed (1/2) + Strategy Signals (1/2) */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <HotRolesFeed roles={hotRoles} />
+        <StrategySignals digest={latestDigest} />
       </div>
     </div>
   );
