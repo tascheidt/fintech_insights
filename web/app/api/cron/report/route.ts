@@ -269,7 +269,7 @@ export async function GET(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fintech-insights.vercel.app";
     const from = process.env.RESEND_FROM || "onboarding@resend.dev";
     const resendKey = process.env.RESEND_API_KEY;
-    const subject = `Fintech Insights TLDR – ${format(new Date(), "MMM d, yyyy")}`;
+    const subject = `Fintech Insights Weekly – ${format(new Date(), "MMM d, yyyy")}`;
 
     let emailSent = false;
     let successCount = 0;

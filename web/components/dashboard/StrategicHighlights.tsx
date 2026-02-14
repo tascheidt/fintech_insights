@@ -58,38 +58,38 @@ export function StrategySignals({
       </CardHeader>
       <CardContent>
         <div className="max-h-[400px] overflow-y-auto space-y-5">
-          {/* Industry Trends */}
+          {/* Hiring Activity */}
           {trends.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Industry Trends
+                Hiring Activity
               </p>
               {trends.map((trend, i) => (
                 <div key={i} className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{trend.trend}</span>
-                    {trend.direction && (
-                      <span
-                        className={cn(
-                          "text-xs px-1.5 py-0.5 rounded",
-                          trend.direction === "up"
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
-                            : trend.direction === "down"
-                              ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
-                              : "bg-muted text-muted-foreground"
-                        )}
-                      >
-                        {trend.direction}
+                    <span className="text-sm font-medium">
+                      {trend.trend.replace(/ hiring surge$/, "").replace(/ adoption$/, "")}
+                    </span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {trend.jobCount} roles
+                    </span>
+                    {trend.direction === "new" && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                        tech
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {trend.explanation}
-                  </p>
                   {trend.companies?.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Companies: {trend.companies.join(", ")}
-                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {trend.companies.map((company) => (
+                        <span
+                          key={company}
+                          className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
+                        >
+                          {company}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
               ))}
