@@ -51,7 +51,14 @@ function GlobalSummarySection({ summary }: { summary: GlobalSummary }) {
         {summary.headline}
       </Heading>
       {summary.key_insight && (
-        <Text style={{ ...globalBody, fontWeight: "600", marginBottom: "12px" }}>
+        <Text style={{
+          ...globalBody,
+          fontSize: "16px",
+          fontWeight: "600",
+          color: "#1a1a2e",
+          marginBottom: "14px",
+          lineHeight: "1.5",
+        }}>
           {summary.key_insight}
         </Text>
       )}
@@ -116,25 +123,20 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
           {/* Header */}
           <Section style={header}>
             <Heading as="h1" style={title}>
-              Fintech Insights TLDR
+              Fintech Insights Weekly
             </Heading>
             <Text style={subtitle}>
               {dateRange}
             </Text>
-            {/* View in App Button */}
-            <Section style={{ textAlign: "center", marginTop: "20px" }}>
+            <Text style={{ textAlign: "center" as const, marginTop: "12px", marginBottom: "0" }}>
               <Link href={digestUrl} style={{
-                display: "inline-block",
-                padding: "12px 24px",
-                backgroundColor: "#000",
-                color: "#fff",
-                textDecoration: "none",
-                borderRadius: "6px",
-                fontWeight: "600",
+                color: "#6b7280",
+                fontSize: "13px",
+                textDecoration: "underline",
               }}>
-                View Full Digest in App →
+                View full digest in app
               </Link>
-            </Section>
+            </Text>
           </Section>
 
           {/* Global Summary - Cross-company trend analysis */}
@@ -166,7 +168,7 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
               <Hr style={divider} />
               <Section style={companySection}>
                 <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px" }}>
-                  🎯 Strategy Signals
+                  Strategy Signals
                 </Heading>
                 {digest.strategy_signals.slice(0, 3).map((signal, idx) => (
                   <div key={idx} style={{ marginBottom: "16px", paddingBottom: "16px", borderBottom: idx < Math.min(digest.strategy_signals!.length - 1, 2) ? "1px solid #e5e7eb" : "none" }}>
@@ -190,24 +192,41 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
             </>
           )}
 
-          {/* Industry Trends */}
+          {/* Hiring Activity */}
           {digest.industry_trends && Array.isArray(digest.industry_trends) && digest.industry_trends.length > 0 && (
             <>
               <Hr style={divider} />
               <Section style={companySection}>
-                <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px" }}>
-                  📈 Industry Trends
+                <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "4px" }}>
+                  Hiring Activity
                 </Heading>
-                {digest.industry_trends.slice(0, 3).map((trend, idx) => (
-                  <div key={idx} style={{ marginBottom: "12px" }}>
-                    <Text style={{ fontWeight: "600", marginBottom: "4px" }}>
-                      {trend.trend}
-                    </Text>
-                    <Text style={{ fontSize: "13px", color: "#6b7280" }}>
-                      {trend.explanation}
-                    </Text>
-                  </div>
-                ))}
+                <Text style={{ fontSize: "13px", color: "#6b7280", marginBottom: "12px" }}>
+                  Department activity across tracked companies this week
+                </Text>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
+                      <th style={{ textAlign: "left", padding: "6px 8px 6px 0", fontWeight: "600", color: "#6b7280" }}>Dept</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: "600", color: "#6b7280" }}>Roles</th>
+                      <th style={{ textAlign: "left", padding: "6px 0 6px 8px", fontWeight: "600", color: "#6b7280" }}>Companies</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {digest.industry_trends.slice(0, 5).map((trend, idx) => (
+                      <tr key={idx} style={{ borderBottom: idx < Math.min(digest.industry_trends!.length - 1, 4) ? "1px solid #f3f4f6" : "none" }}>
+                        <td style={{ padding: "8px 8px 8px 0", fontWeight: "500" }}>
+                          {trend.trend.replace(/ hiring surge$/, "").replace(/ adoption$/, "")}
+                        </td>
+                        <td style={{ padding: "8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                          {String(trend.jobCount)}
+                        </td>
+                        <td style={{ padding: "8px 0 8px 8px", color: "#6b7280" }}>
+                          {trend.companies.join(", ")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </Section>
             </>
           )}
@@ -283,10 +302,9 @@ const subtitle: React.CSSProperties = {
 };
 
 const globalSummarySection: React.CSSProperties = {
-  padding: "0 40px 24px",
-  backgroundColor: "#f0f7ff",
-  borderRadius: "8px",
-  margin: "0 20px 24px",
+  padding: "24px 40px 28px",
+  borderTop: "3px solid #1a1a2e",
+  margin: "0 20px 8px",
 };
 
 const globalHeadline: React.CSSProperties = {
@@ -294,16 +312,16 @@ const globalHeadline: React.CSSProperties = {
   fontSize: "22px",
   fontWeight: "700",
   lineHeight: "1.3",
-  margin: "16px 0 12px",
-  textAlign: "center" as const,
+  margin: "0 0 16px",
+  textAlign: "left" as const,
 };
 
 const globalBody: React.CSSProperties = {
-  color: "#4b5563",
+  color: "#374151",
   fontSize: "15px",
-  lineHeight: "1.6",
+  lineHeight: "1.7",
   margin: "0 0 8px",
-  textAlign: "center" as const,
+  textAlign: "left" as const,
 };
 
 const summarySection: React.CSSProperties = {

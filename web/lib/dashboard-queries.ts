@@ -68,6 +68,7 @@ export interface LatestDigest {
     trend: string;
     explanation: string;
     companies: string[];
+    jobCount: number;
     direction: string;
   }>;
   strategySignals: Array<{

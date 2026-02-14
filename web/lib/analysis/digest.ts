@@ -311,6 +311,208 @@ function buildCompanySummaryForAI(data: CompanyJobData): {
 }
 
 // ============================================================================
+// Longitudinal Context — Previous Digests
+// ============================================================================
+
+interface PreviousDigestSummary {
+  week_start: string;
+  week_end: string;
+  global_summary: GlobalSummary | null;
+  company_headlines: Array<{ company_name: string; headline: string; job_count: number }>;
+}
+
+/**
+ * Fetches the last N weekly digests for longitudinal context.
+ * Skips the current week so we only get prior history.
+ */
+async function getPreviousDigests(count: number = 3): Promise<PreviousDigestSummary[]> {
+  const supabase = createAdminClient();
+
+  // Get Monday of current week to exclude it
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const currentWeekStart = new Date(now);
+  currentWeekStart.setUTCDate(now.getUTCDate() - daysToMonday);
+  currentWeekStart.setUTCHours(0, 0, 0, 0);
+
+  const { data: digests, error } = await supabase
+    .from("weekly_digests")
+    .select(`
+      week_start,
+      week_end,
+      global_summary,
+      weekly_digest_companies (
+        headline,
+        new_job_count,
+        company_id,
+        companies:company_id (
+          name
+        )
+      )
+    `)
+    .lt("week_start", currentWeekStart.toISOString())
+    .order("week_start", { ascending: false })
+    .limit(count);
+
+  if (error) {
+    console.warn("Failed to fetch previous digests for longitudinal context:", error.message);
+    return [];
+  }
+
+  return (digests ?? []).map((d) => ({
+    week_start: d.week_start,
+    week_end: d.week_end,
+    global_summary: d.global_summary as GlobalSummary | null,
+    company_headlines: (
+      (d.weekly_digest_companies as unknown as Array<{
+        headline: string;
+        new_job_count: number;
+        companies: { name: string } | Array<{ name: string }>;
+      }>) ?? []
+    ).map((c) => {
+      const company = Array.isArray(c.companies) ? c.companies[0] : c.companies;
+      return {
+        company_name: company?.name ?? "Unknown",
+        headline: c.headline,
+        job_count: c.new_job_count,
+      };
+    }),
+  }));
+}
+
+/**
+ * Format previous digests into a prompt-friendly string for company-level context.
+ */
+function formatPreviousDigestsForCompany(
+  previousDigests: PreviousDigestSummary[],
+  companyName: string
+): string {
+  if (previousDigests.length === 0) return "";
+
+  const lines = previousDigests.map((d) => {
+    const weekLabel = new Date(d.week_start).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const companyEntry = d.company_headlines.find(
+      (c) => c.company_name.toLowerCase() === companyName.toLowerCase()
+    );
+    if (companyEntry) {
+      return `- Week of ${weekLabel}: ${companyEntry.company_name} (${companyEntry.job_count} jobs, "${companyEntry.headline}")`;
+    }
+    return `- Week of ${weekLabel}: No activity for ${companyName}`;
+  });
+
+  return `\n## Recent Weeks (for context — identify longitudinal trends):\n${lines.join("\n")}\nUse the recent weeks as context. If hiring is accelerating, decelerating, or shifting focus week-over-week, note it. If this week continues an existing trend, say so. If it is a departure, highlight the change.`;
+}
+
+/**
+ * Format previous digests into a prompt-friendly string for global summary context.
+ */
+function formatPreviousDigestsForGlobal(previousDigests: PreviousDigestSummary[]): string {
+  if (previousDigests.length === 0) return "";
+
+  const lines = previousDigests.map((d) => {
+    const weekLabel = new Date(d.week_start).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const totalJobs = d.company_headlines.reduce((sum, c) => sum + c.job_count, 0);
+    const topCompanies = d.company_headlines
+      .sort((a, b) => b.job_count - a.job_count)
+      .slice(0, 3)
+      .map((c) => `${c.company_name} (${c.job_count})`)
+      .join(", ");
+    const theme = d.global_summary?.headline ?? "No summary";
+    return `- Week of ${weekLabel}: ${totalJobs} total jobs | Top: ${topCompanies} | Theme: "${theme}"`;
+  });
+
+  return `\n## Recent Weeks (for longitudinal context):\n${lines.join("\n")}\nNote whether this week represents acceleration, continuation, or a shift from recent trends.`;
+}
+
+// ============================================================================
+// Company Insights Context
+// ============================================================================
+
+interface CompanyInsightContext {
+  strategic_hypothesis: string;
+  key_signal: string;
+  headline: string;
+  generated_at: string;
+}
+
+/**
+ * Fetches the most recent company insight for each given company ID.
+ * Returns a Map keyed by company_id.
+ */
+async function getCompanyInsightsContext(
+  companyIds: string[]
+): Promise<Map<string, CompanyInsightContext>> {
+  if (companyIds.length === 0) return new Map();
+
+  const supabase = createAdminClient();
+  const result = new Map<string, CompanyInsightContext>();
+
+  // Fetch the most recent insight per company using distinct on
+  const { data, error } = await supabase
+    .from("company_insights")
+    .select("company_id, strategic_hypothesis, key_signal, headline, generated_at")
+    .in("company_id", companyIds)
+    .order("generated_at", { ascending: false });
+
+  if (error) {
+    console.warn("Failed to fetch company insights context:", error.message);
+    return result;
+  }
+
+  // Take the most recent per company (data is ordered by generated_at desc)
+  const seen = new Set<string>();
+  for (const row of data ?? []) {
+    if (row.company_id && !seen.has(row.company_id)) {
+      seen.add(row.company_id);
+      result.set(row.company_id, {
+        strategic_hypothesis: row.strategic_hypothesis,
+        key_signal: row.key_signal ?? "",
+        headline: row.headline ?? "",
+        generated_at: row.generated_at,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Format a company's insight context into a prompt-friendly string.
+ */
+function formatInsightForCompany(insight: CompanyInsightContext | undefined): string {
+  if (!insight) return "";
+
+  const age = Math.round(
+    (Date.now() - new Date(insight.generated_at).getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  return `\n## 90-Day Strategic Context (from deep analysis, ${age} days ago):
+Strategic hypothesis: "${insight.strategic_hypothesis}"
+Key signal: "${insight.key_signal}"
+If this context is available, reference it. Does this week's hiring reinforce or contradict the longer-term strategic direction? This is how you provide truly differentiated insight.`;
+}
+
+/**
+ * Format company insights for the global summary prompt.
+ */
+function formatInsightsForGlobal(
+  companies: CompanyWeeklySummary[],
+  insightsMap: Map<string, CompanyInsightContext>
+): string {
+  const entries: string[] = [];
+  for (const c of companies) {
+    const insight = insightsMap.get(c.company_id);
+    if (insight) {
+      entries.push(`- ${c.company_name}: "${insight.strategic_hypothesis}" (key signal: "${insight.key_signal}")`);
+    }
+  }
+  if (entries.length === 0) return "";
+
+  return `\n## Company Strategic Context (90-day deep analysis):\n${entries.join("\n")}`;
+}
+
+// ============================================================================
 // Industry Trend Detection
 // ============================================================================
 
@@ -390,17 +592,35 @@ export async function detectIndustryTrends(
     });
   }
   
-  // Seniority trends
-  const totalJobs = allJobs.length;
-  const seniorJobs = (seniorityCounts["senior"] || 0) + (seniorityCounts["lead"] || 0) + (seniorityCounts["principal"] || 0);
-  const seniorPercentage = totalJobs > 0 ? (seniorJobs / totalJobs) * 100 : 0;
-  
-  if (seniorPercentage > 50) {
+  // Executive-tier seniority trend: only flag if executive/principal roles appear across 2+ companies
+  const executiveTierCounts: Record<string, Set<string>> = {};
+  for (const companyData of weeklyData.values()) {
+    for (const job of companyData.jobs) {
+      const level = job.seniority_level;
+      if (level === "executive" || level === "principal") {
+        if (!executiveTierCounts[level]) {
+          executiveTierCounts[level] = new Set();
+        }
+        executiveTierCounts[level].add(companyData.company_name);
+      }
+    }
+  }
+
+  const executiveCompanies = new Set<string>();
+  let executiveJobCount = 0;
+  for (const [level, companies] of Object.entries(executiveTierCounts)) {
+    if (companies.size >= 2) {
+      for (const c of companies) executiveCompanies.add(c);
+      executiveJobCount += seniorityCounts[level] || 0;
+    }
+  }
+
+  if (executiveCompanies.size >= 2 && executiveJobCount > 0) {
     trends.push({
-      trend: "Senior-heavy hiring",
-      explanation: `${Math.round(seniorPercentage)}% of new roles are senior-level`,
-      companies: Array.from(weeklyData.values()).map(c => c.company_name),
-      jobCount: seniorJobs,
+      trend: "Executive-level hiring across sector",
+      explanation: `${executiveJobCount} VP/Principal-level roles across ${executiveCompanies.size} companies signal strategic leadership investment`,
+      companies: Array.from(executiveCompanies),
+      jobCount: executiveJobCount,
       direction: "up",
     });
   }
@@ -409,57 +629,72 @@ export async function detectIndustryTrends(
 }
 
 // ============================================================================
-// AI Analyst Function - TLDR Style
+// AI Analyst Function - Company Commentary
 // ============================================================================
 
-const TLDR_PROMPT = `You are the witty, insightful Editor of "Fintech Insights TLDR". Your style is punchy, conversational, and smart. Avoid corporate jargon. Use emojis effectively.
+const TLDR_PROMPT = `You are a senior fintech analyst writing a concise intelligence briefing. Your style is evidence-based, interpretive, and professional — like a Stratechery or analyst note. No slang, no puns, no wordplay. Minimal emoji (one at most, and only if it genuinely aids comprehension).
 
 ## Company: {company_name}
 
-## This Week's Hiring Summary:
+## This Week's Hiring Data:
 - Total New Postings: {job_count}
 - Departments: {departments}
 - Seniority Levels: {seniority_breakdown}
 - Top Technologies: {tech_stack}
-- Job Titles: {job_titles}
+- All Job Titles: {job_titles}
+{previous_context}
+{insight_context}
 
 ## Your Task:
-Write a TLDR-style update that reveals the STRATEGIC MOVE behind these hires.
+Write a brief analyst note interpreting the strategic signal behind this week's hiring activity.
 
-**CRITICAL - Headlines That Are FAILURES (never do these):**
-❌ "[Company] is hiring" - BORING, says nothing
-❌ "[Company] posted jobs" - OBVIOUS, waste of space  
-❌ "[Company] has openings" - GENERIC, no insight
-❌ "[Company] expands team" - VAGUE, could be anyone
-❌ "📊 EQ Bank is hiring" - THIS IS A FAILURE
+**Headline guidance:**
+- State the strategic move clearly and specifically (6-12 words)
+- Good: "Wealthsimple accelerates crypto and wealth hiring"
+- Good: "EQ Bank signals lending expansion with 6 new risk roles"
+- Good: "Questrade expands wealth platform with 4 engineering and 2 product hires"
+- Bad: "Wealthsimple hits the gas" (vague, slangy)
+- Bad: "EQ Bank is hiring" (obvious, no insight)
+- Bad: "[Company] expands team" (generic)
+- Emoji is optional — omit unless it genuinely clarifies (e.g., a flag for geographic expansion)
 
-**Headlines That Win:**
-✅ "🚀 Wealthsimple hits the gas" - implies acceleration/growth
-✅ "🔧 Stripe rebuilds the engine" - implies infrastructure overhaul
-✅ "🎯 EQ Bank doubles down on lending" - specific strategic focus
-✅ "🤖 Koho bets big on AI" - clear tech direction
-✅ "🏗️ Neo builds the platform team" - what they're building
-✅ "💼 CIBC raids the Street" - talent acquisition narrative
+**Body guidance (2-3 sentences of strategic interpretation):**
+- Use cause-and-effect framing: "The mix of X and Y roles suggests Z", "This hiring pattern indicates..."
+- Be specific about role types: "3 ML engineers focused on fraud detection" is better than "ramping up engineering"
+- Name exact role titles that drive the insight when possible
+- If 90-day strategic context is available, reference it: does this week reinforce or contradict the longer-term direction?
+- If previous week data is available, note acceleration, deceleration, or strategic shifts
 
-**Pattern Detection - Use the data to infer the story:**
-- Senior-heavy (>50% senior/lead roles) → "building the A-team" or "scaling expertise"
-- Single department dominance (>60% one area) → "laser-focused on [X]" or "doubling down on [X]"
-- AI/ML tech stack → "betting on AI" or "going autonomous"
-- Engineering + Product mix → "shipping mode" or "building something big"
-- Compliance/Risk heavy → "battening down the hatches" or "playing defense"
-- Multiple locations → "going global" or "expanding reach"
-- Entry-level heavy → "building the bench" or "scaling ops"
+**Seniority — only comment when strategically meaningful:**
+- Executive tier (VP, Director, C-suite, Principal): Always notable — "VP-level hires signal strategic leadership investment"
+- Staff/Lead tier: Notable only if concentrated in one area — "3 Staff Engineers in payments suggests platform rebuild"
+- Senior IC tier: Only mention if combined with department concentration — "4 senior fraud engineers" is notable, "a mix of senior roles" is not
+- Mid/Junior tier: Only mention if dominant (>60%), suggesting new team buildout or scale-up
+- DEFAULT: Do NOT comment on seniority if it is a normal mix. A blend of senior and mid-level roles is unremarkable.
+
+**Role specificity:**
+- When referencing job types, identify the specific KIND of work they reveal strategically
+- Use the full job title list to identify clusters, not just department labels
+- "3 fraud ML engineers and 2 compliance analysts" reveals a regulatory-tech investment
+- "ramping up engineering" reveals nothing
 
 **Output JSON:**
 {
-  "headline": "A 3-5 word headline with ONE emoji that reveals the STRATEGIC MOVE, not just the fact of hiring",
-  "body": "2-3 punchy sentences. What are they building? Why now? What does the tech/seniority mix tell us about their strategy?"
+  "headline": "Clear analytical headline (6-12 words, no emoji required) stating the strategic move",
+  "body": "2-3 sentences of strategic interpretation. What does the hiring pattern reveal about the company's direction? Be specific about roles and what they signal."
+}
+
+**Example of desired output:**
+{
+  "headline": "Questrade expands wealth platform with 4 engineering and 2 product hires",
+  "body": "The concentration of full-stack and platform engineering roles alongside product management suggests Questrade is investing in its core trading platform rather than adjacent products. The absence of compliance hires is notable given recent regulatory changes — the company appears to be betting on product differentiation over regulatory readiness."
 }
 
 **Self-check before responding:**
-1. Does my headline reveal WHAT they're doing, not just THAT they're hiring?
-2. Would this headline make a fintech insider say "interesting..."?
-3. Could this headline apply to literally any company? If yes, make it more specific.
+1. Would a fintech professional find this analytically useful?
+2. Does it identify a specific strategic signal, not just summarize the data?
+3. Are role references specific (named titles/clusters) rather than generic ("engineering roles")?
+4. Is seniority commentary earned — or just restating the breakdown?
 
 Respond with ONLY valid JSON, no markdown.`;
 
@@ -510,7 +745,7 @@ function parseTLDRResponse(text: string, companyName: string): TLDRCommentary {
 }
 
 /**
- * Generate TLDR-style AI commentary for a single company's weekly hiring data.
+ * Generate analyst-style AI commentary for a single company's weekly hiring data.
  * Throws on failure - we want to surface and fix issues, not mask them with fallbacks.
  */
 async function generateCompanyCommentary(
@@ -521,12 +756,17 @@ async function generateCompanyCommentary(
     dominant_tech: string[];
     job_titles: string[];
   },
-  jobCount: number
+  jobCount: number,
+  previousDigests?: PreviousDigestSummary[],
+  companyInsight?: CompanyInsightContext
 ): Promise<TLDRCommentary> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     throw new Error("GEMINI_API_KEY not configured - cannot generate AI commentary");
   }
+
+  const previousContext = formatPreviousDigestsForCompany(previousDigests ?? [], companyName);
+  const insightContext = formatInsightForCompany(companyInsight);
 
   const prompt = TLDR_PROMPT
     .replace("{company_name}", companyName)
@@ -534,7 +774,9 @@ async function generateCompanyCommentary(
     .replace("{departments}", JSON.stringify(summary.departments))
     .replace("{seniority_breakdown}", JSON.stringify(summary.seniority_breakdown))
     .replace("{tech_stack}", summary.dominant_tech.join(", ") || "Not specified")
-    .replace("{job_titles}", summary.job_titles.slice(0, 10).join(", "));
+    .replace("{job_titles}", summary.job_titles.join(", "))
+    .replace("{previous_context}", previousContext)
+    .replace("{insight_context}", insightContext);
 
   const genAI = new GoogleGenerativeAI(key);
   
@@ -567,7 +809,7 @@ async function generateCompanyCommentary(
  * Prompt for generating a global summary that synthesizes trends across all companies.
  * This is the "TL;DR of TL;DRs" - a high-level view of what's happening in the market.
  */
-const GLOBAL_SUMMARY_PROMPT = `You are an elite fintech analyst creating a weekly intelligence brief.
+const GLOBAL_SUMMARY_PROMPT = `You are an elite fintech analyst creating a weekly intelligence brief. Write in an objective, evidence-based style. Avoid puns, wordplay, and emojis.
 
 ## This Week's Hiring Data:
 - Total new jobs: {total_jobs} across {company_count} companies
@@ -576,24 +818,29 @@ const GLOBAL_SUMMARY_PROMPT = `You are an elite fintech analyst creating a weekl
 
 ## Company Summaries:
 {company_summaries}
+{previous_context}
+{insights_context}
 
 ## Your Task:
 Create an industry-level intelligence brief that answers:
-1. What's the overall theme of fintech hiring this week?
-2. What's the single most important insight readers should know?
+1. What is the most significant hiring pattern across companies this week?
+2. Why does it matter for the Canadian fintech competitive landscape?
+3. What is the single most actionable takeaway for someone tracking competitive dynamics?
 
 **Output a JSON object with exactly these fields:**
 {
-  "headline": "Industry-wide headline (5-8 words with emoji)",
-  "key_insight": "The single most important thing to know (one sentence)",
-  "body": "2-3 sentences synthesizing the key trend(s). Be specific about what you're seeing."
+  "headline": "Clear analytical headline (8-12 words, no emoji required)",
+  "key_insight": "The single most actionable takeaway for someone tracking Canadian fintech competitive dynamics (one sentence)",
+  "body": "2-3 sentences synthesizing the key pattern(s). Explain WHY the pattern matters, not just WHAT you observe. Reference specific companies and role types."
 }
 
 **Guidelines:**
-- Focus on cross-company patterns, not individual company news
-- Be specific about the trend you're identifying
-- Make it valuable for someone who only has 10 seconds
-- If there's no clear theme, note the diversity instead
+- Focus on cross-company patterns and what they reveal about industry direction
+- Identify the most significant signal and explain its implications
+- If previous week data is available, note whether this week represents acceleration, continuation, or a shift from recent trends
+- If company strategic context is available, reference whether industry hiring aligns with or diverges from stated strategies
+- Be specific: name companies, role types, and the strategic interpretation
+- If there's no clear theme, note the diversity and what it suggests about market maturity
 
 Respond with ONLY valid JSON, no markdown formatting.`;
 
@@ -617,16 +864,20 @@ function buildCompanySummariesForGlobalPrompt(companies: CompanyWeeklySummary[])
 /**
  * Generate a global summary that synthesizes trends across all companies.
  * Returns null if generation fails (we prefer omission over generic fallback).
- * 
+ *
  * @param companies - Array of company summaries with their AI commentary
  * @param totalJobs - Total number of new jobs across all companies
  * @param industryTrends - Detected industry trends
+ * @param previousDigests - Previous week digests for longitudinal context
+ * @param insightsMap - Company insights for strategic context
  * @returns GlobalSummary or null if generation fails
  */
 async function generateGlobalSummary(
   companies: CompanyWeeklySummary[],
   totalJobs: number,
-  industryTrends: IndustryTrend[]
+  industryTrends: IndustryTrend[],
+  previousDigests?: PreviousDigestSummary[],
+  insightsMap?: Map<string, CompanyInsightContext>
 ): Promise<GlobalSummary | null> {
   // Skip if no companies or very few jobs (not enough signal)
   if (companies.length === 0 || totalJobs < 3) {
@@ -645,13 +896,18 @@ async function generateGlobalSummary(
   const trendsText = industryTrends.length > 0
     ? industryTrends.map(t => `- ${t.trend}: ${t.explanation}`).join("\n")
     : "No major trends detected";
-  
+
+  const previousContext = formatPreviousDigestsForGlobal(previousDigests ?? []);
+  const insightsContext = formatInsightsForGlobal(companies, insightsMap ?? new Map());
+
   const prompt = GLOBAL_SUMMARY_PROMPT
     .replace("{company_count}", String(companies.length))
     .replace("{total_jobs}", String(totalJobs))
     .replace("{top_companies}", topCompanies)
     .replace("{trends}", trendsText)
-    .replace("{company_summaries}", companySummaries);
+    .replace("{company_summaries}", companySummaries)
+    .replace("{previous_context}", previousContext)
+    .replace("{insights_context}", insightsContext);
 
   try {
     const genAI = new GoogleGenerativeAI(key);
@@ -771,22 +1027,34 @@ export async function generateWeeklyReport(
   // Use normalized week boundaries (Monday-Sunday of previous complete week)
   const { weekStart, weekEnd } = getWeekBoundaries();
 
+  // Fetch longitudinal context and company insights in parallel with trend detection
+  const allCompanyIds = Array.from(weeklyData.keys());
+  console.log("Fetching longitudinal context and company insights...");
+  const [previousDigests, companyInsightsMap, industry_trends] = await Promise.all([
+    getPreviousDigests(3),
+    getCompanyInsightsContext(allCompanyIds),
+    detectIndustryTrends(weeklyData),
+  ]);
+  console.log(`Longitudinal context: ${previousDigests.length} previous digests, ${companyInsightsMap.size} company insights`);
+
   const companies: CompanyWeeklySummary[] = [];
   const companyDataArray = Array.from(weeklyData.values());
 
   // Process companies in batches for parallel AI requests
   for (let i = 0; i < companyDataArray.length; i += parallelRequests) {
     const batch = companyDataArray.slice(i, i + parallelRequests);
-    
+
     const batchResults = await Promise.all(
       batch.map(async (companyData) => {
         const summary = buildCompanySummaryForAI(companyData);
-        
-        // Generate AI commentary
+
+        // Generate AI commentary with longitudinal and strategic context
         const ai_commentary = await generateCompanyCommentary(
           companyData.company_name,
           summary,
-          companyData.jobs.length
+          companyData.jobs.length,
+          previousDigests,
+          companyInsightsMap.get(companyData.company_id)
         );
 
         // Build the company weekly summary
@@ -825,10 +1093,6 @@ export async function generateWeeklyReport(
 
   // Calculate totals
   const totalJobs = companies.reduce((sum, c) => sum + c.new_job_count, 0);
-
-  // Detect industry trends
-  console.log("Detecting industry trends...");
-  const industry_trends = await detectIndustryTrends(weeklyData);
 
   // Generate strategy signals and notable movements for notable companies.
   // Companies with 5+ jobs are considered "notable" - no artificial cap since we
@@ -898,7 +1162,9 @@ export async function generateWeeklyReport(
 
   // Generate global summary (second AI pass to synthesize cross-company trends)
   console.log("Generating global summary...");
-  const global_summary = await generateGlobalSummary(companies, totalJobs, industry_trends);
+  const global_summary = await generateGlobalSummary(
+    companies, totalJobs, industry_trends, previousDigests, companyInsightsMap
+  );
 
   const generatedAt = new Date();
   

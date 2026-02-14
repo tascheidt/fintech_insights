@@ -74,29 +74,91 @@ export function DigestViewer({ digest }: DigestViewerProps) {
         </Link>
       </div>
 
-      {/* Industry Trends */}
+      {/* Hiring Activity */}
       {industryTrends.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Industry Trends
+              Hiring Activity
             </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Department activity across tracked companies this week
+            </p>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {industryTrends.map((trend, idx) => (
-                <div key={idx} className="border-l-2 border-primary pl-4">
-                  <div className="font-semibold">{trend.trend}</div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {trend.explanation}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Companies: {trend.companies.join(", ")}
-                  </div>
+            {/* Department activity table */}
+            {industryTrends.filter((t) => t.direction !== "new").length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 pr-4 font-medium text-muted-foreground">
+                        Department
+                      </th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">
+                        Roles
+                      </th>
+                      <th className="text-left py-2 pl-4 font-medium text-muted-foreground">
+                        Companies
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {industryTrends
+                      .filter((t) => t.direction !== "new")
+                      .map((trend, idx) => (
+                        <tr key={idx} className="border-b last:border-b-0">
+                          <td className="py-2.5 pr-4 font-medium">
+                            {trend.trend.replace(/ hiring surge$/, "")}
+                          </td>
+                          <td className="py-2.5 px-3 text-right tabular-nums">
+                            {trend.jobCount}
+                          </td>
+                          <td className="py-2.5 pl-4">
+                            <div className="flex flex-wrap gap-1">
+                              {trend.companies.map((company) => (
+                                <span
+                                  key={company}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground"
+                                >
+                                  {company}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Tech convergence signals */}
+            {industryTrends.filter((t) => t.direction === "new").length > 0 && (
+              <div className={industryTrends.filter((t) => t.direction !== "new").length > 0 ? "mt-4 pt-4 border-t" : ""}>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                  Tech Convergence
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {industryTrends
+                    .filter((t) => t.direction === "new")
+                    .map((trend, idx) => (
+                      <div
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 dark:bg-blue-950 text-sm"
+                      >
+                        <span className="font-medium">
+                          {trend.trend.replace(/ adoption$/, "")}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {trend.jobCount} roles, {trend.companies.length} companies
+                        </span>
+                      </div>
+                    ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
