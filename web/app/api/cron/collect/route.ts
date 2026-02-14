@@ -41,27 +41,50 @@ export async function GET(req: NextRequest) {
     console.log(`Processing ${companies.length} companies:`, companies.map(c => `${c.name} (${c.ats_type})`));
 
     // Phase 1: Collection
-    const jobRunId = await createJobRun({
-      jobType: 'collect',
-      triggerType: 'cron',
-      companyIds: companies.map(c => c.id),
-    });
+    // Resume an existing in-flight collect run first to avoid starving tail companies.
+    const { data: existingRun } = await supabase
+      .from("job_runs")
+      .select("id")
+      .eq("job_type", "collect")
+      .in("status", ["pending", "running"])
+      .order("started_at", { ascending: true, nullsFirst: true })
+      .limit(1)
+      .maybeSingle();
 
-    console.log(`Created job run: ${jobRunId}`);
+    const jobRunId =
+      existingRun?.id ??
+      (await createJobRun({
+        jobType: "collect",
+        triggerType: "cron",
+        companyIds: companies.map((c) => c.id),
+      }));
+
+    console.log(
+      existingRun?.id
+        ? `Resuming collect job run: ${jobRunId}`
+        : `Created job run: ${jobRunId}`
+    );
 
     const result = await executeCollectionJob(jobRunId);
 
     console.log("Collection completed:", result.stats);
 
-    // Phase 2: Analysis (auto-triggered if there are new jobs to analyze)
-    await triggerAnalysisJobIfNeeded(jobRunId);
+    // Only trigger follow-on work once all collection tasks are terminal.
+    if (result.status === "completed") {
+      // Phase 2: Analysis (auto-triggered if there are new jobs to analyze)
+      await triggerAnalysisJobIfNeeded(jobRunId);
 
-    // Phase 3: News cache refresh (async, non-blocking)
-    // Pre-warms the cache for weekly digest generation
-    refreshNewsCacheForActiveCompanies(jobRunId, {
-      parallelism: 2,
-      skipIfCached: true,
-    }).catch((err) => console.error("News cache refresh error:", err));
+      // Phase 3: News cache refresh (async, non-blocking)
+      // Pre-warms the cache for weekly digest generation
+      refreshNewsCacheForActiveCompanies(jobRunId, {
+        parallelism: 2,
+        skipIfCached: true,
+      }).catch((err) => console.error("News cache refresh error:", err));
+    } else {
+      console.log(
+        `Collection job ${jobRunId} still in progress; skipping analysis/news until completion`
+      );
+    }
 
     return NextResponse.json({
       success: true,
