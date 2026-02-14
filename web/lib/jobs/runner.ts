@@ -77,10 +77,11 @@ export async function executeCollectionJob(jobRunId: string): Promise<JobRunResu
     .update({
       status: 'running',
       started_at: new Date().toISOString(),
+      completed_at: null,
     })
     .eq('id', jobRunId);
 
-  // Get all tasks for this job run (with retry logic to handle async creation)
+  // Get resumable tasks for this job run (pending/failed only)
   let tasks: Array<{ id: string }> | null = null;
   let attempts = 0;
   const maxAttempts = 10;
@@ -90,6 +91,7 @@ export async function executeCollectionJob(jobRunId: string): Promise<JobRunResu
       .from('job_run_tasks')
       .select('id')
       .eq('job_run_id', jobRunId)
+      .in('status', ['pending', 'failed'])
       .order('started_at', { ascending: true, nullsFirst: true });
     
     if (error) {
@@ -108,14 +110,14 @@ export async function executeCollectionJob(jobRunId: string): Promise<JobRunResu
     }
   }
 
-  if (!tasks || tasks.length === 0) {
+  if (!tasks) {
     throw new Error(`No tasks found for job run ${jobRunId} after ${maxAttempts} attempts`);
   }
 
   let completedCount = 0;
   let failedCount = 0;
 
-  // Process each task
+  // Process resumable tasks
   for (const task of tasks) {
     try {
       await processCollectionTask(task.id);
@@ -129,15 +131,28 @@ export async function executeCollectionJob(jobRunId: string): Promise<JobRunResu
     await updateJobRunStats(jobRunId);
   }
 
-  // Determine final status
-  const finalStatus = failedCount === 0 ? 'completed' : failedCount === tasks.length ? 'failed' : 'completed';
+  // Determine final status from all task states
+  const { data: taskStatuses, error: statusError } = await supabase
+    .from('job_run_tasks')
+    .select('status')
+    .eq('job_run_id', jobRunId);
+
+  if (statusError) {
+    throw new Error(`Failed to determine job run status: ${statusError.message}`);
+  }
+
+  const hasPendingOrRunning = (taskStatuses ?? []).some(
+    (task) => task.status === 'pending' || task.status === 'running'
+  );
+  const hasFailed = (taskStatuses ?? []).some((task) => task.status === 'failed');
+  const finalStatus = hasPendingOrRunning ? 'running' : hasFailed ? 'failed' : 'completed';
 
   // Update job run status
   await supabase
     .from('job_runs')
     .update({
       status: finalStatus,
-      completed_at: new Date().toISOString(),
+      completed_at: finalStatus === 'running' ? null : new Date().toISOString(),
     })
     .eq('id', jobRunId);
 

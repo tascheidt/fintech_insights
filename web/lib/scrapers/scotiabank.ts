@@ -79,7 +79,25 @@ export async function fetchScotiabankJobs(
   console.log(
     `[scotiabank] Scraped ${allJobs.length} jobs for ${atsIdentifier}`
   );
-  return allJobs;
+
+  // Fetch job detail pages to populate description fields.
+  // This is required for downstream structure extraction (department/function).
+  try {
+    const enriched = await enrichScotiabankJobDescriptions(allJobs, 4);
+    const withDescriptions = enriched.filter(
+      (job) => !!job.description_text && job.description_text.trim().length > 0
+    ).length;
+    console.log(
+      `[scotiabank] Enriched descriptions for ${withDescriptions}/${enriched.length} jobs`
+    );
+    return enriched;
+  } catch (error) {
+    console.warn(
+      "[scotiabank] Description enrichment failed, continuing with listing data only:",
+      error
+    );
+    return allJobs;
+  }
 }
 
 /**
@@ -247,26 +265,11 @@ export async function enrichScotiabankJobDescriptions(
 
           const html = await res.text();
 
-          // Extract job description from the detail page
-          const descMatch = html.match(
-            /<div[^>]*class="[^"]*jobdescription[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?:<div|<\/section|<\/article)/i
-          );
-
-          if (descMatch) {
-            const descHtml = descMatch[1].trim();
-            return {
-              ...job,
-              description_html: descHtml,
-              description_text: htmlToText(descHtml),
-            };
-          }
-
-          // Fallback: try broader content area
-          const contentMatch = html.match(
-            /<div[^>]*id="job-description"[^>]*>([\s\S]*?)<\/div>/i
-          );
-          if (contentMatch) {
-            const descHtml = contentMatch[1].trim();
+          // Extract job description from the detail page.
+          // SuccessFactors pages commonly render description in a span with
+          // itemprop="description" and nested span tags.
+          const descHtml = extractScotiabankDescriptionHtml(html);
+          if (descHtml) {
             return {
               ...job,
               description_html: descHtml,
@@ -290,4 +293,55 @@ export async function enrichScotiabankJobDescriptions(
   }
 
   return enriched;
+}
+
+function extractScotiabankDescriptionHtml(html: string): string | null {
+  const descriptionByItemprop = extractBalancedSpanInnerHtml(
+    html,
+    /<span[^>]*itemprop="description"[^>]*>/i
+  );
+  if (descriptionByItemprop) {
+    return descriptionByItemprop.replace(/<img[^>]*>/gi, "").trim();
+  }
+
+  const descriptionByClass = extractBalancedSpanInnerHtml(
+    html,
+    /<span[^>]*class="[^"]*jobdescription[^"]*"[^>]*>/i
+  );
+  if (descriptionByClass) {
+    return descriptionByClass.replace(/<img[^>]*>/gi, "").trim();
+  }
+
+  return null;
+}
+
+function extractBalancedSpanInnerHtml(
+  html: string,
+  openingSpanRegex: RegExp
+): string | null {
+  const openingMatch = openingSpanRegex.exec(html);
+  if (!openingMatch || openingMatch.index < 0) return null;
+
+  const openingIndex = openingMatch.index;
+  const openingTagEnd = html.indexOf(">", openingIndex);
+  if (openingTagEnd < 0) return null;
+
+  const spanTagRegex = /<span\b[^>]*>|<\/span>/gi;
+  spanTagRegex.lastIndex = openingTagEnd + 1;
+
+  let depth = 1;
+  let match: RegExpExecArray | null;
+  while ((match = spanTagRegex.exec(html)) !== null) {
+    if (match[0].startsWith("</span")) {
+      depth -= 1;
+    } else {
+      depth += 1;
+    }
+
+    if (depth === 0) {
+      return html.slice(openingTagEnd + 1, match.index);
+    }
+  }
+
+  return null;
 }

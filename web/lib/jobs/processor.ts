@@ -105,6 +105,7 @@ async function extractAndUpdateStructure(
 
     // Validate and clean department field - set to null if invalid
     const cleanedDepartment = isValidDepartment(rawDepartment) ? rawDepartment : null;
+    const finalDepartment = cleanedDepartment || structure.standardized_department || null;
 
     // Handle location: always use AI-extracted location from description
     // Validate scraper-provided location - if invalid, set to null
@@ -145,8 +146,8 @@ async function extractAndUpdateStructure(
         standardized_department: structure.standardized_department,
         function_category: structure.function_category,
         normalized_title: normalizedTitle,
-        // Clean invalid department values (set to null)
-        department: cleanedDepartment,
+        // Prefer validated source department, fallback to standardized extraction
+        department: finalDepartment,
         // Store structured location (always from AI extraction)
         location_structured: locationStructured,
         // Use formatted location from structured data, or cleaned scraper location, or null
