@@ -1,29 +1,14 @@
 "use client";
 
-/**
- * CompaniesOverview - Displays tracked companies with Notion-style card/table toggle.
- * 
- * Shows:
- * - Company name and country
- * - Active job count
- * - Recent job highlights
- * - Link to company detail page
- */
-
-import * as React from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Building2, MapPin, Briefcase, TrendingUp, ArrowRight } from "lucide-react";
 import {
-  NotionCard,
-  NotionCardContent,
-  NotionCardTitle,
-  NotionCardDescription,
-  NotionCardFooter,
-  NotionCardTag,
-  NotionCardMetric,
-} from "@/components/ui/notion-card";
-import { ViewToggle, useViewPreference, ViewMode } from "@/components/ui/view-toggle";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -32,166 +17,134 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CATEGORY_GROUPS } from "@/lib/analysis/function-categories";
+import type { CompetitiveMatrixRow } from "@/lib/dashboard-queries";
 
-/** Company data structure */
-export interface CompanyOverviewData {
-  id: string;
-  name: string;
-  slug: string;
-  country: string;
-  activeJobCount: number;
-  recentHighlight?: string | null;
-  atsType: string;
-}
+const DISPLAY_GROUPS = Object.keys(CATEGORY_GROUPS).filter(
+  (g) => g !== "Other"
+);
 
-interface CompaniesOverviewProps {
-  companies: CompanyOverviewData[];
+const GROUP_SHORT_LABELS: Record<string, string> = {
+  Engineering: "Eng",
+  "Product & Design": "Prod",
+  "Data & Analytics": "Data",
+  "Risk, Legal & Compliance": "Risk",
+  "Go-To-Market": "GTM",
+  "Finance & Strategy": "Fin",
+  "Operations & People": "Ops",
+};
+
+export function CompetitiveMatrix({
+  data,
+  className,
+}: {
+  data: CompetitiveMatrixRow[];
   className?: string;
-}
-
-/**
- * Main CompaniesOverview component with view toggle
- */
-export function CompaniesOverview({ companies, className }: CompaniesOverviewProps) {
-  const [view, setView] = useViewPreference("dashboard-companies", "card");
-
-  return (
-    <div className={cn("space-y-4", className)}>
-      {/* Header with view toggle */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Companies Being Tracked</h2>
+}) {
+  if (data.length === 0) {
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle>Competitive Matrix</CardTitle>
+          <CardDescription>Active jobs by company and function</CardDescription>
+        </CardHeader>
+        <CardContent>
           <p className="text-sm text-muted-foreground">
-            {companies.length} active companies
+            No data available yet.
           </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle>Competitive Matrix</CardTitle>
+        <CardDescription>
+          Active jobs by company and function group
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto -mx-6">
+          <div className="min-w-[600px] px-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="sticky left-0 bg-card z-10 min-w-[120px]">
+                    Company
+                  </TableHead>
+                  {DISPLAY_GROUPS.map((group) => (
+                    <TableHead
+                      key={group}
+                      className="text-center text-xs whitespace-nowrap px-2"
+                    >
+                      {GROUP_SHORT_LABELS[group] || group}
+                    </TableHead>
+                  ))}
+                  <TableHead className="text-center text-xs">Total</TableHead>
+                  <TableHead className="text-center text-xs">WoW</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.map((row) => (
+                  <TableRow key={row.companyId}>
+                    <TableCell className="sticky left-0 bg-card z-10">
+                      <Link
+                        href={`/companies/${row.companySlug}`}
+                        className="font-medium text-sm hover:text-primary hover:underline"
+                      >
+                        {row.companyName}
+                      </Link>
+                    </TableCell>
+                    {DISPLAY_GROUPS.map((group) => {
+                      const cell = row.groups[group];
+                      const count = cell?.current || 0;
+                      const change = cell?.change || 0;
+                      return (
+                        <TableCell
+                          key={group}
+                          className={cn(
+                            "text-center text-xs tabular-nums px-2",
+                            change > 0 && "bg-green-50 dark:bg-green-950/30",
+                            change < 0 && "bg-red-50 dark:bg-red-950/30"
+                          )}
+                        >
+                          {count > 0 ? (
+                            count
+                          ) : (
+                            <span className="text-muted-foreground/40">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className="text-center font-semibold text-sm">
+                      {row.total}
+                    </TableCell>
+                    <TableCell className="text-center text-xs">
+                      <span
+                        className={cn(
+                          "font-medium",
+                          row.weekChange > 0 && "text-green-600",
+                          row.weekChange < 0 && "text-red-600",
+                          row.weekChange === 0 && "text-muted-foreground"
+                        )}
+                      >
+                        {row.weekChange > 0 ? "+" : ""}
+                        {row.weekChange}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
-        <ViewToggle view={view} onViewChange={setView} />
-      </div>
-
-      {/* Content based on view mode */}
-      {view === "card" ? (
-        <CompaniesCardView companies={companies} />
-      ) : (
-        <CompaniesTableView companies={companies} />
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
-/**
- * Card view - Notion-style cards in a grid
- */
-function CompaniesCardView({ companies }: { companies: CompanyOverviewData[] }) {
-  if (companies.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        No companies being tracked yet.
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {companies.map((company) => (
-        <Link key={company.id} href={`/companies/${company.slug}`}>
-          <NotionCard className="h-full">
-            <NotionCardContent className="flex-1">
-              {/* Company icon and name */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <NotionCardTitle>{company.name}</NotionCardTitle>
-                  <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    <span>{company.country}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Job count metric */}
-              <div className="flex items-center gap-2 mt-4">
-                <Briefcase className="h-4 w-4 text-muted-foreground" />
-                <span className="text-2xl font-bold">{company.activeJobCount}</span>
-                <span className="text-sm text-muted-foreground">active jobs</span>
-              </div>
-
-              {/* Recent highlight */}
-              {company.recentHighlight && (
-                <NotionCardDescription className="mt-3 text-xs">
-                  <TrendingUp className="inline h-3 w-3 mr-1" />
-                  {company.recentHighlight}
-                </NotionCardDescription>
-              )}
-
-              {/* Footer with tags */}
-              <NotionCardFooter className="mt-auto pt-4">
-                <NotionCardTag>{company.atsType}</NotionCardTag>
-                <ArrowRight className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-              </NotionCardFooter>
-            </NotionCardContent>
-          </NotionCard>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Table view - Traditional table layout
- */
-function CompaniesTableView({ companies }: { companies: CompanyOverviewData[] }) {
-  if (companies.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        No companies being tracked yet.
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Company</TableHead>
-            <TableHead>Country</TableHead>
-            <TableHead className="text-right">Active Jobs</TableHead>
-            <TableHead>Recent Activity</TableHead>
-            <TableHead></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {companies.map((company) => (
-            <TableRow key={company.id}>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{company.name}</span>
-                </div>
-              </TableCell>
-              <TableCell>{company.country}</TableCell>
-              <TableCell className="text-right font-semibold">
-                {company.activeJobCount}
-              </TableCell>
-              <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-                {company.recentHighlight || "—"}
-              </TableCell>
-              <TableCell>
-                <Link
-                  href={`/companies/${company.slug}`}
-                  className="text-primary text-sm hover:underline"
-                >
-                  View →
-                </Link>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-export default CompaniesOverview;
+export default CompetitiveMatrix;

@@ -1,8 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { format, parseISO, startOfMonth } from "date-fns";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -11,53 +16,45 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FunctionBreakdownChart } from "./FunctionBreakdownChart";
-import { RawFunctionData, FunctionTrend } from "@/lib/dashboard-queries";
+import type { RawFunctionData, DonutDataPoint } from "@/lib/dashboard-queries";
 import { getCategoryGroup, RoleCategory } from "@/lib/analysis/function-categories";
+import { FUNCTION_GROUP_COLORS } from "@/lib/constants";
 
 interface FunctionBreakdownContainerProps {
   rawData: RawFunctionData[];
   companies: { id: string; name: string }[];
 }
 
-export function FunctionBreakdownContainer({ rawData, companies }: FunctionBreakdownContainerProps) {
+export function FunctionBreakdownContainer({
+  rawData,
+  companies,
+}: FunctionBreakdownContainerProps) {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
 
-  const chartData = useMemo(() => {
-    // 1. Filter data
-    const filteredData = selectedCompanyId === "all"
-      ? rawData
-      : rawData.filter(d => d.company_id === selectedCompanyId);
+  const donutData: DonutDataPoint[] = useMemo(() => {
+    const filteredData =
+      selectedCompanyId === "all"
+        ? rawData
+        : rawData.filter((d) => d.company_id === selectedCompanyId);
 
-    // 2. Aggregate data
-    const periodMap = new Map<string, Record<string, number>>();
+    const groupCounts = new Map<string, number>();
 
-    filteredData.forEach((job) => {
-      if (!job.first_seen_date || !job.function_category) return;
-
-      const date = parseISO(job.first_seen_date);
-      // Group by month for cleaner high-level trends
-      const periodStart = startOfMonth(date);
-      const periodKey = periodStart.toISOString();
-
+    for (const job of filteredData) {
+      if (!job.function_category) continue;
       const group = getCategoryGroup(job.function_category as RoleCategory);
+      groupCounts.set(group, (groupCounts.get(group) || 0) + 1);
+    }
 
-      if (!periodMap.has(periodKey)) {
-        periodMap.set(periodKey, {});
-      }
-
-      const periodCounts = periodMap.get(periodKey)!;
-      periodCounts[group] = (periodCounts[group] || 0) + 1;
-    });
-
-    // 3. Convert to array
-    return Array.from(periodMap.entries())
-      .map(([date, counts]) => ({
-        date,
-        period: format(parseISO(date), "MMM yyyy"),
-        ...counts,
-      } as FunctionTrend))
-      .sort((a, b) => a.date.localeCompare(b.date));
-
+    return Array.from(groupCounts.entries())
+      .map(([name, value]) => ({
+        name,
+        value,
+        color:
+          FUNCTION_GROUP_COLORS[
+            name as keyof typeof FUNCTION_GROUP_COLORS
+          ] || FUNCTION_GROUP_COLORS["Other"],
+      }))
+      .sort((a, b) => b.value - a.value);
   }, [rawData, selectedCompanyId]);
 
   return (
@@ -65,10 +62,13 @@ export function FunctionBreakdownContainer({ rawData, companies }: FunctionBreak
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="space-y-1">
           <CardTitle>Function Mix</CardTitle>
-          <CardDescription>Hiring distribution by function group</CardDescription>
+          <CardDescription>Current hiring distribution</CardDescription>
         </div>
         <div className="w-[180px]">
-          <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+          <Select
+            value={selectedCompanyId}
+            onValueChange={setSelectedCompanyId}
+          >
             <SelectTrigger>
               <SelectValue placeholder="All Companies" />
             </SelectTrigger>
@@ -83,19 +83,8 @@ export function FunctionBreakdownContainer({ rawData, companies }: FunctionBreak
           </Select>
         </div>
       </CardHeader>
-      <CardContent className="pl-2 flex-1 min-h-0">
-        {/* Pass data to the chart component, but we need to strip the Card wrapper from the Chart component first 
-            OR we can just render the chart content here. 
-            Actually, FunctionBreakdownChart renders its own Card. 
-            I should modify FunctionBreakdownChart to NOT render a Card, or use composition.
-            
-            Strategy: I will modify FunctionBreakdownChart to accept a `className` and optionally `hideHeader` prop, 
-            or better yet, just extract the chart part. 
-            
-            For now, I will render the chart component but I need to handle the double Card wrapping.
-            Let's modify FunctionBreakdownChart to be a pure chart renderer or make it flexible.
-        */}
-        <FunctionBreakdownChart data={chartData} headless />
+      <CardContent className="flex-1 min-h-0">
+        <FunctionBreakdownChart data={donutData} />
       </CardContent>
     </Card>
   );

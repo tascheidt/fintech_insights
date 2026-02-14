@@ -1,93 +1,117 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { ReactNode } from "react";
 
-export interface StatCardData {
+interface StatCardDef {
   label: string;
-  value: number | string;
+  value: ReactNode;
+  subtitle?: string;
   href?: string;
-  trend?: {
-    value: number;
-    label: string; // e.g. "vs last week"
-    direction: "up" | "down" | "neutral";
-  };
+  sparkline?: number[];
+}
+
+function Sparkline({ data, className }: { data: number[]; className?: string }) {
+  if (data.length < 2) return null;
+
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const width = 60;
+  const height = 20;
+
+  const points = data.map((value, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((value - min) / range) * (height - 2) - 1;
+    return `${x},${y}`;
+  });
+
+  const pathD = `M ${points.join(" L ")}`;
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      className={cn("text-primary", className)}
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      <path
+        d={pathD}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 export function StatsCards({
   activeJobs,
-  newToday,
-  insightsCount,
-  newThisWeek,
-  newLastWeek,
+  netThisWeek,
+  avgWeeklyVelocity,
+  companiesTracked,
+  sparklineData,
 }: {
   activeJobs: number;
-  newToday: number;
-  insightsCount: number;
-  newThisWeek: number;
-  newLastWeek: number;
+  netThisWeek: { newCount: number; closedCount: number };
+  avgWeeklyVelocity: number;
+  companiesTracked: number;
+  sparklineData: number[];
 }) {
-  // Calculate trend for "New This Week"
-  let weekTrendValue = 0;
-  let weekTrendDirection: "up" | "down" | "neutral" = "neutral";
+  const net = netThisWeek.newCount - netThisWeek.closedCount;
 
-  if (newLastWeek > 0) {
-    weekTrendValue = Math.round(((newThisWeek - newLastWeek) / newLastWeek) * 100);
-    weekTrendDirection = weekTrendValue > 0 ? "up" : weekTrendValue < 0 ? "down" : "neutral";
-  } else if (newThisWeek > 0) {
-    // Growth from zero
-    weekTrendValue = 100;
-    weekTrendDirection = "up";
-  }
-  
-  const stats: StatCardData[] = [
-    { 
-      label: "Active Jobs", 
+  const stats: StatCardDef[] = [
+    {
+      label: "Active Jobs",
       value: activeJobs,
-      href: "/jobs?status=active"
+      href: "/jobs?status=active",
+      sparkline: sparklineData,
     },
-    { 
-      label: "New Today", 
-      value: newToday,
-      href: "/jobs?date=today"
-    },
-    { 
-      label: "Insights", 
-      value: insightsCount,
-      href: "/digests"
-    },
-    { 
-      label: "New This Week", 
-      value: newThisWeek,
+    {
+      label: "Net This Week",
+      value: (
+        <span>
+          <span className="text-green-600">+{netThisWeek.newCount}</span>
+          <span className="text-muted-foreground mx-1">/</span>
+          <span className="text-red-500">-{netThisWeek.closedCount}</span>
+        </span>
+      ),
+      subtitle: `Net ${net >= 0 ? "+" : ""}${net}`,
       href: "/jobs?date=week",
-      trend: {
-        value: Math.abs(weekTrendValue),
-        label: "vs last week",
-        direction: weekTrendDirection
-      }
+    },
+    {
+      label: "Avg Weekly Velocity",
+      value: avgWeeklyVelocity,
+      subtitle: "new postings/week",
+    },
+    {
+      label: "Companies Tracked",
+      value: companiesTracked,
+      href: "/companies",
     },
   ];
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {stats.map(({ label, value, href, trend }) => {
+      {stats.map(({ label, value, subtitle, href, sparkline }) => {
         const Content = (
-          <Card className={cn("h-full transition-colors", href && "hover:bg-muted/50")}>
+          <Card
+            className={cn("h-full transition-colors", href && "hover:bg-muted/50")}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <span className="text-sm font-medium text-muted-foreground">{label}</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                {label}
+              </span>
+              {sparkline && sparkline.length >= 2 && (
+                <Sparkline data={sparkline} />
+              )}
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{value}</div>
-              {trend && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  <span className={cn(
-                    "font-medium",
-                    trend.direction === "up" && "text-green-600",
-                    trend.direction === "down" && "text-red-600"
-                  )}>
-                    {trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : ""} {trend.value}%
-                  </span>
-                  {" "}{trend.label}
-                </p>
+              {subtitle && (
+                <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
               )}
             </CardContent>
           </Card>
