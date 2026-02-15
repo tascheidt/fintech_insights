@@ -1,5 +1,5 @@
 #!/bin/bash
-# Weekly report script for Fintech Job Intelligence System
+# Weekly report script for The Fintech Talent Brief
 # Generates and sends the weekly strategic intelligence report
 
 set -e

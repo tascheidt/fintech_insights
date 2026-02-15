@@ -47,7 +47,7 @@ export function DashboardNav({
     <header className="border-b">
       <div className="flex h-14 items-center px-4 sm:px-6 gap-4 sm:gap-6">
         <Link href="/" className="font-semibold text-sm sm:text-base">
-          Fintech Intelligence
+          Talent Brief
         </Link>
         
         {/* Desktop Navigation - Hidden on mobile */}

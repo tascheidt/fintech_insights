@@ -1,4 +1,4 @@
-# Fintech Job Intelligence System
+# The Fintech Talent Brief
 
 A competitive intelligence tool that tracks job postings from Canadian and international fintech companies, analyzes them for strategic insights, and builds a repository of job templates.
 

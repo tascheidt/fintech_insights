@@ -1,4 +1,4 @@
-# Fintech Intelligence Web App
+# The Fintech Talent Brief — Web App
 
 Next.js 14 web application for the Fintech Competitive Intelligence Platform.
 

@@ -122,7 +122,7 @@ class EmailDelivery:
         if report_date is None:
             report_date = datetime.utcnow().strftime("%Y-%m-%d")
 
-        subject = f"Fintech Competitive Intelligence Report - {report_date}"
+        subject = f"The Fintech Talent Brief - {report_date}"
 
         return self.send_report(
             recipients=recipients,
@@ -170,7 +170,7 @@ class EmailDelivery:
         <p>{details}</p>
     </div>
     <p style="color: #999; font-size: 0.85em; margin-top: 20px;">
-        Sent by Fintech Job Intelligence System
+        Sent by The Fintech Talent Brief
     </p>
 </body>
 </html>
