@@ -16,6 +16,7 @@ interface WeeklyDigestEmailProps {
   digest: WeeklyDigest;
   digestId: string;  // NEW - for deep linking
   appUrl?: string;
+  version?: string;
 }
 
 /**
@@ -109,7 +110,7 @@ function CompanySection({ company, appUrl = "https://fintech-talent-brief.vercel
  * 
  * Clean, minimal design with TLDR-style AI commentary for each company
  */
-export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-talent-brief.vercel.app" }: WeeklyDigestEmailProps) {
+export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-talent-brief.vercel.app", version }: WeeklyDigestEmailProps) {
   const dateRange = formatDateRange(digest.week_start, digest.week_end);
   const previewText = `The Fintech Talent Brief: ${digest.total_jobs} new jobs across ${digest.total_companies} companies this week`;
   const digestUrl = `${appUrl}/digests/${digestId}`;
@@ -259,6 +260,15 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
             <Text style={footerMuted}>
               The Fintech Talent Brief | Hiring Intelligence for Fintech
             </Text>
+            {version && (
+              <Text style={footerVersion}>
+                v{version}
+                {" \u2013 "}
+                <Link href={`${appUrl}/releases`} style={footerVersionLink}>
+                  See what&apos;s new
+                </Link>
+              </Text>
+            )}
           </Section>
         </Container>
       </Body>
@@ -431,6 +441,19 @@ const footerMuted: React.CSSProperties = {
   color: "#9ca3af",
   fontSize: "12px",
   margin: "0",
+};
+
+const footerVersion: React.CSSProperties = {
+  color: "#c0c0c0",
+  fontSize: "11px",
+  margin: "8px 0 0",
+  textAlign: "center" as const,
+};
+
+const footerVersionLink: React.CSSProperties = {
+  color: "#9ca3af",
+  fontSize: "11px",
+  textDecoration: "underline",
 };
 
 export default WeeklyDigestEmail;

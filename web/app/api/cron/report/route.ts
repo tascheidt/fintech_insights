@@ -18,6 +18,7 @@ import {
 } from "@/lib/analysis/company-insights";
 import { getWeeklyData, generateWeeklyReport, WeeklyDigest } from "@/lib/analysis/digest";
 import { WeeklyDigestEmail } from "@/lib/email/templates/weekly-digest";
+import { getLatestVersion } from "@/lib/releases";
 import { requireCronAuth } from "@/lib/cron/auth";
 
 export const maxDuration = 300; // Increased to handle company insights and AI generation
@@ -295,7 +296,7 @@ export async function GET(req: NextRequest) {
               from,
               to: user.email,
               subject,
-              react: WeeklyDigestEmail({ digest, digestId: savedDigestId, appUrl }),
+              react: WeeklyDigestEmail({ digest, digestId: savedDigestId, appUrl, version: getLatestVersion() }),
             }));
 
             // Send batch using Resend Batch API
