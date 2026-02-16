@@ -64,12 +64,12 @@ export default function LoginPage() {
           ============================================ */}
       <section className="max-w-3xl space-y-8">
         <h1 className="text-5xl font-bold tracking-tight text-foreground sm:text-6xl md:text-7xl">
-          Your Fintech <br />
-          <span className="text-muted-foreground">Intelligence Hub.</span>
+          The Fintech <br />
+          <span className="text-muted-foreground">Talent Brief.</span>
         </h1>
 
         <p className="mx-auto max-w-xl text-xl text-muted-foreground sm:text-2xl leading-relaxed">
-          Track competitor moves, decode hiring signals, and stay ahead of the market.
+          Fintech hiring intelligence, delivered as a weekly analyst briefing.
         </p>
 
         <div className="flex flex-col items-center gap-4 pt-8">

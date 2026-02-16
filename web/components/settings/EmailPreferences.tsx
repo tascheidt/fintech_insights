@@ -87,7 +87,7 @@ export function EmailPreferences({ initialWeeklyDigest }: EmailPreferencesProps)
               Weekly Strategic Digest
             </label>
             <p className="text-sm text-muted-foreground">
-              Receive weekly email summaries of fintech hiring trends and strategic insights
+              Receive The Fintech Talent Brief — weekly hiring intelligence for fintech
             </p>
           </div>
           <Switch

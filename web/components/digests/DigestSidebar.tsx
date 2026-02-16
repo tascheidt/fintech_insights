@@ -137,7 +137,7 @@ export function DigestSidebar({ digests }: DigestSidebarProps) {
       <div className="p-4 border-b">
         <Link href="/digests" className="block">
           <h2 className="font-bold text-lg">TLDR</h2>
-          <p className="text-xs text-muted-foreground">by Fintech Intelligence</p>
+          <p className="text-xs text-muted-foreground">by The Fintech Talent Brief</p>
         </Link>
       </div>
 

@@ -72,7 +72,7 @@ function GlobalSummarySection({ summary }: { summary: GlobalSummary }) {
 /**
  * Company section component
  */
-function CompanySection({ company, appUrl = "https://fintech-insights.vercel.app" }: { company: CompanyWeeklySummary; appUrl?: string }) {
+function CompanySection({ company, appUrl = "https://fintech-talent-brief.vercel.app" }: { company: CompanyWeeklySummary; appUrl?: string }) {
   const primaryFocus = getPrimaryFocus(company.departments);
   const techList = company.dominant_tech.slice(0, 3).join(", ") || "Various";
   const companyUrl = `${appUrl}/companies/${company.company_slug}`;
@@ -109,9 +109,9 @@ function CompanySection({ company, appUrl = "https://fintech-insights.vercel.app
  * 
  * Clean, minimal design with TLDR-style AI commentary for each company
  */
-export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-insights.vercel.app" }: WeeklyDigestEmailProps) {
+export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-talent-brief.vercel.app" }: WeeklyDigestEmailProps) {
   const dateRange = formatDateRange(digest.week_start, digest.week_end);
-  const previewText = `Fintech Insights: ${digest.total_jobs} new jobs across ${digest.total_companies} companies this week`;
+  const previewText = `The Fintech Talent Brief: ${digest.total_jobs} new jobs across ${digest.total_companies} companies this week`;
   const digestUrl = `${appUrl}/digests/${digestId}`;
 
   return (
@@ -123,7 +123,7 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
           {/* Header */}
           <Section style={header}>
             <Heading as="h1" style={title}>
-              Fintech Insights Weekly
+              The Fintech Talent Brief
             </Heading>
             <Text style={subtitle}>
               {dateRange}
@@ -257,7 +257,7 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
               </Link>
             </Text>
             <Text style={footerMuted}>
-              Fintech Insights | Competitive Intelligence Platform
+              The Fintech Talent Brief | Hiring Intelligence for Fintech
             </Text>
           </Section>
         </Container>

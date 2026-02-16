@@ -17,7 +17,7 @@ reports:
 
 logging:
   level: INFO
-  file: logs/fintech_insights.log
+  file: logs/fintech_talent_brief.log
 
 schedule:
   collection_time: "06:00"

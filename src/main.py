@@ -1,4 +1,4 @@
-"""Main CLI entry point for the Fintech Job Intelligence System."""
+"""Main CLI entry point for The Fintech Talent Brief."""
 
 import os
 import sys
@@ -68,12 +68,12 @@ def load_config() -> dict:
 @click.option("--log-file", type=click.Path(), help="Log file path")
 @click.pass_context
 def cli(ctx, verbose, log_file):
-    """Fintech Job Intelligence System - Track competitor job postings."""
+    """The Fintech Talent Brief — hiring intelligence for fintech."""
     ctx.ensure_object(dict)
 
     log_level = "DEBUG" if verbose else "INFO"
     if log_file is None:
-        log_file = get_project_root() / "logs" / "fintech_insights.log"
+        log_file = get_project_root() / "logs" / "fintech_talent_brief.log"
     setup_logging(log_level, str(log_file))
 
     # Load config and initialize database
@@ -311,7 +311,7 @@ def stats(ctx):
     """Show current statistics."""
     db = ctx.obj["db"]
 
-    click.echo("\n=== Fintech Job Intelligence Statistics ===\n")
+    click.echo("\n=== Fintech Talent Brief Statistics ===\n")
 
     # Company stats
     company_stats = db.get_posting_counts_by_company()
@@ -386,12 +386,12 @@ def test_email(ctx):
             <html>
             <body>
                 <h1>Test Email</h1>
-                <p>This is a test email from Fintech Job Intelligence System.</p>
+                <p>This is a test email from The Fintech Talent Brief.</p>
                 <p>If you're seeing this, email delivery is working correctly!</p>
             </body>
             </html>
             """
-            if emailer.send_report(recipients, "Test - Fintech Job Intelligence", test_html):
+            if emailer.send_report(recipients, "Test - The Fintech Talent Brief", test_html):
                 click.echo(f"Test email sent to {recipients}")
             else:
                 click.echo("Failed to send test email")

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fintech Job Intelligence System - Run Script
+# The Fintech Talent Brief - Run Script
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

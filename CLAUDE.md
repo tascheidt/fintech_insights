@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Fintech Job Intelligence System - a competitive intelligence platform tracking job postings from fintech companies. Two components:
+The Fintech Talent Brief - a hiring intelligence platform tracking job postings from fintech companies. Two components:
 - **Python CLI backend** (`/src`): Scraping, analysis, and reporting
 - **Next.js web app** (`/web`): Dashboard hosted on Vercel
 

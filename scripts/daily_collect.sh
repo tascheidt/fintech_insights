@@ -1,5 +1,5 @@
 #!/bin/bash
-# Daily job collection script for Fintech Job Intelligence System
+# Daily job collection script for The Fintech Talent Brief
 # Runs daily to collect new job postings and generate strategic analysis
 
 set -e

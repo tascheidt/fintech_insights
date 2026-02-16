@@ -266,10 +266,10 @@ export async function GET(req: NextRequest) {
     console.log(`Found ${optedInUsers.length} users opted in to weekly digest`);
 
     // Send emails using Resend Batch API
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fintech-insights.vercel.app";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fintech-talent-brief.vercel.app";
     const from = process.env.RESEND_FROM || "onboarding@resend.dev";
     const resendKey = process.env.RESEND_API_KEY;
-    const subject = `Fintech Insights Weekly – ${format(new Date(), "MMM d, yyyy")}`;
+    const subject = `The Fintech Talent Brief – ${format(new Date(), "MMM d, yyyy")}`;
 
     let emailSent = false;
     let successCount = 0;
