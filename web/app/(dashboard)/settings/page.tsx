@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmailPreferences } from "@/components/settings/EmailPreferences";
+import { FeedbackHistory } from "@/components/feedback/FeedbackHistory";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -30,6 +31,8 @@ export default async function SettingsPage() {
       </Card>
 
       <EmailPreferences initialWeeklyDigest={weeklyDigestEnabled} />
+
+      <FeedbackHistory />
     </div>
   );
 }

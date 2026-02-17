@@ -13,8 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { format } from "date-fns";
 
-export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function JobDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ source?: string }>;
+}) {
   const { id } = await params;
+  const { source } = await searchParams;
   const supabase = await createClient();
 
   const { data: job, error } = await supabase
@@ -37,8 +44,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
-          <Link href={company?.slug ? `/companies/${company.slug}` : "/companies"}>
-            ← Back to {company?.name ?? "Companies"}
+          <Link href={source === "jobs" ? "/jobs" : company?.slug ? `/companies/${company.slug}` : "/companies"}>
+            ← Back to {source === "jobs" ? "Jobs" : company?.name ?? "Companies"}
           </Link>
         </Button>
       </div>

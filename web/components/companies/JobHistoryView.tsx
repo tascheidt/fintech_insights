@@ -300,9 +300,9 @@ export function JobHistoryView({
           </p>
         </div>
       ) : view === "card" ? (
-        <JobsCardView jobs={paginatedJobs} />
+        <JobsCardView jobs={paginatedJobs} source={companySlug === "all" ? "jobs" : "company"} />
       ) : (
-        <JobsTableView jobs={paginatedJobs} />
+        <JobsTableView jobs={paginatedJobs} source={companySlug === "all" ? "jobs" : "company"} />
       )}
 
       {/* Pagination */}
@@ -340,14 +340,14 @@ export function JobHistoryView({
 /**
  * Card view for jobs
  */
-function JobsCardView({ jobs }: { jobs: JobData[] }) {
+function JobsCardView({ jobs, source }: { jobs: JobData[]; source: string }) {
   const hasCompanyInfo = jobs.some((j) => j.companyName);
   const router = useRouter();
   
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {jobs.map((job) => (
-        <Link key={job.id} href={`/jobs/${job.id}`}>
+        <Link key={job.id} href={`/jobs/${job.id}?source=${source}`}>
           <NotionCard className="h-full">
             <NotionCardContent>
               {/* Title and status */}
@@ -431,7 +431,7 @@ function JobsCardView({ jobs }: { jobs: JobData[] }) {
 /**
  * Table view for jobs
  */
-function JobsTableView({ jobs }: { jobs: JobData[] }) {
+function JobsTableView({ jobs, source }: { jobs: JobData[]; source: string }) {
   const hasCompanyInfo = jobs.some((j) => j.companyName);
   
   return (
@@ -455,7 +455,7 @@ function JobsTableView({ jobs }: { jobs: JobData[] }) {
             <TableRow key={job.id}>
               <TableCell className="font-medium">
                 <Link
-                  href={`/jobs/${job.id}`}
+                  href={`/jobs/${job.id}?source=${source}`}
                   className="text-primary hover:underline"
                 >
                   {job.title}
