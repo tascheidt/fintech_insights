@@ -166,6 +166,33 @@ Each company needs: `name`, `slug`, `country`, `ats_type`, `ats_identifier`
 2. Add to factory in `src/scrapers/__init__.py`
 3. For web scrapers: add to `web/lib/scrapers/`
 
+## Release / Changelog
+
+**Every user-facing or notable change MUST include a changelog update.**
+
+### How to update
+1. Open `web/data/releases.json`
+2. Add a bullet to the current version's `changes` array, or create a new version entry if shipping a version bump
+3. Use the correct change type: `"feature"` (new functionality), `"fix"` (bug fix), `"improvement"` (enhancement to existing feature)
+4. Keep descriptions to one sentence
+
+### When to bump the version
+- **patch** (1.0.x): bug fixes only
+- **minor** (1.x.0): new features or improvements
+- **major** (x.0.0): breaking changes or major redesigns
+- Bump in both `web/package.json` and `web/data/releases.json`
+
+### What counts as "notable"
+- Any new page, feature, or UI component
+- Bug fixes that affected user-visible behavior
+- Performance improvements users would notice
+- Changes to the email digest format
+
+### What does NOT need a changelog entry
+- Internal refactors with no user-visible effect
+- Dev tooling, CI/CD, or test changes
+- Dependency updates (unless they change behavior)
+
 ## AI Model Requirements
 
 **IMPORTANT: Always use the latest Gemini 3 models. Never use Gemini 2.x or older.**

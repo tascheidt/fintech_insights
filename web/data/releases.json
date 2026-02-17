@@ -1,0 +1,12 @@
+[
+  {
+    "version": "1.0.0",
+    "date": "2026-02-16",
+    "changes": [
+      { "type": "feature", "description": "Release history page and newsletter footer" },
+      { "type": "feature", "description": "Rebrand to The Fintech Talent Brief" },
+      { "type": "feature", "description": "Stratechery-style analyst briefing format for weekly digests" },
+      { "type": "feature", "description": "Intelligence-first dashboard redesign" }
+    ]
+  }
+]
