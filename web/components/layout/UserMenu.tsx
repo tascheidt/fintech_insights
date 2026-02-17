@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { MessageSquare } from "lucide-react";
-import { CircleUser } from "lucide-react";
+import { MessageSquare, CircleUser } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,8 +46,9 @@ export function UserMenu({ email }: { email: string | undefined }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm">
-            {email || "Account"}
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <CircleUser className="h-5 w-5" />
+            <span className="sr-only">{email || "Account"}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -60,34 +60,20 @@ export function UserMenu({ email }: { email: string | undefined }) {
           <DropdownMenuItem asChild>
             <a href="/settings">Settings</a>
           </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <a href="/releases" className="flex items-center gap-1.5">
+              Releases
+              {hasNewRelease && (
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+              )}
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={signOut}>Sign out</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </>
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <CircleUser className="h-5 w-5" />
-          <span className="sr-only">{email || "Account"}</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <a href="/settings">Settings</a>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <a href="/releases" className="flex items-center gap-1.5">
-            Releases
-            {hasNewRelease && (
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-            )}
-          </a>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={signOut}>Sign out</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
