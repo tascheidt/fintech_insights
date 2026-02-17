@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JobsTabContent } from "@/components/admin/JobsTabContent";
+import { FeedbackReviewTable } from "@/components/admin/FeedbackReviewTable";
 import { parseCronExpression } from "@/lib/utils/cron";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -74,6 +75,7 @@ export default async function AdminPage() {
         <TabsList>
           <TabsTrigger value="jobs">Jobs</TabsTrigger>
           <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="feedback">Feedback</TabsTrigger>
         </TabsList>
 
         {/* Jobs Tab */}
@@ -127,6 +129,11 @@ export default async function AdminPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Feedback Tab */}
+        <TabsContent value="feedback">
+          <FeedbackReviewTable />
         </TabsContent>
       </Tabs>
     </div>
