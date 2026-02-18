@@ -140,6 +140,7 @@ async function main() {
           tech_stack: structure.tech_stack,
           keywords: structure.keywords || [],
           standardized_department: structure.standardized_department,
+          function_category: structure.function_category,
           normalized_title: normalizedTitle,
           // Clean invalid department values (set to null)
           department: cleanedDepartment,
