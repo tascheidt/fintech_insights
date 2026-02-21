@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.1.1",
+    "date": "2026-02-21",
+    "changes": [
+      { "type": "improvement", "description": "Upgraded strategic analysis and insight chat to Gemini 3.1 Pro for deeper reasoning and more accurate web grounding" }
+    ]
+  },
+  {
     "version": "1.1.0",
     "date": "2026-02-17",
     "changes": [
