@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.1.2",
+    "date": "2026-02-21",
+    "changes": [
+      { "type": "feature", "description": "Strong-fit feedback is automatically converted into GitHub Issues; admins can trigger code generation for accepted issues directly from the review panel" }
+    ]
+  },
+  {
     "version": "1.1.1",
     "date": "2026-02-21",
     "changes": [
