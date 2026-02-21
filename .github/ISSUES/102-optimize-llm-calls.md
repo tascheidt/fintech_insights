@@ -5,7 +5,7 @@ Gemini API calls are duplicated across 12+ modules (analysis libs, API routes, s
 
 ## Current state
 - **Where:** `web/lib/analysis/*` (structure, strategic, company-research, company-insights, categorizer, advanced-strategic, digest), `web/app/api/**/chat/route.ts`, backfill scripts.
-- **Pattern:** Every caller does `const key = process.env.GEMINI_API_KEY` → check → `new GoogleGenerativeAI(key)` → `getGenerativeModel({ model: "gemini-3-flash-preview" | "gemini-3-pro-preview" })` → `generateContent(...)`.
+- **Pattern:** Every caller does `const key = process.env.GEMINI_API_KEY` → check → `new GoogleGenerativeAI(key)` → `getGenerativeModel({ model: "gemini-3-flash-preview" | "gemini-3.1-pro-preview" })` → `generateContent(...)`.
 - **Inconsistencies:** Mixed error handling (throw vs warn vs skip), differing fallback behavior (Pro→Flash in some places, not others), no shared retries, logging, or cost/token tracking.
 - **Result:** Hard to change models, add rate limiting, mock for tests, or understand usage/cost.
 

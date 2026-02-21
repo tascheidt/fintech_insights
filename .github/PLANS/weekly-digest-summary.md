@@ -7,7 +7,7 @@ We are adding a "Global Summary" section to the weekly digest email. This sectio
 
 ## Critical Decisions
 - **Two-Pass AI Analysis**: We will first generate individual company summaries (as we do now), and then perform a second AI pass using those summaries as context to generate the global summary. This ensures the global summary is grounded in the specific insights we've already found.
-- **Gemini 3 Pro**: We will use `gemini-3-pro-preview` for the global summary generation to ensure high-quality synthesis and trend spotting.
+- **Gemini 3.1 Pro**: We will use `gemini-3.1-pro-preview` for the global summary generation to ensure high-quality synthesis and trend spotting.
 - **Fallback Strategy**: If the global summary generation fails (e.g., API error), we will omit the section rather than showing a generic placeholder, to maintain high signal-to-noise ratio.
 
 ## Tasks

@@ -217,9 +217,9 @@ async function fetchFreshNewsContext(companyName: string): Promise<CompanyNewsCo
   try {
     const genAI = new GoogleGenerativeAI(key);
     
-    // Use Gemini 3 Pro with grounding for web search
+    // Use Gemini 3.1 Pro with grounding for web search
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }], // Enable grounding
       generationConfig: {
