@@ -152,7 +152,7 @@ async function performWebSearch(companyName: string): Promise<Array<{ title: str
     let model: GenerativeModel;
     try {
       model = genAI.getGenerativeModel({
-        model: "gemini-3-pro-preview",
+        model: "gemini-3.1-pro-preview",
         // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
         tools: [{ googleSearch: {} }],
       });
@@ -226,7 +226,7 @@ function formatWebContext(results: Array<{ title: string; snippet: string; url: 
 }
 
 /**
- * Advanced job analysis using Gemini 3 Pro with extended thinking and web search
+ * Advanced job analysis using Gemini 3.1 Pro with extended thinking and web search
  */
 export async function analyzeJobAdvanced(
   options: AnalyzeJobOptions
@@ -271,7 +271,7 @@ export async function analyzeJobAdvanced(
     // Use Gemini model with fallback (pro -> flash)
     // Try pro model first, but fallback to flash if quota exceeded
     let model: GenerativeModel = genAI.getGenerativeModel({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
       generationConfig: {
@@ -292,7 +292,7 @@ export async function analyzeJobAdvanced(
     } catch (error: any) {
       // If we get a quota error during generation, try flash model as fallback
       if (error?.status === 429 || error?.message?.includes("quota") || error?.message?.includes("limit") || error?.message?.includes("exceeded")) {
-        console.warn(`gemini-3-pro-preview quota exceeded: ${error.message}. Falling back to gemini-3-flash-preview.`);
+        console.warn(`gemini-3.1-pro-preview quota exceeded: ${error.message}. Falling back to gemini-3-flash-preview.`);
         model = genAI.getGenerativeModel({
           model: "gemini-3-flash-preview",
           generationConfig: {

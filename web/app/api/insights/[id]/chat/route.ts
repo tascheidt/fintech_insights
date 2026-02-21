@@ -125,7 +125,7 @@ Your role is to answer follow-up questions about this insight, provide deeper an
     
     // Try pro model first, fallback to flash if quota exceeded
     let model = genAI.getGenerativeModel({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
       systemInstruction: systemPrompt,
@@ -153,7 +153,7 @@ Your role is to answer follow-up questions about this insight, provide deeper an
     } catch (error: any) {
       // If we get a quota error during generation, try flash model as fallback
       if (error?.status === 429 || error?.message?.includes("quota") || error?.message?.includes("limit") || error?.message?.includes("exceeded")) {
-        console.warn(`gemini-3-pro-preview quota exceeded: ${error.message}. Falling back to gemini-3-flash-preview.`);
+        console.warn(`gemini-3.1-pro-preview quota exceeded: ${error.message}. Falling back to gemini-3-flash-preview.`);
         model = genAI.getGenerativeModel({
           model: "gemini-3-flash-preview",
           systemInstruction: systemPrompt,
