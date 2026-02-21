@@ -1,8 +1,7 @@
 /**
- * Advanced Strategic Analysis using Gemini 3 Pro
- * 
+ * Advanced Strategic Analysis using Gemini 3.1 Pro
+ *
  * Features:
- * - Extended thinking budget (24576 tokens)
  * - Google Search tool for web grounding
  * - Historical context comparison
  * - Novelty detection and executive movement analysis
@@ -10,11 +9,71 @@
 
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 import { buildHistoricalContext, formatHistoricalContextForPrompt, type HistoricalContext } from "./context-builder";
-import { createAdminClient } from "@/lib/supabase/admin";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const PRO_MODEL = "gemini-3.1-pro-preview";
+const FLASH_MODEL = "gemini-3-flash-preview";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface WebSearchResult {
+  title: string;
+  snippet: string;
+  url: string;
+}
+
+/**
+ * Result from advanced job analysis
+ *
+ * TLDR-style additions:
+ * - headline: Punchy, emoji-forward headline for digest display
+ * - what_it_means: Plain-language takeaway for readers
+ */
+export interface AdvancedAnalyzeResult {
+  /** Punchy headline with emoji (e.g., "🚀 Koho bets big on small businesses!") */
+  headline: string;
+  category: string;
+  /** Conversational 2-3 sentence summary */
+  insight_summary: string;
+  /** Plain-language one-liner takeaway */
+  what_it_means: string;
+  strategic_signals: string[];
+  is_new_direction: boolean;
+  confidence: string;
+  novelty_score: number;
+  novelty_reasoning: string;
+  is_executive_movement: boolean;
+  executive_context?: string;
+  strategic_hypothesis: string;
+  web_corroboration?: string;
+  model_reasoning: string;
+}
+
+export interface AnalyzeJobOptions {
+  companyId: string;
+  companyName: string;
+  job: {
+    title: string;
+    standardized_department?: string | null;
+    location?: string | null;
+    description_text?: string | null;
+  };
+  historicalContext?: HistoricalContext;
+  webSearchResults?: WebSearchResult[];
+}
+
+// ---------------------------------------------------------------------------
+// Prompt
+// ---------------------------------------------------------------------------
 
 /**
  * Advanced analysis prompt with TLDR-style punchy voice
- * 
+ *
  * Key additions for TLDR style:
  * - headline: Punchy, emoji-forward headline (e.g., "🚀 Koho bets big on small businesses!")
  * - Conversational insight_summary in plain language
@@ -93,52 +152,117 @@ Respond with a JSON object containing:
   "model_reasoning": "your detailed reasoning process and confidence assessment"
 }`;
 
-/**
- * Result from advanced job analysis
- * 
- * TLDR-style additions:
- * - headline: Punchy, emoji-forward headline for digest display
- * - what_it_means: Plain-language takeaway for readers
- */
-export interface AdvancedAnalyzeResult {
-  /** Punchy headline with emoji (e.g., "🚀 Koho bets big on small businesses!") */
-  headline: string;
-  category: string;
-  /** Conversational 2-3 sentence summary */
-  insight_summary: string;
-  /** Plain-language one-liner takeaway */
-  what_it_means: string;
-  strategic_signals: string[];
-  is_new_direction: boolean;
-  confidence: string;
-  novelty_score: number;
-  novelty_reasoning: string;
-  is_executive_movement: boolean;
-  executive_context?: string;
-  strategic_hypothesis: string;
-  web_corroboration?: string;
-  model_reasoning: string;
+function buildPrompt(
+  companyName: string,
+  job: AnalyzeJobOptions["job"],
+  historicalText: string,
+  webText: string
+): string {
+  return ADVANCED_PROMPT
+    .replace("{historical_context}", historicalText)
+    .replace("{web_context}", webText)
+    .replace("{company_name}", companyName)
+    .replace("{job_title}", job.title)
+    .replace("{department}", job.standardized_department ?? "Not specified")
+    .replace("{location}", job.location ?? "Not specified")
+    .replace("{description}", job.description_text ?? "No description available");
 }
 
-export interface AnalyzeJobOptions {
-  companyId: string;
-  companyName: string;
-  job: {
-    title: string;
-    standardized_department?: string | null;
-    location?: string | null;
-    description_text?: string | null;
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Returns true for quota / rate-limit errors from the Gemini API. */
+function isQuotaError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const e = error as Record<string, unknown>;
+  return (
+    e["status"] === 429 ||
+    (typeof e["message"] === "string" &&
+      (e["message"].includes("quota") ||
+        e["message"].includes("limit") ||
+        e["message"].includes("exceeded")))
+  );
+}
+
+/**
+ * Extract grounding results from a Gemini response.
+ * The SDK types don't fully expose groundingMetadata, so we read it via
+ * the raw candidates array.
+ */
+function extractGroundingResults(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  response: any
+): WebSearchResult[] {
+  try {
+    const chunks =
+      response?.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+    return (chunks as Array<{ web?: { title?: string; uri?: string; snippet?: string } }>)
+      .filter((c) => c.web?.uri)
+      .slice(0, 5)
+      .map((c, i) => ({
+        title: c.web?.title ?? `Search result ${i + 1}`,
+        snippet: c.web?.snippet ?? "",
+        url: c.web?.uri ?? "",
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function formatWebContext(results: WebSearchResult[]): string {
+  if (results.length === 0) {
+    return "No recent company news found via web search.";
+  }
+  let text = "Recent company news and strategy updates:\n\n";
+  for (const result of results) {
+    text += `- ${result.title}\n  ${result.snippet}\n  Source: ${result.url}\n\n`;
+  }
+  return text;
+}
+
+function parseAnalysisResult(
+  parsed: Record<string, unknown>,
+  companyName: string
+): AdvancedAnalyzeResult {
+  const noveltyScore =
+    typeof parsed["novelty_score"] === "number"
+      ? Math.max(1, Math.min(10, Math.round(parsed["novelty_score"])))
+      : 5;
+
+  return {
+    headline: String(parsed["headline"] ?? `📊 ${companyName} is hiring`),
+    category: String(parsed["category"] ?? "other"),
+    insight_summary: String(parsed["insight_summary"] ?? ""),
+    what_it_means: String(parsed["what_it_means"] ?? ""),
+    strategic_signals: Array.isArray(parsed["strategic_signals"])
+      ? (parsed["strategic_signals"] as string[])
+      : [],
+    is_new_direction: Boolean(parsed["is_new_direction"]),
+    confidence: String(parsed["confidence"] ?? "medium"),
+    novelty_score: noveltyScore,
+    novelty_reasoning: String(parsed["novelty_reasoning"] ?? ""),
+    is_executive_movement: Boolean(parsed["is_executive_movement"]),
+    executive_context: parsed["executive_context"]
+      ? String(parsed["executive_context"])
+      : undefined,
+    strategic_hypothesis: String(parsed["strategic_hypothesis"] ?? ""),
+    web_corroboration: parsed["web_corroboration"]
+      ? String(parsed["web_corroboration"])
+      : undefined,
+    model_reasoning: String(parsed["model_reasoning"] ?? ""),
   };
-  historicalContext?: HistoricalContext;
-  webSearchResults?: Array<{ title: string; snippet: string; url: string }>;
 }
 
+// ---------------------------------------------------------------------------
+// Web Search
+// ---------------------------------------------------------------------------
+
 /**
- * Perform web search for company strategy/news
- * Uses Gemini's Google Search tool to find recent company information
- * Falls back gracefully if quota is exceeded or model is unavailable
+ * Perform web search for company strategy/news using Gemini grounding.
+ * Falls back gracefully if quota is exceeded or model is unavailable.
  */
-async function performWebSearch(companyName: string): Promise<Array<{ title: string; snippet: string; url: string }>> {
+export async function performWebSearch(companyName: string): Promise<WebSearchResult[]> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     console.warn("GEMINI_API_KEY not configured, skipping web search");
@@ -147,140 +271,90 @@ async function performWebSearch(companyName: string): Promise<Array<{ title: str
 
   try {
     const genAI = new GoogleGenerativeAI(key);
-    
-    // Try to use pro model with web search, but handle quota errors gracefully
-    let model: GenerativeModel;
-    try {
-      model = genAI.getGenerativeModel({
-        model: "gemini-3.1-pro-preview",
-        // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
-        tools: [{ googleSearch: {} }],
-      });
-    } catch (error: any) {
-      // If quota exceeded or model unavailable, skip web search
-      if (error?.status === 429 || error?.message?.includes("quota") || error?.message?.includes("limit")) {
-        console.warn(`Web search unavailable (quota/model limit): ${error.message}. Continuing without web context.`);
-        return [];
-      }
-      throw error;
-    }
+    const model = genAI.getGenerativeModel({
+      model: PRO_MODEL,
+      // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
+      tools: [{ googleSearch: {} }],
+    });
 
     const searchQuery = `Recent news, strategy updates, funding, or product launches for ${companyName} fintech company in 2025 or 2026`;
-    
+
     const result = await model.generateContent({
       contents: [{
         role: "user",
-        parts: [{ text: `Search the web for: ${searchQuery}. Return the top 5 most relevant results with titles, snippets, and URLs.` }],
+        parts: [{ text: `Search the web for: ${searchQuery}. Summarise the top 5 most relevant results.` }],
       }],
     });
 
-    // The Google Search tool will be invoked automatically by the model
-    // We need to check the response for function calls and results
+    // Extract structured grounding results from groundingMetadata
+    const groundingResults = extractGroundingResults(result.response);
+    if (groundingResults.length > 0) {
+      return groundingResults;
+    }
+
+    // Fallback: pull any URLs from the text response
     const responseText = result.response.text();
-    
-    // If the model used the search tool, it will be in the response
-    // For now, we'll extract any URLs and snippets from the text response
-    // In production, you may need to handle function call responses differently
-    // based on the actual Gemini API response format
-    
-    // Try to parse structured data from response
-    // This is a fallback - the actual implementation may vary based on API version
-    const urlRegex = /https?:\/\/[^\s]+/g;
-    const urls = responseText.match(urlRegex) || [];
-    
-    // Return basic results - in production, you'd parse the actual function call response
+    const urls = responseText.match(/https?:\/\/[^\s]+/g) ?? [];
     if (urls.length > 0) {
       return urls.slice(0, 5).map((url, i) => ({
         title: `Search result ${i + 1}`,
         snippet: responseText.substring(0, 200) + "...",
-        url: url,
+        url,
       }));
     }
 
     return [];
-  } catch (error: any) {
-    // Handle quota errors gracefully
-    if (error?.status === 429 || error?.message?.includes("quota") || error?.message?.includes("limit")) {
-      console.warn(`Web search quota exceeded: ${error.message}. Continuing without web context.`);
+  } catch (error: unknown) {
+    if (isQuotaError(error)) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn(`Web search quota exceeded: ${msg}. Continuing without web context.`);
       return [];
     }
     console.error("Web search error:", error);
-    // Return empty array on error - analysis can continue without web context
     return [];
   }
 }
 
-/**
- * Format web search results for prompt
- */
-function formatWebContext(results: Array<{ title: string; snippet: string; url: string }>): string {
-  if (results.length === 0) {
-    return "No recent company news found via web search.";
-  }
-
-  let text = "Recent company news and strategy updates:\n\n";
-  for (const result of results) {
-    text += `- ${result.title}\n  ${result.snippet}\n  Source: ${result.url}\n\n`;
-  }
-  return text;
-}
+// ---------------------------------------------------------------------------
+// Analysis
+// ---------------------------------------------------------------------------
 
 /**
- * Advanced job analysis using Gemini 3.1 Pro with extended thinking and web search
+ * Advanced job analysis using Gemini 3.1 Pro with web search grounding.
+ * Falls back to Flash if the Pro quota is exceeded.
  */
 export async function analyzeJobAdvanced(
   options: AnalyzeJobOptions
 ): Promise<AdvancedAnalyzeResult | null> {
   const { companyId, companyName, job, historicalContext, webSearchResults } = options;
   const key = process.env.GEMINI_API_KEY;
-  
+
   if (!key) {
     console.error("GEMINI_API_KEY not configured");
     return null;
   }
 
   try {
-    // Build or use provided historical context
-    let context = historicalContext;
-    if (!context) {
-      context = await buildHistoricalContext(companyId, 90);
-    }
+    const context = historicalContext ?? (await buildHistoricalContext(companyId, 90));
+    const webResults = webSearchResults ?? (await performWebSearch(companyName));
 
-    // Perform web search if not provided
-    let webResults = webSearchResults;
-    if (!webResults) {
-      webResults = await performWebSearch(companyName);
-    }
-
-    // Build the prompt
-    const historicalText = formatHistoricalContextForPrompt(context);
-    const webText = formatWebContext(webResults);
-    const fullDescription = job.description_text || "No description available";
-
-    const prompt = ADVANCED_PROMPT
-      .replace("{historical_context}", historicalText)
-      .replace("{web_context}", webText)
-      .replace("{company_name}", companyName)
-      .replace("{job_title}", job.title)
-      .replace("{department}", job.standardized_department ?? "Not specified")
-      .replace("{location}", job.location ?? "Not specified")
-      .replace("{description}", fullDescription);
+    const prompt = buildPrompt(
+      companyName,
+      job,
+      formatHistoricalContextForPrompt(context),
+      formatWebContext(webResults)
+    );
 
     const genAI = new GoogleGenerativeAI(key);
-    
-    // Use Gemini model with fallback (pro -> flash)
-    // Try pro model first, but fallback to flash if quota exceeded
+
     let model: GenerativeModel = genAI.getGenerativeModel({
-      model: "gemini-3.1-pro-preview",
+      model: PRO_MODEL,
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
       generationConfig: {
         temperature: 0.6,
         maxOutputTokens: 64000,
         responseMimeType: "application/json",
-        // Extended thinking configuration for deep reasoning
-        // Note: The exact parameter name may vary - check latest Gemini API docs
-        // thinkingBudget: 24576, // Maximum thinking tokens for deep analysis
       },
     });
 
@@ -289,12 +363,12 @@ export async function analyzeJobAdvanced(
       result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
       });
-    } catch (error: any) {
-      // If we get a quota error during generation, try flash model as fallback
-      if (error?.status === 429 || error?.message?.includes("quota") || error?.message?.includes("limit") || error?.message?.includes("exceeded")) {
-        console.warn(`gemini-3.1-pro-preview quota exceeded: ${error.message}. Falling back to gemini-3-flash-preview.`);
+    } catch (error: unknown) {
+      if (isQuotaError(error)) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.warn(`${PRO_MODEL} quota exceeded: ${msg}. Falling back to ${FLASH_MODEL}.`);
         model = genAI.getGenerativeModel({
-          model: "gemini-3-flash-preview",
+          model: FLASH_MODEL,
           generationConfig: {
             temperature: 0.6,
             maxOutputTokens: 64000,
@@ -311,41 +385,20 @@ export async function analyzeJobAdvanced(
 
     const text = result.response.text()?.trim() ?? "{}";
     const parsed = JSON.parse(text) as Record<string, unknown>;
-
-    // Validate and return structured result
-    const noveltyScore = typeof parsed.novelty_score === "number" 
-      ? Math.max(1, Math.min(10, Math.round(parsed.novelty_score)))
-      : 5;
-
-    // Generate fallback headline if AI didn't provide one
-    const fallbackHeadline = `📊 ${companyName} is hiring`;
-
-    return {
-      headline: String(parsed.headline ?? fallbackHeadline),
-      category: String(parsed.category ?? "other"),
-      insight_summary: String(parsed.insight_summary ?? ""),
-      what_it_means: String(parsed.what_it_means ?? ""),
-      strategic_signals: Array.isArray(parsed.strategic_signals)
-        ? (parsed.strategic_signals as string[])
-        : [],
-      is_new_direction: Boolean(parsed.is_new_direction),
-      confidence: String(parsed.confidence ?? "medium"),
-      novelty_score: noveltyScore,
-      novelty_reasoning: String(parsed.novelty_reasoning ?? ""),
-      is_executive_movement: Boolean(parsed.is_executive_movement),
-      executive_context: parsed.executive_context ? String(parsed.executive_context) : undefined,
-      strategic_hypothesis: String(parsed.strategic_hypothesis ?? ""),
-      web_corroboration: parsed.web_corroboration ? String(parsed.web_corroboration) : undefined,
-      model_reasoning: String(parsed.model_reasoning ?? ""),
-    };
-  } catch (error) {
+    return parseAnalysisResult(parsed, companyName);
+  } catch (error: unknown) {
     console.error("Advanced Gemini analysis error:", error);
     return null;
   }
 }
 
+// ---------------------------------------------------------------------------
+// Batch Analysis
+// ---------------------------------------------------------------------------
+
 /**
- * Batch analyze multiple jobs with shared context
+ * Batch analyze multiple jobs with shared context.
+ * Builds historical context and performs web search once, then reuses for all jobs.
  */
 export async function analyzeJobsAdvanced(
   companyId: string,
@@ -358,13 +411,11 @@ export async function analyzeJobsAdvanced(
     description_text?: string | null;
   }>
 ): Promise<Array<{ jobId: string; result: AdvancedAnalyzeResult }>> {
-  // Build context once for all jobs
   const historicalContext = await buildHistoricalContext(companyId, 90);
   const webResults = await performWebSearch(companyName);
 
   const results: Array<{ jobId: string; result: AdvancedAnalyzeResult }> = [];
 
-  // Analyze each job with shared context
   for (const job of jobs) {
     const result = await analyzeJobAdvanced({
       companyId,
