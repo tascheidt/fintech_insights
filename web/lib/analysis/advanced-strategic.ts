@@ -2,8 +2,8 @@
  * Advanced Strategic Analysis using Gemini 3.1 Pro
  *
  * Features:
- * - Google Search tool for web grounding
- * - Historical context comparison
+ * - Google Search tool for web grounding (two-stage: pre-fetch + model grounding during analysis)
+ * - Historical context comparison (180-day window)
  * - Novelty detection and executive movement analysis
  */
 
@@ -17,6 +17,24 @@ import { buildHistoricalContext, formatHistoricalContextForPrompt, type Historic
 const PRO_MODEL = "gemini-3.1-pro-preview";
 const FLASH_MODEL = "gemini-3-flash-preview";
 
+/** How many days of hiring history to include as context for each job analysis. */
+const HISTORICAL_CONTEXT_DAYS = 180;
+
+/** Max grounding chunks to extract from the web search response. */
+const MAX_GROUNDING_CHUNKS = 8;
+
+/** Max concurrent LLM calls during batch analysis. */
+const BATCH_CONCURRENCY = 3;
+
+const VALID_CATEGORIES = [
+  "expansion", "new-product", "technology", "operational",
+  "compliance", "customer", "data", "marketing", "leadership", "other",
+] as const;
+type AnalysisCategory = typeof VALID_CATEGORIES[number];
+
+const VALID_CONFIDENCE = ["high", "medium", "low"] as const;
+type ConfidenceLevel = typeof VALID_CONFIDENCE[number];
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -25,6 +43,20 @@ export interface WebSearchResult {
   title: string;
   snippet: string;
   url: string;
+}
+
+/**
+ * Rich web research context returned from performWebSearch.
+ * Carries both the model's synthesized narrative AND individual source chunks.
+ *
+ * The synthesis text is typically the most valuable signal — it's the model's
+ * prose summary of what it found. The results array provides source attribution.
+ */
+export interface WebSearchContext {
+  /** Model's synthesized prose summary of its research findings. */
+  synthesis: string;
+  /** Individual grounding source chunks (title, snippet, URL). */
+  results: WebSearchResult[];
 }
 
 /**
@@ -37,14 +69,14 @@ export interface WebSearchResult {
 export interface AdvancedAnalyzeResult {
   /** Punchy headline with emoji (e.g., "🚀 Koho bets big on small businesses!") */
   headline: string;
-  category: string;
+  category: AnalysisCategory;
   /** Conversational 2-3 sentence summary */
   insight_summary: string;
   /** Plain-language one-liner takeaway */
   what_it_means: string;
   strategic_signals: string[];
   is_new_direction: boolean;
-  confidence: string;
+  confidence: ConfidenceLevel;
   novelty_score: number;
   novelty_reasoning: string;
   is_executive_movement: boolean;
@@ -64,7 +96,8 @@ export interface AnalyzeJobOptions {
     description_text?: string | null;
   };
   historicalContext?: HistoricalContext;
-  webSearchResults?: WebSearchResult[];
+  /** Pre-fetched web research context. If omitted, performWebSearch is called automatically. */
+  webSearchContext?: WebSearchContext;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +117,7 @@ const ADVANCED_PROMPT = `You are a sharp fintech analyst who writes like Wealths
 ## Company Historical Context
 {historical_context}
 
-## Recent Company News & Strategy (from web search)
+## Recent Company News & Strategy (from web research)
 {web_context}
 
 ## Current Job Posting to Analyze
@@ -146,7 +179,7 @@ Respond with a JSON object containing:
   "novelty_score": 1-10 integer,
   "novelty_reasoning": "detailed explanation of why this score was assigned",
   "is_executive_movement": true or false,
-  "executive_context": "if executive_movement is true, explain the significance",
+  "executive_context": "significance of this executive hire, or null if not an executive role",
   "strategic_hypothesis": "your best hypothesis about why this role exists and what it signals",
   "web_corroboration": "how recent company news/strategy relates to this posting",
   "model_reasoning": "your detailed reasoning process and confidence assessment"
@@ -186,7 +219,7 @@ function isQuotaError(error: unknown): boolean {
 }
 
 /**
- * Extract grounding results from a Gemini response.
+ * Extract grounding source chunks from a Gemini response.
  * The SDK types don't fully expose groundingMetadata, so we read it via
  * the raw candidates array.
  */
@@ -199,7 +232,7 @@ function extractGroundingResults(
       response?.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
     return (chunks as Array<{ web?: { title?: string; uri?: string; snippet?: string } }>)
       .filter((c) => c.web?.uri)
-      .slice(0, 5)
+      .slice(0, MAX_GROUNDING_CHUNKS)
       .map((c, i) => ({
         title: c.web?.title ?? `Search result ${i + 1}`,
         snippet: c.web?.snippet ?? "",
@@ -210,15 +243,47 @@ function extractGroundingResults(
   }
 }
 
-function formatWebContext(results: WebSearchResult[]): string {
-  if (results.length === 0) {
-    return "No recent company news found via web search.";
+/**
+ * Format web research context for the analysis prompt.
+ *
+ * Includes the model's synthesized narrative first (highest signal), followed
+ * by individual source attribution.
+ */
+function formatWebContext(ctx: WebSearchContext): string {
+  const parts: string[] = [];
+
+  if (ctx.synthesis) {
+    parts.push("### Research Summary\n" + ctx.synthesis);
   }
-  let text = "Recent company news and strategy updates:\n\n";
-  for (const result of results) {
-    text += `- ${result.title}\n  ${result.snippet}\n  Source: ${result.url}\n\n`;
+
+  if (ctx.results.length > 0) {
+    const sourceLines = ctx.results
+      .filter((r) => r.url)
+      .map((r) => {
+        const snippet = r.snippet ? `\n  ${r.snippet}` : "";
+        return `- ${r.title}${snippet}\n  Source: ${r.url}`;
+      })
+      .join("\n");
+    parts.push("### Sources\n" + sourceLines);
   }
-  return text;
+
+  return parts.length > 0
+    ? parts.join("\n\n")
+    : "No recent company news found via web research.";
+}
+
+function normalizeCategory(raw: unknown): AnalysisCategory {
+  const s = String(raw ?? "").toLowerCase().trim();
+  return (VALID_CATEGORIES as readonly string[]).includes(s)
+    ? (s as AnalysisCategory)
+    : "other";
+}
+
+function normalizeConfidence(raw: unknown): ConfidenceLevel {
+  const s = String(raw ?? "").toLowerCase().trim();
+  return (VALID_CONFIDENCE as readonly string[]).includes(s)
+    ? (s as ConfidenceLevel)
+    : "medium";
 }
 
 function parseAnalysisResult(
@@ -232,20 +297,21 @@ function parseAnalysisResult(
 
   return {
     headline: String(parsed["headline"] ?? `📊 ${companyName} is hiring`),
-    category: String(parsed["category"] ?? "other"),
+    category: normalizeCategory(parsed["category"]),
     insight_summary: String(parsed["insight_summary"] ?? ""),
     what_it_means: String(parsed["what_it_means"] ?? ""),
     strategic_signals: Array.isArray(parsed["strategic_signals"])
       ? (parsed["strategic_signals"] as string[])
       : [],
     is_new_direction: Boolean(parsed["is_new_direction"]),
-    confidence: String(parsed["confidence"] ?? "medium"),
+    confidence: normalizeConfidence(parsed["confidence"]),
     novelty_score: noveltyScore,
     novelty_reasoning: String(parsed["novelty_reasoning"] ?? ""),
     is_executive_movement: Boolean(parsed["is_executive_movement"]),
-    executive_context: parsed["executive_context"]
-      ? String(parsed["executive_context"])
-      : undefined,
+    executive_context:
+      parsed["executive_context"] && parsed["executive_context"] !== "null"
+        ? String(parsed["executive_context"])
+        : undefined,
     strategic_hypothesis: String(parsed["strategic_hypothesis"] ?? ""),
     web_corroboration: parsed["web_corroboration"]
       ? String(parsed["web_corroboration"])
@@ -255,18 +321,27 @@ function parseAnalysisResult(
 }
 
 // ---------------------------------------------------------------------------
-// Web Search
+// Web Research
 // ---------------------------------------------------------------------------
 
 /**
- * Perform web search for company strategy/news using Gemini grounding.
- * Falls back gracefully if quota is exceeded or model is unavailable.
+ * Perform web research for a company using Gemini grounding.
+ *
+ * Returns both the model's synthesized narrative (the primary signal) and the
+ * individual grounding source chunks. Falls back gracefully if quota is
+ * exceeded or the model is unavailable.
+ *
+ * NOTE: This is a separate pre-fetch step. The analysis model in
+ * analyzeJobAdvanced also has googleSearch available so it can do targeted
+ * follow-up searches during reasoning. These two stages are intentionally
+ * complementary: the pre-fetch provides general company context, while the
+ * analysis model can dig deeper on specific signals it encounters.
  */
-export async function performWebSearch(companyName: string): Promise<WebSearchResult[]> {
+export async function performWebSearch(companyName: string): Promise<WebSearchContext> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     console.warn("GEMINI_API_KEY not configured, skipping web search");
-    return [];
+    return { synthesis: "", results: [] };
   }
 
   try {
@@ -277,41 +352,58 @@ export async function performWebSearch(companyName: string): Promise<WebSearchRe
       tools: [{ googleSearch: {} }],
     });
 
-    const searchQuery = `Recent news, strategy updates, funding, or product launches for ${companyName} fintech company in 2025 or 2026`;
+    const now = new Date();
+    const cutoff = new Date(now);
+    cutoff.setMonth(cutoff.getMonth() - 18);
+    const recentCutoff = new Date(now);
+    recentCutoff.setMonth(recentCutoff.getMonth() - 3);
+
+    const fmt = (d: Date) =>
+      d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+    const searchQuery =
+      `${companyName} fintech company news, strategy, funding, partnerships, or product launches ` +
+      `from ${fmt(cutoff)} to ${fmt(now)}. ` +
+      `Prioritise results from ${fmt(recentCutoff)} to ${fmt(now)} first.`;
 
     const result = await model.generateContent({
       contents: [{
         role: "user",
-        parts: [{ text: `Search the web for: ${searchQuery}. Summarise the top 5 most relevant results.` }],
+        parts: [{
+          text:
+            `Research: ${searchQuery}. ` +
+            `Write a 3-5 sentence summary of the most significant strategic developments, ` +
+            `then list the top ${MAX_GROUNDING_CHUNKS} most relevant sources.`,
+        }],
       }],
     });
 
-    // Extract structured grounding results from groundingMetadata
-    const groundingResults = extractGroundingResults(result.response);
-    if (groundingResults.length > 0) {
-      return groundingResults;
-    }
+    // The model's text response is the synthesized research narrative
+    const synthesis = result.response.text()?.trim() ?? "";
 
-    // Fallback: pull any URLs from the text response
-    const responseText = result.response.text();
-    const urls = responseText.match(/https?:\/\/[^\s]+/g) ?? [];
-    if (urls.length > 0) {
-      return urls.slice(0, 5).map((url, i) => ({
-        title: `Search result ${i + 1}`,
-        snippet: responseText.substring(0, 200) + "...",
+    // Extract individual grounding source chunks for attribution
+    const groundingResults = extractGroundingResults(result.response);
+
+    // Fallback: if grounding metadata is empty, pull URLs from the text
+    if (groundingResults.length === 0) {
+      const urls = synthesis.match(/https?:\/\/[^\s]+/g) ?? [];
+      const fallbackResults = urls.slice(0, MAX_GROUNDING_CHUNKS).map((url, i) => ({
+        title: `Source ${i + 1}`,
+        snippet: "",
         url,
       }));
+      return { synthesis, results: fallbackResults };
     }
 
-    return [];
+    return { synthesis, results: groundingResults };
   } catch (error: unknown) {
     if (isQuotaError(error)) {
       const msg = error instanceof Error ? error.message : String(error);
       console.warn(`Web search quota exceeded: ${msg}. Continuing without web context.`);
-      return [];
+      return { synthesis: "", results: [] };
     }
     console.error("Web search error:", error);
-    return [];
+    return { synthesis: "", results: [] };
   }
 }
 
@@ -322,11 +414,15 @@ export async function performWebSearch(companyName: string): Promise<WebSearchRe
 /**
  * Advanced job analysis using Gemini 3.1 Pro with web search grounding.
  * Falls back to Flash if the Pro quota is exceeded.
+ *
+ * Two-stage web research:
+ * 1. Pre-fetch: performWebSearch provides a synthesized company overview
+ * 2. Analysis: the Pro model can do additional targeted searches during reasoning
  */
 export async function analyzeJobAdvanced(
   options: AnalyzeJobOptions
 ): Promise<AdvancedAnalyzeResult | null> {
-  const { companyId, companyName, job, historicalContext, webSearchResults } = options;
+  const { companyId, companyName, job, historicalContext, webSearchContext } = options;
   const key = process.env.GEMINI_API_KEY;
 
   if (!key) {
@@ -335,25 +431,29 @@ export async function analyzeJobAdvanced(
   }
 
   try {
-    const context = historicalContext ?? (await buildHistoricalContext(companyId, 90));
-    const webResults = webSearchResults ?? (await performWebSearch(companyName));
+    const context =
+      historicalContext ?? (await buildHistoricalContext(companyId, HISTORICAL_CONTEXT_DAYS));
+    const webCtx =
+      webSearchContext ?? (await performWebSearch(companyName));
 
     const prompt = buildPrompt(
       companyName,
       job,
       formatHistoricalContextForPrompt(context),
-      formatWebContext(webResults)
+      formatWebContext(webCtx)
     );
 
     const genAI = new GoogleGenerativeAI(key);
 
+    // Two-stage research: analysis model can do targeted follow-up searches
+    // in addition to the pre-fetched context passed in the prompt.
     let model: GenerativeModel = genAI.getGenerativeModel({
       model: PRO_MODEL,
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
       generationConfig: {
-        temperature: 0.6,
-        maxOutputTokens: 64000,
+        temperature: 0.4,
+        maxOutputTokens: 8192,
         responseMimeType: "application/json",
       },
     });
@@ -370,8 +470,8 @@ export async function analyzeJobAdvanced(
         model = genAI.getGenerativeModel({
           model: FLASH_MODEL,
           generationConfig: {
-            temperature: 0.6,
-            maxOutputTokens: 64000,
+            temperature: 0.4,
+            maxOutputTokens: 8192,
             responseMimeType: "application/json",
           },
         });
@@ -398,7 +498,10 @@ export async function analyzeJobAdvanced(
 
 /**
  * Batch analyze multiple jobs with shared context.
- * Builds historical context and performs web search once, then reuses for all jobs.
+ *
+ * Builds historical context and performs web research once, then reuses for all
+ * jobs. Runs up to BATCH_CONCURRENCY jobs in parallel to reduce total wall time
+ * without triggering API rate limits.
  */
 export async function analyzeJobsAdvanced(
   companyId: string,
@@ -411,27 +514,36 @@ export async function analyzeJobsAdvanced(
     description_text?: string | null;
   }>
 ): Promise<Array<{ jobId: string; result: AdvancedAnalyzeResult }>> {
-  const historicalContext = await buildHistoricalContext(companyId, 90);
-  const webResults = await performWebSearch(companyName);
+  const [historicalContext, webSearchContext] = await Promise.all([
+    buildHistoricalContext(companyId, HISTORICAL_CONTEXT_DAYS),
+    performWebSearch(companyName),
+  ]);
 
   const results: Array<{ jobId: string; result: AdvancedAnalyzeResult }> = [];
 
-  for (const job of jobs) {
-    const result = await analyzeJobAdvanced({
-      companyId,
-      companyName,
-      job: {
-        title: job.title,
-        standardized_department: job.standardized_department,
-        location: job.location,
-        description_text: job.description_text,
-      },
-      historicalContext,
-      webSearchResults: webResults,
-    });
+  // Process in parallel chunks to balance throughput vs rate-limit safety
+  for (let i = 0; i < jobs.length; i += BATCH_CONCURRENCY) {
+    const chunk = jobs.slice(i, i + BATCH_CONCURRENCY);
+    const chunkResults = await Promise.all(
+      chunk.map(async (job) => {
+        const result = await analyzeJobAdvanced({
+          companyId,
+          companyName,
+          job: {
+            title: job.title,
+            standardized_department: job.standardized_department,
+            location: job.location,
+            description_text: job.description_text,
+          },
+          historicalContext,
+          webSearchContext,
+        });
+        return result ? { jobId: job.id, result } : null;
+      })
+    );
 
-    if (result) {
-      results.push({ jobId: job.id, result });
+    for (const r of chunkResults) {
+      if (r) results.push(r);
     }
   }
 

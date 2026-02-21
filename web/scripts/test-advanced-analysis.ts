@@ -15,7 +15,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { performWebSearch, analyzeJobAdvanced } from "@/lib/analysis/advanced-strategic";
+import { performWebSearch, analyzeJobAdvanced, type WebSearchContext } from "@/lib/analysis/advanced-strategic";
 
 const TARGET_COMPANY = process.argv[2] ?? "Wealthsimple";
 
@@ -58,37 +58,46 @@ function checkEnv() {
 // Test 1: Web Search
 // ---------------------------------------------------------------------------
 
-async function testWebSearch() {
-  section(`TEST 1: Web Search Grounding — "${TARGET_COMPANY}"`);
+async function testWebSearch(): Promise<WebSearchContext> {
+  section(`TEST 1: Web Research — "${TARGET_COMPANY}"`);
   console.log(`  Model: gemini-3.1-pro-preview\n`);
 
   const start = Date.now();
-  const results = await performWebSearch(TARGET_COMPANY);
+  const ctx = await performWebSearch(TARGET_COMPANY);
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
   info(`Completed in ${elapsed}s`);
 
-  if (results.length === 0) {
+  if (!ctx.synthesis && ctx.results.length === 0) {
     console.log("  ⚠️  No results returned — model may not have invoked the search tool,");
     console.log("     or grounding is not enabled for this API key.");
   } else {
-    pass(`Got ${results.length} grounding result(s)`);
-    results.forEach((r, i) => {
-      console.log(`\n  Result ${i + 1}:`);
-      console.log(`    Title:   ${r.title}`);
-      console.log(`    Snippet: ${r.snippet.substring(0, 100)}${r.snippet.length > 100 ? "..." : ""}`);
-      console.log(`    URL:     ${r.url}`);
-    });
+    pass(`Got ${ctx.results.length} source(s) + synthesis text`);
+
+    if (ctx.synthesis) {
+      console.log(`\n  Synthesis:`);
+      const lines = ctx.synthesis.split("\n").slice(0, 6);
+      lines.forEach((l) => console.log(`    ${l}`));
+      if (ctx.synthesis.split("\n").length > 6) console.log("    ...");
+    }
+
+    if (ctx.results.length > 0) {
+      console.log(`\n  Sources (${ctx.results.length}):`);
+      ctx.results.forEach((r, i) => {
+        console.log(`    ${i + 1}. ${r.title}`);
+        if (r.snippet) console.log(`       ${r.snippet.substring(0, 80)}...`);
+      });
+    }
   }
 
-  return results;
+  return ctx;
 }
 
 // ---------------------------------------------------------------------------
 // Test 2: Full Job Analysis
 // ---------------------------------------------------------------------------
 
-async function testJobAnalysis(webResults: Awaited<ReturnType<typeof performWebSearch>>) {
+async function testJobAnalysis(webCtx: WebSearchContext) {
   section(`TEST 2: Full Job Analysis — "${TARGET_COMPANY}"`);
   console.log(`  Model: gemini-3.1-pro-preview (flash fallback on quota)\n`);
 
@@ -103,7 +112,7 @@ async function testJobAnalysis(webResults: Awaited<ReturnType<typeof performWebS
 
   if (companyError || !company) {
     console.log(`  ⚠️  "${TARGET_COMPANY}" not found in database. Running with synthetic job data.`);
-    return runSyntheticAnalysis(webResults);
+    return runSyntheticAnalysis(webCtx);
   }
 
   info(`Found company: ${company.name} (${company.id})`);
@@ -119,7 +128,7 @@ async function testJobAnalysis(webResults: Awaited<ReturnType<typeof performWebS
   const job = jobs?.[0];
   if (!job) {
     console.log(`  ⚠️  No job postings found for ${company.name}. Running with synthetic data.`);
-    return runSyntheticAnalysis(webResults, company.id, company.name);
+    return runSyntheticAnalysis(webCtx, company.id, company.name);
   }
 
   info(`Using job: "${job.title}" (${job.standardized_department ?? "unknown dept"})`);
@@ -134,7 +143,7 @@ async function testJobAnalysis(webResults: Awaited<ReturnType<typeof performWebS
       location: job.location,
       description_text: job.description_text,
     },
-    webSearchResults: webResults,
+    webSearchContext: webCtx,
   });
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
@@ -142,7 +151,7 @@ async function testJobAnalysis(webResults: Awaited<ReturnType<typeof performWebS
 }
 
 async function runSyntheticAnalysis(
-  webResults: Awaited<ReturnType<typeof performWebSearch>>,
+  webCtx: WebSearchContext,
   companyId = "00000000-0000-0000-0000-000000000000",
   companyName = TARGET_COMPANY
 ) {
@@ -156,12 +165,12 @@ async function runSyntheticAnalysis(
       title: "VP of Product, Payments",
       standardized_department: "Product",
       location: "Toronto, ON",
-      description_text: `We are looking for a VP of Product to lead our payments product team. 
-You will own the roadmap for our core payments infrastructure, work with engineering to ship 
-new payment rails, and define the strategy for expanding into new payment types including 
+      description_text: `We are looking for a VP of Product to lead our payments product team.
+You will own the roadmap for our core payments infrastructure, work with engineering to ship
+new payment rails, and define the strategy for expanding into new payment types including
 real-time payments and international transfers. You will report directly to the CPO.`,
     },
-    webSearchResults: webResults,
+    webSearchContext: webCtx,
     historicalContext: {
       summary: "No historical data available (synthetic test)",
       hiringTrends: [],
