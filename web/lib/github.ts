@@ -1,6 +1,81 @@
 /**
+ * GitHub API Utilities
+ *
+ * Functions for creating issues and triggering GitHub Actions workflows
+ * from the Vercel backend.
+ *
+ * Required env vars: GJ_GITHUB_TOKEN, GJ_GITHUB_OWNER, GJ_GITHUB_REPO
+ */
+
+function getGitHubConfig() {
+  const token = process.env.GJ_GITHUB_TOKEN;
+  const owner = process.env.GJ_GITHUB_OWNER;
+  const repo = process.env.GJ_GITHUB_REPO;
+  if (!token || !owner || !repo) {
+    throw new Error("GitHub integration not configured (GJ_GITHUB_TOKEN, GJ_GITHUB_OWNER, GJ_GITHUB_REPO required)");
+  }
+  return {
+    token,
+    owner,
+    repo,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "Content-Type": "application/json",
+    },
+  };
+}
+
+/**
+ * Create a GitHub Issue in the configured repository
+ */
+export async function createGitHubIssue(input: {
+  title: string;
+  body: string;
+  labels?: string[];
+}): Promise<{ number: number; html_url: string }> {
+  const { headers, owner, repo } = getGitHubConfig();
+  const url = `https://api.github.com/repos/${owner}/${repo}/issues`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      title: input.title,
+      body: input.body,
+      labels: input.labels ?? [],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub API error ${res.status}: ${await res.text()}`);
+  }
+  const data = await res.json() as { number: number; html_url: string };
+  return { number: data.number, html_url: data.html_url };
+}
+
+/**
+ * Trigger the auto-implement GitHub Actions workflow for a specific issue
+ */
+export async function triggerCodeGenWorkflow(issueNumber: number): Promise<void> {
+  const { headers, owner, repo } = getGitHubConfig();
+  const workflowFile = "auto-implement.yml";
+  const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      ref: "main",
+      inputs: { issue_number: String(issueNumber) },
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub Actions trigger error ${res.status}: ${await res.text()}`);
+  }
+}
+
+/**
  * GitHub Actions Workflow Trigger Utility
- * 
+ *
  * Provides functions to programmatically trigger GitHub Actions workflows
  * from the Vercel backend.
  */

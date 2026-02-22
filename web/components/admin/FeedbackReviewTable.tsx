@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Check, ExternalLink, Code2, Loader2 } from "lucide-react";
 
 interface FeedbackSubmission {
   id: string;
@@ -25,6 +25,8 @@ interface FeedbackSubmission {
   admin_override_decision: string | null;
   admin_notes: string | null;
   reviewed_at: string | null;
+  github_issue_number: number | null;
+  github_issue_url: string | null;
   created_at: string;
   profiles: { email: string } | null;
 }
@@ -53,6 +55,8 @@ export function FeedbackReviewTable() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [codeGenLoading, setCodeGenLoading] = useState<string | null>(null);
+  const [codeGenTriggered, setCodeGenTriggered] = useState<Set<string>>(new Set());
 
   const fetchFeedback = useCallback(async () => {
     try {
@@ -98,6 +102,18 @@ export function FeedbackReviewTable() {
     await navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  async function handleGenerateCode(id: string) {
+    setCodeGenLoading(id);
+    try {
+      const res = await fetch(`/api/admin/feedback/${id}/generate-code`, { method: "POST" });
+      if (res.ok) {
+        setCodeGenTriggered((prev) => new Set(prev).add(id));
+      }
+    } finally {
+      setCodeGenLoading(null);
+    }
   }
 
   return (
@@ -218,22 +234,55 @@ export function FeedbackReviewTable() {
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                               Generated Issue
                             </p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => copyIssueMarkdown(item.generated_issue!, item.id)}
-                            >
-                              {copiedId === item.id ? (
-                                <><Check className="h-3 w-3" /> Copied</>
-                              ) : (
-                                <><Copy className="h-3 w-3" /> Copy markdown</>
-                              )}
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              {item.github_issue_url ? (
+                                <a
+                                  href={item.github_issue_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 h-7 px-2 text-xs rounded-md font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  Issue #{item.github_issue_number}
+                                </a>
+                              ) : null}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => copyIssueMarkdown(item.generated_issue!, item.id)}
+                              >
+                                {copiedId === item.id ? (
+                                  <><Check className="h-3 w-3" /> Copied</>
+                                ) : (
+                                  <><Copy className="h-3 w-3" /> Copy</>
+                                )}
+                              </Button>
+                            </div>
                           </div>
                           <pre className="text-xs bg-muted p-3 rounded-md overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap">
                             {item.generated_issue}
                           </pre>
+                        </div>
+                      )}
+
+                      {item.status === "accepted" && item.github_issue_number && (
+                        <div className="pt-2 border-t">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={codeGenLoading === item.id || codeGenTriggered.has(item.id)}
+                            onClick={() => handleGenerateCode(item.id)}
+                            className="text-xs h-7"
+                          >
+                            {codeGenLoading === item.id ? (
+                              <><Loader2 className="h-3 w-3 animate-spin" /> Triggering...</>
+                            ) : codeGenTriggered.has(item.id) ? (
+                              <><Check className="h-3 w-3" /> Code generation triggered</>
+                            ) : (
+                              <><Code2 className="h-3 w-3" /> Generate Code</>
+                            )}
+                          </Button>
                         </div>
                       )}
 
