@@ -1,9 +1,14 @@
 [
   {
-    "version": "1.1.2",
-    "date": "2026-02-21",
+    "version": "1.2.0",
+    "date": "2026-02-22",
     "changes": [
-      { "type": "feature", "description": "Strong-fit feedback is automatically converted into GitHub Issues; admins can trigger code generation for accepted issues directly from the review panel" }
+      { "type": "feature", "description": "Feedback-to-code pipeline: accepted feedback automatically creates GitHub Issues with AI-generated specs" },
+      { "type": "feature", "description": "Generate Code button in admin panel triggers Claude Opus 4.6 to implement issues on a feature branch and open a draft PR" },
+      { "type": "feature", "description": "Admin email notifications when new feedback is submitted" },
+      { "type": "feature", "description": "GitHub Issue status comments track implementation progress with links to workflow runs and draft PRs" },
+      { "type": "improvement", "description": "Add Company page now routes through the feedback dialog for agent-driven setup" },
+      { "type": "fix", "description": "Admin panel shows actions for all feedback states including accepted items missing a GitHub Issue" }
     ]
   },
   {
