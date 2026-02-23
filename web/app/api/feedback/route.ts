@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { notifyAdminsOfNewFeedback } from "@/lib/email/notify-admins";
 
 const feedbackSchema = z.object({
   type: z.enum(["feature", "bug", "improvement", "general"]),
@@ -54,6 +55,15 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Fire-and-forget: notify admins via email (non-blocking)
+  notifyAdminsOfNewFeedback({
+    title,
+    type,
+    description,
+    submittedByEmail: user.email ?? "unknown",
+    pageUrl: pageUrl || undefined,
+  }).catch(() => {});
 
   return NextResponse.json(data, { status: 201 });
 }

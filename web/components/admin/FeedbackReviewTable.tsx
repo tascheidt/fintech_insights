@@ -104,6 +104,23 @@ export function FeedbackReviewTable() {
     setTimeout(() => setCopiedId(null), 2000);
   }
 
+  async function handleCreateIssue(id: string) {
+    setActionLoading(id);
+    try {
+      // Re-accept to trigger GitHub issue creation in the PATCH handler
+      const res = await fetch("/api/admin/feedback", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, admin_override_decision: "accepted" }),
+      });
+      if (res.ok) {
+        await fetchFeedback();
+      }
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   async function handleGenerateCode(id: string) {
     setCodeGenLoading(id);
     try {
@@ -266,27 +283,43 @@ export function FeedbackReviewTable() {
                         </div>
                       )}
 
-                      {item.status === "accepted" && item.github_issue_number && (
-                        <div className="pt-2 border-t">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={codeGenLoading === item.id || codeGenTriggered.has(item.id)}
-                            onClick={() => handleGenerateCode(item.id)}
-                            className="text-xs h-7"
-                          >
-                            {codeGenLoading === item.id ? (
-                              <><Loader2 className="h-3 w-3 animate-spin" /> Triggering...</>
-                            ) : codeGenTriggered.has(item.id) ? (
-                              <><Check className="h-3 w-3" /> Code generation triggered</>
-                            ) : (
-                              <><Code2 className="h-3 w-3" /> Generate Code</>
-                            )}
-                          </Button>
+                      {item.status === "accepted" && (
+                        <div className="pt-2 border-t flex items-center gap-2">
+                          {item.github_issue_number ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={codeGenLoading === item.id || codeGenTriggered.has(item.id)}
+                              onClick={() => handleGenerateCode(item.id)}
+                              className="text-xs h-7"
+                            >
+                              {codeGenLoading === item.id ? (
+                                <><Loader2 className="h-3 w-3 animate-spin" /> Triggering...</>
+                              ) : codeGenTriggered.has(item.id) ? (
+                                <><Check className="h-3 w-3" /> Code generation triggered</>
+                              ) : (
+                                <><Code2 className="h-3 w-3" /> Generate Code</>
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actionLoading === item.id}
+                              onClick={() => handleCreateIssue(item.id)}
+                              className="text-xs h-7"
+                            >
+                              {actionLoading === item.id ? (
+                                <><Loader2 className="h-3 w-3 animate-spin" /> Creating...</>
+                              ) : (
+                                <><ExternalLink className="h-3 w-3" /> Create GitHub Issue</>
+                              )}
+                            </Button>
+                          )}
                         </div>
                       )}
 
-                      {(item.status === "maybe" || item.status === "reviewing") && !item.admin_override_decision && (
+                      {!item.admin_override_decision && item.status !== "accepted" && item.status !== "declined" && (
                         <div className="space-y-2 pt-2 border-t">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                             Admin Actions
