@@ -55,7 +55,7 @@ jobs:
 
       - name: Create feature branch
         run: |
-          BRANCH="feedback/${{ inputs.issue_number }}-${{ steps.issue.outputs.slug }}"
+          BRANCH="auto/${{ inputs.issue_number }}-${{ steps.issue.outputs.slug }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
