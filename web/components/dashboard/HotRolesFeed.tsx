@@ -64,7 +64,7 @@ export function HotRolesFeed({ roles }: { roles: HotRole[] }) {
           {roles.map((role) => (
             <Link
               key={role.id}
-              href={`/companies/${role.companySlug}`}
+              href={`/jobs/${role.id}`}
               className="grid grid-cols-[2.5rem_auto_1fr] items-baseline gap-x-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50 transition-colors"
             >
               <span className="text-xs text-muted-foreground tabular-nums text-right">
