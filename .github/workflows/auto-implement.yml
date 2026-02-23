@@ -94,6 +94,7 @@ jobs:
           ## Rules
           - Work exclusively inside the \`web/\` directory. Do NOT touch \`src/\`, \`scripts/\`, \`.github/\`, \`CLAUDE.md\`, \`vercel.json\`, or any \`.env\` files.
           - Do NOT modify migration files or create new Supabase migrations — schema changes must be done manually.
+          - Do NOT update \`web/data/releases.json\`, \`web/package.json\` version, or any changelog files — versioning is handled separately by humans.
           - Follow the existing code patterns and Notion-style aesthetic (clean white/off-white, high contrast typography).
           - After making all changes, run: \`cd web && npm run build\` to verify the build passes. Fix any TypeScript errors before finishing.
           - Keep changes minimal and focused — only implement what the issue describes." \
