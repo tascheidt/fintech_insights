@@ -2,7 +2,7 @@
  * Weekly Digest Generator with AI Analysis
  * 
  * Generates weekly reports combining raw job data with AI-generated strategic commentary.
- * Uses Gemini 3 Pro for strategic analysis of each company's hiring patterns.
+ * Uses Gemini Pro for strategic analysis of each company's hiring patterns.
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";

@@ -48,7 +48,7 @@ We have completed the porting of core logic from the legacy Python CLI to a clou
 ### AI Implementation
 We have integrated **Google Gemini 3.0**:
 - **Categorization:** Uses `gemini-3-flash-preview` for low-latency, high-accuracy role classification.
-- **Strategic Analysis:** Uses `gemini-3.1-pro-preview` for complex reasoning tasks, specifically "Novelty Scoring" and "Executive Movement Detection."
+- **Strategic Analysis:** Uses `gemini-pro-latest` for complex reasoning tasks, specifically "Novelty Scoring" and "Executive Movement Detection."
 
 ---
 

@@ -1,7 +1,7 @@
 /**
  * Company News Context Fetcher
  * 
- * Uses Gemini 3 Pro with Google Search grounding to fetch recent company news,
+ * Uses Gemini Pro with Google Search grounding to fetch recent company news,
  * stated strategy, and other external context for digest generation.
  * 
  * Results are cached in the database for 7 days to avoid expensive real-time
@@ -172,7 +172,7 @@ export interface FetchNewsOptions {
  * Fetch company news context with caching support.
  * 
  * If companyId is provided, checks cache first and returns cached data if valid.
- * Otherwise fetches fresh data from Gemini Pro + Google Search.
+ * Otherwise fetches fresh data from Gemini Pro (latest) + Google Search.
  * 
  * @param companyName - The company name to search for
  * @param companyId - Optional company UUID for cache lookup/storage
@@ -217,9 +217,9 @@ async function fetchFreshNewsContext(companyName: string): Promise<CompanyNewsCo
   try {
     const genAI = new GoogleGenerativeAI(key);
     
-    // Use Gemini 3.1 Pro with grounding for web search
+    // Use Gemini Pro with grounding for web search
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-pro-latest",
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }], // Enable grounding
       generationConfig: {

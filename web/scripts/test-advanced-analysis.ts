@@ -1,5 +1,5 @@
 /**
- * Test script for advanced strategic analysis using gemini-3.1-pro-preview
+ * Test script for advanced strategic analysis using gemini-pro-latest
  *
  * Tests:
  * 1. Web search grounding (performWebSearch)
@@ -60,7 +60,7 @@ function checkEnv() {
 
 async function testWebSearch(): Promise<WebSearchContext> {
   section(`TEST 1: Web Research — "${TARGET_COMPANY}"`);
-  console.log(`  Model: gemini-3.1-pro-preview\n`);
+  console.log(`  Model: gemini-pro-latest\n`);
 
   const start = Date.now();
   const ctx = await performWebSearch(TARGET_COMPANY);
@@ -99,7 +99,7 @@ async function testWebSearch(): Promise<WebSearchContext> {
 
 async function testJobAnalysis(webCtx: WebSearchContext) {
   section(`TEST 2: Full Job Analysis — "${TARGET_COMPANY}"`);
-  console.log(`  Model: gemini-3.1-pro-preview (flash fallback on quota)\n`);
+  console.log(`  Model: gemini-pro-latest (flash fallback on quota)\n`);
 
   // Look up the company in the database
   const supabase = createAdminClient();
@@ -217,7 +217,7 @@ function printAnalysisResult(result: Awaited<ReturnType<typeof analyzeJobAdvance
 async function main() {
   console.log("🧪 Advanced Strategic Analysis — Model Test");
   console.log(`   Target company: ${TARGET_COMPANY}`);
-  console.log(`   Model: gemini-3.1-pro-preview\n`);
+  console.log(`   Model: gemini-pro-latest\n`);
 
   checkEnv();
 

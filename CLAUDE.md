@@ -198,14 +198,14 @@ Each company needs: `name`, `slug`, `country`, `ats_type`, `ats_identifier`
 **IMPORTANT: Always use the latest Gemini 3 models. Never use Gemini 2.x or older.**
 
 ### Approved Models
-- `gemini-3.1-pro-preview` - For advanced analysis with web search/grounding
+- `gemini-pro-latest` - For advanced analysis with web search/grounding (always uses the latest Pro version)
 - `gemini-3-flash-preview` - For fast, cost-effective analysis
 
 ### Rules
 1. **Never use Gemini 2.x models** (gemini-2.0-flash, gemini-2.5-*, etc.)
 2. **Never use Gemini 1.x models** (gemini-1.5-pro, gemini-1.5-flash, etc.)
-3. All AI analysis code must use `gemini-3-flash-preview` or `gemini-3.1-pro-preview`
-4. Use Pro (gemini-3.1-pro-preview) for features requiring web search/grounding tools
+3. All AI analysis code must use `gemini-3-flash-preview` or `gemini-pro-latest`
+4. Use Pro (`gemini-pro-latest`) for features requiring web search/grounding tools
 5. Use Flash for standard JSON generation and analysis
 
 

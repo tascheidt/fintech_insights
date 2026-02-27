@@ -30,5 +30,5 @@ The weekly digest currently provides per-company insights but lacks a high-level
 5.  Update the email template to render the new section.
 
 ## Risks / Notes
-- **Context Window**: Ensure the prompt context (all company summaries) fits within the model's limits. `gemini-3.1-pro-preview` should handle this easily, but we should be mindful of token usage.
+- **Context Window**: Ensure the prompt context (all company summaries) fits within the model's limits. `gemini-pro-latest` should handle this easily, but we should be mindful of token usage.
 - **Fallback**: Implement a default generic summary if the AI generation fails.

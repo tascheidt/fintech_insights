@@ -1,5 +1,5 @@
 /**
- * Advanced Strategic Analysis using Gemini 3.1 Pro
+ * Advanced Strategic Analysis using Gemini Pro
  *
  * Features:
  * - Google Search tool for web grounding (two-stage: pre-fetch + model grounding during analysis)
@@ -14,7 +14,7 @@ import { buildHistoricalContext, formatHistoricalContextForPrompt, type Historic
 // Constants
 // ---------------------------------------------------------------------------
 
-const PRO_MODEL = "gemini-3.1-pro-preview";
+const PRO_MODEL = "gemini-pro-latest";
 const FLASH_MODEL = "gemini-3-flash-preview";
 
 /** How many days of hiring history to include as context for each job analysis. */
@@ -412,7 +412,7 @@ export async function performWebSearch(companyName: string): Promise<WebSearchCo
 // ---------------------------------------------------------------------------
 
 /**
- * Advanced job analysis using Gemini 3.1 Pro with web search grounding.
+ * Advanced job analysis using Gemini Pro with web search grounding.
  * Falls back to Flash if the Pro quota is exceeded.
  *
  * Two-stage web research:
