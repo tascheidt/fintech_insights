@@ -124,25 +124,33 @@ export async function PATCH(req: NextRequest) {
         .eq("id", id)
         .single();
 
-      if (feedback?.generated_issue) {
-        const labels = ["feedback", feedback.type, ...(feedback.triage_suggested_labels ?? [])].filter(Boolean);
-        const issue = await createGitHubIssue({
-          title: feedback.triage_suggested_title || feedback.title,
-          body: feedback.generated_issue,
-          labels,
+      if (!feedback?.generated_issue) {
+        return NextResponse.json({
+          ...data,
+          github_error: "No generated issue content — run AI triage first",
         });
-
-        await supabase
-          .from("feedback_submissions")
-          .update({ github_issue_number: issue.number, github_issue_url: issue.html_url })
-          .eq("id", id);
-
-        data.github_issue_number = issue.number;
-        data.github_issue_url = issue.html_url;
       }
+
+      const labels = ["feedback", feedback.type, ...(feedback.triage_suggested_labels ?? [])].filter(Boolean);
+      const issue = await createGitHubIssue({
+        title: feedback.triage_suggested_title || feedback.title,
+        body: feedback.generated_issue,
+        labels,
+      });
+
+      await supabase
+        .from("feedback_submissions")
+        .update({ github_issue_number: issue.number, github_issue_url: issue.html_url })
+        .eq("id", id);
+
+      data.github_issue_number = issue.number;
+      data.github_issue_url = issue.html_url;
     } catch (err) {
-      // Non-fatal: admin can still use "Copy markdown" fallback
       console.error("Failed to create GitHub issue:", err);
+      return NextResponse.json({
+        ...data,
+        github_error: err instanceof Error ? err.message : "Unknown error creating GitHub issue",
+      });
     }
   }
 

@@ -57,6 +57,7 @@ export function FeedbackReviewTable() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [codeGenLoading, setCodeGenLoading] = useState<string | null>(null);
   const [codeGenTriggered, setCodeGenTriggered] = useState<Set<string>>(new Set());
+  const [issueError, setIssueError] = useState<Record<string, string>>({});
 
   const fetchFeedback = useCallback(async () => {
     try {
@@ -106,15 +107,20 @@ export function FeedbackReviewTable() {
 
   async function handleCreateIssue(id: string) {
     setActionLoading(id);
+    setIssueError((prev) => { const next = { ...prev }; delete next[id]; return next; });
     try {
-      // Re-accept to trigger GitHub issue creation in the PATCH handler
       const res = await fetch("/api/admin/feedback", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, admin_override_decision: "accepted" }),
       });
       if (res.ok) {
-        await fetchFeedback();
+        const json = await res.json();
+        if (json.github_error) {
+          setIssueError((prev) => ({ ...prev, [id]: json.github_error }));
+        } else {
+          await fetchFeedback();
+        }
       }
     } finally {
       setActionLoading(null);
@@ -302,19 +308,24 @@ export function FeedbackReviewTable() {
                               )}
                             </Button>
                           ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={actionLoading === item.id}
-                              onClick={() => handleCreateIssue(item.id)}
-                              className="text-xs h-7"
-                            >
-                              {actionLoading === item.id ? (
-                                <><Loader2 className="h-3 w-3 animate-spin" /> Creating...</>
-                              ) : (
-                                <><ExternalLink className="h-3 w-3" /> Create GitHub Issue</>
+                            <div className="space-y-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={actionLoading === item.id}
+                                onClick={() => handleCreateIssue(item.id)}
+                                className="text-xs h-7"
+                              >
+                                {actionLoading === item.id ? (
+                                  <><Loader2 className="h-3 w-3 animate-spin" /> Creating...</>
+                                ) : (
+                                  <><ExternalLink className="h-3 w-3" /> Create GitHub Issue</>
+                                )}
+                              </Button>
+                              {issueError[item.id] && (
+                                <p className="text-xs text-red-600">{issueError[item.id]}</p>
                               )}
-                            </Button>
+                            </div>
                           )}
                         </div>
                       )}
