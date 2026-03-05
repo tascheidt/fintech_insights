@@ -1,5 +1,19 @@
 [
   {
+    "version": "1.3.0",
+    "date": "2026-03-05",
+    "changes": [
+      { "type": "feature", "description": "Horizontal Gantt-style timeline showing initiative timeframes at a glance" },
+      { "type": "improvement", "description": "Summary stats row with roles mapped, ongoing count, top category, and confidence distribution" },
+      { "type": "improvement", "description": "Multi-phase loading with progress bar replaces plain spinner during analysis" },
+      { "type": "improvement", "description": "Structured AI assessment with bold headline and key risk callout" },
+      { "type": "feature", "description": "Category filter bar to show/hide initiative cards by type" },
+      { "type": "improvement", "description": "Role tags now link to job detail pages and show relevance" },
+      { "type": "feature", "description": "Copy Analysis button exports results as formatted Markdown" },
+      { "type": "improvement", "description": "Multi-expand initiative cards allow side-by-side comparison" }
+    ]
+  },
+  {
     "version": "1.2.0",
     "date": "2026-02-23",
     "changes": [

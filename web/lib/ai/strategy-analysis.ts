@@ -41,12 +41,18 @@ export interface StrategicInitiative {
   };
 }
 
+export interface StructuredAssessment {
+  headline: string;
+  details: string;
+  keyRisk: string;
+}
+
 export interface StrategyAnalysisResult {
   companyName: string;
   analyzedAt: string;
   totalJobsAnalyzed: number;
   initiatives: StrategicInitiative[];
-  overallAssessment: string;
+  overallAssessment: string | StructuredAssessment;
 }
 
 // ============================================================================
@@ -80,7 +86,11 @@ Respond with a JSON object:
       "is_ongoing": true
     }
   ],
-  "overall_assessment": "2-3 sentence overall strategic assessment of where this company is headed based on their hiring patterns"
+  "overall_assessment": {
+    "headline": "One-sentence strategic thesis summarizing the company's direction",
+    "details": "2-3 sentence supporting analysis expanding on the headline",
+    "key_risk": "Primary risk or concern identified from the hiring patterns"
+  }
 }
 
 Guidelines:
@@ -89,6 +99,27 @@ Guidelines:
 - Roles that don't fit any initiative can be omitted
 - Confidence should be "high" only when 3+ roles clearly support the initiative
 - The overall_assessment should synthesize the initiatives into a coherent strategic narrative`;
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function parseAssessment(
+  raw: unknown
+): string | StructuredAssessment {
+  if (typeof raw === "string") return raw;
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    if (typeof obj.headline === "string") {
+      return {
+        headline: obj.headline,
+        details: String(obj.details ?? ""),
+        keyRisk: String(obj.key_risk ?? ""),
+      };
+    }
+  }
+  return "Analysis could not be completed.";
+}
 
 // ============================================================================
 // Analysis Function
@@ -110,7 +141,7 @@ export async function analyzeCompanyStrategy(
       analyzedAt: new Date().toISOString(),
       totalJobsAnalyzed: 0,
       initiatives: [],
-      overallAssessment: "No job postings available for analysis.",
+      overallAssessment: { headline: "No data available", details: "No job postings available for analysis.", keyRisk: "" },
     };
   }
 
@@ -209,9 +240,7 @@ export async function analyzeCompanyStrategy(
       analyzedAt: new Date().toISOString(),
       totalJobsAnalyzed: jobs.length,
       initiatives,
-      overallAssessment: String(
-        parsed.overall_assessment ?? "Analysis could not be completed."
-      ),
+      overallAssessment: parseAssessment(parsed.overall_assessment),
     };
   } catch (error) {
     console.error("Strategy analysis error:", error);

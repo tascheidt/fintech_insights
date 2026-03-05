@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import type { StrategicInitiative } from "@/lib/ai/strategy-analysis";
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import type { StrategicInitiative, StructuredAssessment } from "@/lib/ai/strategy-analysis";
 
 // ============================================================================
 // Constants
@@ -34,6 +35,19 @@ const CATEGORY_LABELS: Record<string, string> = {
   "other": "Other",
 };
 
+const CATEGORY_COLORS_HEX: Record<string, string> = {
+  "market-expansion": "#3b82f6",
+  "new-product": "#a855f7",
+  "technology-investment": "#06b6d4",
+  "regulatory-preparation": "#ef4444",
+  "operational-scaling": "#f59e0b",
+  "talent-upgrade": "#10b981",
+  "cost-optimization": "#6b7280",
+  "customer-experience": "#ec4899",
+  "ai-data-capabilities": "#8b5cf6",
+  other: "#71717a",
+};
+
 const CONFIDENCE_STYLES: Record<string, string> = {
   high: "bg-green-100 text-green-700",
   medium: "bg-yellow-100 text-yellow-700",
@@ -57,11 +71,15 @@ function formatDate(dateStr: string): string {
 export function StrategyTimeline({
   initiatives,
   overallAssessment,
+  expandedIds,
+  onToggleExpand,
 }: {
   initiatives: StrategicInitiative[];
-  overallAssessment: string;
+  overallAssessment: string | StructuredAssessment;
+  expandedIds: Set<string>;
+  onToggleExpand: (id: string) => void;
 }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   if (initiatives.length === 0) {
     return (
@@ -88,31 +106,81 @@ export function StrategyTimeline({
             <div className="mt-0.5 h-8 w-8 rounded-full bg-foreground/5 flex items-center justify-center shrink-0">
               <span className="text-sm font-semibold text-foreground/70">AI</span>
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-muted-foreground mb-1">Strategic Assessment</p>
-              <p className="text-sm leading-relaxed">{overallAssessment}</p>
+              {typeof overallAssessment === "string" ? (
+                <p className="text-sm leading-relaxed">{overallAssessment}</p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">{overallAssessment.headline}</p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">{overallAssessment.details}</p>
+                  {overallAssessment.keyRisk && (
+                    <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                      <p className="text-xs font-medium text-amber-800">Key Risk</p>
+                      <p className="text-sm text-amber-700">{overallAssessment.keyRisk}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Initiative Timeline */}
-      <div className="relative">
-        {/* Vertical timeline line */}
-        <div className="absolute left-[19px] top-0 bottom-0 w-px bg-border" />
+      {/* Category Filter */}
+      {(() => {
+        const categoryCounts: Record<string, number> = {};
+        for (const init of sorted) {
+          const cat = init.category;
+          categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
+        }
+        return (
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setActiveCategory(null)}
+              className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+                activeCategory === null
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-muted text-muted-foreground border-transparent hover:bg-accent"
+              }`}
+            >
+              All ({sorted.length})
+            </button>
+            {Object.entries(categoryCounts).map(([cat, count]) => {
+              const colors = CATEGORY_COLORS[cat] ?? CATEGORY_COLORS.other;
+              const isActive = activeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(isActive ? null : cat)}
+                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+                    isActive
+                      ? `${colors.bg} ${colors.text} ${colors.border}`
+                      : "bg-muted text-muted-foreground border-transparent hover:bg-accent"
+                  }`}
+                >
+                  {CATEGORY_LABELS[cat] ?? cat} ({count})
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
-        <div className="space-y-4">
-          {sorted.map((initiative) => {
+      {/* Initiative Cards */}
+      <div className="space-y-3">
+          {sorted
+            .filter((i) => !activeCategory || i.category === activeCategory)
+            .map((initiative) => {
             const colors = CATEGORY_COLORS[initiative.category] ?? CATEGORY_COLORS.other;
-            const isExpanded = expandedId === initiative.id;
+            const isExpanded = expandedIds.has(initiative.id);
+            const totalRoles = sorted.reduce((sum, i) => sum + i.roles.length, 0);
+            const roleFraction = totalRoles > 0 ? (initiative.roles.length / totalRoles) * 100 : 0;
 
             return (
-              <div key={initiative.id} className="relative pl-12">
-                {/* Timeline dot */}
-                <div className={`absolute left-[12px] top-[18px] h-4 w-4 rounded-full border-2 border-background ${colors.dot}`} />
-
+              <div key={initiative.id}>
                 <button
-                  onClick={() => setExpandedId(isExpanded ? null : initiative.id)}
+                  onClick={() => onToggleExpand(initiative.id)}
                   className={`w-full text-left rounded-lg border p-4 transition-colors hover:bg-accent/50 ${isExpanded ? "ring-1 ring-ring" : ""}`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -128,12 +196,19 @@ export function StrategyTimeline({
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-2">{initiative.description}</p>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 space-y-1">
                       <p className="text-xs text-muted-foreground">
                         {initiative.roles.length} role{initiative.roles.length !== 1 ? "s" : ""}
                       </p>
+                      {/* Mini role distribution bar */}
+                      <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${Math.max(roleFraction, 8)}%`, backgroundColor: CATEGORY_COLORS_HEX[initiative.category] ?? "#71717a" }}
+                        />
+                      </div>
                       {initiative.timeframe.firstPosting && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="text-xs text-muted-foreground">
                           {formatDate(initiative.timeframe.firstPosting)}
                           {initiative.timeframe.lastPosting !== initiative.timeframe.firstPosting && (
                             <> &mdash; {formatDate(initiative.timeframe.lastPosting)}</>
@@ -167,12 +242,17 @@ export function StrategyTimeline({
                           <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Related Roles</p>
                           <div className="flex flex-wrap gap-1.5">
                             {initiative.roles.map((role) => (
-                              <span
+                              <Link
                                 key={role.jobId}
-                                className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-xs"
+                                href={`/jobs/${role.jobId}`}
+                                className="inline-flex flex-col px-2 py-1 rounded-md bg-muted text-xs hover:bg-accent transition-colors"
+                                onClick={(e) => e.stopPropagation()}
                               >
-                                {role.title}
-                              </span>
+                                <span>{role.title}</span>
+                                {role.relevance && role.relevance !== "unknown" && (
+                                  <span className="text-[10px] text-muted-foreground">{role.relevance}</span>
+                                )}
+                              </Link>
                             ))}
                           </div>
                         </div>
@@ -192,7 +272,6 @@ export function StrategyTimeline({
             );
           })}
         </div>
-      </div>
     </div>
   );
 }
