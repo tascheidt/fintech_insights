@@ -40,6 +40,7 @@ export function DashboardNav({
     { href: "/jobs", label: "Jobs" },
     { href: "/companies", label: "Companies" },
     { href: "/digests", label: "Weekly Digests" },
+    { href: "/labs", label: "TB Labs" },
     ...(role === "admin" ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
