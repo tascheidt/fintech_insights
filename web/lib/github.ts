@@ -37,7 +37,7 @@ export async function createGitHubIssue(input: {
 }): Promise<{ number: number; html_url: string }> {
   const { headers, owner, repo } = getGitHubConfig();
   const url = `https://api.github.com/repos/${owner}/${repo}/issues`;
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -46,6 +46,17 @@ export async function createGitHubIssue(input: {
       labels: input.labels ?? [],
     }),
   });
+  // Retry without labels if they don't exist in the repo
+  if (res.status === 422 && input.labels?.length) {
+    res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        title: input.title,
+        body: input.body,
+      }),
+    });
+  }
   if (!res.ok) {
     throw new Error(`GitHub API error ${res.status}: ${await res.text()}`);
   }
