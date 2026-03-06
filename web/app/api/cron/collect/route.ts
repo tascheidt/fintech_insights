@@ -124,9 +124,8 @@ export async function GET(req: NextRequest) {
 
     // Phase 4: Tech stack refresh — fire off in a separate serverless invocation
     // so it gets its own timeout budget (collection alone can take 4-9 min)
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    // Use req.nextUrl.origin so the URL is always correct regardless of deployment alias
+    const baseUrl = req.nextUrl.origin;
     fetch(`${baseUrl}/api/internal/tech-stack-refresh`, {
       method: "POST",
       headers: {

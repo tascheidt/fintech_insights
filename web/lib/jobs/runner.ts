@@ -587,6 +587,82 @@ export async function refreshTechStacksForCompanies(
 }
 
 /**
+ * Backfill tech stacks for all active companies that have never had one generated.
+ * Used for one-time backfills without needing a collection job run ID.
+ */
+export async function backfillTechStacksForAllCompanies(): Promise<{ refreshed: number; skipped: number; failed: number }> {
+  const supabase = createAdminClient();
+  const PARALLELISM = 2;
+
+  const { data: companies } = await supabase
+    .from('companies')
+    .select('id, name, tech_stack_generated_at')
+    .eq('is_active', true);
+
+  if (!companies || companies.length === 0) {
+    return { refreshed: 0, skipped: 0, failed: 0 };
+  }
+
+  const eligible = companies.filter((c) => !c.tech_stack_generated_at);
+  const skippedCount = companies.length - eligible.length;
+
+  if (eligible.length === 0) {
+    console.log('All companies already have tech stacks, skipping backfill');
+    return { refreshed: 0, skipped: skippedCount, failed: 0 };
+  }
+
+  console.log(`Backfilling tech stacks for ${eligible.length} companies...`);
+
+  let refreshedCount = 0;
+  let failedCount = 0;
+
+  for (let i = 0; i < eligible.length; i += PARALLELISM) {
+    const batch = eligible.slice(i, i + PARALLELISM);
+
+    const results = await Promise.allSettled(
+      batch.map(async (company) => {
+        console.log(`Aggregating tech stack for ${company.name}...`);
+        const rawData = await aggregateTechStackFromJobs(company.id);
+
+        if (rawData.technologies.length === 0) {
+          console.log(`No tech data found for ${company.name}, skipping enrichment`);
+          return;
+        }
+
+        const enrichedStack = await enrichTechStackWithAnalysis(
+          rawData.technologies,
+          rawData.totalJobsAnalyzed,
+          rawData.periodStart,
+          rawData.periodEnd
+        );
+
+        await supabase
+          .from('companies')
+          .update({
+            tech_stack: enrichedStack,
+            tech_stack_generated_at: new Date().toISOString(),
+          })
+          .eq('id', company.id);
+
+        console.log(`Tech stack backfilled for ${company.name}`);
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        refreshedCount++;
+      } else {
+        console.error('Tech stack backfill failed:', result.reason);
+        failedCount++;
+      }
+    }
+  }
+
+  console.log(`Tech stack backfill complete: ${refreshedCount} refreshed, ${skippedCount} skipped, ${failedCount} failed`);
+  return { refreshed: refreshedCount, skipped: skippedCount, failed: failedCount };
+}
+
+/**
  * Resume a failed/partial job run (skip completed tasks)
  */
 export async function resumeJobRun(jobRunId: string): Promise<JobRunResult> {

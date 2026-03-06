@@ -23,26 +23,34 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { job_type } = body;
 
-  if (!job_type || !["collect", "report"].includes(job_type)) {
+  if (!job_type || !["collect", "report", "tech-stack-backfill"].includes(job_type)) {
     return NextResponse.json({ error: "Invalid job type" }, { status: 400 });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const baseUrl = req.nextUrl.origin;
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
     return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
   }
 
-  // Fire and forget — don't await the full job, just confirm it started
-  fetch(`${baseUrl}/api/cron/${job_type}`, {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${cronSecret}`,
-    },
-  }).catch((error) => {
-    console.error(`Background ${job_type} job error:`, error);
-  });
+  if (job_type === "tech-stack-backfill") {
+    // Trigger backfill for all companies with no tech stack
+    fetch(`${baseUrl}/api/internal/tech-stack-refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cronSecret}`,
+      },
+      body: JSON.stringify({ jobRunId: null }),
+    }).catch((error) => console.error("Tech stack backfill trigger error:", error));
+  } else {
+    // Fire and forget — don't await the full job, just confirm it started
+    fetch(`${baseUrl}/api/cron/${job_type}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${cronSecret}` },
+    }).catch((error) => console.error(`Background ${job_type} job error:`, error));
+  }
 
   return NextResponse.json({
     success: true,
