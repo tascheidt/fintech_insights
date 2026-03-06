@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.5.0",
+    "date": "2026-03-06",
+    "changes": [
+      { "type": "feature", "description": "Company Overview now shows the full strategic analysis inline — no separate insight detail page needed" },
+      { "type": "improvement", "description": "Tech stack section integrated natively into the analysis flow on the company Overview tab" },
+      { "type": "improvement", "description": "Generate Insight button moved to the company header for one-click access from the Overview" }
+    ]
+  },
+  {
     "version": "1.4.0",
     "date": "2026-03-06",
     "changes": [

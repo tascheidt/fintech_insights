@@ -42,7 +42,7 @@ export function RecentCompanyInsights({ insights }: RecentCompanyInsightsProps) 
             {insights.map((insight) => (
               <li key={insight.id}>
                 <Link
-                  href={`/companies/${insight.company.slug}/insights/${insight.id}`}
+                  href={`/companies/${insight.company.slug}`}
                   className="block hover:bg-muted/50 -mx-2 px-2 py-2 rounded-lg transition-colors"
                 >
                   <div className="flex items-center justify-between mb-1">
