@@ -31,11 +31,10 @@ export function JobsTabContent({
   lastCollect,
   lastReport,
 }: JobsTabContentProps) {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshSignal, setRefreshSignal] = useState(0);
 
   const handleTriggered = useCallback(() => {
-    // Trigger a refresh by updating the key
-    setRefreshKey((prev) => prev + 1);
+    setRefreshSignal((prev) => prev + 1);
   }, []);
 
   return (
@@ -129,7 +128,7 @@ export function JobsTabContent({
       </Card>
 
       {/* Execution History Table */}
-      <CronLogsTable key={refreshKey} />
+      <CronLogsTable refreshSignal={refreshSignal} />
     </div>
   );
 }

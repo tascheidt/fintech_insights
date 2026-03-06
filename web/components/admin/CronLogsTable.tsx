@@ -17,13 +17,18 @@ interface CronLog {
   error_message: string | null;
 }
 
-export function CronLogsTable() {
+interface CronLogsTableProps {
+  /** Bumped externally to signal a refresh is needed */
+  refreshSignal?: number;
+}
+
+export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
   const [logs, setLogs] = useState<CronLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "collect" | "report">("all");
 
-  const fetchLogs = async () => {
-    setLoading(true);
+  const fetchLogs = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const params = new URLSearchParams({ limit: "20" });
       if (filter !== "all") params.set("job_type", filter);
@@ -37,9 +42,26 @@ export function CronLogsTable() {
     }
   };
 
+  // Fetch on mount and filter change
   useEffect(() => {
     fetchLogs();
   }, [filter]);
+
+  // Re-fetch when a job is triggered (with a short delay for the DB row to appear)
+  useEffect(() => {
+    if (!refreshSignal) return;
+    const t1 = setTimeout(() => fetchLogs(false), 1500);
+    const t2 = setTimeout(() => fetchLogs(false), 5000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [refreshSignal]);
+
+  // Poll every 10s while any job is running
+  useEffect(() => {
+    const hasRunning = logs.some((l) => l.status === "running");
+    if (!hasRunning) return;
+    const interval = setInterval(() => fetchLogs(false), 10000);
+    return () => clearInterval(interval);
+  }, [logs]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
