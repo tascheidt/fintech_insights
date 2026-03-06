@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EditCompanyForm } from "@/components/companies/EditCompanyForm";
 import { CompanyDigestSummary } from "@/components/companies/CompanyDigestSummary";
+import { CompanyTechStack } from "@/components/companies/CompanyTechStack";
 import { DeleteCompanyButton } from "@/components/companies/DeleteCompanyButton";
 import { JobHistoryView, JobData } from "@/components/companies/JobHistoryView";
 
@@ -172,6 +173,14 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             companyId={company.id}
             companyName={company.name}
             companySlug={company.slug}
+          />
+
+          {/* Tech Stack */}
+          <CompanyTechStack
+            companyId={company.id}
+            companyName={company.name}
+            initialTechStack={company.tech_stack ?? null}
+            initialGeneratedAt={company.tech_stack_generated_at ?? null}
           />
         </TabsContent>
 
