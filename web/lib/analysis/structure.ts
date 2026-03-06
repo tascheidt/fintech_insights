@@ -74,7 +74,7 @@ Extract and return a JSON object with:
 1. **summary**: A concise 2-3 sentence summary (max 300 chars)
 2. **seniority_level**: One of: intern, junior, mid, senior, staff, principal, lead, executive
 3. **salary**: Object with min, max (integers), currency (default "USD"), or null
-4. **tech_stack**: Array of specific technologies (max 15 items, most important first)
+4. **tech_stack**: Array of specific technologies, platforms, and domain software (max 15 items, most important first). Focus on: programming languages, frameworks, databases, cloud platforms, banking/financial platforms (e.g., Temenos T24, FIS, Finastra), data/analytics tools (e.g., Snowflake, Spark, Tableau), and DevOps tooling. EXCLUDE generic office productivity software (Excel, Word, PowerPoint, Outlook, MS Office, Google Docs, Slack, Zoom, Teams, SharePoint, Jira, Confluence) and generic methodologies (Agile, Scrum, Lean, PMP)
 5. **keywords**: Array of relevant keywords/skills/domains (max 20 items, most important first)
 6. **standardized_department**: One of: Engineering, Sales, Marketing, Product, Operations, Finance, Legal, HR, Customer Success, Support
 7. **function_category**: Must be one of: {categories}

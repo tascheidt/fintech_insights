@@ -122,6 +122,11 @@ const NORMALIZATION_MAP: Record<string, string> = {
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
+  banking_platforms: "Banking & Financial Platforms",
+  dev_stack: "Software Development Stack",
+  data_analytics: "Data & Analytics",
+  other: "Other",
+  // Legacy categories (for backward compat with older data)
   languages: "Languages",
   frameworks: "Frameworks & Libraries",
   databases: "Databases & Storage",
@@ -129,7 +134,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   devops: "DevOps & CI/CD",
   data_tools: "Data & Analytics",
   ai_ml: "AI & Machine Learning",
-  other: "Other Tools",
 };
 
 // ============================================================================
@@ -339,9 +343,14 @@ export { NORMALIZATION_MAP, CATEGORY_LABELS, normalizeTechName };
 // Gemini Pro Enrichment
 // ============================================================================
 
-const ENRICHMENT_PROMPT = `You are a senior software architect conducting a technical due diligence review of a company's technology stack. You have been provided with aggregated technology data extracted from their job postings.
+const ENRICHMENT_PROMPT = `You are a senior software architect conducting a technical due diligence review of a fintech company's technology stack. You have been provided with aggregated technology data extracted from their job postings.
 
-For each technology category, write a concise narrative summary (2-3 sentences) that a CTO or VP Engineering would find useful. State conclusions only when the data supports them. When data is insufficient, say so explicitly (e.g., "Insufficient data to determine the primary cloud provider — only 2 job postings reference infrastructure tools").
+The data is organized into three perspectives:
+1. **Banking & Financial Platforms** (banking_platforms): Core banking systems, payment platforms, lending/credit systems, risk/compliance tools, CRM, and digital banking infrastructure. This reveals what the company runs its financial services on.
+2. **Software Development Stack** (dev_stack): Programming languages, frameworks, databases, cloud providers, and DevOps tooling. This reveals how the company builds and ships software.
+3. **Data & Analytics** (data_analytics): Data pipelines, warehouses, BI tools, and AI/ML tooling. This reveals how the company uses data for decision-making and product intelligence.
+
+For each category present in the data, write a concise narrative summary (2-3 sentences) that a CTO or banking technology analyst would find useful. Focus on what the technology choices reveal about the company's architecture decisions, modernization posture, and build-vs-buy philosophy. When data is insufficient, say so explicitly.
 
 AGGREGATED TECH STACK DATA:
 {tech_data}
@@ -351,13 +360,13 @@ Period: {period_start} to {period_end}
 
 Respond with a JSON object:
 {
-  "architectSummary": "2-3 sentence overall assessment of the company's technology posture",
+  "architectSummary": "2-3 sentence overall assessment of the company's technology posture, focusing on what stands out for a fintech/banking context",
   "categorySummaries": {
     "category_key": "2-3 sentence narrative for this category"
   }
 }
 
-Be specific with percentages when the data supports it (e.g., "Go appears in 65% of engineering roles"). Be opinionated but honest about data limitations.`;
+Be specific with percentages when the data supports it. Be opinionated but honest about data limitations. Do NOT mention excluded categories or missing data for categories not present in the input.`;
 
 /**
  * Enrich a raw aggregated tech stack with AI-generated narrative summaries.
