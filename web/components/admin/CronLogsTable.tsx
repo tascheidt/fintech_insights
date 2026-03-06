@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { formatDistanceToNow, format } from "date-fns";
 
@@ -27,7 +27,7 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "collect" | "report">("all");
 
-  const fetchLogs = async (showLoading = true) => {
+  const fetchLogs = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
       const params = new URLSearchParams({ limit: "20" });
@@ -40,12 +40,12 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter]);
 
   // Fetch on mount and filter change
   useEffect(() => {
     fetchLogs();
-  }, [filter]);
+  }, [fetchLogs]);
 
   // Re-fetch when a job is triggered (with a short delay for the DB row to appear)
   useEffect(() => {
@@ -53,7 +53,7 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
     const t1 = setTimeout(() => fetchLogs(false), 1500);
     const t2 = setTimeout(() => fetchLogs(false), 5000);
     return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [refreshSignal]);
+  }, [refreshSignal, fetchLogs]);
 
   // Poll every 10s while any job is running
   useEffect(() => {
@@ -61,7 +61,7 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
     if (!hasRunning) return;
     const interval = setInterval(() => fetchLogs(false), 10000);
     return () => clearInterval(interval);
-  }, [logs]);
+  }, [logs, fetchLogs]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
