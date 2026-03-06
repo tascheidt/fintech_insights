@@ -11,7 +11,7 @@ import { CompanyTechStack } from "@/components/companies/CompanyTechStack";
 import { DeleteCompanyButton } from "@/components/companies/DeleteCompanyButton";
 import { JobHistoryView, JobData } from "@/components/companies/JobHistoryView";
 import { FunctionBreakdown } from "@/components/companies/FunctionBreakdown";
-import { CompanyInsightChat } from "@/components/companies/CompanyInsightChat";
+import { ChatPanel } from "@/components/companies/ChatPanel";
 import { GenerateInsightButton } from "@/components/companies/GenerateInsightButton";
 import { ExternalLink } from "lucide-react";
 import { format } from "date-fns";
@@ -369,8 +369,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 </CardContent>
               </Card>
 
-              {/* Chat with Insight */}
-              <CompanyInsightChat
+              {/* Floating chat panel */}
+              <ChatPanel
                 companyId={company.id}
                 insightId={insight.id}
                 companyName={company.name}
