@@ -15,6 +15,7 @@ export interface TechCategory {
   category: string;
   label: string;
   technologies: TechItem[];
+  narrativeSummary?: string;
 }
 
 export interface TechItem {
@@ -35,6 +36,8 @@ export interface CompanyTechStack {
   periodStart: string;
   /** Most recent job posting considered */
   periodEnd: string;
+  /** AI-generated architect-level summary of the tech stack */
+  architectSummary?: string;
 }
 
 /** Raw extraction result from a batch of job descriptions */
@@ -249,7 +252,7 @@ export async function extractCompanyTechStack(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: "gemini-flash-latest",
+    model: "gemini-3-flash-preview",
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 8192,
@@ -259,7 +262,7 @@ export async function extractCompanyTechStack(
 
   const stack: CompanyTechStack = {
     categories: [],
-    totalJobsAnalyzed: jobsWithDesc.length,
+    totalJobsAnalyzed: 0,
     generatedAt: new Date().toISOString(),
     periodStart: "",
     periodEnd: "",
@@ -267,6 +270,7 @@ export async function extractCompanyTechStack(
 
   // Process in batches of 10 jobs to stay within token limits
   const BATCH_SIZE = 10;
+  let batchesSucceeded = 0;
   for (let i = 0; i < jobsWithDesc.length; i += BATCH_SIZE) {
     const batch = jobsWithDesc.slice(i, i + BATCH_SIZE);
 
@@ -293,6 +297,8 @@ export async function extractCompanyTechStack(
       const earliestDate = batchDates[0];
       const latestDate = batchDates[batchDates.length - 1];
       mergeIntoStack(stack, parsed, earliestDate, latestDate);
+      batchesSucceeded++;
+      stack.totalJobsAnalyzed += batch.length;
     } catch (error) {
       console.error(
         `Tech stack extraction error (batch ${i / BATCH_SIZE + 1}):`,
@@ -300,6 +306,10 @@ export async function extractCompanyTechStack(
       );
       // Continue with next batch on error
     }
+  }
+
+  if (batchesSucceeded === 0) {
+    throw new Error("All batches failed during tech stack extraction");
   }
 
   // Sort technologies within each category by count (descending)
@@ -318,6 +328,109 @@ export async function extractCompanyTechStack(
   const allDates = jobsWithDesc.map((j) => j.first_seen_date).sort();
   stack.periodStart = allDates[0] ?? "";
   stack.periodEnd = allDates[allDates.length - 1] ?? "";
+
+  return stack;
+}
+
+// Re-export for use by aggregation module
+export { NORMALIZATION_MAP, CATEGORY_LABELS, normalizeTechName };
+
+// ============================================================================
+// Gemini Pro Enrichment
+// ============================================================================
+
+const ENRICHMENT_PROMPT = `You are a senior software architect conducting a technical due diligence review of a company's technology stack. You have been provided with aggregated technology data extracted from their job postings.
+
+For each technology category, write a concise narrative summary (2-3 sentences) that a CTO or VP Engineering would find useful. State conclusions only when the data supports them. When data is insufficient, say so explicitly (e.g., "Insufficient data to determine the primary cloud provider — only 2 job postings reference infrastructure tools").
+
+AGGREGATED TECH STACK DATA:
+{tech_data}
+
+Total job postings analyzed: {total_jobs}
+Period: {period_start} to {period_end}
+
+Respond with a JSON object:
+{
+  "architectSummary": "2-3 sentence overall assessment of the company's technology posture",
+  "categorySummaries": {
+    "category_key": "2-3 sentence narrative for this category"
+  }
+}
+
+Be specific with percentages when the data supports it (e.g., "Go appears in 65% of engineering roles"). Be opinionated but honest about data limitations.`;
+
+/**
+ * Enrich a raw aggregated tech stack with AI-generated narrative summaries.
+ * Uses Gemini Pro for higher quality analysis with structured output.
+ */
+export async function enrichTechStackWithAnalysis(
+  stack: CompanyTechStack
+): Promise<CompanyTechStack> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    throw new Error("GEMINI_API_KEY not configured");
+  }
+
+  if (stack.categories.length === 0) {
+    return stack;
+  }
+
+  // Build a compact representation of the tech data for the prompt
+  const techData = stack.categories.map((cat) => ({
+    category: cat.category,
+    label: cat.label,
+    technologies: cat.technologies.map((t) => ({
+      name: t.name,
+      count: t.count,
+      firstSeen: t.firstSeen,
+      lastSeen: t.lastSeen,
+    })),
+  }));
+
+  const prompt = ENRICHMENT_PROMPT
+    .replace("{tech_data}", JSON.stringify(techData, null, 2))
+    .replace("{total_jobs}", String(stack.totalJobsAnalyzed))
+    .replace("{period_start}", stack.periodStart)
+    .replace("{period_end}", stack.periodEnd);
+
+  const genAI = new GoogleGenerativeAI(key);
+  const model = genAI.getGenerativeModel({
+    model: "gemini-pro-latest",
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json",
+    },
+  });
+
+  try {
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+
+    const text = result.response.text()?.trim() ?? "{}";
+    const parsed = JSON.parse(text) as {
+      architectSummary?: string;
+      categorySummaries?: Record<string, string>;
+    };
+
+    // Apply enrichments to the stack
+    if (parsed.architectSummary) {
+      stack.architectSummary = parsed.architectSummary;
+    }
+
+    if (parsed.categorySummaries) {
+      for (const cat of stack.categories) {
+        const summary = parsed.categorySummaries[cat.category];
+        if (summary) {
+          cat.narrativeSummary = summary;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Tech stack enrichment error:", error);
+    // Non-fatal: return stack without enrichment rather than failing
+  }
 
   return stack;
 }

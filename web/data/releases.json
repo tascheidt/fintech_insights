@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.4.0",
+    "date": "2026-03-06",
+    "changes": [
+      { "type": "feature", "description": "Tech stack analysis now auto-generates after job collection with AI-enriched summaries" },
+      { "type": "improvement", "description": "Redesigned company page with cleaner layout, streamlined navigation, and consistent styling" },
+      { "type": "fix", "description": "Fixed tech stack generation failing silently due to invalid AI model configuration" }
+    ]
+  },
+  {
     "version": "1.3.0",
     "date": "2026-03-05",
     "changes": [
