@@ -1,19 +1,16 @@
 /**
  * Company Detail Page
- * 
- * Shows company overview, strategic insights, job postings with card/table toggle,
- * and job history with filters.
  */
 
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EditCompanyForm } from "@/components/companies/EditCompanyForm";
 import { CompanyDigestSummary } from "@/components/companies/CompanyDigestSummary";
 import { CompanyTechStack } from "@/components/companies/CompanyTechStack";
 import { DeleteCompanyButton } from "@/components/companies/DeleteCompanyButton";
 import { JobHistoryView, JobData } from "@/components/companies/JobHistoryView";
+import { ExternalLink } from "lucide-react";
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -45,7 +42,6 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       .order("generated_at", { ascending: false })
       .limit(1)
       .single(),
-    // Get latest weekly digest summary for this company
     supabase
       .from("weekly_digest_companies")
       .select(`
@@ -62,8 +58,6 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       .single(),
   ]);
 
-  // Transform digestSummary to match DigestSummary interface
-  // Supabase returns joined relations as arrays, so we need to extract the first element
   const transformedDigestSummary = digestSummary
     ? {
         ...digestSummary,
@@ -73,7 +67,6 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       }
     : null;
 
-  // Transform jobs data for JobHistoryView
   const jobs: JobData[] = (jobsRaw ?? []).map((j: any) => ({
     id: j.id,
     title: j.title,
@@ -85,24 +78,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     url: j.url,
   }));
 
-  // Count active vs inactive jobs
   const activeJobCount = jobs.filter(j => j.isActive).length;
-  const inactiveJobCount = jobs.filter(j => !j.isActive).length;
-
-  // Get ATS label for display
-  const atsLabels: Record<string, string> = {
-    lever: "Lever",
-    greenhouse: "Greenhouse",
-    workable: "Workable",
-    ashby: "Ashby",
-    dayforce: "Dayforce",
-    workday: "Workday",
-    smartrecruiters: "SmartRecruiters",
-    bamboohr: "BambooHR",
-    jazzhr: "JazzHR",
-    recruitee: "Recruitee",
-    custom: "Custom",
-  };
 
   return (
     <div className="space-y-6">
@@ -110,63 +86,35 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="jobs">
-            Jobs ({jobs.length})
+            Jobs ({activeJobCount} active)
           </TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          {/* Company Header */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold">{company.name}</h1>
-                  <div className="flex items-center gap-2 mt-2 text-muted-foreground">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted">
-                      {company.country}
-                    </span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                      {atsLabels[company.ats_type] ?? company.ats_type}
-                    </span>
-                    {!company.is_active && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                        Inactive
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Active Jobs</p>
-                  <p className="font-semibold text-green-600">{activeJobCount}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Closed Jobs</p>
-                  <p className="font-semibold text-gray-500">{inactiveJobCount}</p>
-                </div>
-                {company.careers_url && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Careers Page</p>
-                    <a
-                      href={company.careers_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary hover:underline text-sm truncate block"
-                    >
-                      {company.careers_url}
-                    </a>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Bare Typography Header */}
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">{company.name}</h1>
+              {company.careers_url && (
+                <a
+                  href={company.careers_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                  title="Careers page"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {company.country}
+            </p>
+          </div>
 
-          {/* Weekly Digest Summary with expandable 90-day insights */}
+          {/* Weekly Digest Summary */}
           <CompanyDigestSummary
             digestSummary={transformedDigestSummary}
             insight={latestInsight}
@@ -184,13 +132,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           />
         </TabsContent>
 
-        {/* Jobs Tab - Combined with toggle */}
+        {/* Jobs Tab */}
         <TabsContent value="jobs">
           <JobHistoryView
             jobs={jobs}
             companySlug={company.slug}
             initialStatus="all"
-            showHeader={true}
+            showHeader={false}
             pageSize={24}
           />
         </TabsContent>

@@ -3,6 +3,8 @@ import { processCollectionTask } from "./processor";
 import { processAnalysisTask } from "./analyzer";
 import { updateJobRunStats } from "./progress";
 import { fetchCompanyNewsContext } from "@/lib/analysis/company-news";
+import { aggregateTechStackFromJobs } from "@/lib/ai/tech-stack-aggregation";
+import { enrichTechStackWithAnalysis } from "@/lib/ai/tech-stack-extraction";
 import type {
   JobRunTrigger,
   JobType,
@@ -441,6 +443,100 @@ export async function refreshNewsCacheForActiveCompanies(
   }
 
   console.log(`News cache refresh complete: ${refreshedCount} refreshed, ${skippedCount} skipped, ${failedCount} failed`);
+  return { refreshed: refreshedCount, skipped: skippedCount, failed: failedCount };
+}
+
+/**
+ * Refresh tech stacks for companies that had new/updated jobs in a collection run.
+ * Uses hybrid pipeline: DB aggregation (instant) + Gemini Pro enrichment.
+ * Non-blocking: errors are logged but not propagated.
+ */
+export async function refreshTechStacksForCompanies(
+  collectionJobRunId: string
+): Promise<{ refreshed: number; skipped: number; failed: number }> {
+  const supabase = createAdminClient();
+  const PARALLELISM = 2;
+  const STALENESS_DAYS = 7;
+
+  // Get companies that had new jobs from the collection run
+  const { data: tasks } = await supabase
+    .from('job_run_tasks')
+    .select('company_id, new_jobs')
+    .eq('job_run_id', collectionJobRunId)
+    .gt('new_jobs', 0);
+
+  if (!tasks || tasks.length === 0) {
+    console.log('No companies with new jobs, skipping tech stack refresh');
+    return { refreshed: 0, skipped: 0, failed: 0 };
+  }
+
+  const companyIds = tasks.map((t) => t.company_id);
+
+  // Get companies with staleness check
+  const staleDate = new Date(Date.now() - STALENESS_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { data: companies } = await supabase
+    .from('companies')
+    .select('id, name, tech_stack_generated_at')
+    .in('id', companyIds);
+
+  if (!companies || companies.length === 0) {
+    return { refreshed: 0, skipped: 0, failed: 0 };
+  }
+
+  // Filter out recently generated stacks
+  const eligible = companies.filter(
+    (c) => !c.tech_stack_generated_at || c.tech_stack_generated_at < staleDate
+  );
+  const skippedCount = companies.length - eligible.length;
+
+  if (eligible.length === 0) {
+    console.log(`All ${companies.length} companies have fresh tech stacks, skipping refresh`);
+    return { refreshed: 0, skipped: skippedCount, failed: 0 };
+  }
+
+  console.log(`Refreshing tech stacks for ${eligible.length} companies (${skippedCount} recently generated)...`);
+
+  let refreshedCount = 0;
+  let failedCount = 0;
+
+  for (let i = 0; i < eligible.length; i += PARALLELISM) {
+    const batch = eligible.slice(i, i + PARALLELISM);
+
+    const results = await Promise.allSettled(
+      batch.map(async (company) => {
+        console.log(`Aggregating tech stack for ${company.name}...`);
+        const rawStack = await aggregateTechStackFromJobs(company.id);
+
+        if (rawStack.categories.length === 0) {
+          console.log(`No tech data found for ${company.name}, skipping enrichment`);
+          return;
+        }
+
+        const enrichedStack = await enrichTechStackWithAnalysis(rawStack);
+
+        await supabase
+          .from('companies')
+          .update({
+            tech_stack: enrichedStack,
+            tech_stack_generated_at: new Date().toISOString(),
+          })
+          .eq('id', company.id);
+
+        console.log(`Tech stack refreshed for ${company.name}`);
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        refreshedCount++;
+      } else {
+        console.error('Tech stack refresh failed:', result.reason);
+        failedCount++;
+      }
+    }
+  }
+
+  console.log(`Tech stack refresh complete: ${refreshedCount} refreshed, ${skippedCount} skipped, ${failedCount} failed`);
   return { refreshed: refreshedCount, skipped: skippedCount, failed: failedCount };
 }
 

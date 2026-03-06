@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies } from "@/lib/jobs";
+import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies, refreshTechStacksForCompanies } from "@/lib/jobs";
 import { requireCronAuth } from "@/lib/cron/auth";
 
 export const maxDuration = 300;
@@ -80,6 +80,10 @@ export async function GET(req: NextRequest) {
         parallelism: 2,
         skipIfCached: true,
       }).catch((err) => console.error("News cache refresh error:", err));
+
+      // Phase 4: Tech stack refresh (non-blocking)
+      refreshTechStacksForCompanies(jobRunId)
+        .catch((err) => console.error("Tech stack refresh error:", err));
     } else {
       console.log(
         `Collection job ${jobRunId} still in progress; skipping analysis/news until completion`

@@ -1,30 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-interface TechItem {
-  name: string;
-  count: number;
-  lastSeen: string;
-  firstSeen: string;
-}
-
-interface TechCategory {
-  category: string;
-  label: string;
-  technologies: TechItem[];
-}
-
-interface TechStack {
-  categories: TechCategory[];
-  totalJobsAnalyzed: number;
-  generatedAt: string;
-  periodStart: string;
-  periodEnd: string;
-}
+import type { CompanyTechStack as TechStack } from "@/lib/ai/tech-stack-extraction";
 
 interface CompanyTechStackProps {
   companyId: string;
@@ -33,14 +12,19 @@ interface CompanyTechStackProps {
   initialGeneratedAt: string | null;
 }
 
+// 3 color families + gray fallback (Notion-style, muted)
 const CATEGORY_COLORS: Record<string, string> = {
+  // Blue: engineering/code
   languages: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
-  frameworks: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800",
-  databases: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
-  cloud: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-300 dark:border-cyan-800",
-  devops: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
-  data_tools: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800",
-  ai_ml: "bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950 dark:text-pink-300 dark:border-pink-800",
+  frameworks: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
+  // Green: infra/ops
+  cloud: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
+  devops: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
+  databases: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
+  // Purple: data/AI
+  data_tools: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800",
+  ai_ml: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800",
+  // Gray: everything else
   other: "bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700",
 };
 
@@ -53,7 +37,6 @@ function formatDate(dateStr: string): string {
 function getFrequencyLabel(count: number, total: number): string {
   const pct = (count / total) * 100;
   if (pct >= 30) return "Core";
-  if (pct >= 10) return "Common";
   return "";
 }
 
@@ -67,10 +50,12 @@ export function CompanyTechStack({
   const [generatedAt, setGeneratedAt] = useState<string | null>(initialGeneratedAt);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
 
-  async function handleGenerate() {
+  async function handleRefresh() {
     setLoading(true);
     setError(null);
+    setErrorStatus(null);
 
     try {
       const res = await fetch(`/api/companies/${companyId}/tech-stack`, {
@@ -82,6 +67,7 @@ export function CompanyTechStack({
 
       if (!res.ok) {
         setError(data.error || "Failed to generate tech stack");
+        setErrorStatus(res.status);
         return;
       }
 
@@ -89,43 +75,34 @@ export function CompanyTechStack({
       setGeneratedAt(new Date().toISOString());
     } catch {
       setError("An error occurred. Please try again.");
+      setErrorStatus(500);
     } finally {
       setLoading(false);
     }
   }
 
-  // Empty state
+  // State 1: Pending (no data yet)
   if (!techStack || techStack.categories.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Tech Stack</h3>
-            <Button
-              size="sm"
-              onClick={handleGenerate}
-              disabled={loading}
-            >
-              {loading ? "Analyzing..." : "Generate Tech Stack"}
-            </Button>
-          </div>
+          <h3 className="text-lg font-semibold">Tech Stack</h3>
         </CardHeader>
         <CardContent>
           {error ? (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          ) : loading ? (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Analyzing job descriptions for {companyName}...
-              </p>
-              <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-primary/60 rounded-full animate-pulse" style={{ width: "60%" }} />
-              </div>
+            <div className="space-y-2">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="text-sm text-primary hover:underline"
+              >
+                {loading ? "Retrying..." : "Try again"}
+              </button>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No tech stack data yet. Click &quot;Generate Tech Stack&quot; to analyze job descriptions
-              and extract technology keywords.
+              Tech stack extraction scheduled — will be ready after the next collection run.
             </p>
           )}
         </CardContent>
@@ -133,11 +110,26 @@ export function CompanyTechStack({
     );
   }
 
-  const totalMentions = techStack.categories.reduce(
-    (sum, cat) => sum + cat.technologies.reduce((s, t) => s + t.count, 0),
-    0
-  );
+  // State 3: Error on populated card
+  const renderError = () => {
+    if (!error) return null;
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-red-600 dark:text-red-400">{error}</span>
+        {errorStatus !== 429 && (
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="text-primary hover:underline"
+          >
+            {loading ? "Retrying..." : "Try again"}
+          </button>
+        )}
+      </div>
+    );
+  };
 
+  // State 2: Populated
   return (
     <Card>
       <CardHeader>
@@ -149,26 +141,38 @@ export function CompanyTechStack({
               {generatedAt && <> &middot; Updated {formatDate(generatedAt)}</>}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleGenerate}
-            disabled={loading}
-          >
-            {loading ? "Refreshing..." : "Refresh"}
-          </Button>
+          <div className="relative">
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              title="Refresh tech stack"
+            >
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
-        {error && (
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        {renderError()}
+
+        {/* Architect Summary */}
+        {techStack.architectSummary && (
+          <p className="text-sm text-muted-foreground leading-relaxed border-l-2 border-muted pl-3">
+            {techStack.architectSummary}
+          </p>
         )}
 
         {techStack.categories.map((cat) => (
           <div key={cat.category}>
-            <h4 className="text-sm font-medium text-muted-foreground mb-2">
+            <h4 className="text-sm font-medium text-muted-foreground mb-1">
               {cat.label}
             </h4>
+            {cat.narrativeSummary && (
+              <p className="text-xs text-muted-foreground mb-2">
+                {cat.narrativeSummary}
+              </p>
+            )}
             <div className="flex flex-wrap gap-1.5">
               {cat.technologies.map((tech) => {
                 const freqLabel = getFrequencyLabel(tech.count, techStack.totalJobsAnalyzed);
@@ -184,9 +188,6 @@ export function CompanyTechStack({
                     title={`Mentioned in ${tech.count} job${tech.count !== 1 ? "s" : ""} (${formatDate(tech.firstSeen)} - ${formatDate(tech.lastSeen)})`}
                   >
                     {tech.name}
-                    {tech.count > 1 && (
-                      <span className="opacity-60 text-[10px]">{tech.count}</span>
-                    )}
                     {freqLabel && (
                       <span className="opacity-50 text-[10px] uppercase tracking-wide">
                         {freqLabel}
