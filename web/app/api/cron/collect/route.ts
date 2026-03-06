@@ -20,6 +20,36 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createAdminClient();
 
+    // Inline cleanup: mark any job_runs/tasks stuck in "running" for >20 min as failed
+    const staleThreshold = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    const { data: staleTasks } = await supabase
+      .from("job_run_tasks")
+      .select("id, job_run_id")
+      .eq("status", "running")
+      .lt("started_at", staleThreshold);
+
+    if (staleTasks && staleTasks.length > 0) {
+      await supabase
+        .from("job_run_tasks")
+        .update({ status: "failed", error_message: "Timed out", completed_at: new Date().toISOString() })
+        .in("id", staleTasks.map((t) => t.id));
+
+      // Mark parent job_runs as failed if all their tasks are now failed
+      const staleJobRunIds = [...new Set(staleTasks.map((t) => t.job_run_id))];
+      for (const runId of staleJobRunIds) {
+        const { data: remaining } = await supabase
+          .from("job_run_tasks").select("status").eq("job_run_id", runId);
+        const allDone = (remaining ?? []).every((t) => t.status !== "running" && t.status !== "pending");
+        if (allDone) {
+          await supabase
+            .from("job_runs")
+            .update({ status: "failed", completed_at: new Date().toISOString(), error_message: "Tasks timed out" })
+            .eq("id", runId).eq("status", "running");
+        }
+      }
+      console.log(`Cleaned up ${staleTasks.length} stale task(s) before collection run`);
+    }
+
     // Get all active companies
     const { data: companies, error: companiesError } = await supabase
       .from("companies")
@@ -41,12 +71,15 @@ export async function GET(req: NextRequest) {
     console.log(`Processing ${companies.length} companies:`, companies.map(c => `${c.name} (${c.ats_type})`));
 
     // Phase 1: Collection
-    // Resume an existing in-flight collect run first to avoid starving tail companies.
+    // Resume a recent in-flight collect run (started within last 20 min) to avoid starving
+    // tail companies. Older "running" jobs are stale (Vercel killed them) — don't resume.
+    const resumeWindow = new Date(Date.now() - 20 * 60 * 1000).toISOString();
     const { data: existingRun } = await supabase
       .from("job_runs")
       .select("id")
       .eq("job_type", "collect")
       .in("status", ["pending", "running"])
+      .gte("started_at", resumeWindow)
       .order("started_at", { ascending: true, nullsFirst: true })
       .limit(1)
       .maybeSingle();

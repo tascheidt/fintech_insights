@@ -83,87 +83,124 @@ export async function executeCollectionJob(jobRunId: string): Promise<JobRunResu
     })
     .eq('id', jobRunId);
 
-  // Get resumable tasks for this job run (pending/failed only)
-  let tasks: Array<{ id: string }> | null = null;
-  let attempts = 0;
-  const maxAttempts = 10;
-  
-  while (attempts < maxAttempts) {
-    const { data, error } = await supabase
-      .from('job_run_tasks')
-      .select('id')
-      .eq('job_run_id', jobRunId)
-      .in('status', ['pending', 'failed'])
-      .order('started_at', { ascending: true, nullsFirst: true });
-    
-    if (error) {
-      throw new Error(`Failed to fetch tasks: ${error.message}`);
-    }
-    
-    if (data && data.length > 0) {
-      tasks = data;
-      break;
-    }
-    
-    attempts++;
-    if (attempts < maxAttempts) {
-      // Wait 100ms before retrying
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-  }
-
-  if (!tasks) {
-    throw new Error(`No tasks found for job run ${jobRunId} after ${maxAttempts} attempts`);
-  }
-
   let completedCount = 0;
   let failedCount = 0;
+  let finalStatus: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' = 'failed';
 
-  // Process resumable tasks
-  for (const task of tasks) {
-    try {
-      await processCollectionTask(task.id);
-      completedCount++;
-    } catch (error) {
-      console.error(`Task ${task.id} failed:`, error);
-      failedCount++;
+  try {
+    // Inline stale cleanup: tasks stuck in "running" for >20 minutes are failed tasks
+    // (e.g. Vercel killed the function mid-run, or GitHub Actions never called back)
+    const staleThreshold = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    await supabase
+      .from('job_run_tasks')
+      .update({
+        status: 'failed',
+        error_message: 'Task timed out (stuck in running state)',
+        error_stage: 'timeout',
+        completed_at: new Date().toISOString(),
+      })
+      .eq('job_run_id', jobRunId)
+      .eq('status', 'running')
+      .lt('started_at', staleThreshold);
+
+    // Get resumable tasks (pending/failed only — running tasks were just cleaned up above)
+    let tasks: Array<{ id: string }> | null = null;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (attempts < maxAttempts) {
+      const { data, error } = await supabase
+        .from('job_run_tasks')
+        .select('id')
+        .eq('job_run_id', jobRunId)
+        .in('status', ['pending', 'failed'])
+        .order('started_at', { ascending: true, nullsFirst: true });
+
+      if (error) throw new Error(`Failed to fetch tasks: ${error.message}`);
+
+      if (data && data.length > 0) {
+        tasks = data;
+        break;
+      }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
 
-    // Update aggregate stats after each task
-    await updateJobRunStats(jobRunId);
+    if (!tasks || tasks.length === 0) {
+      // No resumable tasks — either all completed/running (GH Actions) or nothing to do.
+      // Determine final status from existing task states.
+      console.log(`No resumable tasks for job run ${jobRunId}, checking task states...`);
+    } else {
+      // Process resumable tasks
+      for (const task of tasks) {
+        try {
+          await processCollectionTask(task.id);
+          completedCount++;
+        } catch (error) {
+          console.error(`Task ${task.id} failed:`, error);
+          failedCount++;
+        }
+        await updateJobRunStats(jobRunId);
+      }
+    }
+
+    // Determine final status from all task states.
+    // Tasks in "running" state are delegated to GitHub Actions — they don't block completion.
+    const { data: taskStatuses } = await supabase
+      .from('job_run_tasks')
+      .select('status')
+      .eq('job_run_id', jobRunId);
+
+    const hasPending = (taskStatuses ?? []).some((t) => t.status === 'pending');
+    const hasFailed = (taskStatuses ?? []).some((t) => t.status === 'failed');
+    // "running" tasks are GH Actions delegated — treat the run as complete from our side
+    finalStatus = hasPending ? 'running' : hasFailed ? 'failed' : 'completed';
+  } catch (error) {
+    // Ensure we always set a terminal status — never leave a job stuck in "running"
+    console.error(`executeCollectionJob error for ${jobRunId}:`, error);
+    finalStatus = 'failed';
+
+    await supabase
+      .from('job_runs')
+      .update({
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+        error_message: error instanceof Error ? error.message : String(error),
+      })
+      .eq('id', jobRunId);
+
+    // Get stats and return even on error
+    const { data: jobRun } = await supabase
+      .from('job_runs').select('*').eq('id', jobRunId).single();
+    return {
+      jobRunId,
+      status: 'failed',
+      stats: {
+        totalCompanies: jobRun?.total_companies || 0,
+        completedCompanies: completedCount,
+        failedCompanies: failedCount,
+        totalNewJobs: jobRun?.total_new_jobs || 0,
+        totalUpdatedJobs: jobRun?.total_updated_jobs || 0,
+        totalClosedJobs: jobRun?.total_closed_jobs || 0,
+        totalInsights: jobRun?.total_insights || 0,
+      },
+    };
   }
 
-  // Determine final status from all task states
-  const { data: taskStatuses, error: statusError } = await supabase
-    .from('job_run_tasks')
-    .select('status')
-    .eq('job_run_id', jobRunId);
-
-  if (statusError) {
-    throw new Error(`Failed to determine job run status: ${statusError.message}`);
-  }
-
-  const hasPendingOrRunning = (taskStatuses ?? []).some(
-    (task) => task.status === 'pending' || task.status === 'running'
-  );
-  const hasFailed = (taskStatuses ?? []).some((task) => task.status === 'failed');
-  const finalStatus = hasPendingOrRunning ? 'running' : hasFailed ? 'failed' : 'completed';
-
-  // Update job run status
+  // Always set a terminal status
   await supabase
     .from('job_runs')
     .update({
       status: finalStatus,
-      completed_at: finalStatus === 'running' ? null : new Date().toISOString(),
+      completed_at: new Date().toISOString(),
     })
     .eq('id', jobRunId);
 
-  // Get final stats
   const { data: jobRun } = await supabase
-    .from('job_runs')
-    .select('*')
-    .eq('id', jobRunId)
-    .single();
+    .from('job_runs').select('*').eq('id', jobRunId).single();
 
   return {
     jobRunId,
