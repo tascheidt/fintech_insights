@@ -20,6 +20,7 @@ interface LabCardProps {
   summary: string;
   ctaLabel: string;
   featured?: boolean;
+  adminOnly?: boolean;
   className?: string;
 }
 
@@ -30,6 +31,7 @@ export function LabCard({
   summary,
   ctaLabel,
   featured = false,
+  adminOnly = false,
   className,
 }: LabCardProps) {
   return (
@@ -50,16 +52,23 @@ export function LabCard({
         />
         <NotionCardContent className="gap-4">
           <div className="flex items-center justify-between gap-3">
-            <NotionCardTag
-              className={cn(
-                "rounded-full px-2.5 py-1 text-[11px]",
-                featured
-                  ? "bg-slate-900 text-slate-50"
-                  : "bg-muted text-muted-foreground"
+            <div className="flex items-center gap-2">
+              <NotionCardTag
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-[11px]",
+                  featured
+                    ? "bg-slate-900 text-slate-50"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {status}
+              </NotionCardTag>
+              {adminOnly && (
+                <NotionCardTag className="rounded-full px-2.5 py-1 text-[11px] bg-amber-100 text-amber-700">
+                  Admin only
+                </NotionCardTag>
               )}
-            >
-              {status}
-            </NotionCardTag>
+            </div>
             {featured && (
               <span className="text-[11px] font-medium text-muted-foreground">
                 Featured

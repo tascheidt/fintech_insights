@@ -5,6 +5,7 @@ import { updateJobRunStats } from "./progress";
 import { fetchCompanyNewsContext } from "@/lib/analysis/company-news";
 import { aggregateTechStackFromJobs } from "@/lib/ai/tech-stack-aggregation";
 import { enrichTechStackWithAnalysis } from "@/lib/ai/tech-stack-extraction";
+import { getActiveTechStackAiConfig } from "@/lib/ai/prompt-config";
 import type {
   JobRunTrigger,
   JobType,
@@ -494,6 +495,7 @@ export async function refreshTechStacksForCompanies(
   const supabase = createAdminClient();
   const PARALLELISM = 2;
   const STALENESS_DAYS = 7;
+  const config = await getActiveTechStackAiConfig();
 
   // Get all companies from the collection run
   const { data: tasks } = await supabase
@@ -554,10 +556,12 @@ export async function refreshTechStacksForCompanies(
         }
 
         const enrichedStack = await enrichTechStackWithAnalysis(
+          company.name,
           rawData.technologies,
           rawData.totalJobsAnalyzed,
           rawData.periodStart,
-          rawData.periodEnd
+          rawData.periodEnd,
+          config
         );
 
         await supabase
@@ -593,6 +597,7 @@ export async function refreshTechStacksForCompanies(
 export async function backfillTechStacksForAllCompanies(): Promise<{ refreshed: number; skipped: number; failed: number }> {
   const supabase = createAdminClient();
   const PARALLELISM = 2;
+  const config = await getActiveTechStackAiConfig();
 
   const { data: companies } = await supabase
     .from('companies')
@@ -630,10 +635,12 @@ export async function backfillTechStacksForAllCompanies(): Promise<{ refreshed: 
         }
 
         const enrichedStack = await enrichTechStackWithAnalysis(
+          company.name,
           rawData.technologies,
           rawData.totalJobsAnalyzed,
           rawData.periodStart,
-          rawData.periodEnd
+          rawData.periodEnd,
+          config
         );
 
         await supabase

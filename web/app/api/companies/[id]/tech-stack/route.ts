@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { aggregateTechStackFromJobs } from "@/lib/ai/tech-stack-aggregation";
 import { enrichTechStackWithAnalysis, type CompanyTechStack } from "@/lib/ai/tech-stack-extraction";
+import { getActiveTechStackAiConfig } from "@/lib/ai/prompt-config";
 
 export const maxDuration = 120;
 
@@ -87,6 +88,7 @@ export async function POST(
   try {
     // Step 1: DB aggregation (instant, no AI)
     const rawData = await aggregateTechStackFromJobs(id);
+    const config = await getActiveTechStackAiConfig();
 
     if (rawData.technologies.length === 0) {
       return NextResponse.json(
@@ -97,10 +99,12 @@ export async function POST(
 
     // Step 2: Gemini Pro enrichment (categorizes + adds narrative summaries)
     const enrichedStack = await enrichTechStackWithAnalysis(
+      company.name,
       rawData.technologies,
       rawData.totalJobsAnalyzed,
       rawData.periodStart,
-      rawData.periodEnd
+      rawData.periodEnd,
+      config
     );
 
     // Store the result

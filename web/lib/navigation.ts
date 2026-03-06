@@ -13,6 +13,7 @@ export interface LabsExperiment {
   description: string;
   ctaLabel: string;
   featured?: boolean;
+  adminOnly?: boolean;
 }
 
 const PRIMARY_NAV_ITEMS: NavItem[] = [
@@ -39,6 +40,19 @@ export const labsExperiments: LabsExperiment[] = [
     ctaLabel: "Open experiment",
     featured: true,
   },
+  {
+    slug: "prompt-forge",
+    href: "/labs/prompt-forge",
+    title: "Prompt Forge",
+    status: "Beta",
+    summary:
+      "Tune extraction and synthesis prompts like a signal-hunting game, compare models, and ship winning configs live.",
+    description:
+      "Battle prompt variants against real company data, score them on specificity and insight depth, then save or promote the champion configuration.",
+    ctaLabel: "Enter forge",
+    featured: true,
+    adminOnly: true,
+  },
 ];
 
 export function getPrimaryNavItems(role?: string): NavItem[] {
@@ -53,6 +67,10 @@ export function getUtilityNavItems(): NavItem[] {
   return UTILITY_NAV_ITEMS;
 }
 
-export function getLabsExperiment(slug: string) {
-  return labsExperiments.find((experiment) => experiment.slug === slug);
+export function getLabsExperiments(role?: string) {
+  return labsExperiments.filter((experiment) => !experiment.adminOnly || role === "admin");
+}
+
+export function getLabsExperiment(slug: string, role?: string) {
+  return getLabsExperiments(role).find((experiment) => experiment.slug === slug);
 }

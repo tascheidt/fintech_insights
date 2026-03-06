@@ -5,6 +5,10 @@ import type { Browser } from "puppeteer-core";
 import type { Company, IngestResult } from "./types";
 import { updateTaskProgress } from "./progress";
 import { extractJobStructure, normalizeJobTitle, isValidDepartment, isValidLocation } from "@/lib/analysis/structure";
+import {
+  getActiveJobStructureAiConfig,
+  type JobStructureAiConfig,
+} from "@/lib/ai/prompt-config";
 
 /**
  * Stage 1: Scrape - Fetch raw data from ATS
@@ -76,12 +80,13 @@ export async function runScrapeStage(
  * Extract Silver Layer structure and update job posting
  * This runs asynchronously and doesn't block the ingestion pipeline
  */
-async function extractAndUpdateStructure(
+export async function extractAndUpdateStructure(
   jobId: string,
   jobTitle: string,
   description: string,
   rawDepartment?: string | null,
-  rawLocation?: string | null
+  rawLocation?: string | null,
+  config?: JobStructureAiConfig
 ): Promise<void> {
   const supabase = createAdminClient();
 
@@ -93,7 +98,9 @@ async function extractAndUpdateStructure(
   try {
     // Extract structured data (pass raw department as context)
     // Always extract location from description - description is source of truth
-    const structure = await extractJobStructure(jobTitle, description, rawDepartment);
+    const structure = await extractJobStructure(jobTitle, description, rawDepartment, {
+      config,
+    });
 
     if (!structure) {
       // Extraction failed, but continue - we'll still have the raw data
@@ -169,9 +176,11 @@ export async function runIngestStage(
   taskId: string,
   company: Company,
   jobs: JobData[],
-  onProgress?: (processed: number, total: number) => void
+  onProgress?: (processed: number, total: number) => void,
+  config?: JobStructureAiConfig
 ): Promise<IngestResult> {
   const supabase = createAdminClient();
+  const activeConfig = config ?? await getActiveJobStructureAiConfig();
 
   // Update stage to running
   await updateTaskProgress(taskId, 'ingest', {
@@ -234,7 +243,14 @@ export async function runIngestStage(
         // Pass raw location for validation (AI will extract from description)
         if (row.description_text) {
           extractionPromises.push(
-            extractAndUpdateStructure(existingId, job.title, row.description_text, row.department, row.location)
+            extractAndUpdateStructure(
+              existingId,
+              job.title,
+              row.description_text,
+              row.department,
+              row.location,
+              activeConfig
+            )
           );
         }
       } else {
@@ -257,7 +273,14 @@ export async function runIngestStage(
           // Pass raw location for validation (AI will extract from description)
           if (row.description_text) {
             extractionPromises.push(
-              extractAndUpdateStructure(inserted.id, job.title, row.description_text, row.department, row.location)
+              extractAndUpdateStructure(
+                inserted.id,
+                job.title,
+                row.description_text,
+                row.department,
+                row.location,
+                activeConfig
+              )
             );
           }
         }

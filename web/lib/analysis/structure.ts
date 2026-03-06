@@ -1,6 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { ROLE_CATEGORIES, type RoleCategory } from "./function-categories";
+import {
+  DEFAULT_JOB_STRUCTURE_AI_CONFIG,
+  type JobStructureAiConfig,
+} from "@/lib/ai/prompt-config";
 
 /**
  * Job Structure Extractor
@@ -44,6 +48,8 @@ export const JobStructureSchema = z.object({
 
 export type JobStructure = z.infer<typeof JobStructureSchema>;
 
+const GEMINI_REQUEST_TIMEOUT_MS = 30000;
+
 // Extended type for database insertion (flattened salary fields)
 export interface JobStructureForDB extends Omit<JobStructure, "salary" | "location"> {
   salary_min: number | null;
@@ -59,40 +65,35 @@ export interface JobStructureForDB extends Omit<JobStructure, "salary" | "locati
   } | null;
 }
 
-const EXTRACTION_PROMPT = `Analyze this job description and extract the following structured data.
+interface ExtractJobStructureOptions {
+  config?: JobStructureAiConfig;
+  retryCount?: number;
+}
 
-Job Title: {job_title}
-Raw Department (from ATS): {raw_department}
-Note: The raw department may be empty, null, or contain invalid data (e.g., cookie banners). Use it as a hint if it appears valid, but extract the correct standardized department from the description.
+function resolveExtractOptions(
+  options?: number | ExtractJobStructureOptions
+): Required<ExtractJobStructureOptions> {
+  if (typeof options === "number") {
+    return {
+      config: DEFAULT_JOB_STRUCTURE_AI_CONFIG,
+      retryCount: options,
+    };
+  }
 
-Job Description:
-{description}
+  return {
+    config: options?.config ?? DEFAULT_JOB_STRUCTURE_AI_CONFIG,
+    retryCount: options?.retryCount ?? 0,
+  };
+}
 
-IMPORTANT: Always extract location from the job description. Look for location information in sections like "Location(s):", "Location:", or within the job details. The description is the source of truth for location data.
-
-Extract and return a JSON object with:
-1. **summary**: A concise 2-3 sentence summary (max 300 chars)
-2. **seniority_level**: One of: intern, junior, mid, senior, staff, principal, lead, executive
-3. **salary**: Object with min, max (integers), currency (default "USD"), or null
-4. **tech_stack**: Array of specific technologies, platforms, and domain software (max 15 items, most important first). Focus on: programming languages, frameworks, databases, cloud platforms, banking/financial platforms (e.g., Temenos T24, FIS, Finastra), data/analytics tools (e.g., Snowflake, Spark, Tableau), and DevOps tooling. EXCLUDE generic office productivity software (Excel, Word, PowerPoint, Outlook, MS Office, Google Docs, Slack, Zoom, Teams, SharePoint, Jira, Confluence) and generic methodologies (Agile, Scrum, Lean, PMP)
-5. **keywords**: Array of relevant keywords/skills/domains (max 20 items, most important first)
-6. **standardized_department**: One of: Engineering, Sales, Marketing, Product, Operations, Finance, Legal, HR, Customer Success, Support
-7. **function_category**: Must be one of: {categories}
-   - Edge Cases: SQL/ETL→engineering-data, Excel/Accounting→finance-accounting, Risk Modeling→data-science, Fraud Ops→fraud-trust-safety, Compliance Ops→compliance, Legal→legal, Support→customer-support-cx, Success→account-management-customer-success
-   - Return "other" only if truly uncategorizable
-8. **location**: Object with city, state, country, formatted (all nullable), or null
-
-Respond ONLY with valid JSON matching this structure:
-{
-  "summary": "...",
-  "seniority_level": "senior",
-  "salary": {"min": 120000, "max": 150000, "currency": "USD"} or null,
-  "tech_stack": ["React", "TypeScript", "AWS"],
-  "keywords": ["fintech", "payments", "API development", "microservices", "agile"],
-  "standardized_department": "Engineering",
-  "function_category": "engineering-backend",
-  "location": {"city": "Toronto", "state": "Ontario", "country": "Canada", "formatted": "Toronto, Ontario, Canada"} or null
-}`;
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]);
+}
 
 /**
  * Extract structured data from a job description
@@ -107,8 +108,9 @@ export async function extractJobStructure(
   jobTitle: string,
   description: string,
   rawDepartment?: string | null,
-  retryCount: number = 0
+  options?: number | ExtractJobStructureOptions
 ): Promise<JobStructureForDB | null> {
+  const { config, retryCount } = resolveExtractOptions(options);
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     console.error("GEMINI_API_KEY not configured");
@@ -118,7 +120,7 @@ export async function extractJobStructure(
   // Truncate description to avoid token limits (keep first 8000 chars)
   const truncatedDescription = description.slice(0, 8000) || "No description available";
 
-  const prompt = EXTRACTION_PROMPT
+  const prompt = config.promptTemplate
     .replace("{job_title}", jobTitle)
     .replace("{raw_department}", rawDepartment || "null or empty")
     .replace("{description}", truncatedDescription)
@@ -131,17 +133,21 @@ export async function extractJobStructure(
 
     // Use Gemini 3 Flash with JSON mode for guaranteed structured output
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: config.model,
       generationConfig: {
-        temperature: 0.2, // Lower temperature for more consistent extraction
-        maxOutputTokens: 64000, // Increased to handle longer responses and prevent truncation
+        temperature: config.temperature,
+        maxOutputTokens: config.maxOutputTokens,
         responseMimeType: "application/json",
       },
     });
 
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    });
+    const result = await withTimeout(
+      model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      }),
+      GEMINI_REQUEST_TIMEOUT_MS,
+      `Gemini extraction for "${jobTitle}"`
+    );
 
     const text = result.response.text()?.trim() ?? "";
     
@@ -154,7 +160,10 @@ export async function extractJobStructure(
         console.log(`Retrying extraction for job "${jobTitle}" due to empty response (attempt ${retryCount + 2}/3)`);
         // Wait a bit before retrying (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-        return extractJobStructure(jobTitle, description, rawDepartment, retryCount + 1);
+        return extractJobStructure(jobTitle, description, rawDepartment, {
+          config,
+          retryCount: retryCount + 1,
+        });
       }
       
       return null;
@@ -227,7 +236,10 @@ export async function extractJobStructure(
               // Retry with progressively shorter description to reduce input tokens
               const shorterDescription = description.slice(0, Math.max(4000, 8000 - (retryCount * 2000)));
               await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-              return extractJobStructure(jobTitle, shorterDescription, rawDepartment, retryCount + 1);
+              return extractJobStructure(jobTitle, shorterDescription, rawDepartment, {
+                config,
+                retryCount: retryCount + 1,
+              });
             }
             
             // If not truncated or retries exhausted, try to extract partial data from what we have
@@ -274,7 +286,10 @@ export async function extractJobStructure(
             console.log(`Retrying extraction for job "${jobTitle}" (attempt ${retryCount + 2}/3)`);
             // Wait a bit before retrying (exponential backoff)
             await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-            return extractJobStructure(jobTitle, description, rawDepartment, retryCount + 1);
+            return extractJobStructure(jobTitle, description, rawDepartment, {
+              config,
+              retryCount: retryCount + 1,
+            });
           }
           
           return null;
@@ -328,7 +343,10 @@ export async function extractJobStructure(
         console.log(`Retrying extraction for job "${jobTitle}" due to ${errorMessage} (attempt ${retryCount + 2}/3)`);
         // Wait before retrying (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
-        return extractJobStructure(jobTitle, description, rawDepartment, retryCount + 1);
+        return extractJobStructure(jobTitle, description, rawDepartment, {
+          config,
+          retryCount: retryCount + 1,
+        });
       }
     }
     

@@ -291,7 +291,6 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               {/* Tech Stack */}
               <CompanyTechStack
                 companyId={company.id}
-                companyName={company.name}
                 initialTechStack={company.tech_stack ?? null}
                 initialGeneratedAt={company.tech_stack_generated_at ?? null}
               />
@@ -382,7 +381,6 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           {!insight && (
             <CompanyTechStack
               companyId={company.id}
-              companyName={company.name}
               initialTechStack={company.tech_stack ?? null}
               initialGeneratedAt={company.tech_stack_generated_at ?? null}
             />

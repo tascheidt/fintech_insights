@@ -1,4 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  DEFAULT_TECH_STACK_AI_CONFIG,
+  type TechStackAiConfig,
+} from "./prompt-config";
 
 /**
  * Tech Stack Extraction
@@ -39,6 +43,8 @@ export interface CompanyTechStack {
   /** AI-generated architect-level summary of the tech stack */
   architectSummary?: string;
 }
+
+const GEMINI_REQUEST_TIMEOUT_MS = 30000;
 
 /** Raw extraction result from a batch of job descriptions */
 interface JobTechExtraction {
@@ -345,52 +351,6 @@ export { NORMALIZATION_MAP, CATEGORY_LABELS, normalizeTechName };
 
 import type { FlatTechMention } from "./tech-stack-aggregation";
 
-const ENRICHMENT_PROMPT = `You are a senior software architect conducting a technical due diligence review of a fintech company's technology stack. You have been provided with a flat list of technologies extracted from their job postings, along with how many postings mention each one.
-
-Your task is to:
-1. **Categorize** each technology into one of three fintech-relevant perspectives (or "other")
-2. **Write narrative summaries** for each category and an overall architect assessment
-
-CATEGORIES:
-- **banking_platforms** ("Banking & Financial Platforms"): Core banking systems (Temenos, FIS, Finastra, Mambu), payment platforms (Stripe, Plaid, Marqeta), lending/credit systems, risk/compliance tools (KYC, AML, FICO), CRM platforms used in financial services (Salesforce, ServiceNow, Pega), and digital banking infrastructure (React Native for banking apps). This reveals what the company runs its financial services on.
-- **dev_stack** ("Software Development Stack"): Programming languages, frameworks, databases, cloud providers, DevOps/CI-CD tooling, message queues, and testing tools. This reveals how the company builds and ships software.
-- **data_analytics** ("Data & Analytics"): Data pipelines, warehouses, BI/visualization tools, ETL, and AI/ML tooling. This reveals how the company uses data for decision-making and product intelligence.
-- **other**: Technologies that don't clearly fit the above categories.
-
-FLAT TECHNOLOGY LIST:
-{tech_data}
-
-Total job postings analyzed: {total_jobs}
-Period: {period_start} to {period_end}
-
-Respond with a JSON object:
-{
-  "architectSummary": "2-3 sentence overall assessment of the company's technology posture, focusing on what stands out for a fintech/banking context",
-  "categories": [
-    {
-      "category": "banking_platforms",
-      "label": "Banking & Financial Platforms",
-      "technologies": ["Temenos", "Stripe", "Salesforce"],
-      "narrativeSummary": "2-3 sentence narrative for this category"
-    },
-    {
-      "category": "dev_stack",
-      "label": "Software Development Stack",
-      "technologies": ["Python", "React", "AWS", "Docker"],
-      "narrativeSummary": "2-3 sentence narrative"
-    }
-  ]
-}
-
-RULES:
-- Only include categories that have technologies assigned to them
-- The "technologies" array for each category should contain the technology NAMES exactly as provided in the input (preserve casing)
-- Sort technologies within each category by importance/relevance to the category, not alphabetically
-- Be specific with percentages when the data supports it (e.g., "Python appears in 65% of engineering roles")
-- Be opinionated but honest about data limitations
-- If a technology could fit multiple categories, place it in the most relevant one (no duplicates)
-- Omit the "other" category entirely if it would be empty or contain only 1-2 low-signal items`;
-
 /** Result shape from the LLM enrichment call */
 interface EnrichmentResult {
   architectSummary?: string;
@@ -402,16 +362,27 @@ interface EnrichmentResult {
   }[];
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]);
+}
+
 /**
  * Categorize and enrich a flat list of technology mentions using Gemini Pro.
  * This replaces the old two-step approach (hardcoded categorization + separate enrichment).
  * The LLM handles both categorization and narrative generation in a single pass.
  */
 export async function enrichTechStackWithAnalysis(
+  companyName: string,
   technologies: FlatTechMention[],
   totalJobsAnalyzed: number,
   periodStart: string,
-  periodEnd: string
+  periodEnd: string,
+  config: TechStackAiConfig = DEFAULT_TECH_STACK_AI_CONFIG
 ): Promise<CompanyTechStack> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
@@ -439,7 +410,8 @@ export async function enrichTechStackWithAnalysis(
     lastSeen: t.lastSeen,
   }));
 
-  const prompt = ENRICHMENT_PROMPT
+  const prompt = config.promptTemplate
+    .replace("{company_name}", companyName)
     .replace("{tech_data}", JSON.stringify(techData, null, 2))
     .replace("{total_jobs}", String(totalJobsAnalyzed))
     .replace("{period_start}", periodStart)
@@ -447,18 +419,22 @@ export async function enrichTechStackWithAnalysis(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: "gemini-pro-latest",
+    model: config.model,
     generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 4096,
+      temperature: config.temperature,
+      maxOutputTokens: config.maxOutputTokens,
       responseMimeType: "application/json",
     },
   });
 
   try {
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    });
+    const result = await withTimeout(
+      model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      }),
+      GEMINI_REQUEST_TIMEOUT_MS,
+      `Gemini tech stack enrichment for "${companyName}"`
+    );
 
     const text = result.response.text()?.trim() ?? "{}";
     const parsed = JSON.parse(text) as EnrichmentResult;

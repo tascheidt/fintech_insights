@@ -1,8 +1,20 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { LabCard } from "@/components/labs/LabCard";
-import { labsExperiments } from "@/lib/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getLabsExperiments } from "@/lib/navigation";
 
 export default async function LabsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("role").eq("id", user.id).single()
+    : { data: null };
+
+  const experiments = getLabsExperiments(profile?.role);
+
   return (
     <div className="mx-auto max-w-6xl space-y-10">
       <Card className="rounded-[24px] border-border/70 bg-muted/20">
@@ -34,7 +46,7 @@ export default async function LabsPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {labsExperiments.map((experiment) => (
+          {experiments.map((experiment) => (
             <LabCard
               key={experiment.slug}
               href={experiment.href}
@@ -43,6 +55,7 @@ export default async function LabsPage() {
               summary={experiment.summary}
               ctaLabel={experiment.ctaLabel}
               featured={experiment.featured}
+              adminOnly={experiment.adminOnly}
             />
           ))}
 
