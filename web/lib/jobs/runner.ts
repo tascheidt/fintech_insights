@@ -508,7 +508,7 @@ export async function refreshTechStacksForCompanies(
 
   const companyIds = tasks.map((t) => t.company_id);
   const companiesWithNewJobs = new Set(
-    tasks.filter((t) => t.new_jobs > 0).map((t) => t.company_id)
+    tasks.filter((t) => (t.new_jobs ?? 0) > 0).map((t) => t.company_id)
   );
 
   // Get companies with staleness check

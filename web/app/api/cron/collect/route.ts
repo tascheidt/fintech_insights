@@ -107,21 +107,28 @@ export async function GET(req: NextRequest) {
       // Phase 2: Analysis (auto-triggered if there are new jobs to analyze)
       await triggerAnalysisJobIfNeeded(jobRunId);
 
-      // Phase 3: News cache refresh (async, non-blocking)
-      refreshNewsCacheForActiveCompanies(jobRunId, {
-        parallelism: 2,
-        skipIfCached: true,
-      }).catch((err) => console.error("News cache refresh error:", err));
+      // Phase 3: News cache refresh
+      try {
+        await refreshNewsCacheForActiveCompanies(jobRunId, {
+          parallelism: 2,
+          skipIfCached: true,
+        });
+      } catch (err) {
+        console.error("News cache refresh error:", err);
+      }
     } else {
       console.log(
         `Collection job ${jobRunId} still in progress; skipping analysis/news until completion`
       );
     }
 
-    // Phase 4: Tech stack refresh (always runs, non-blocking)
-    // Uses existing per-job tech_stack data from the DB, independent of collection status
-    refreshTechStacksForCompanies(jobRunId)
-      .catch((err) => console.error("Tech stack refresh error:", err));
+    // Phase 4: Tech stack refresh (always runs, uses existing per-job data)
+    // MUST be awaited — Vercel kills the function once the response is sent
+    try {
+      await refreshTechStacksForCompanies(jobRunId);
+    } catch (err) {
+      console.error("Tech stack refresh error:", err);
+    }
 
     return NextResponse.json({
       success: true,

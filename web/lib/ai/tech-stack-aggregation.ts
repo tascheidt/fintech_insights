@@ -57,12 +57,14 @@ export async function aggregateTechStackFromJobs(
 ): Promise<CompanyTechStack> {
   const supabase = createAdminClient();
 
-  // Get all jobs for this company with tech_stack data
+  // Get all jobs for this company with non-empty tech_stack data
+  // tech_stack column defaults to '[]' (empty JSONB array), so we must exclude both NULL and '[]'
   const { data: jobs, error } = await supabase
     .from("job_postings")
     .select("id, tech_stack, first_seen_date, is_active")
     .eq("company_id", companyId)
     .not("tech_stack", "is", null)
+    .neq("tech_stack", "[]")
     .order("first_seen_date", { ascending: false });
 
   if (error) {
