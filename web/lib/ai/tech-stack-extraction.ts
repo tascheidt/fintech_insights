@@ -340,19 +340,24 @@ export async function extractCompanyTechStack(
 export { NORMALIZATION_MAP, CATEGORY_LABELS, normalizeTechName };
 
 // ============================================================================
-// Gemini Pro Enrichment
+// Gemini Pro Enrichment (Categorization + Narration in one pass)
 // ============================================================================
 
-const ENRICHMENT_PROMPT = `You are a senior software architect conducting a technical due diligence review of a fintech company's technology stack. You have been provided with aggregated technology data extracted from their job postings.
+import type { FlatTechMention } from "./tech-stack-aggregation";
 
-The data is organized into three perspectives:
-1. **Banking & Financial Platforms** (banking_platforms): Core banking systems, payment platforms, lending/credit systems, risk/compliance tools, CRM, and digital banking infrastructure. This reveals what the company runs its financial services on.
-2. **Software Development Stack** (dev_stack): Programming languages, frameworks, databases, cloud providers, and DevOps tooling. This reveals how the company builds and ships software.
-3. **Data & Analytics** (data_analytics): Data pipelines, warehouses, BI tools, and AI/ML tooling. This reveals how the company uses data for decision-making and product intelligence.
+const ENRICHMENT_PROMPT = `You are a senior software architect conducting a technical due diligence review of a fintech company's technology stack. You have been provided with a flat list of technologies extracted from their job postings, along with how many postings mention each one.
 
-For each category present in the data, write a concise narrative summary (2-3 sentences) that a CTO or banking technology analyst would find useful. Focus on what the technology choices reveal about the company's architecture decisions, modernization posture, and build-vs-buy philosophy. When data is insufficient, say so explicitly.
+Your task is to:
+1. **Categorize** each technology into one of three fintech-relevant perspectives (or "other")
+2. **Write narrative summaries** for each category and an overall architect assessment
 
-AGGREGATED TECH STACK DATA:
+CATEGORIES:
+- **banking_platforms** ("Banking & Financial Platforms"): Core banking systems (Temenos, FIS, Finastra, Mambu), payment platforms (Stripe, Plaid, Marqeta), lending/credit systems, risk/compliance tools (KYC, AML, FICO), CRM platforms used in financial services (Salesforce, ServiceNow, Pega), and digital banking infrastructure (React Native for banking apps). This reveals what the company runs its financial services on.
+- **dev_stack** ("Software Development Stack"): Programming languages, frameworks, databases, cloud providers, DevOps/CI-CD tooling, message queues, and testing tools. This reveals how the company builds and ships software.
+- **data_analytics** ("Data & Analytics"): Data pipelines, warehouses, BI/visualization tools, ETL, and AI/ML tooling. This reveals how the company uses data for decision-making and product intelligence.
+- **other**: Technologies that don't clearly fit the above categories.
+
+FLAT TECHNOLOGY LIST:
 {tech_data}
 
 Total job postings analyzed: {total_jobs}
@@ -361,46 +366,84 @@ Period: {period_start} to {period_end}
 Respond with a JSON object:
 {
   "architectSummary": "2-3 sentence overall assessment of the company's technology posture, focusing on what stands out for a fintech/banking context",
-  "categorySummaries": {
-    "category_key": "2-3 sentence narrative for this category"
-  }
+  "categories": [
+    {
+      "category": "banking_platforms",
+      "label": "Banking & Financial Platforms",
+      "technologies": ["Temenos", "Stripe", "Salesforce"],
+      "narrativeSummary": "2-3 sentence narrative for this category"
+    },
+    {
+      "category": "dev_stack",
+      "label": "Software Development Stack",
+      "technologies": ["Python", "React", "AWS", "Docker"],
+      "narrativeSummary": "2-3 sentence narrative"
+    }
+  ]
 }
 
-Be specific with percentages when the data supports it. Be opinionated but honest about data limitations. Do NOT mention excluded categories or missing data for categories not present in the input.`;
+RULES:
+- Only include categories that have technologies assigned to them
+- The "technologies" array for each category should contain the technology NAMES exactly as provided in the input (preserve casing)
+- Sort technologies within each category by importance/relevance to the category, not alphabetically
+- Be specific with percentages when the data supports it (e.g., "Python appears in 65% of engineering roles")
+- Be opinionated but honest about data limitations
+- If a technology could fit multiple categories, place it in the most relevant one (no duplicates)
+- Omit the "other" category entirely if it would be empty or contain only 1-2 low-signal items`;
+
+/** Result shape from the LLM enrichment call */
+interface EnrichmentResult {
+  architectSummary?: string;
+  categories?: {
+    category: string;
+    label: string;
+    technologies: string[];
+    narrativeSummary?: string;
+  }[];
+}
 
 /**
- * Enrich a raw aggregated tech stack with AI-generated narrative summaries.
- * Uses Gemini Pro for higher quality analysis with structured output.
+ * Categorize and enrich a flat list of technology mentions using Gemini Pro.
+ * This replaces the old two-step approach (hardcoded categorization + separate enrichment).
+ * The LLM handles both categorization and narrative generation in a single pass.
  */
 export async function enrichTechStackWithAnalysis(
-  stack: CompanyTechStack
+  technologies: FlatTechMention[],
+  totalJobsAnalyzed: number,
+  periodStart: string,
+  periodEnd: string
 ): Promise<CompanyTechStack> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     throw new Error("GEMINI_API_KEY not configured");
   }
 
-  if (stack.categories.length === 0) {
-    return stack;
+  // Base stack to return if enrichment fails
+  const baseStack: CompanyTechStack = {
+    categories: [],
+    totalJobsAnalyzed,
+    generatedAt: new Date().toISOString(),
+    periodStart,
+    periodEnd,
+  };
+
+  if (technologies.length === 0) {
+    return baseStack;
   }
 
-  // Build a compact representation of the tech data for the prompt
-  const techData = stack.categories.map((cat) => ({
-    category: cat.category,
-    label: cat.label,
-    technologies: cat.technologies.map((t) => ({
-      name: t.name,
-      count: t.count,
-      firstSeen: t.firstSeen,
-      lastSeen: t.lastSeen,
-    })),
+  // Build compact representation for the prompt
+  const techData = technologies.map((t) => ({
+    name: t.name,
+    mentions: t.count,
+    firstSeen: t.firstSeen,
+    lastSeen: t.lastSeen,
   }));
 
   const prompt = ENRICHMENT_PROMPT
     .replace("{tech_data}", JSON.stringify(techData, null, 2))
-    .replace("{total_jobs}", String(stack.totalJobsAnalyzed))
-    .replace("{period_start}", stack.periodStart)
-    .replace("{period_end}", stack.periodEnd);
+    .replace("{total_jobs}", String(totalJobsAnalyzed))
+    .replace("{period_start}", periodStart)
+    .replace("{period_end}", periodEnd);
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
@@ -418,28 +461,57 @@ export async function enrichTechStackWithAnalysis(
     });
 
     const text = result.response.text()?.trim() ?? "{}";
-    const parsed = JSON.parse(text) as {
-      architectSummary?: string;
-      categorySummaries?: Record<string, string>;
-    };
+    const parsed = JSON.parse(text) as EnrichmentResult;
 
-    // Apply enrichments to the stack
     if (parsed.architectSummary) {
-      stack.architectSummary = parsed.architectSummary;
+      baseStack.architectSummary = parsed.architectSummary;
     }
 
-    if (parsed.categorySummaries) {
-      for (const cat of stack.categories) {
-        const summary = parsed.categorySummaries[cat.category];
-        if (summary) {
-          cat.narrativeSummary = summary;
+    // Build a lookup from tech name → flat mention data
+    const techLookup = new Map<string, FlatTechMention>();
+    for (const t of technologies) {
+      techLookup.set(t.name.toLowerCase(), t);
+    }
+
+    if (parsed.categories) {
+      for (const cat of parsed.categories) {
+        const techItems: TechItem[] = [];
+        for (const techName of cat.technologies) {
+          const mention = techLookup.get(techName.toLowerCase());
+          if (mention) {
+            techItems.push({
+              name: mention.name,
+              count: mention.count,
+              firstSeen: mention.firstSeen,
+              lastSeen: mention.lastSeen,
+            });
+          }
+        }
+
+        if (techItems.length > 0) {
+          baseStack.categories.push({
+            category: cat.category,
+            label: cat.label,
+            technologies: techItems,
+            narrativeSummary: cat.narrativeSummary,
+          });
         }
       }
     }
   } catch (error) {
     console.error("Tech stack enrichment error:", error);
-    // Non-fatal: return stack without enrichment rather than failing
+    // Fallback: put everything in a single "other" category without narratives
+    baseStack.categories = [{
+      category: "other",
+      label: "Technologies",
+      technologies: technologies.map((t) => ({
+        name: t.name,
+        count: t.count,
+        firstSeen: t.firstSeen,
+        lastSeen: t.lastSeen,
+      })),
+    }];
   }
 
-  return stack;
+  return baseStack;
 }

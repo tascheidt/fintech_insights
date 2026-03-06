@@ -86,17 +86,22 @@ export async function POST(
 
   try {
     // Step 1: DB aggregation (instant, no AI)
-    const rawStack = await aggregateTechStackFromJobs(id);
+    const rawData = await aggregateTechStackFromJobs(id);
 
-    if (rawStack.categories.length === 0) {
+    if (rawData.technologies.length === 0) {
       return NextResponse.json(
         { error: "No tech stack data found in job postings for this company" },
         { status: 404 }
       );
     }
 
-    // Step 2: Gemini Pro enrichment (adds narrative summaries)
-    const enrichedStack = await enrichTechStackWithAnalysis(rawStack);
+    // Step 2: Gemini Pro enrichment (categorizes + adds narrative summaries)
+    const enrichedStack = await enrichTechStackWithAnalysis(
+      rawData.technologies,
+      rawData.totalJobsAnalyzed,
+      rawData.periodStart,
+      rawData.periodEnd
+    );
 
     // Store the result
     await adminSupabase

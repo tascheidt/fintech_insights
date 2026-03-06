@@ -546,14 +546,19 @@ export async function refreshTechStacksForCompanies(
     const results = await Promise.allSettled(
       batch.map(async (company) => {
         console.log(`Aggregating tech stack for ${company.name}...`);
-        const rawStack = await aggregateTechStackFromJobs(company.id);
+        const rawData = await aggregateTechStackFromJobs(company.id);
 
-        if (rawStack.categories.length === 0) {
+        if (rawData.technologies.length === 0) {
           console.log(`No tech data found for ${company.name}, skipping enrichment`);
           return;
         }
 
-        const enrichedStack = await enrichTechStackWithAnalysis(rawStack);
+        const enrichedStack = await enrichTechStackWithAnalysis(
+          rawData.technologies,
+          rawData.totalJobsAnalyzed,
+          rawData.periodStart,
+          rawData.periodEnd
+        );
 
         await supabase
           .from('companies')
