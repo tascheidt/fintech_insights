@@ -15,9 +15,12 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { getPrimaryNavItems, getUtilityNavItems, type NavItem } from "@/lib/navigation";
 import {
   Sheet,
   SheetContent,
@@ -34,15 +37,18 @@ export function DashboardNav({
   role?: string;
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const pathname = usePathname();
 
-  const navLinks = [
-    { href: "/", label: "Dashboard" },
-    { href: "/jobs", label: "Jobs" },
-    { href: "/companies", label: "Companies" },
-    { href: "/digests", label: "Weekly Digests" },
-    { href: "/labs", label: "TB Labs" },
-    ...(role === "admin" ? [{ href: "/admin", label: "Admin" }] : []),
-  ];
+  const primaryNavItems = getPrimaryNavItems(role);
+  const labsEntry = getUtilityNavItems()[0];
+
+  const isActive = (item: NavItem) => {
+    if (item.exact) {
+      return pathname === item.href;
+    }
+
+    return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  };
 
   return (
     <header className="border-b">
@@ -53,11 +59,16 @@ export function DashboardNav({
         
         {/* Desktop Navigation - Hidden on mobile */}
         <nav className="hidden md:flex gap-4">
-          {navLinks.map((link) => (
+          {primaryNavItems.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className={cn(
+                "text-sm transition-colors",
+                isActive(link)
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
             >
               {link.label}
             </Link>
@@ -77,12 +88,17 @@ export function DashboardNav({
               <SheetTitle>Navigation</SheetTitle>
             </SheetHeader>
             <nav className="flex flex-col gap-2 mt-6">
-              {navLinks.map((link) => (
+              {primaryNavItems.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-base py-3 px-3 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  className={cn(
+                    "text-base py-3 px-3 rounded-md transition-colors",
+                    isActive(link)
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  )}
                 >
                   {link.label}
                 </Link>
@@ -91,8 +107,26 @@ export function DashboardNav({
           </SheetContent>
         </Sheet>
 
-        {/* User Menu - Always visible */}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            href={labsEntry.href}
+            className={cn(
+              "inline-flex h-8 items-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors",
+              isActive(labsEntry)
+                ? "border-border bg-accent text-foreground"
+                : "border-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground"
+            )}
+          >
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                isActive(labsEntry) ? "bg-foreground" : "bg-muted-foreground"
+              )}
+            />
+            Labs
+          </Link>
+
+          {/* User Menu - Always visible */}
           <UserMenu email={user?.email} />
         </div>
       </div>

@@ -1,42 +1,73 @@
-/**
- * TB Labs Page
- *
- * Experimental features for strategic analysis and visualization.
- * Currently features: Strategy Inference — clusters job postings into
- * inferred strategic initiatives using AI analysis.
- */
-
-import { createClient } from "@/lib/supabase/server";
-import { StrategyAnalyzer } from "@/components/labs/StrategyAnalyzer";
+import { Card, CardContent } from "@/components/ui/card";
+import { LabCard } from "@/components/labs/LabCard";
+import { labsExperiments } from "@/lib/navigation";
 
 export default async function LabsPage() {
-  const supabase = await createClient();
-
-  // Fetch active companies for the selector
-  const { data: companies } = await supabase
-    .from("companies")
-    .select("id, name, slug")
-    .eq("is_active", true)
-    .order("name");
-
   return (
-    <div className="space-y-6 max-w-4xl">
-      {/* Page Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">TB Labs</h1>
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-100 text-amber-700 border border-amber-200">
-            Experimental
-          </span>
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          Prototype tools for deeper hiring intelligence. Results are
-          AI-generated and may not be fully accurate.
-        </p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-10">
+      <Card className="rounded-[24px] border-border/70 bg-muted/20">
+        <CardContent className="space-y-4 p-8">
+          <div className="inline-flex items-center rounded-full border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+            Talent Brief Labs
+          </div>
+          <div className="space-y-3">
+            <h1 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
+              A place to explore new Talent Brief concepts before they become core product features.
+            </h1>
+            <p className="max-w-3xl text-base leading-7 text-muted-foreground">
+              Labs gives experimental workflows a dedicated home without crowding
+              the main product navigation. Each concept is meant to be useful,
+              clearly labeled, and easy to expand as new ideas are added.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Strategy Analyzer */}
-      <StrategyAnalyzer companies={companies ?? []} />
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-muted-foreground">
+            Available now
+          </p>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Current experiments
+          </h2>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {labsExperiments.map((experiment) => (
+            <LabCard
+              key={experiment.slug}
+              href={experiment.href}
+              title={experiment.title}
+              status={experiment.status}
+              summary={experiment.summary}
+              ctaLabel={experiment.ctaLabel}
+              featured={experiment.featured}
+            />
+          ))}
+
+          <Card className="h-full rounded-[24px] border-dashed border-border/70 bg-muted/20">
+            <CardContent className="flex h-full flex-col justify-between gap-5 p-6">
+              <div className="space-y-3">
+                <div className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                  In development
+                </div>
+                <h3 className="text-lg font-semibold tracking-tight">
+                  More concepts are on the way
+                </h3>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Future Labs concepts should plug into this surface without any
+                  primary navigation changes. Add the experiment metadata, add
+                  its route, and it becomes discoverable here.
+                </p>
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">
+                Built for expansion, not one-off exposure.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
     </div>
   );
 }
