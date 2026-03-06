@@ -458,19 +458,21 @@ export async function refreshTechStacksForCompanies(
   const PARALLELISM = 2;
   const STALENESS_DAYS = 7;
 
-  // Get companies that had new jobs from the collection run
+  // Get all companies from the collection run
   const { data: tasks } = await supabase
     .from('job_run_tasks')
     .select('company_id, new_jobs')
-    .eq('job_run_id', collectionJobRunId)
-    .gt('new_jobs', 0);
+    .eq('job_run_id', collectionJobRunId);
 
   if (!tasks || tasks.length === 0) {
-    console.log('No companies with new jobs, skipping tech stack refresh');
+    console.log('No companies in collection run, skipping tech stack refresh');
     return { refreshed: 0, skipped: 0, failed: 0 };
   }
 
   const companyIds = tasks.map((t) => t.company_id);
+  const companiesWithNewJobs = new Set(
+    tasks.filter((t) => t.new_jobs > 0).map((t) => t.company_id)
+  );
 
   // Get companies with staleness check
   const staleDate = new Date(Date.now() - STALENESS_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -483,9 +485,11 @@ export async function refreshTechStacksForCompanies(
     return { refreshed: 0, skipped: 0, failed: 0 };
   }
 
-  // Filter out recently generated stacks
+  // Eligible if: never generated before OR (has new jobs AND stale)
   const eligible = companies.filter(
-    (c) => !c.tech_stack_generated_at || c.tech_stack_generated_at < staleDate
+    (c) =>
+      !c.tech_stack_generated_at ||
+      (companiesWithNewJobs.has(c.id) && c.tech_stack_generated_at < staleDate)
   );
   const skippedCount = companies.length - eligible.length;
 
