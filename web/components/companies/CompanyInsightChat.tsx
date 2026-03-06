@@ -48,9 +48,11 @@ export function CompanyInsightChat({
     loadConversation();
   }, [companyId, insightId]);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages (not on initial empty state)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   async function handleSubmit(e: React.FormEvent) {
