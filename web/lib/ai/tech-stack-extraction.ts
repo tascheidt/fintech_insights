@@ -37,16 +37,16 @@ export interface CompanyTechStack {
   periodEnd: string;
 }
 
-/** Raw extraction result from a single job description */
+/** Raw extraction result from a batch of job descriptions */
 interface JobTechExtraction {
-  languages: string[];
-  frameworks: string[];
-  databases: string[];
-  cloud: string[];
-  devops: string[];
-  data_tools: string[];
-  ai_ml: string[];
-  other: string[];
+  languages: Record<string, number>;
+  frameworks: Record<string, number>;
+  databases: Record<string, number>;
+  cloud: Record<string, number>;
+  devops: Record<string, number>;
+  data_tools: Record<string, number>;
+  ai_ml: Record<string, number>;
+  other: Record<string, number>;
 }
 
 // ============================================================================
@@ -146,16 +146,16 @@ RULES:
 JOB DESCRIPTIONS:
 {job_data}
 
-Respond with a JSON object categorizing each technology found:
+Respond with a JSON object categorizing each technology found, with the value being the number of job descriptions that mention it:
 {
-  "languages": ["Python", "Go", "TypeScript"],
-  "frameworks": ["React", "Django", "Spring Boot"],
-  "databases": ["PostgreSQL", "Redis", "DynamoDB"],
-  "cloud": ["AWS", "GCP", "Terraform"],
-  "devops": ["Docker", "Kubernetes", "GitHub Actions"],
-  "data_tools": ["Spark", "Airflow", "dbt", "Snowflake"],
-  "ai_ml": ["PyTorch", "TensorFlow", "LangChain"],
-  "other": ["Kafka", "Elasticsearch", "GraphQL"]
+  "languages": {"Python": 5, "Go": 3, "TypeScript": 2},
+  "frameworks": {"React": 4, "Django": 2},
+  "databases": {"PostgreSQL": 6, "Redis": 3},
+  "cloud": {"AWS": 7, "Terraform": 2},
+  "devops": {"Docker": 4, "Kubernetes": 3},
+  "data_tools": {"Spark": 2, "Snowflake": 1},
+  "ai_ml": {"PyTorch": 1},
+  "other": {"Kafka": 3, "GraphQL": 2}
 }
 
 Only include categories that have entries. Return an empty object {} if no technologies are found.`;
@@ -171,15 +171,17 @@ function normalizeTechName(name: string): string {
 
 /**
  * Merge extracted technologies into an aggregated tech stack.
- * Increments counts and updates first/last seen dates.
+ * Each call represents one batch of jobs analyzed together.
+ * The extraction contains per-tech mention counts from the model.
  */
 function mergeIntoStack(
   existing: CompanyTechStack,
   extraction: JobTechExtraction,
-  jobDate: string
+  earliestDate: string,
+  latestDate: string
 ): void {
-  for (const [categoryKey, techs] of Object.entries(extraction)) {
-    if (!Array.isArray(techs) || techs.length === 0) continue;
+  for (const [categoryKey, techCounts] of Object.entries(extraction)) {
+    if (!techCounts || typeof techCounts !== "object" || Object.keys(techCounts).length === 0) continue;
 
     let category = existing.categories.find((c) => c.category === categoryKey);
     if (!category) {
@@ -191,23 +193,24 @@ function mergeIntoStack(
       existing.categories.push(category);
     }
 
-    for (const rawName of techs) {
+    for (const [rawName, count] of Object.entries(techCounts)) {
       const name = normalizeTechName(rawName);
       if (!name) continue;
+      const mentionCount = typeof count === "number" ? count : 1;
 
       const item = category.technologies.find(
         (t) => t.name.toLowerCase() === name.toLowerCase()
       );
       if (item) {
-        item.count += 1;
-        if (jobDate < item.firstSeen) item.firstSeen = jobDate;
-        if (jobDate > item.lastSeen) item.lastSeen = jobDate;
+        item.count += mentionCount;
+        if (earliestDate < item.firstSeen) item.firstSeen = earliestDate;
+        if (latestDate > item.lastSeen) item.lastSeen = latestDate;
       } else {
         category.technologies.push({
           name,
-          count: 1,
-          firstSeen: jobDate,
-          lastSeen: jobDate,
+          count: mentionCount,
+          firstSeen: earliestDate,
+          lastSeen: latestDate,
         });
       }
     }
@@ -246,7 +249,7 @@ export async function extractCompanyTechStack(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: "gemini-3-flash-preview",
+    model: "gemini-flash-latest",
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 8192,
@@ -285,10 +288,11 @@ export async function extractCompanyTechStack(
       const text = result.response.text()?.trim() ?? "{}";
       const parsed = JSON.parse(text) as JobTechExtraction;
 
-      // Merge each job's date contribution
-      for (const job of batch) {
-        mergeIntoStack(stack, parsed, job.first_seen_date);
-      }
+      // Merge batch extraction once, using the most recent job date as reference
+      const batchDates = batch.map((j) => j.first_seen_date).sort();
+      const earliestDate = batchDates[0];
+      const latestDate = batchDates[batchDates.length - 1];
+      mergeIntoStack(stack, parsed, earliestDate, latestDate);
     } catch (error) {
       console.error(
         `Tech stack extraction error (batch ${i / BATCH_SIZE + 1}):`,
