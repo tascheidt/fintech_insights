@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies, refreshTechStacksForCompanies } from "@/lib/jobs";
+import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies } from "@/lib/jobs";
 import { requireCronAuth } from "@/lib/cron/auth";
 
 export const maxDuration = 300;
@@ -122,13 +122,19 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Phase 4: Tech stack refresh (always runs, uses existing per-job data)
-    // MUST be awaited — Vercel kills the function once the response is sent
-    try {
-      await refreshTechStacksForCompanies(jobRunId);
-    } catch (err) {
-      console.error("Tech stack refresh error:", err);
-    }
+    // Phase 4: Tech stack refresh — fire off in a separate serverless invocation
+    // so it gets its own timeout budget (collection alone can take 4-9 min)
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    fetch(`${baseUrl}/api/internal/tech-stack-refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      },
+      body: JSON.stringify({ jobRunId }),
+    }).catch((err) => console.error("Failed to trigger tech stack refresh:", err));
 
     return NextResponse.json({
       success: true,
