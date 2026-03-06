@@ -69,26 +69,26 @@ export async function GET(req: NextRequest) {
 
     console.log("Collection completed:", result.stats);
 
-    // Only trigger follow-on work once all collection tasks are terminal.
+    // Only trigger analysis/news once all collection tasks are terminal.
     if (result.status === "completed") {
       // Phase 2: Analysis (auto-triggered if there are new jobs to analyze)
       await triggerAnalysisJobIfNeeded(jobRunId);
 
       // Phase 3: News cache refresh (async, non-blocking)
-      // Pre-warms the cache for weekly digest generation
       refreshNewsCacheForActiveCompanies(jobRunId, {
         parallelism: 2,
         skipIfCached: true,
       }).catch((err) => console.error("News cache refresh error:", err));
-
-      // Phase 4: Tech stack refresh (non-blocking)
-      refreshTechStacksForCompanies(jobRunId)
-        .catch((err) => console.error("Tech stack refresh error:", err));
     } else {
       console.log(
         `Collection job ${jobRunId} still in progress; skipping analysis/news until completion`
       );
     }
+
+    // Phase 4: Tech stack refresh (always runs, non-blocking)
+    // Uses existing per-job tech_stack data from the DB, independent of collection status
+    refreshTechStacksForCompanies(jobRunId)
+      .catch((err) => console.error("Tech stack refresh error:", err));
 
     return NextResponse.json({
       success: true,

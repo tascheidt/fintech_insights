@@ -27,10 +27,9 @@ export function JobTriggerButtons({ onTriggered }: JobTriggerButtonsProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ job_type: jobType }),
-        signal: AbortSignal.timeout(30000),
       });
 
-      if (!res.ok) {
+      if (!res.ok && res.status !== 202) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Failed (${res.status})`);
       }
