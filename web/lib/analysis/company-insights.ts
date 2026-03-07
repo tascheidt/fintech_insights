@@ -109,6 +109,18 @@ export interface AlignmentAnalysis {
 
 const COMPANY_INSIGHT_TIMEOUT_MS = 45000;
 
+function isMissingInsightLockInfrastructure(error: { code?: string; message?: string } | null | undefined) {
+  if (!error) return false;
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    error.code === "42P01" ||
+    error.code === "42883" ||
+    error.code === "PGRST205" ||
+    message.includes("insight_generation_locks") ||
+    message.includes("cleanup_expired_insight_locks")
+  );
+}
+
 // ============================================================================
 // Main Generation Function
 // ============================================================================
@@ -148,15 +160,21 @@ export async function generateCompanyInsight(
 
       // If lock already exists, another process is generating an insight
       if (lockError) {
-        // Check if it's a unique constraint violation (lock exists)
-        if (lockError.code === "23505") {
-          throw new Error(
-            `Insight generation already in progress for ${companyName}. Please wait for it to complete.`
+        if (isMissingInsightLockInfrastructure(lockError)) {
+          console.warn(
+            "Insight lock infrastructure is unavailable; continuing without concurrency locks."
           );
+        } else {
+        // Check if it's a unique constraint violation (lock exists)
+          if (lockError.code === "23505") {
+            throw new Error(
+              `Insight generation already in progress for ${companyName}. Please wait for it to complete.`
+            );
+          }
+          throw new Error(`Failed to acquire processing lock: ${lockError.message}`);
         }
-        throw new Error(`Failed to acquire processing lock: ${lockError.message}`);
       }
-      lockAcquired = true;
+      lockAcquired = !lockError;
     }
 
     // Step 1: Check for recent insight (rate limiting) - double-check after acquiring lock
@@ -752,7 +770,10 @@ export async function getNextCompanyForInsight(): Promise<{
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
   // Clean up expired locks first
-  await supabase.rpc("cleanup_expired_insight_locks");
+  const { error: cleanupError } = await supabase.rpc("cleanup_expired_insight_locks");
+  if (cleanupError && !isMissingInsightLockInfrastructure(cleanupError)) {
+    throw new Error(`Failed to clean up insight locks: ${cleanupError.message}`);
+  }
 
   // Get active companies that don't have a recent insight
   // Exclude companies that are currently being processed (have active locks)
@@ -766,10 +787,20 @@ export async function getNextCompanyForInsight(): Promise<{
   }
 
   // Get active locks to exclude locked companies
-  const { data: activeLocks } = await supabase
+  let activeLocks: Array<{ company_id: string }> | null = [];
+  const { data: lockData, error: lockError } = await supabase
     .from("insight_generation_locks")
     .select("company_id")
     .gt("expires_at", new Date().toISOString());
+
+  if (lockError) {
+    if (!isMissingInsightLockInfrastructure(lockError)) {
+      throw new Error(`Failed to load insight locks: ${lockError.message}`);
+    }
+    activeLocks = [];
+  } else {
+    activeLocks = lockData;
+  }
 
   const lockedCompanyIds = new Set((activeLocks ?? []).map((lock) => lock.company_id));
 
