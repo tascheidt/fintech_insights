@@ -49,6 +49,10 @@ export const JobStructureSchema = z.object({
 export type JobStructure = z.infer<typeof JobStructureSchema>;
 
 const GEMINI_REQUEST_TIMEOUT_MS = 30000;
+const MAX_STAGE1_DESCRIPTION_CHARS = 8000;
+const MIN_STAGE1_DESCRIPTION_CHARS = 4000;
+const STAGE1_RETRY_DESCRIPTION_STEP = 2000;
+const MAX_STAGE1_OUTPUT_TOKENS = 4096;
 
 // Extended type for database insertion (flattened salary fields)
 export interface JobStructureForDB extends Omit<JobStructure, "salary" | "location"> {
@@ -86,6 +90,13 @@ function resolveExtractOptions(
   };
 }
 
+function getRetryDescriptionLength(retryCount: number) {
+  return Math.max(
+    MIN_STAGE1_DESCRIPTION_CHARS,
+    MAX_STAGE1_DESCRIPTION_CHARS - (retryCount * STAGE1_RETRY_DESCRIPTION_STEP)
+  );
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return await Promise.race([
     promise,
@@ -117,8 +128,10 @@ export async function extractJobStructure(
     return null;
   }
 
-  // Truncate description to avoid token limits (keep first 8000 chars)
-  const truncatedDescription = description.slice(0, 8000) || "No description available";
+  // Truncate description to avoid token limits and keep retries deterministic.
+  const descriptionLimit = getRetryDescriptionLength(retryCount);
+  const truncatedDescription = description.slice(0, descriptionLimit) || "No description available";
+  const effectiveMaxOutputTokens = Math.min(config.maxOutputTokens, MAX_STAGE1_OUTPUT_TOKENS);
 
   const prompt = config.promptTemplate
     .replace("{job_title}", jobTitle)
@@ -136,7 +149,9 @@ export async function extractJobStructure(
       model: config.model,
       generationConfig: {
         temperature: config.temperature,
-        maxOutputTokens: config.maxOutputTokens,
+        // Stage 1 should return a compact JSON payload. Cap output size to reduce
+        // malformed/truncated responses even if the saved runtime config is overly generous.
+        maxOutputTokens: effectiveMaxOutputTokens,
         responseMimeType: "application/json",
       },
     });
@@ -232,13 +247,15 @@ export async function extractJobStructure(
             const isTruncated = endsMidString || endsMidArray || endsMidObject || text.length > 3000;
             
             if (isTruncated && retryCount < 2) {
-              console.warn(`Response appears truncated for job "${jobTitle}". Retrying with shorter description...`);
-              // Retry with progressively shorter description to reduce input tokens
-              const shorterDescription = description.slice(0, Math.max(4000, 8000 - (retryCount * 2000)));
+              const nextRetryCount = retryCount + 1;
+              const nextDescriptionLimit = getRetryDescriptionLength(nextRetryCount);
+              console.warn(
+                `Response appears truncated for job "${jobTitle}". Retrying with a shorter description (${nextDescriptionLimit} chars, attempt ${nextRetryCount + 1}/3).`
+              );
               await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-              return extractJobStructure(jobTitle, shorterDescription, rawDepartment, {
+              return extractJobStructure(jobTitle, description, rawDepartment, {
                 config,
-                retryCount: retryCount + 1,
+                retryCount: nextRetryCount,
               });
             }
             

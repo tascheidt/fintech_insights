@@ -158,7 +158,7 @@ export const DEFAULT_JOB_STRUCTURE_AI_CONFIG: JobStructureAiConfig = {
   model: "gemini-3-flash-preview",
   promptTemplate: DEFAULT_JOB_STRUCTURE_PROMPT,
   temperature: 0.2,
-  maxOutputTokens: 64000,
+  maxOutputTokens: 4096,
   version: "default-job-structure-v2",
 };
 
