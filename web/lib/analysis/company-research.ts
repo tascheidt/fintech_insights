@@ -62,6 +62,91 @@ export interface DeepResearchOptions {
   maxSearches?: number;
 }
 
+const FINTECH_RELEVANCE_TERMS = [
+  "bank",
+  "banking",
+  "financial",
+  "fintech",
+  "wealth",
+  "payments",
+  "payment",
+  "credit",
+  "debit",
+  "lending",
+  "loan",
+  "deposit",
+  "card",
+  "invest",
+  "investment",
+  "customer",
+  "client",
+  "mobile app",
+  "digital bank",
+  "money",
+  "portfolio",
+  "onboarding",
+];
+
+const IRRELEVANT_SOURCE_PATTERNS = [
+  "essential oil",
+  "citrus",
+  "retailer",
+  "retailers",
+  "shibuya",
+  "lagos",
+  "japan",
+  "market size",
+  "industry market",
+  "extraction techniques",
+  "oil market",
+];
+
+const LOW_SIGNAL_SOURCE_DOMAINS = [
+  "youtube.com",
+  "youtu.be",
+  "wikipedia.org",
+];
+
+const LOW_SIGNAL_TITLE_PATTERNS = [
+  "reports, statistics & marketing trends",
+  "market trends",
+  "market industry analysis",
+  "industry analysis",
+];
+
+const COMPANY_DISAMBIGUATION_RULES: Record<
+  string,
+  {
+    requiredAny: string[];
+    blockedAny: string[];
+  }
+> = {
+  tangerine: {
+    requiredAny: [
+      "bank",
+      "banking",
+      "canada",
+      "canadian",
+      "scotiabank",
+      "forward banking",
+      "engine by starling",
+      "terri-lee weeks",
+      "gillian riley",
+      "scene+",
+    ],
+    blockedAny: [
+      "nigeria",
+      "mumbai",
+      "africa",
+      "insurance",
+      "pensions",
+      "startuplist",
+      "seed funding round",
+      "private equity-backed financial services group",
+    ],
+  },
+};
+
 // ============================================================================
 // Company Type Detection
 // ============================================================================
@@ -271,8 +356,49 @@ export async function performDeepResearch(
 
   const genAI = new GoogleGenerativeAI(key);
 
+  function getFallbackQueries(query: string, sourceType: VerifiedSource["sourceType"]) {
+    const normalizedCompany = companyName.replace(/"/g, "");
+
+    if (query.includes("press release")) {
+      return [
+        `"${normalizedCompany}" announcement partnership launch Canada`,
+        `"${normalizedCompany}" product launch digital banking 2025 2026`,
+      ];
+    }
+
+    if (sourceType === "official") {
+      return [
+        `"${normalizedCompany}" about mission leadership banking`,
+      ];
+    }
+
+    if (sourceType === "funding") {
+      return [
+        `"${normalizedCompany}" valuation funding investors fintech`,
+      ];
+    }
+
+    if (sourceType === "analyst") {
+      return [
+        `"${normalizedCompany}" digital banking competitive analysis`,
+      ];
+    }
+
+    if (sourceType === "news") {
+      return [
+        `"${normalizedCompany}" fintech bank wealth payments strategy`,
+      ];
+    }
+
+    return [];
+  }
+
   // Helper to perform a search and extract sources
-  async function performSearch(query: string, sourceType: VerifiedSource["sourceType"]): Promise<void> {
+  async function performSearch(
+    query: string,
+    sourceType: VerifiedSource["sourceType"],
+    allowFallback: boolean = true
+  ): Promise<void> {
     if (searchCount >= maxSearches) return;
     searchCount++;
     searchQueriesUsed.push(query);
@@ -301,14 +427,17 @@ export async function performDeepResearch(
           const parsed = JSON.parse(jsonMatch[0]) as Array<{ title?: string; snippet?: string; url?: string }>;
           for (const item of parsed) {
             if (item.url && item.title) {
-              sources.push({
+              const source: VerifiedSource = {
                 url: item.url,
                 title: item.title,
                 snippet: item.snippet || "",
                 sourceType,
                 verificationStatus: determineVerificationStatus(item.url, sourceType),
                 retrievedAt: new Date().toISOString(),
-              });
+              };
+              if (isLikelyRelevantSource(companyName, source)) {
+                sources.push(source);
+              }
             }
           }
         } catch {
@@ -316,14 +445,17 @@ export async function performDeepResearch(
           const urlRegex = /https?:\/\/[^\s"'<>]+/g;
           const urls = responseText.match(urlRegex) || [];
           for (const url of urls.slice(0, 3)) {
-            sources.push({
+            const source: VerifiedSource = {
               url,
               title: `Search result for: ${query}`,
               snippet: responseText.substring(0, 200),
               sourceType,
               verificationStatus: "unverified",
               retrievedAt: new Date().toISOString(),
-            });
+            };
+            if (isLikelyRelevantSource(companyName, source)) {
+              sources.push(source);
+            }
           }
         }
       }
@@ -331,19 +463,35 @@ export async function performDeepResearch(
       // Add delay to avoid rate limiting
       await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+      const shouldRetryWithFallback =
+        allowFallback &&
+        (errorMessage.includes("recitation") || errorMessage.includes("blocked"));
+
+      if (shouldRetryWithFallback) {
+        console.warn(`Search blocked for "${query}", retrying with fallback queries.`);
+        for (const fallbackQuery of getFallbackQueries(query, sourceType)) {
+          await performSearch(fallbackQuery, sourceType, false);
+          if (searchCount >= maxSearches) {
+            break;
+          }
+        }
+        return;
+      }
+
       console.error(`Search error for "${query}":`, error);
     }
   }
 
   // Tier 1: Always available (basic research)
-  await performSearch(`"${companyName}" company strategy mission`, "official");
-  await performSearch(`"${companyName}" fintech news announcement 2025 2026`, "news");
+  await performSearch(`"${companyName}" financial services company strategy mission`, "official");
+  await performSearch(`"${companyName}" fintech bank wealth payments news announcement 2025 2026`, "news");
   await performSearch(`"${companyName}" press release`, "news");
 
   if (options.depth === "deep") {
     // More comprehensive basic research
-    await performSearch(`"${companyName}" funding round investment`, "funding");
-    await performSearch(`"${companyName}" CEO interview strategy`, "news");
+    await performSearch(`"${companyName}" fintech funding round investment`, "funding");
+    await performSearch(`"${companyName}" CEO interview digital banking strategy`, "news");
 
     // Tier 2: Public companies only
     if (options.isPublic) {
@@ -355,33 +503,37 @@ export async function performDeepResearch(
     }
 
     // Tier 3: Best effort (may be paywalled)
-    await performSearch(`"${companyName}" analyst report research`, "analyst");
+      await performSearch(`"${companyName}" fintech analyst report research`, "analyst");
   }
 
+  const filteredSources = dedupeSources(sources).filter((source) =>
+    isLikelyRelevantSource(companyName, source)
+  );
+
   // Calculate quality score
-  const qualityScore = calculateResearchQuality(sources, options.isPublic);
+  const qualityScore = calculateResearchQuality(filteredSources, options.isPublic);
 
   // Extract stated strategy from sources
-  const statedStrategy = await extractStatedStrategy(genAI, companyName, sources);
+  const statedStrategy = await extractStatedStrategy(genAI, companyName, filteredSources);
   estimatedCost += 0.03; // Cost for strategy extraction
 
   // Extract financial context
-  const financialContext = await extractFinancialContext(genAI, companyName, sources);
+  const financialContext = await extractFinancialContext(genAI, companyName, filteredSources);
   estimatedCost += 0.02; // Cost for financial extraction
 
   // Add limitations based on research results
-  if (sources.length < 3) {
+  if (filteredSources.length < 3) {
     limitations.push("Limited public information available");
   }
-  if (!sources.some((s) => s.sourceType === "official")) {
+  if (!filteredSources.some((s) => s.sourceType === "official")) {
     limitations.push("No official company sources found");
   }
-  if (options.depth === "deep" && !sources.some((s) => s.sourceType === "analyst")) {
+  if (options.depth === "deep" && !filteredSources.some((s) => s.sourceType === "analyst")) {
     limitations.push("Analyst reports may be paywalled or unavailable");
   }
 
   return {
-    sources,
+    sources: filteredSources,
     qualityScore,
     statedStrategy,
     financialContext,
@@ -422,6 +574,124 @@ function determineVerificationStatus(
   }
 
   return "unverified";
+}
+
+function normalizeText(value: string) {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function getSourceHost(url: string) {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return url.toLowerCase();
+  }
+}
+
+function isLowSignalSource(source: Pick<VerifiedSource, "title" | "url" | "sourceType" | "verificationStatus">) {
+  if (source.sourceType === "official" || source.verificationStatus === "verified") {
+    return false;
+  }
+
+  const host = getSourceHost(source.url);
+  const title = normalizeText(source.title);
+
+  if (LOW_SIGNAL_SOURCE_DOMAINS.some((domain) => host.includes(domain))) {
+    return true;
+  }
+
+  if (LOW_SIGNAL_TITLE_PATTERNS.some((pattern) => title.includes(pattern))) {
+    return true;
+  }
+
+  return false;
+}
+
+function dedupeSources(sources: VerifiedSource[]) {
+  const seen = new Set<string>();
+  return sources.filter((source) => {
+    const key = `${source.url}|${source.title.toLowerCase()}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function isLikelyRelevantSource(companyName: string, source: Pick<VerifiedSource, "title" | "snippet" | "url" | "sourceType">) {
+  const company = normalizeText(companyName);
+  const haystack = normalizeText(`${source.title} ${source.snippet} ${source.url}`);
+  const hasCompanyMention = haystack.includes(company);
+  const fintechHits = FINTECH_RELEVANCE_TERMS.filter((term) => haystack.includes(term)).length;
+  const blocked = IRRELEVANT_SOURCE_PATTERNS.some((pattern) => haystack.includes(pattern));
+  const officialHint = source.sourceType === "official" || source.url.includes(".gov");
+  const disambiguationRule = COMPANY_DISAMBIGUATION_RULES[company];
+  const verificationStatus = determineVerificationStatus(source.url, source.sourceType);
+
+  if (blocked) return false;
+  if (isLowSignalSource({ ...source, verificationStatus })) return false;
+  if (disambiguationRule?.blockedAny.some((pattern) => haystack.includes(pattern))) {
+    return false;
+  }
+  if (!hasCompanyMention && !officialHint) return false;
+  if (company.split(" ").length === 1 && fintechHits === 0 && source.sourceType !== "official") {
+    return false;
+  }
+  if (disambiguationRule && !disambiguationRule.requiredAny.some((pattern) => haystack.includes(pattern))) {
+    return false;
+  }
+
+  return true;
+}
+
+function rankSourcesForPrompt(sources: VerifiedSource[]) {
+  return [...sources].sort((left, right) => {
+    const leftScore = rankSource(left);
+    const rightScore = rankSource(right);
+    return rightScore - leftScore;
+  });
+}
+
+function rankSource(source: VerifiedSource) {
+  const text = normalizeText(`${source.title} ${source.snippet}`);
+  let score = 0;
+
+  if (source.verificationStatus === "verified") score += 5;
+  if (source.sourceType === "official") score += 4;
+  if (source.sourceType === "sec_filing") score += 3;
+  if (source.sourceType === "news") score += 2;
+  if (text.includes("platform")) score += 2;
+  if (text.includes("system")) score += 2;
+  if (text.includes("agreement")) score += 1;
+  if (text.includes("partnership")) score += 1;
+  if (text.includes("cloud-native")) score += 2;
+  if (text.includes("digital banking")) score += 2;
+  if (text.includes("wealth")) score += 1;
+  if (text.includes("engine by starling")) score += 4;
+  if (text.includes("small business")) score += 1;
+  if (text.includes("digital wealth")) score += 1;
+  if (isLowSignalSource(source)) score -= 6;
+
+  return score;
+}
+
+function closeOpenJsonStructures(text: string) {
+  let fixed = text;
+  const openBraces = (fixed.match(/\{/g) ?? []).length;
+  const closeBraces = (fixed.match(/\}/g) ?? []).length;
+  const openBrackets = (fixed.match(/\[/g) ?? []).length;
+  const closeBrackets = (fixed.match(/\]/g) ?? []).length;
+
+  if (closeBrackets < openBrackets) {
+    fixed += "]".repeat(openBrackets - closeBrackets);
+  }
+
+  if (closeBraces < openBraces) {
+    fixed += "}".repeat(openBraces - closeBraces);
+  }
+
+  return fixed;
 }
 
 /**
@@ -466,19 +736,20 @@ async function extractStatedStrategy(
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 64000,
+        maxOutputTokens: 2048,
       },
     });
 
-    const sourceText = sources
-      .slice(0, 5)
+    const sourceText = rankSourcesForPrompt(sources)
+      .slice(0, 6)
       .map((s) => `Source: ${s.title}\n${s.snippet}`)
       .join("\n\n");
 
-    const prompt = `Based on these research sources about ${companyName}, summarize their publicly stated strategy, mission, and key priorities in 2-3 paragraphs. Focus on:
+    const prompt = `Based on these research sources about ${companyName}, summarize their publicly stated strategy, mission, and key priorities in 2-3 concise paragraphs. Use exact named systems, products, and partnerships when they appear in the sources. Focus on:
 - Their stated mission and vision
 - Key strategic priorities or focus areas
 - Recent announcements about direction or growth plans
+- Exact named strategic platforms, systems, or partnerships when supported by the source text
 
 Sources:
 ${sourceText}
@@ -517,12 +788,12 @@ async function extractFinancialContext(
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 64000,
+        maxOutputTokens: 2048,
         responseMimeType: "application/json",
       },
     });
 
-    const sourceText = fundingSources
+    const sourceText = rankSourcesForPrompt(fundingSources)
       .slice(0, 5)
       .map((s) => `Source: ${s.title}\n${s.snippet}`)
       .join("\n\n");
@@ -584,6 +855,7 @@ ${sourceText}`;
           try {
             // Try to fix common JSON issues: trailing commas before closing braces/brackets
             let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
+            jsonText = closeOpenJsonStructures(jsonText);
             
             parsed = JSON.parse(jsonText) as Record<string, unknown>;
             console.log(`Successfully parsed JSON after fixing trailing commas for financial context "${companyName}"`);
@@ -655,9 +927,13 @@ export function formatResearchForPrompt(research: ResearchResult): string {
 
   if (research.sources.length > 0) {
     text += `### Research Sources (${research.sources.length} found, quality score: ${research.qualityScore}/5):\n`;
-    const verifiedSources = research.sources.filter((s) => s.verificationStatus === "verified");
-    for (const source of verifiedSources.slice(0, 5)) {
-      text += `- [${source.sourceType}] ${source.title}\n`;
+    const prioritizedSources = rankSourcesForPrompt(research.sources).slice(0, 5);
+    for (const source of prioritizedSources) {
+      const snippet = source.snippet.trim().replace(/\s+/g, " ").slice(0, 220);
+      text += `- [${source.verificationStatus} ${source.sourceType}] ${source.title}\n`;
+      if (snippet) {
+        text += `  Evidence: ${snippet}${source.snippet.length > 220 ? "..." : ""}\n`;
+      }
     }
     text += `\n`;
   }

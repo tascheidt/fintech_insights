@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { aggregateTechStackFromJobs } from "@/lib/ai/tech-stack-aggregation";
 import { enrichTechStackWithAnalysis, type CompanyTechStack } from "@/lib/ai/tech-stack-extraction";
 import { getActiveTechStackAiConfig } from "@/lib/ai/prompt-config";
+import { buildTechStackStrategicContext } from "@/lib/analysis/strategic-context";
 
 export const maxDuration = 120;
 
@@ -89,6 +90,7 @@ export async function POST(
     // Step 1: DB aggregation (instant, no AI)
     const rawData = await aggregateTechStackFromJobs(id);
     const config = await getActiveTechStackAiConfig();
+    const strategicContext = await buildTechStackStrategicContext(id);
 
     if (rawData.technologies.length === 0) {
       return NextResponse.json(
@@ -104,6 +106,7 @@ export async function POST(
       rawData.totalJobsAnalyzed,
       rawData.periodStart,
       rawData.periodEnd,
+      strategicContext.context,
       config
     );
 

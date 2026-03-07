@@ -294,10 +294,24 @@ export interface FunctionTrend {
   description: string;
 }
 
+export interface TechnologySignal {
+  name: string;
+  count: number;
+  exampleTitles: string[];
+}
+
+export interface RoleEvidence {
+  title: string;
+  firstSeenDate: string;
+  techStack: string[];
+}
+
 export interface ExtendedHistoricalContext extends HistoricalContext {
   functionBreakdown: FunctionStats[];
   groupBreakdown: GroupStats[];
   functionTrends: FunctionTrend[];
+  topTechnologies: TechnologySignal[];
+  notableRoleSignals: RoleEvidence[];
   periodStart: Date;
   periodEnd: Date;
 }
@@ -323,7 +337,7 @@ export async function buildExtendedHistoricalContext(
   // Fetch current period jobs
   const { data: currentJobs } = await supabase
     .from("job_postings")
-    .select("id, title, standardized_department, function_category, first_seen_date, is_active")
+    .select("id, title, standardized_department, function_category, first_seen_date, is_active, tech_stack")
     .eq("company_id", companyId)
     .gte("first_seen_date", periodStart.toISOString())
     .order("first_seen_date", { ascending: false });
@@ -331,7 +345,7 @@ export async function buildExtendedHistoricalContext(
   // Fetch previous period jobs for trend comparison
   const { data: previousJobs } = await supabase
     .from("job_postings")
-    .select("id, title, standardized_department, function_category, first_seen_date, is_active")
+    .select("id, title, standardized_department, function_category, first_seen_date, is_active, tech_stack")
     .eq("company_id", companyId)
     .gte("first_seen_date", previousPeriodStart.toISOString())
     .lt("first_seen_date", periodStart.toISOString())
@@ -350,6 +364,8 @@ export async function buildExtendedHistoricalContext(
       functionBreakdown: [],
       groupBreakdown: [],
       functionTrends: [],
+      topTechnologies: [],
+      notableRoleSignals: [],
       periodStart,
       periodEnd,
     };
@@ -367,6 +383,8 @@ export async function buildExtendedHistoricalContext(
   // Calculate function trends vs previous period
   const previousFunctionBreakdown = categorizeJobs(prevJobs);
   const functionTrends = calculateFunctionTrends(functionBreakdown, previousFunctionBreakdown, days);
+  const topTechnologies = getTopTechnologySignals(jobs);
+  const notableRoleSignals = getNotableRoleSignals(jobs);
 
   // Build enhanced summary
   const summary = buildExtendedSummaryText(jobs.length, trends, executives, departments, functionBreakdown, days);
@@ -380,6 +398,8 @@ export async function buildExtendedHistoricalContext(
     functionBreakdown,
     groupBreakdown,
     functionTrends,
+    topTechnologies,
+    notableRoleSignals,
     periodStart,
     periodEnd,
   };
@@ -493,6 +513,57 @@ function buildExtendedSummaryText(
   return parts.join(" ");
 }
 
+function parseTechStack(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim());
+}
+
+function getTopTechnologySignals(
+  jobs: Array<{ title: string; tech_stack: unknown }>
+): TechnologySignal[] {
+  const signals = new Map<string, { count: number; titles: Set<string> }>();
+
+  for (const job of jobs) {
+    const techStack = parseTechStack(job.tech_stack);
+    for (const tech of techStack) {
+      const existing = signals.get(tech) ?? { count: 0, titles: new Set<string>() };
+      existing.count += 1;
+      existing.titles.add(job.title);
+      signals.set(tech, existing);
+    }
+  }
+
+  return Array.from(signals.entries())
+    .map(([name, value]) => ({
+      name,
+      count: value.count,
+      exampleTitles: Array.from(value.titles).slice(0, 3),
+    }))
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 12);
+}
+
+function getNotableRoleSignals(
+  jobs: Array<{ title: string; first_seen_date: string; tech_stack: unknown }>
+): RoleEvidence[] {
+  return jobs
+    .map((job) => ({
+      title: job.title,
+      firstSeenDate: job.first_seen_date,
+      techStack: parseTechStack(job.tech_stack),
+    }))
+    .filter((job) => job.techStack.length > 0)
+    .sort((left, right) => {
+      if (right.techStack.length !== left.techStack.length) {
+        return right.techStack.length - left.techStack.length;
+      }
+      return new Date(right.firstSeenDate).getTime() - new Date(left.firstSeenDate).getTime();
+    })
+    .slice(0, 8);
+}
+
 /**
  * Format extended context for company insight LLM prompt
  */
@@ -521,6 +592,25 @@ export function formatExtendedContextForPrompt(context: ExtendedHistoricalContex
     for (const trend of significantTrends.slice(0, 10)) {
       const emoji = trend.trend === "increasing" ? "📈" : trend.trend === "new" ? "🆕" : "📉";
       text += `- ${emoji} ${trend.label}: ${trend.description}\n`;
+    }
+    text += `\n`;
+  }
+
+  if (context.topTechnologies.length > 0) {
+    text += `### Named Systems And Technologies In Hiring:\n`;
+    for (const signal of context.topTechnologies.slice(0, 10)) {
+      const roleContext = signal.exampleTitles.length > 0
+        ? ` | example roles: ${signal.exampleTitles.join("; ")}`
+        : "";
+      text += `- ${signal.name}: mentioned in ${signal.count} role(s)${roleContext}\n`;
+    }
+    text += `\n`;
+  }
+
+  if (context.notableRoleSignals.length > 0) {
+    text += `### Representative Role Evidence:\n`;
+    for (const role of context.notableRoleSignals.slice(0, 6)) {
+      text += `- ${role.title}: ${role.techStack.join(", ")}\n`;
     }
     text += `\n`;
   }

@@ -362,6 +362,227 @@ interface EnrichmentResult {
   }[];
 }
 
+function buildTechLookupKey(value: string) {
+  return normalizeTechName(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+const HEURISTIC_CATEGORY_CONFIG: Array<{
+  category: string;
+  label: string;
+  keywords: string[];
+}> = [
+  {
+    category: "financial_systems",
+    label: "Financial Systems",
+    keywords: [
+      "fundserv",
+      "aton",
+      "cmhc",
+      "genworth",
+      "mastercard",
+      "visa",
+      "swift",
+      "kyriba",
+      "modern treasury",
+      "trm labs",
+      "chainalysis",
+      "elliptic",
+      "cds",
+      "dtc",
+      "dtcc",
+      "acats",
+      "banking",
+      "payments",
+      "credit",
+      "mortgage",
+    ],
+  },
+  {
+    category: "application_stack",
+    label: "Application Stack",
+    keywords: [
+      "python",
+      "java",
+      "javascript",
+      "typescript",
+      "node.js",
+      "spring boot",
+      "ruby",
+      "rails",
+      "react",
+      "swiftui",
+      "swift",
+      "kotlin",
+      "ios",
+      "android",
+      "html",
+      "css",
+      "objective-c",
+      "uikit",
+      "android jetpack",
+      "coroutines",
+      "livedata",
+      "flow",
+    ],
+  },
+  {
+    category: "platform_infrastructure",
+    label: "Platform Infrastructure",
+    keywords: [
+      "gcp",
+      "aws",
+      "azure",
+      "kubernetes",
+      "docker",
+      "terraform",
+      "git",
+      "github",
+      "gitlab",
+      "jenkins",
+      "linux",
+      "windows server",
+      "active directory",
+      "servicenow",
+      "sccm",
+      "scom",
+      "dynatrace",
+      "sumo logic",
+      "cyberark",
+      "vmware",
+      "powershell",
+      "ansible",
+      "anthos",
+      "datapower",
+      "akamai",
+      "crowdstrike",
+      "tanium",
+      "tenable",
+      "splunk",
+      "pagerduty",
+      "websphere",
+      "aix",
+      "exchange",
+      "artifactory",
+      "sonarqube",
+      "bitbucket",
+    ],
+  },
+  {
+    category: "data_ai",
+    label: "Data & AI",
+    keywords: [
+      "bigquery",
+      "sql",
+      "sql server",
+      "oracle",
+      "vertex ai",
+      "sas",
+      "apache airflow",
+      "informatica",
+      "power bi",
+      "looker",
+      "firebase",
+      "analytics",
+      "machine learning",
+      "dbt",
+      "snowflake",
+      "redshift",
+      "airflow",
+      "rag",
+      "llm",
+      "ai",
+    ],
+  },
+  {
+    category: "business_operations",
+    label: "Business Operations",
+    keywords: [
+      "coupa",
+      "peoplesoft",
+      "anaplan",
+      "adobe",
+      "braze",
+      "sketch",
+      "invision",
+      "axure",
+      "proto.io",
+      "project clarity",
+      "smartview",
+      "oracle obi",
+      "tidal enterprise scheduler",
+      "think-cell",
+      "doubleclick",
+      "appnexus",
+      "journey optimizer",
+    ],
+  },
+];
+
+function buildHeuristicCategories(technologies: FlatTechMention[]): TechCategory[] {
+  const categories = new Map<string, TechCategory>();
+
+  for (const config of HEURISTIC_CATEGORY_CONFIG) {
+    categories.set(config.category, {
+      category: config.category,
+      label: config.label,
+      technologies: [],
+    });
+  }
+
+  for (const technology of technologies) {
+    const normalized = buildTechLookupKey(technology.name);
+    const matchedCategory = HEURISTIC_CATEGORY_CONFIG.find((config) =>
+      config.keywords.some((keyword) => normalized.includes(buildTechLookupKey(keyword)))
+    );
+
+    const categoryKey = matchedCategory?.category ?? "other";
+    if (!categories.has(categoryKey)) {
+      categories.set(categoryKey, {
+        category: "other",
+        label: "Technologies",
+        technologies: [],
+      });
+    }
+
+    categories.get(categoryKey)?.technologies.push({
+      name: technology.name,
+      count: technology.count,
+      firstSeen: technology.firstSeen,
+      lastSeen: technology.lastSeen,
+    });
+  }
+
+  return [...categories.values()]
+    .filter((category) => category.technologies.length > 0)
+    .map((category) => ({
+      ...category,
+      technologies: category.technologies.sort((left, right) => right.count - left.count),
+    }));
+}
+
+function buildHeuristicArchitectSummary(companyName: string, categories: TechCategory[]) {
+  const topCategories = categories
+    .slice(0, 3)
+    .map((category) => {
+      const topTechnologies = category.technologies
+        .slice(0, 3)
+        .map((technology) => technology.name)
+        .join(", ");
+      return `${category.label} (${topTechnologies})`;
+    })
+    .join("; ");
+
+  const hasInfrastructure = categories.some((category) => category.category === "platform_infrastructure");
+  const hasData = categories.some((category) => category.category === "data_ai");
+  const posture = hasInfrastructure && hasData
+    ? "a hybrid estate balancing cloud modernization with data and AI investment"
+    : "a mixed estate spanning multiple layers of the platform";
+
+  return `${companyName}'s hiring signals point to ${posture}. The strongest technology clusters are ${topCategories}.`;
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return await Promise.race([
     promise,
@@ -382,6 +603,7 @@ export async function enrichTechStackWithAnalysis(
   totalJobsAnalyzed: number,
   periodStart: string,
   periodEnd: string,
+  strategicContext: string,
   config: TechStackAiConfig = DEFAULT_TECH_STACK_AI_CONFIG
 ): Promise<CompanyTechStack> {
   const key = process.env.GEMINI_API_KEY;
@@ -413,80 +635,141 @@ export async function enrichTechStackWithAnalysis(
   const prompt = config.promptTemplate
     .replace("{company_name}", companyName)
     .replace("{tech_data}", JSON.stringify(techData, null, 2))
+    .replace("{strategic_context}", strategicContext)
     .replace("{total_jobs}", String(totalJobsAnalyzed))
     .replace("{period_start}", periodStart)
     .replace("{period_end}", periodEnd);
 
-  const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({
-    model: config.model,
-    generationConfig: {
-      temperature: config.temperature,
-      maxOutputTokens: config.maxOutputTokens,
-      responseMimeType: "application/json",
-    },
-  });
-
   try {
-    const result = await withTimeout(
-      model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-      }),
-      GEMINI_REQUEST_TIMEOUT_MS,
-      `Gemini tech stack enrichment for "${companyName}"`
-    );
-
-    const text = result.response.text()?.trim() ?? "{}";
-    const parsed = JSON.parse(text) as EnrichmentResult;
-
-    if (parsed.architectSummary) {
-      baseStack.architectSummary = parsed.architectSummary;
-    }
-
     // Build a lookup from tech name → flat mention data
     const techLookup = new Map<string, FlatTechMention>();
     for (const t of technologies) {
-      techLookup.set(t.name.toLowerCase(), t);
+      const variants = new Set([
+        t.name.toLowerCase(),
+        normalizeTechName(t.name).toLowerCase(),
+        buildTechLookupKey(t.name),
+      ]);
+
+      for (const variant of variants) {
+        techLookup.set(variant, t);
+      }
     }
 
-    if (parsed.categories) {
-      for (const cat of parsed.categories) {
-        const techItems: TechItem[] = [];
-        for (const techName of cat.technologies) {
-          const mention = techLookup.get(techName.toLowerCase());
-          if (mention) {
-            techItems.push({
-              name: mention.name,
-              count: mention.count,
-              firstSeen: mention.firstSeen,
-              lastSeen: mention.lastSeen,
+    const genAI = new GoogleGenerativeAI(key);
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const model = genAI.getGenerativeModel({
+        model: config.model,
+        generationConfig: {
+          temperature: attempt === 0 ? config.temperature : Math.min(config.temperature, 0.1),
+          maxOutputTokens: config.maxOutputTokens,
+          responseMimeType: "application/json",
+        },
+      });
+
+      const result = await withTimeout(
+        model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+        }),
+        GEMINI_REQUEST_TIMEOUT_MS,
+        `Gemini tech stack enrichment for "${companyName}" (attempt ${attempt + 1})`
+      );
+
+      const text = result.response.text()?.trim() ?? "{}";
+      const parsed = JSON.parse(text) as EnrichmentResult;
+      const candidateCategories: CompanyTechStack["categories"] = [];
+
+      if (parsed.architectSummary) {
+        baseStack.architectSummary = parsed.architectSummary;
+      }
+
+      if (parsed.categories) {
+        for (const cat of parsed.categories) {
+          const techItems: TechItem[] = [];
+          for (const techName of cat.technologies) {
+            const mention =
+              techLookup.get(techName.toLowerCase()) ??
+              techLookup.get(normalizeTechName(techName).toLowerCase()) ??
+              techLookup.get(buildTechLookupKey(techName));
+            if (mention) {
+              techItems.push({
+                name: mention.name,
+                count: mention.count,
+                firstSeen: mention.firstSeen,
+                lastSeen: mention.lastSeen,
+              });
+            }
+          }
+
+          if (techItems.length > 0) {
+            candidateCategories.push({
+              category: cat.category,
+              label: cat.label,
+              technologies: techItems,
+              narrativeSummary: cat.narrativeSummary,
             });
           }
         }
-
-        if (techItems.length > 0) {
-          baseStack.categories.push({
-            category: cat.category,
-            label: cat.label,
-            technologies: techItems,
-            narrativeSummary: cat.narrativeSummary,
-          });
-        }
       }
+
+      if (candidateCategories.length > 1 || (candidateCategories.length > 0 && parsed.architectSummary)) {
+        baseStack.categories = candidateCategories;
+        break;
+      }
+
+      if (attempt === 1 && candidateCategories.length > 0) {
+        baseStack.categories = candidateCategories;
+      }
+    }
+
+    if (baseStack.categories.length < 2) {
+      const heuristicCategories = buildHeuristicCategories(technologies);
+      if (heuristicCategories.length > baseStack.categories.length) {
+        baseStack.categories = heuristicCategories;
+      }
+    }
+
+    if (baseStack.categories.length === 0) {
+      baseStack.categories = buildHeuristicCategories(technologies);
+
+      if (baseStack.categories.length === 0) {
+        baseStack.categories = [{
+          category: "other",
+          label: "Technologies",
+          technologies: technologies.map((t) => ({
+            name: t.name,
+            count: t.count,
+            firstSeen: t.firstSeen,
+            lastSeen: t.lastSeen,
+          })),
+        }];
+      }
+    }
+
+    if (!baseStack.architectSummary && baseStack.categories.length > 0) {
+      baseStack.architectSummary = buildHeuristicArchitectSummary(companyName, baseStack.categories);
     }
   } catch (error) {
     console.error("Tech stack enrichment error:", error);
-    // Fallback: put everything in a single "other" category without narratives
-    baseStack.categories = [{
-      category: "other",
-      label: "Technologies",
-      technologies: technologies.map((t) => ({
-        name: t.name,
-        count: t.count,
-        firstSeen: t.firstSeen,
-        lastSeen: t.lastSeen,
-      })),
-    }];
+    baseStack.categories = buildHeuristicCategories(technologies);
+
+    if (baseStack.categories.length === 0) {
+      // Fallback: put everything in a single "other" category without narratives
+      baseStack.categories = [{
+        category: "other",
+        label: "Technologies",
+        technologies: technologies.map((t) => ({
+          name: t.name,
+          count: t.count,
+          firstSeen: t.firstSeen,
+          lastSeen: t.lastSeen,
+        })),
+      }];
+    }
+
+    if (!baseStack.architectSummary && baseStack.categories.length > 0) {
+      baseStack.architectSummary = buildHeuristicArchitectSummary(companyName, baseStack.categories);
+    }
   }
 
   return baseStack;

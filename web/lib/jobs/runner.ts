@@ -3,6 +3,7 @@ import { processCollectionTask } from "./processor";
 import { processAnalysisTask } from "./analyzer";
 import { updateJobRunStats } from "./progress";
 import { fetchCompanyNewsContext } from "@/lib/analysis/company-news";
+import { buildTechStackStrategicContext } from "@/lib/analysis/strategic-context";
 import { aggregateTechStackFromJobs } from "@/lib/ai/tech-stack-aggregation";
 import { enrichTechStackWithAnalysis } from "@/lib/ai/tech-stack-extraction";
 import { getActiveTechStackAiConfig } from "@/lib/ai/prompt-config";
@@ -555,12 +556,15 @@ export async function refreshTechStacksForCompanies(
           return;
         }
 
+        const strategicContext = await buildTechStackStrategicContext(company.id);
+
         const enrichedStack = await enrichTechStackWithAnalysis(
           company.name,
           rawData.technologies,
           rawData.totalJobsAnalyzed,
           rawData.periodStart,
           rawData.periodEnd,
+          strategicContext.context,
           config
         );
 
@@ -634,12 +638,15 @@ export async function backfillTechStacksForAllCompanies(): Promise<{ refreshed: 
           return;
         }
 
+        const strategicContext = await buildTechStackStrategicContext(company.id);
+
         const enrichedStack = await enrichTechStackWithAnalysis(
           company.name,
           rawData.technologies,
           rawData.totalJobsAnalyzed,
           rawData.periodStart,
           rawData.periodEnd,
+          strategicContext.context,
           config
         );
 

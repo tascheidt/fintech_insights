@@ -160,7 +160,14 @@ const ARENA_OPTIONS: Record<
 
 const PLACEHOLDERS: Record<PromptStage, string[]> = {
   "job-structure": ["{job_title}", "{raw_department}", "{description}", "{categories}"],
-  "tech-stack": ["{company_name}", "{tech_data}", "{total_jobs}", "{period_start}", "{period_end}"],
+  "tech-stack": [
+    "{company_name}",
+    "{tech_data}",
+    "{strategic_context}",
+    "{total_jobs}",
+    "{period_start}",
+    "{period_end}",
+  ],
 };
 
 function toneClass(tone: Metric["tone"]) {

@@ -107,6 +107,8 @@ export interface AlignmentAnalysis {
   strategicImplications: string;
 }
 
+const COMPANY_INSIGHT_TIMEOUT_MS = 45000;
+
 // ============================================================================
 // Main Generation Function
 // ============================================================================
@@ -179,12 +181,18 @@ export async function generateCompanyInsight(
   }
 
     // Step 2: Get previous insight for comparison
-    type PreviousInsightData = { id: string; core_functions: FunctionStats[] };
+    type PreviousInsightData = {
+      id: string;
+      core_functions: FunctionStats[];
+      headline: string | null;
+      key_signal: string | null;
+      executive_summary: string | null;
+    };
     let previousInsight: PreviousInsightData | null = null;
     if (compareToPrevious) {
       const { data } = await supabase
         .from("company_insights")
-        .select("id, core_functions")
+        .select("id, core_functions, headline, key_signal, executive_summary")
         .eq("company_id", companyId)
         .order("generated_at", { ascending: false })
         .limit(1)
@@ -194,6 +202,9 @@ export async function generateCompanyInsight(
         previousInsight = {
           id: data.id as string,
           core_functions: (data.core_functions as FunctionStats[]) || [],
+          headline: (data.headline as string | null) ?? null,
+          key_signal: (data.key_signal as string | null) ?? null,
+          executive_summary: (data.executive_summary as string | null) ?? null,
         };
       }
     }
@@ -361,22 +372,32 @@ interface GeneratedInsightContent {
   keySignal: string;         // One-liner explaining strategic signal
 }
 
-const COMPANY_INSIGHT_PROMPT = `You are an elite competitive intelligence analyst specializing in fintech. Analyze this company's hiring patterns and compare them to their publicly stated strategy.
+const COMPANY_INSIGHT_PROMPT = `You are a fintech strategy analyst. Produce an evidence-backed company insight from hiring signals and external research.
 
 {hiring_context}
 
 {research_context}
 
+{previous_insight_context}
+
+## Evidence Rules
+- Preserve exact named systems, products, vendors, and partnerships when they appear in the evidence.
+- Do not downgrade precise names into generic phrases. If the evidence says "Engine by Starling", keep that exact name.
+- Distinguish three things clearly in your reasoning: direct hiring evidence, public research evidence, and strategic inference.
+- If the evidence is weak, mixed, or ambiguous, say so explicitly.
+- Only call something a new direction if the current evidence materially differs from the previous insight or the previous hiring pattern.
+- Avoid empty strategy language such as "focuses on innovation" unless it is immediately tied to a concrete named initiative, platform, or hiring signal.
+
 ## Analysis Tasks
 
 1. **Headline** (CRITICAL for dashboard display):
    - Write a punchy 5-8 word headline with ONE emoji at the start
-   - Examples: "🎯 Koho doubles down on SMB", "🚀 Neo's engineering surge begins", "💡 Wealthsimple bets big on AI"
+   - Examples: "🎯 Koho doubles down on SMB", "🚀 Neo's engineering surge begins", "💡 Wealthsimple names its new core platform bet"
    - Be specific about the strategic move, not generic "Company is hiring"
 
 2. **Key Signal** (one-liner):
-   - A brief explanation of what the headline means strategically
-   - Example: "Pivoting from consumer to small business banking"
+   - A brief explanation of what the headline means strategically, anchored in named evidence when available
+   - Example: "Pivoting from consumer to small business banking while modernizing onboarding on Engine by Starling"
 
 3. **Significance Score** (1-10):
    - How noteworthy is this insight for industry observers?
@@ -392,16 +413,19 @@ const COMPANY_INSIGHT_PROMPT = `You are an elite competitive intelligence analys
 
 4. **Executive Summary** (2-3 paragraphs):
    - What do the hiring patterns reveal about this company's priorities?
-   - How do they compare to their stated strategy?
-   - What strategic directions can we infer?
+   - Which named systems, products, or partnerships matter strategically?
+   - How do the hiring patterns compare to the stated strategy?
+   - What strategic directions can we infer vs directly observe?
 
 5. **Strategic Hypothesis**:
    - What is your best hypothesis about why they're hiring this way?
    - What strategic bet are they making?
+   - Explicitly mention the strongest evidence for that hypothesis
 
 6. **Alignment Analysis**:
    - How well do their hiring patterns align with their stated strategy?
    - Where do they match? Where do they diverge?
+   - Use direct evidence, not general tone
 
 7. **Discrepancies** (if any):
    - Identify specific areas where hiring doesn't match stated priorities
@@ -409,7 +433,8 @@ const COMPANY_INSIGHT_PROMPT = `You are an elite competitive intelligence analys
 
 8. **New Directions**:
    - List any new strategic directions evident from hiring patterns
-   - Focus on significant shifts from historical patterns
+   - Focus on significant shifts from historical patterns or the previous insight
+   - Do not include routine hiring activity
 
 9. **Strategic Implications**:
    - What does this mean for competitors?
@@ -435,15 +460,58 @@ Respond with JSON:
     }
   ],
   "strategic_implications": "...",
-  "model_reasoning": "your reasoning process"
+  "model_reasoning": "brief explanation of the most important evidence used"
 }`;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]);
+}
+
+function formatPreviousInsightContext(
+  previousInsight: {
+    headline: string | null;
+    key_signal: string | null;
+    executive_summary: string | null;
+  } | null
+) {
+  if (!previousInsight) {
+    return "## Previous Insight Comparison\nNo previous company insight is available. Treat any claimed new direction as tentative unless the current evidence is unusually strong.";
+  }
+
+  const sections = ["## Previous Insight Comparison"];
+
+  if (previousInsight.headline) {
+    sections.push(`Previous headline: ${previousInsight.headline}`);
+  }
+
+  if (previousInsight.key_signal) {
+    sections.push(`Previous key signal: ${previousInsight.key_signal}`);
+  }
+
+  if (previousInsight.executive_summary) {
+    sections.push(`Previous summary: ${previousInsight.executive_summary.replace(/\s+/g, " ").trim().slice(0, 320)}`);
+  }
+
+  return sections.join("\n");
+}
 
 async function generateInsightWithLLM(
   companyName: string,
   context: ExtendedHistoricalContext,
   research: ResearchResult,
   _companyType: CompanyType,
-  _previousInsight: { id: string; core_functions: FunctionStats[] } | null
+  previousInsight: {
+    id: string;
+    core_functions: FunctionStats[];
+    headline: string | null;
+    key_signal: string | null;
+    executive_summary: string | null;
+  } | null
 ): Promise<GeneratedInsightContent> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
@@ -454,23 +522,29 @@ async function generateInsightWithLLM(
   const model = genAI.getGenerativeModel({
     model: "gemini-3-flash-preview",
     generationConfig: {
-      temperature: 0.4,
-      maxOutputTokens: 64000,
+      temperature: 0.25,
+      maxOutputTokens: 4096,
       responseMimeType: "application/json",
     },
   });
 
   const hiringContext = formatExtendedContextForPrompt(context);
   const researchContext = formatResearchForPrompt(research);
+  const previousInsightContext = formatPreviousInsightContext(previousInsight);
 
   const prompt = COMPANY_INSIGHT_PROMPT
     .replace("{hiring_context}", hiringContext)
-    .replace("{research_context}", researchContext);
+    .replace("{research_context}", researchContext)
+    .replace("{previous_insight_context}", previousInsightContext);
 
   try {
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    });
+    const result = await withTimeout(
+      model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      }),
+      COMPANY_INSIGHT_TIMEOUT_MS,
+      `Gemini company insight generation for "${companyName}"`
+    );
 
     const text = result.response.text()?.trim() ?? "";
 

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractJobStructure } from "@/lib/analysis/structure";
+import { buildTechStackStrategicContext } from "@/lib/analysis/strategic-context";
 import { enrichTechStackWithAnalysis, normalizeTechName, type CompanyTechStack } from "@/lib/ai/tech-stack-extraction";
 import {
   AI_MODEL_OPTIONS,
@@ -320,6 +321,7 @@ async function scoreTechStackBenchmarks(config: TechStackAiConfig) {
         benchmark.totalJobsAnalyzed,
         benchmark.periodStart,
         benchmark.periodEnd,
+        benchmark.strategicContext ?? "No company strategic context is available.",
         config
       );
       return scoreTechStackBenchmark(result, benchmark);
@@ -467,6 +469,7 @@ export async function evaluateTechStackPrompt(options: {
   }
 
   const baselineConfig = await getActiveTechStackAiConfig();
+  const strategicContext = await buildTechStackStrategicContext(options.companyId);
 
   const baselineStart = Date.now();
   const baselineStack = configsMatch(baselineConfig, options.candidateConfig)
@@ -476,6 +479,7 @@ export async function evaluateTechStackPrompt(options: {
         rawData.totalJobsAnalyzed,
         rawData.periodStart,
         rawData.periodEnd,
+        strategicContext.context,
         baselineConfig
       )
     : await enrichTechStackWithAnalysis(
@@ -484,6 +488,7 @@ export async function evaluateTechStackPrompt(options: {
         rawData.totalJobsAnalyzed,
         rawData.periodStart,
         rawData.periodEnd,
+        strategicContext.context,
         baselineConfig
       );
   const baselineLatencyMs = Date.now() - baselineStart;
@@ -495,6 +500,7 @@ export async function evaluateTechStackPrompt(options: {
     rawData.totalJobsAnalyzed,
     rawData.periodStart,
     rawData.periodEnd,
+    strategicContext.context,
     options.candidateConfig
   );
   const candidateLatencyMs = Date.now() - candidateStart;

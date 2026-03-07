@@ -54,7 +54,14 @@ export const SYSTEM_PROMPT_KEYS = {
 
 const REQUIRED_PLACEHOLDERS: Record<PromptStage, string[]> = {
   "job-structure": ["{job_title}", "{raw_department}", "{description}", "{categories}"],
-  "tech-stack": ["{company_name}", "{tech_data}", "{total_jobs}", "{period_start}", "{period_end}"],
+  "tech-stack": [
+    "{company_name}",
+    "{tech_data}",
+    "{strategic_context}",
+    "{total_jobs}",
+    "{period_start}",
+    "{period_end}",
+  ],
 };
 
 export const DEFAULT_JOB_STRUCTURE_PROMPT = `Analyze this fintech job description and extract the structured fields below.
@@ -107,13 +114,28 @@ Respond ONLY with valid JSON matching this structure:
   "location": {"city": "Toronto", "state": "Ontario", "country": "Canada", "formatted": "Toronto, Ontario, Canada"} or null
 }`;
 
-export const DEFAULT_TECH_STACK_PROMPT = `You are a fintech CTO and technical diligence advisor reviewing {company_name}'s hiring-derived technology footprint. You have a flat list of technologies extracted from job postings, plus mention counts and recency.
+export const DEFAULT_TECH_STACK_PROMPT = `You are a fintech CTO and technical diligence advisor reviewing {company_name}'s hiring-derived technology footprint.
 
-Your goal is not to restate the list. Your goal is to infer what the stack suggests about how this company builds, runs, and governs financial products.
+You have two evidence sources:
+1. Direct hiring-derived technology mentions with counts and recency.
+2. Company strategic context derived from strategic insights and verified research snippets.
+
+Your job is to fuse those sources carefully.
+
+CRITICAL EVIDENCE RULES:
+- The technologies in category.technologies must come only from the Technology mentions input.
+- You may use the strategic context to interpret what the stack implies, preserve exact named systems, and explain likely modernization or product direction.
+- If a system or product name appears only in the strategic context, you may reference it in architectSummary or narrativeSummary, but do not add it to category.technologies unless it is also present in Technology mentions.
+- Preserve exact names from the evidence when they are present. If the context says "Engine by Starling", do not downgrade that to a generic phrase like "core banking SaaS platform".
+- Distinguish direct evidence from strategic interpretation. If a conclusion is inferential, say so.
+- If hiring evidence and strategic context point in different directions, explain the tension instead of forcing certainty.
 
 INPUT:
 Technology mentions:
 {tech_data}
+
+Strategic context:
+{strategic_context}
 
 Total job postings analyzed: {total_jobs}
 Period covered: {period_start} to {period_end}
@@ -125,27 +147,27 @@ Create a JSON object with:
     {
       "category": "financial_systems",
       "label": "Financial Systems",
-      "technologies": ["FI Serv", "Temenos"],
+      "technologies": ["Temenos", "Stripe"],
       "narrativeSummary": "2-3 sentences explaining what these tools imply"
     }
   ]
 }
 
 Use these category IDs when relevant:
-- financial_systems: payments, banking cores, card issuing, lending, risk, fraud,  payments, compliance, or other financial operations systems
+- financial_systems: payments, banking cores, card issuing, lending, risk, fraud, compliance, treasury, servicing, or other named financial operations systems
 - application_stack: languages, frameworks, app runtimes, APIs, front-end and back-end product tooling
 - platform_infrastructure: cloud, infrastructure, DevOps, observability, data movement, security tooling, developer platform signals
 - data_ai: warehouses, BI, analytics, experimentation, ML, GenAI, feature pipelines
-- business_operations: systems that suggest customer servicing, sales force support, operations, support, workflow automation, or enterprise workflow management
+- business_operations: systems that suggest customer servicing, CRM, enterprise workflow support, support operations, or back-office platform posture
 - other: low-volume leftovers that still matter
 
-RULES:
-- Use technology names exactly as provided in the input.
+RUNTIME RULES:
+- Use technology names exactly as provided in Technology mentions.
 - Do not invent technologies or overstate confidence.
 - Distinguish strong signals from weak signals. If evidence is thin, say so explicitly.
 - Use counts and recency to talk about prominence or momentum when justified.
 - Focus on insight: stack maturity, build-vs-buy posture, vendor dependence, platform sophistication, regulated-fintech readiness, and notable gaps.
-- Avoid generic filler like "modern tech stack" or "focuses on innovation" unless you immediately anchor it in the evidence.
+- Avoid generic filler like "modern tech stack" or "focuses on innovation" unless you immediately anchor it in named evidence.
 - Only include categories that actually have technologies assigned.
 - No duplicate technologies across categories.
 - Omit other if it would be mostly noise.
@@ -153,8 +175,9 @@ RULES:
 The narrative should answer:
 - What is core vs secondary?
 - What does this imply about product architecture and operating model?
+- Which named systems or vendors matter strategically, and are they directly evidenced vs context-only?
 - Where does the company appear opinionated or unusually finance-specific?
-- What important uncertainty remains because hiring data is imperfect?`;
+- What important uncertainty remains because hiring data and strategic context are both incomplete?`;
 
 export const DEFAULT_JOB_STRUCTURE_AI_CONFIG: JobStructureAiConfig = {
   stage: "job-structure",
