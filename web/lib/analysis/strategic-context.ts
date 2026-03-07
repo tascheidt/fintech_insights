@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { scoreRankedSource } from "@/lib/analysis/source-scoring";
 
 const MAX_STRATEGIC_SOURCES = 4;
 const MAX_STRATEGY_LENGTH = 500;
@@ -58,26 +59,13 @@ function parseStrategicSources(value: unknown): StrategicSource[] {
 }
 
 function scoreStrategicSource(source: StrategicSource) {
-  const text = `${source.title} ${source.snippet}`.toLowerCase();
-  let score = 0;
-
-  if (source.verificationStatus === "verified") score += 5;
-  if (source.sourceType === "official") score += 4;
-  if (source.sourceType === "sec_filing") score += 3;
-  if (source.sourceType === "news") score += 2;
-
-  if (text.includes("platform")) score += 2;
-  if (text.includes("system")) score += 2;
-  if (text.includes("engine by")) score += 4;
-  if (text.includes("agreement")) score += 1;
-  if (text.includes("partnership")) score += 1;
-  if (text.includes("cloud-native")) score += 2;
-  if (text.includes("digital banking")) score += 2;
-  if (text.includes("wealth")) score += 1;
-  if (text.includes("payments")) score += 1;
-  if (text.includes("bank")) score += 1;
-
-  return score;
+  return scoreRankedSource(source, {
+    extraKeywordWeights: {
+      "engine by": 4,
+      payments: 1,
+      bank: 1,
+    },
+  });
 }
 
 function formatSourceEvidence(source: StrategicSource) {

@@ -10,6 +10,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { scoreRankedSource } from "./source-scoring";
 
 // ============================================================================
 // Types
@@ -654,26 +655,15 @@ function rankSourcesForPrompt(sources: VerifiedSource[]) {
 }
 
 function rankSource(source: VerifiedSource) {
-  const text = normalizeText(`${source.title} ${source.snippet}`);
-  let score = 0;
-
-  if (source.verificationStatus === "verified") score += 5;
-  if (source.sourceType === "official") score += 4;
-  if (source.sourceType === "sec_filing") score += 3;
-  if (source.sourceType === "news") score += 2;
-  if (text.includes("platform")) score += 2;
-  if (text.includes("system")) score += 2;
-  if (text.includes("agreement")) score += 1;
-  if (text.includes("partnership")) score += 1;
-  if (text.includes("cloud-native")) score += 2;
-  if (text.includes("digital banking")) score += 2;
-  if (text.includes("wealth")) score += 1;
-  if (text.includes("engine by starling")) score += 4;
-  if (text.includes("small business")) score += 1;
-  if (text.includes("digital wealth")) score += 1;
-  if (isLowSignalSource(source)) score -= 6;
-
-  return score;
+  return scoreRankedSource(source, {
+    extraKeywordWeights: {
+      "engine by starling": 4,
+      "small business": 1,
+      "digital wealth": 1,
+    },
+    isLowSignalSource: isLowSignalSource(source),
+    lowSignalPenalty: 6,
+  });
 }
 
 function closeOpenJsonStructures(text: string) {
