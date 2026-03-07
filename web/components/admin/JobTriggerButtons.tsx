@@ -14,10 +14,11 @@ export function JobTriggerButtons({ onTriggered }: JobTriggerButtonsProps) {
   const [collectState, setCollectState] = useState<ButtonState>("idle");
   const [reportState, setReportState] = useState<ButtonState>("idle");
   const [techStackState, setTechStackState] = useState<ButtonState>("idle");
+  const [insightRefreshState, setInsightRefreshState] = useState<ButtonState>("idle");
   const [error, setError] = useState<string | null>(null);
 
   const triggerJob = useCallback(async (
-    jobType: "collect" | "report" | "tech-stack-backfill",
+    jobType: "collect" | "report" | "tech-stack-backfill" | "company-insights-refresh",
     setState: (s: ButtonState) => void,
   ) => {
     setState("submitting");
@@ -78,6 +79,20 @@ export function JobTriggerButtons({ onTriggered }: JobTriggerButtonsProps) {
           {techStackState === "submitting" && <Loader2 className="w-3 h-3 animate-spin mr-1.5" />}
           {techStackState === "accepted" && <Check className="w-3 h-3 mr-1.5" />}
           {techStackState === "idle" ? "Refresh Tech Stacks" : techStackState === "submitting" ? "Starting..." : "Queued"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={insightRefreshState !== "idle"}
+          onClick={() => triggerJob("company-insights-refresh", setInsightRefreshState)}
+        >
+          {insightRefreshState === "submitting" && <Loader2 className="w-3 h-3 animate-spin mr-1.5" />}
+          {insightRefreshState === "accepted" && <Check className="w-3 h-3 mr-1.5" />}
+          {insightRefreshState === "idle"
+            ? "Refresh Strategic Insights"
+            : insightRefreshState === "submitting"
+              ? "Starting..."
+              : "Queued"}
         </Button>
       </div>
       {error && (

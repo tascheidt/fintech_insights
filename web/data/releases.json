@@ -6,7 +6,9 @@
       { "type": "feature", "description": "Prompt Forge adds an admin-only Labs workflow for tuning AI prompts, comparing Gemini models, and shipping winning configs live." },
       { "type": "feature", "description": "Admins can now save active AI prompt/model settings, replay evaluation runs, and promote approved prompt changes into GitHub implementation specs." },
       { "type": "improvement", "description": "Tech stack extraction and synthesis now read validated runtime prompt settings so improved prompts apply immediately to new runs and backfills." },
-      { "type": "improvement", "description": "Stage 1 reprocessing is more resilient with better truncated-response recovery, tighter output budgeting, and clearer operational guidance." }
+      { "type": "improvement", "description": "Stage 1 reprocessing is more resilient with better truncated-response recovery, tighter output budgeting, and clearer operational guidance." },
+      { "type": "improvement", "description": "Company insights and tech stack synthesis now preserve more named systems while filtering ambiguous or low-signal research sources more aggressively." },
+      { "type": "feature", "description": "Admins can now refresh strategic insights for all companies from the dashboard, and company insight generation degrades safely when lock infrastructure is unavailable." }
     ]
   },
   {

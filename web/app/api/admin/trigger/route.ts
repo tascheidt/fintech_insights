@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { job_type } = body;
 
-  if (!job_type || !["collect", "report", "tech-stack-backfill"].includes(job_type)) {
+  if (!job_type || !["collect", "report", "tech-stack-backfill", "company-insights-refresh"].includes(job_type)) {
     return NextResponse.json({ error: "Invalid job type" }, { status: 400 });
   }
 
@@ -44,6 +44,15 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({ jobRunId: null }),
     }).catch((error) => console.error("Tech stack backfill trigger error:", error));
+  } else if (job_type === "company-insights-refresh") {
+    fetch(`${baseUrl}/api/internal/company-insights-refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cronSecret}`,
+      },
+      body: JSON.stringify({ jobRunId: null }),
+    }).catch((error) => console.error("Company insights refresh trigger error:", error));
   } else {
     // Fire and forget — don't await the full job, just confirm it started
     fetch(`${baseUrl}/api/cron/${job_type}`, {

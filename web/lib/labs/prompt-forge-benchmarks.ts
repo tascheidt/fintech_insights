@@ -12,6 +12,7 @@ export interface JobStructureBenchmarkCase {
 export interface TechStackBenchmarkCase {
   id: string;
   companyName: string;
+  strategicContext?: string;
   technologies: {
     name: string;
     count: number;
@@ -55,6 +56,13 @@ export const TECH_STACK_BENCHMARKS: TechStackBenchmarkCase[] = [
   {
     id: "fintech-platform-mix",
     companyName: "Benchmark BankTech",
+    strategicContext: `## Strategic Context
+Latest company insight generated: 2026-02-10
+Headline: Core banking modernization accelerates
+Key signal: The company is pairing named financial systems with a platform modernization push.
+Named strategic evidence:
+- [verified news] Benchmark BankTech expands core modernization: Benchmark BankTech signed a multi-year agreement with Engine by Starling to modernize onboarding and deposit operations.
+- [verified official] Benchmark BankTech payments strategy update: Leadership said Stripe remains central to payments orchestration while Temenos supports banking core workflows.`,
     technologies: [
       { name: "Temenos", count: 7, firstSeen: "2025-09-01", lastSeen: "2026-02-01" },
       { name: "Stripe", count: 6, firstSeen: "2025-09-01", lastSeen: "2026-02-10" },
@@ -69,11 +77,17 @@ export const TECH_STACK_BENCHMARKS: TechStackBenchmarkCase[] = [
     periodEnd: "2026-02-11",
     expectedCategories: ["financial_systems", "application_stack", "platform_infrastructure", "data_ai"],
     expectedTechnologies: ["Temenos", "Stripe", "Go", "Kubernetes", "Datadog", "Snowflake"],
-    expectedNarrativeTerms: ["vendor", "platform", "payments", "banking", "data", "observability"],
+    expectedNarrativeTerms: ["vendor", "platform", "payments", "banking", "data", "observability", "engine by starling"],
   },
   {
     id: "data-heavy-fintech",
     companyName: "Benchmark Analytics Fintech",
+    strategicContext: `## Strategic Context
+Latest company insight generated: 2026-02-10
+Headline: Data platform remains central
+Key signal: Research suggests the company is scaling a data-led underwriting and data-sharing model.
+Named strategic evidence:
+- [verified news] Benchmark Analytics Fintech expands data partnerships: Leadership highlighted Plaid-driven acquisition and tighter warehouse governance for analytics products.`,
     technologies: [
       { name: "Python", count: 8, firstSeen: "2025-08-01", lastSeen: "2026-02-11" },
       { name: "Databricks", count: 5, firstSeen: "2025-08-20", lastSeen: "2026-02-02" },

@@ -43,14 +43,15 @@ export function GenerateInsightButton({
 
       const data = await res.json();
 
+      if (res.status === 200 && data.message === "Recent insight exists") {
+        setError(
+          `An insight was recently generated. Next generation allowed after ${new Date(data.nextAllowedAt).toLocaleDateString()}.`
+        );
+        return;
+      }
+
       if (!res.ok) {
-        if (res.status === 200 && data.message === "Recent insight exists") {
-          setError(
-            `An insight was recently generated. Next generation allowed after ${new Date(data.nextAllowedAt).toLocaleDateString()}.`
-          );
-        } else {
-          setError(data.error || "Failed to generate insight");
-        }
+        setError(data.error || "Failed to generate insight");
         return;
       }
 
