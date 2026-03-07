@@ -59,7 +59,7 @@ const REQUIRED_PLACEHOLDERS: Record<PromptStage, string[]> = {
 
 export const DEFAULT_JOB_STRUCTURE_PROMPT = `Analyze this fintech job description and extract the structured fields below.
 
-You are acting as a senior fintech technical recruiter and taxonomy specialist. Your job is to capture only high-signal, evidence-backed technologies and normalize them into clear product or platform names.
+You are acting as a senior fintech technical recruiter and taxonomy specialist. Your job is to capture only high-signal, evidence-backed details of job descriptions you review. For technical platforms you use your knowledge or research of technologies applied to support financial services businesses to normalize them into clear product or platform names.
 
 Job Title: {job_title}
 Raw Department (from ATS): {raw_department}
@@ -73,11 +73,14 @@ IMPORTANT RULES FOR tech_stack:
 - Never infer a technology from responsibilities. If the description says "cloud infrastructure" but does not name AWS, GCP, or Azure, do not add a cloud platform.
 - Prefer fewer high-confidence technologies over padded lists.
 - Normalize to canonical names when obvious: Postgres -> PostgreSQL, Amazon Web Services -> AWS, K8s -> Kubernetes, React.js -> React, NodeJS -> Node.js.
-- Keep specific fintech systems when named: Temenos, FIS, Finastra, Mambu, Stripe, Plaid, Marqeta, Adyen, Jack Henry, FICO, nCino, Q2, Envestnet, Snowflake, Databricks, Kafka.
-- Include developer infrastructure when named: Docker, Kubernetes, Terraform, GitHub Actions, CircleCI, Datadog, New Relic, ArgoCD, Redis, PostgreSQL, Snowflake.
-- Exclude generic abstractions and role concepts: cloud, APIs, microservices, distributed systems, machine learning, analytics, ETL, automation, architecture, object-oriented design, security best practices.
+- Keep specific fintech systems when named: Temenos, Engine, Broadridge, FIS, Finastra, Mambu, Stripe, Plaid, Adyen, Jack Henry, FICO, nCino, Q2, Envestnet,  Kafka.
+- Include common enterprise software packages: SAP, Zendesk, Decagon, Saleforce.
+- Include developer infrastructure when named: Docker, Kubernetes, Terraform, GitHub Actions, CircleCI, Datadog, New Relic, ArgoCD, Redis, PostgreSQL, Databricks, Snowflake.
+- Include machine learning and AI frameworks and libraries: PyTorch, Keras, SciKit-learn, sparkML.
+- Exclude generic abstractions and role concepts: cloud, APIs, microservices, distributed systems, machine learning, analytics, ETL, automation, architecture, object-oriented design, security best practices, real time rails, open banking.
 - Exclude office/productivity tools and generic collaboration software: Excel, Word, PowerPoint, Outlook, MS Office, Google Docs, Slack, Zoom, Teams, SharePoint, Jira, Confluence, Notion, Miro.
 - Exclude methodologies and certifications unless they are part of a named product: Agile, Scrum, Lean, PMP, SAFe.
+- Exclude company specific products: Wealthsimple for Business.
 
 IMPORTANT RULES FOR location:
 - Always extract location from the description if present. Look for sections like "Location", "Location(s)", "Where you'll work", or explicit city/country references.
@@ -86,7 +89,7 @@ Return a JSON object with:
 1. summary: concise 2-3 sentence summary (max 300 chars)
 2. seniority_level: one of intern, junior, mid, senior, staff, principal, lead, executive
 3. salary: object with min, max, currency, or null
-4. tech_stack: array of the most important explicitly named technologies (max 12, ordered by signal strength)
+4. tech_stack: array of the most important explicitly named technologies (ordered by signal strength)
 5. keywords: broader skills/domains/topics (max 20, ordered by signal strength)
 6. standardized_department: one of Engineering, Sales, Marketing, Product, Operations, Finance, Legal, HR, Customer Success, Support
 7. function_category: must be one of {categories}
@@ -97,7 +100,7 @@ Respond ONLY with valid JSON matching this structure:
   "summary": "...",
   "seniority_level": "senior",
   "salary": {"min": 120000, "max": 150000, "currency": "USD"} or null,
-  "tech_stack": ["React", "TypeScript", "AWS"],
+  "tech_stack": ["React", "TypeScript", "AWS", "Temenos"],
   "keywords": ["payments", "risk systems", "API integrations"],
   "standardized_department": "Engineering",
   "function_category": "engineering-backend",
