@@ -125,18 +125,18 @@ Create a JSON object with:
     {
       "category": "financial_systems",
       "label": "Financial Systems",
-      "technologies": ["Stripe", "Plaid"],
+      "technologies": ["FI Serv", "Temenos"],
       "narrativeSummary": "2-3 sentences explaining what these tools imply"
     }
   ]
 }
 
 Use these category IDs when relevant:
-- financial_systems: payments, banking cores, card issuing, lending, risk, fraud, compliance, CRM or servicing systems tied to financial operations
+- financial_systems: payments, banking cores, card issuing, lending, risk, fraud,  payments, compliance, or other financial operations systems
 - application_stack: languages, frameworks, app runtimes, APIs, front-end and back-end product tooling
 - platform_infrastructure: cloud, infrastructure, DevOps, observability, data movement, security tooling, developer platform signals
 - data_ai: warehouses, BI, analytics, experimentation, ML, GenAI, feature pipelines
-- business_operations: systems that suggest servicing, operations, support, workflow automation, or enterprise workflow posture
+- business_operations: systems that suggest customer servicing, sales force support, operations, support, workflow automation, or enterprise workflow management
 - other: low-volume leftovers that still matter
 
 RULES:
@@ -167,11 +167,12 @@ export const DEFAULT_JOB_STRUCTURE_AI_CONFIG: JobStructureAiConfig = {
 
 export const DEFAULT_TECH_STACK_AI_CONFIG: TechStackAiConfig = {
   stage: "tech-stack",
-  model: "gemini-pro-latest",
+  model: "gemini-3-flash-preview",
   promptTemplate: DEFAULT_TECH_STACK_PROMPT,
   temperature: 0.25,
   maxOutputTokens: 4096,
-  version: "default-tech-stack-v2",
+  version: "prompt-forge-approved-ddaf1f4b",
+  benchmarkScore: 93,
 };
 
 function getStageSchema(stage: PromptStage) {
