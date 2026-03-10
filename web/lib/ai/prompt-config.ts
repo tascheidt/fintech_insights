@@ -79,15 +79,16 @@ IMPORTANT RULES FOR tech_stack:
 - Extract only technologies, tools, vendors, platforms, frameworks, languages, databases, cloud services, observability tools, CI/CD tools, and fintech domain systems that are explicitly named in the description.
 - Never infer a technology from responsibilities. If the description says "cloud infrastructure" but does not name AWS, GCP, or Azure, do not add a cloud platform.
 - Prefer fewer high-confidence technologies over padded lists.
-- Normalize to canonical names when obvious: Postgres -> PostgreSQL, Amazon Web Services -> AWS, K8s -> Kubernetes, React.js -> React, NodeJS -> Node.js.
-- Keep specific fintech systems when named: Temenos, Engine, Broadridge, FIS, Finastra, Mambu, Stripe, Plaid, Adyen, Jack Henry, FICO, nCino, Q2, Envestnet,  Kafka.
-- Include common enterprise software packages: SAP, Zendesk, Decagon, Saleforce.
-- Include developer infrastructure when named: Docker, Kubernetes, Terraform, GitHub Actions, CircleCI, Datadog, New Relic, ArgoCD, Redis, PostgreSQL, Databricks, Snowflake.
-- Include machine learning and AI frameworks and libraries: PyTorch, Keras, SciKit-learn, sparkML.
-- Exclude generic abstractions and role concepts: cloud, APIs, microservices, distributed systems, machine learning, analytics, ETL, automation, architecture, object-oriented design, security best practices, real time rails, open banking.
-- Exclude office/productivity tools and generic collaboration software: Excel, Word, PowerPoint, Outlook, MS Office, Google Docs, Slack, Zoom, Teams, SharePoint, Jira, Confluence, Notion, Miro.
-- Exclude methodologies and certifications unless they are part of a named product: Agile, Scrum, Lean, PMP, SAFe.
-- Exclude company specific products: Wealthsimple for Business.
+- Normalize to canonical names when obvious. Examples: Postgres -> PostgreSQL, Amazon Web Services -> AWS, K8s -> Kubernetes, React.js -> React, NodeJS -> Node.js.
+- Keep specific fintech systems when named. Examples: Temenos, Engine, Broadridge, FIS, Finastra, Mambu, Stripe, Plaid, Adyen, Jack Henry, FICO, nCino, Q2, Envestnet,  Kafka.
+- Include common enterprise software packages. Examples: SAP, Zendesk, Decagon, Saleforce.
+- Include developer infrastructure when named. Examples: Docker, Kubernetes, Terraform, GitHub Actions, CircleCI, Datadog, Launch Darkly, ArgoCD, Redis, PostgreSQL, Databricks, Snowflake.
+- Include machine learning and AI frameworks and libraries when named. Examples: PyTorch, Keras, SciKit-learn, sparkML.
+- Exclude generic abstractions and role concepts. Examples: cloud, APIs, microservices, distributed systems, machine learning, analytics, ETL, automation, architecture, object-oriented design, security best practices, real time rails, open banking.
+- Exclude office/productivity tools and generic collaboration software. Examples: Excel, Word, PowerPoint, Outlook, MS Office, Google Docs, Slack, Zoom, Teams, SharePoint, Jira, Confluence, Notion, Miro, LLM.
+- Exclude generic industry platforms. Examples: Mastercard, Visa, Interac, OSFI, Google, Meta, Tiktok.
+- Exclude methodologies and certifications unless they are part of a named product. Examples: Agile, Scrum, Lean, PMP, SAFe, ISO 20022, IFRS.
+- Exclude company specific products. Examples: Wealthsimple for Business.
 
 IMPORTANT RULES FOR location:
 - Always extract location from the description if present. Look for sections like "Location", "Location(s)", "Where you'll work", or explicit city/country references.
@@ -185,7 +186,8 @@ export const DEFAULT_JOB_STRUCTURE_AI_CONFIG: JobStructureAiConfig = {
   promptTemplate: DEFAULT_JOB_STRUCTURE_PROMPT,
   temperature: 0.2,
   maxOutputTokens: 4096,
-  version: "default-job-structure-v2",
+  version: "prompt-forge-approved-acbaaacc",
+  benchmarkScore: 74,
 };
 
 export const DEFAULT_TECH_STACK_AI_CONFIG: TechStackAiConfig = {
