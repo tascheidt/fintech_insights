@@ -6,15 +6,18 @@ import { formatDistanceToNow, format } from "date-fns";
 
 interface CronLog {
   id: string;
-  job_type: "collect" | "report";
+  job_type: "collect" | "report" | "analyze" | "company-insights" | "insight-generation";
+  trigger_type: "cron" | "manual" | "admin";
+  operation: string | null;
   started_at: string;
   completed_at: string | null;
-  status: "running" | "success" | "error";
+  status: "queued" | "running" | "success" | "error";
   new_jobs_count: number;
   closed_jobs_count: number;
   insights_generated: number;
   companies_processed: number;
   error_message: string | null;
+  details?: Record<string, unknown>;
 }
 
 interface CronLogsTableProps {
@@ -25,7 +28,8 @@ interface CronLogsTableProps {
 export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
   const [logs, setLogs] = useState<CronLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "collect" | "report">("all");
+  const [filter, setFilter] = useState<"all" | "collect" | "analyze" | "company-insights" | "report">("all");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchLogs = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -57,7 +61,7 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
 
   // Poll every 10s while any job is running
   useEffect(() => {
-    const hasRunning = logs.some((l) => l.status === "running");
+    const hasRunning = logs.some((l) => l.status === "running" || l.status === "queued");
     if (!hasRunning) return;
     const interval = setInterval(() => fetchLogs(false), 10000);
     return () => clearInterval(interval);
@@ -77,6 +81,13 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
             Running
+          </span>
+        );
+      case "queued":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            Queued
           </span>
         );
       case "error":
@@ -105,21 +116,100 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
             Report
           </span>
         );
+      case "analyze":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/10 text-orange-600">
+            Analyze
+          </span>
+        );
+      case "company-insights":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600">
+            Strategic Insights
+          </span>
+        );
+      case "insight-generation":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-500/10 text-cyan-600">
+            Insight
+          </span>
+        );
       default:
         return null;
     }
   };
 
+  const getJobLabel = (log: CronLog) => {
+    if (log.operation === "job-structure-reprocess") return "Prompt Forge Reprocess";
+    if (log.job_type === "company-insights" && log.trigger_type === "admin") return "Strategic Insights Refresh";
+    return null;
+  };
+
+  const getSummary = (log: CronLog) => {
+    const details = log.details ?? {};
+
+    if (log.operation === "job-structure-reprocess") {
+      const totalJobs = typeof details.totalJobs === "number" ? details.totalJobs : 0;
+      const processedJobs = typeof details.processedJobs === "number" ? details.processedJobs : 0;
+      const failedJobs = typeof details.failedJobs === "number" ? details.failedJobs : 0;
+      const techStacks =
+        typeof details.techStacks === "object" && details.techStacks !== null
+          ? (details.techStacks as Record<string, unknown>)
+          : null;
+      const refreshedStacks = techStacks && typeof techStacks.refreshed === "number" ? techStacks.refreshed : null;
+
+      return `${processedJobs}/${totalJobs} jobs processed${failedJobs ? `, ${failedJobs} failed` : ""}${refreshedStacks !== null ? `, ${refreshedStacks} tech stacks refreshed` : ""}`;
+    }
+
+    if (log.job_type === "collect") {
+      return `+${log.new_jobs_count} new jobs, ${log.closed_jobs_count} closed, ${log.insights_generated} insights`;
+    }
+
+    if (log.job_type === "company-insights") {
+      const refreshed = typeof details.refreshed === "number" ? details.refreshed : log.insights_generated;
+      const failed = typeof details.failed === "number" ? details.failed : 0;
+      return `${refreshed} companies refreshed${failed ? `, ${failed} failed` : ""}`;
+    }
+
+    return null;
+  };
+
+  const deleteJob = useCallback(async (jobRunId: string) => {
+    const confirmed = window.confirm("Delete this job run from history?");
+    if (!confirmed) return;
+
+    setDeletingId(jobRunId);
+    try {
+      const res = await fetch("/api/admin/cron-logs", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobRunId }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete job");
+      }
+
+      setLogs((current) => current.filter((log) => log.id !== jobRunId));
+    } catch (error) {
+      console.error("Failed to delete job:", error);
+    } finally {
+      setDeletingId(null);
+      fetchLogs(false);
+    }
+  }, [fetchLogs]);
+
   return (
     <Card>
       <CardHeader>
         <h3 className="font-semibold">Job Execution History</h3>
-        <CardDescription>Recent cron job runs and their results</CardDescription>
+        <CardDescription>Recent job runs and their results</CardDescription>
       </CardHeader>
       <CardContent>
         {/* Filter tabs */}
-        <div className="flex items-center gap-1 mb-4 border-b">
-          {(["all", "collect", "report"] as const).map((f) => (
+        <div className="flex items-center gap-1 mb-4 border-b overflow-x-auto">
+          {(["all", "collect", "analyze", "company-insights", "report"] as const).map((f) => (
             <button
               key={f}
               className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -129,7 +219,15 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
               }`}
               onClick={() => setFilter(f)}
             >
-              {f === "all" ? "All Jobs" : f === "collect" ? "Collections" : "Reports"}
+              {f === "all"
+                ? "All Jobs"
+                : f === "collect"
+                  ? "Collections"
+                  : f === "analyze"
+                    ? "Analyze"
+                    : f === "company-insights"
+                      ? "Insights"
+                      : "Reports"}
             </button>
           ))}
         </div>
@@ -157,10 +255,22 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                       </div>
-                    ) : (
+                    ) : log.job_type === "report" ? (
                       <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
                         <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    ) : log.job_type === "company-insights" ? (
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
                         </svg>
                       </div>
                     )}
@@ -170,21 +280,30 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
                       {getJobTypeBadge(log.job_type)}
                       {getStatusBadge(log.status)}
                     </div>
+                    {getJobLabel(log) && (
+                      <p className="text-sm font-medium mt-1">{getJobLabel(log)}</p>
+                    )}
                     <p className="text-sm text-muted-foreground mt-1">
                       {format(new Date(log.started_at), "MMM d, yyyy 'at' h:mm a")}
                     </p>
-                    {log.status === "success" && log.job_type === "collect" && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        +{log.new_jobs_count} new jobs, {log.closed_jobs_count} closed, {log.insights_generated} insights
-                      </p>
+                    {getSummary(log) && (
+                      <p className="text-xs text-muted-foreground mt-1">{getSummary(log)}</p>
                     )}
                     {log.error_message && (
                       <p className="text-xs text-red-600 mt-1">{log.error_message}</p>
                     )}
                   </div>
                 </div>
-                <div className="text-right text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(log.started_at), { addSuffix: true })}
+                <div className="text-right text-xs text-muted-foreground space-y-2">
+                  <div>{formatDistanceToNow(new Date(log.started_at), { addSuffix: true })}</div>
+                  <button
+                    type="button"
+                    className="text-red-600 hover:text-red-700 disabled:opacity-50"
+                    disabled={deletingId === log.id}
+                    onClick={() => deleteJob(log.id)}
+                  >
+                    {deletingId === log.id ? "Deleting..." : "Delete"}
+                  </button>
                 </div>
               </div>
             ))}

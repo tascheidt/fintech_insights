@@ -99,6 +99,37 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Clean up standalone background job runs that do not use job_run_tasks
+  const { data: staleStandaloneJobs, error: standaloneJobsError } = await supabase
+    .from("job_runs")
+    .select("id, job_type, status, details, started_at")
+    .in("status", ["pending", "running"])
+    .lt("started_at", staleThreshold.toISOString())
+    .is("completed_at", null);
+
+  if (standaloneJobsError) {
+    console.error("Error fetching stale standalone jobs:", standaloneJobsError);
+  } else if (staleStandaloneJobs && staleStandaloneJobs.length > 0) {
+    for (const jobRun of staleStandaloneJobs) {
+      const details = (jobRun.details as Record<string, unknown> | null) ?? {};
+      const isPromptForgeReprocess = details.operation === "job-structure-reprocess";
+      const isInsightRefresh = jobRun.job_type === "company-insights" && details.mode === "force-refresh-all";
+
+      if (!isPromptForgeReprocess && !isInsightRefresh) {
+        continue;
+      }
+
+      await supabase
+        .from("job_runs")
+        .update({
+          status: "failed",
+          error_message: "Background job timed out before completion",
+          completed_at: now.toISOString(),
+        })
+        .eq("id", jobRun.id);
+    }
+  }
+
   return NextResponse.json({
     success: true,
     message: `Cleaned up ${staleTasks.length} stale task(s)`,

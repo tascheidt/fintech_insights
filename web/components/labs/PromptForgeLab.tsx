@@ -364,7 +364,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
       }
 
       setStatusMessage(
-        `Reprocessed ${data.processedJobs}/${data.totalJobs} jobs${data.failedJobs ? ` with ${data.failedJobs} failures` : ""}. Job run: ${data.jobRunId}.`
+        `Queued reprocess job for ${data.totalJobs} jobs. Track job run ${data.jobRunId} in the admin job execution history.`
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reprocess failed");
@@ -928,7 +928,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
             <Card className="xl:col-span-1">
               <CardHeader>
                 <h3 className="text-lg font-semibold">Silver layer reprocess</h3>
-                <p className="text-sm text-muted-foreground">Re-run Stage 1 across existing job postings with the current live prompt.</p>
+                <p className="text-sm text-muted-foreground">Re-run Stage 1 across existing job postings, then refresh company tech stacks for the affected companies.</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">

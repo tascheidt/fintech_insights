@@ -686,6 +686,8 @@ export async function createJobStructureReprocessRun(options: JobStructureReproc
         totalJobs,
         processedJobs: 0,
         failedJobs: 0,
+        attemptedJobs: 0,
+        reprocessedCompanyIds: [],
         activeOnly: options.activeOnly !== false,
         limit: options.limit ?? null,
         model: config.model,
@@ -705,14 +707,73 @@ export async function createJobStructureReprocessRun(options: JobStructureReproc
   };
 }
 
-export async function executeJobStructureReprocessRun(
+async function refreshTechStacksForReprocessCompanies(companyIds: string[]) {
+  const supabase = createAdminClient();
+  const config = await getActiveTechStackAiConfig();
+  const uniqueCompanyIds = [...new Set(companyIds)];
+
+  if (uniqueCompanyIds.length === 0) {
+    return { refreshed: 0, skipped: 0, failed: 0 };
+  }
+
+  const { data: companies, error } = await supabase
+    .from("companies")
+    .select("id, name")
+    .in("id", uniqueCompanyIds);
+
+  if (error) {
+    throw new Error(`Failed to load companies for tech stack refresh: ${error.message}`);
+  }
+
+  let refreshed = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const company of companies ?? []) {
+    try {
+      const rawData = await aggregateTechStackFromJobs(company.id);
+      if (rawData.technologies.length === 0) {
+        skipped++;
+        continue;
+      }
+
+      const strategicContext = await buildTechStackStrategicContext(company.id);
+      const enrichedStack = await enrichTechStackWithAnalysis(
+        company.name,
+        rawData.technologies,
+        rawData.totalJobsAnalyzed,
+        rawData.periodStart,
+        rawData.periodEnd,
+        strategicContext.context,
+        config
+      );
+
+      await supabase
+        .from("companies")
+        .update({
+          tech_stack: enrichedStack,
+          tech_stack_generated_at: new Date().toISOString(),
+        })
+        .eq("id", company.id);
+
+      refreshed++;
+    } catch (error) {
+      console.error(`Prompt Forge tech stack refresh failed for ${company.name}:`, error);
+      failed++;
+    }
+  }
+
+  return { refreshed, skipped, failed };
+}
+
+async function loadJobStructureReprocessContext(
   jobRunId: string,
   optionsOverride?: Partial<Omit<JobStructureReprocessOptions, "triggeredBy">>
 ) {
   const supabase = createAdminClient();
   const { data: jobRun, error: jobRunError } = await supabase
     .from("job_runs")
-    .select("details, company_id")
+    .select("status, details, company_id")
     .eq("id", jobRunId)
     .single();
 
@@ -726,34 +787,72 @@ export async function executeJobStructureReprocessRun(
     activeOnly: (optionsOverride?.activeOnly ?? details.activeOnly ?? true) as boolean,
     limit: (optionsOverride?.limit ?? details.limit ?? undefined) as number | undefined,
   };
-  const config = await getActiveJobStructureAiConfig();
 
-  await supabase
-    .from("job_runs")
-    .update({
-      status: "running",
-      started_at: new Date().toISOString(),
-      completed_at: null,
-      details: {
-        ...details,
-        operation: "job-structure-reprocess",
+  return {
+    supabase,
+    jobRun,
+    details,
+    options,
+    config: await getActiveJobStructureAiConfig(),
+  };
+}
+
+export async function processJobStructureReprocessBatch(
+  jobRunId: string,
+  optionsOverride?: Partial<Omit<JobStructureReprocessOptions, "triggeredBy">>
+) {
+  const {
+    supabase,
+    jobRun,
+    details,
+    options,
+    config,
+  } = await loadJobStructureReprocessContext(jobRunId, optionsOverride);
+
+  const attemptedJobs = Number(details.attemptedJobs ?? 0);
+  const processedJobs = Number(details.processedJobs ?? 0);
+  const failedJobs = Number(details.failedJobs ?? 0);
+  const totalJobs = Number(details.totalJobs ?? 0);
+  const reprocessedCompanyIds = Array.isArray(details.reprocessedCompanyIds)
+    ? details.reprocessedCompanyIds.filter((item): item is string => typeof item === "string")
+    : [];
+
+  if (jobRun.status === "pending") {
+    await supabase
+      .from("job_runs")
+      .update({
         status: "running",
-        processedJobs: 0,
-        failedJobs: 0,
-        activeOnly: options.activeOnly !== false,
-        limit: options.limit ?? null,
-        model: config.model,
-        version: config.version ?? buildConfigVersion("job-structure"),
-      },
-    })
-    .eq("id", jobRunId);
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        details: {
+          ...details,
+          operation: "job-structure-reprocess",
+          status: "running",
+          processedJobs,
+          failedJobs,
+          attemptedJobs,
+          totalJobs,
+          reprocessedCompanyIds,
+          activeOnly: options.activeOnly !== false,
+          limit: options.limit ?? null,
+          model: config.model,
+          version: config.version ?? buildConfigVersion("job-structure"),
+        },
+      })
+      .eq("id", jobRunId);
+  }
+
+  const BATCH_SIZE = 5;
+  const maxIndex = totalJobs > 0 ? totalJobs - 1 : attemptedJobs + BATCH_SIZE - 1;
+  const rangeEnd = Math.min(attemptedJobs + BATCH_SIZE - 1, maxIndex);
 
   let query = supabase
     .from("job_postings")
     .select("id, company_id, title, description_text, department, location, is_active")
     .not("description_text", "is", null)
     .neq("description_text", "")
-    .order("first_seen_date", { ascending: false });
+    .order("first_seen_date", { ascending: false })
+    .range(attemptedJobs, rangeEnd);
 
   if (options.companyId) {
     query = query.eq("company_id", options.companyId);
@@ -761,10 +860,6 @@ export async function executeJobStructureReprocessRun(
 
   if (options.activeOnly !== false) {
     query = query.eq("is_active", true);
-  }
-
-  if (options.limit && options.limit > 0) {
-    query = query.limit(options.limit);
   }
 
   const { data: jobs, error } = await query;
@@ -780,73 +875,87 @@ export async function executeJobStructureReprocessRun(
     throw new Error(error.message);
   }
 
-  const rows = (jobs ?? []).filter(
-    (job) => typeof job.description_text === "string" && job.description_text.trim().length > 50
-  );
-  const companyCount = new Set(rows.map((row) => row.company_id)).size;
+  const batch = jobs ?? [];
+  if (batch.length === 0) {
+    const techStackRefresh = await refreshTechStacksForReprocessCompanies(reprocessedCompanyIds);
+    const companyCount = new Set(reprocessedCompanyIds).size;
+    const finalStatus = failedJobs > 0 && processedJobs === 0 ? "failed" : "completed";
 
-  let processed = 0;
-  let failed = 0;
-  const BATCH_SIZE = 5;
-
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
-    const results = await Promise.allSettled(
-      batch.map(async (row) => {
-        await extractAndUpdateStructure(
-          row.id,
-          row.title,
-          row.description_text ?? "",
-          row.department,
-          row.location,
-          config
-        );
+    await supabase
+      .from("job_runs")
+      .update({
+        status: finalStatus,
+        completed_at: new Date().toISOString(),
+        total_companies: companyCount,
+        completed_companies: finalStatus === "completed" ? companyCount : 0,
+        failed_companies: failedJobs > 0 ? companyCount : 0,
+        details: {
+          ...details,
+          operation: "job-structure-reprocess",
+          totalJobs,
+          processedJobs,
+          failedJobs,
+          attemptedJobs,
+          reprocessedCompanyIds,
+          techStacks: techStackRefresh,
+          activeOnly: options.activeOnly !== false,
+          limit: options.limit ?? null,
+          model: config.model,
+          version: config.version ?? buildConfigVersion("job-structure"),
+        },
       })
-    );
+      .eq("id", jobRunId);
 
-    for (const result of results) {
-      if (result.status === "fulfilled") {
-        processed++;
-      } else {
-        failed++;
-      }
-    }
+    return {
+      jobRunId,
+      completed: true,
+      totalJobs,
+      processedJobs,
+      failedJobs,
+      techStackRefresh,
+    };
+  }
 
-    if (batch.length > 0) {
-      await supabase
-        .from("job_runs")
-        .update({
-          details: {
-            ...details,
-            operation: "job-structure-reprocess",
-            totalJobs: rows.length,
-            processedJobs: processed,
-            failedJobs: failed,
-            activeOnly: options.activeOnly !== false,
-            limit: options.limit ?? null,
-            model: config.model,
-            version: config.version ?? buildConfigVersion("job-structure"),
-          },
-        })
-        .eq("id", jobRunId);
+  let processed = processedJobs;
+  let failed = failedJobs;
+  const companyIds = new Set(reprocessedCompanyIds);
+
+  const results = await Promise.allSettled(
+    batch.map(async (row) => {
+      companyIds.add(row.company_id);
+      await extractAndUpdateStructure(
+        row.id,
+        row.title,
+        row.description_text ?? "",
+        row.department,
+        row.location,
+        config
+      );
+    })
+  );
+
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      processed++;
+    } else {
+      failed++;
     }
   }
 
-  const finalStatus = failed > 0 && processed === 0 ? "failed" : "completed";
+  const attempted = attemptedJobs + batch.length;
+
   await supabase
     .from("job_runs")
     .update({
-      status: finalStatus,
-      completed_at: new Date().toISOString(),
-      total_companies: companyCount,
-      completed_companies: finalStatus === "completed" ? companyCount : 0,
-      failed_companies: failed > 0 ? companyCount : 0,
+      status: "running",
       details: {
         ...details,
         operation: "job-structure-reprocess",
-        totalJobs: rows.length,
+        totalJobs,
         processedJobs: processed,
         failedJobs: failed,
+        attemptedJobs: attempted,
+        reprocessedCompanyIds: [...companyIds],
         activeOnly: options.activeOnly !== false,
         limit: options.limit ?? null,
         model: config.model,
@@ -857,10 +966,25 @@ export async function executeJobStructureReprocessRun(
 
   return {
     jobRunId,
-    totalJobs: rows.length,
+    completed: false,
+    totalJobs,
     processedJobs: processed,
     failedJobs: failed,
+    attemptedJobs: attempted,
+    remainingJobs: Math.max(totalJobs - attempted, 0),
   };
+}
+
+export async function executeJobStructureReprocessRun(
+  jobRunId: string,
+  optionsOverride?: Partial<Omit<JobStructureReprocessOptions, "triggeredBy">>
+) {
+  while (true) {
+    const result = await processJobStructureReprocessBatch(jobRunId, optionsOverride);
+    if (result.completed) {
+      return result;
+    }
+  }
 }
 
 export async function reprocessJobStructures(options: JobStructureReprocessOptions) {

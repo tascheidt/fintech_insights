@@ -3,7 +3,6 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/auth/admin";
 import {
   createJobStructureReprocessRun,
-  executeJobStructureReprocessRun,
 } from "@/lib/labs/prompt-forge";
 
 export const maxDuration = 300;
@@ -35,6 +34,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
+    }
+
     const job = await createJobStructureReprocessRun({
       companyId: parsed.data.companyId,
       activeOnly: parsed.data.activeOnly,
@@ -42,10 +46,15 @@ export async function POST(req: NextRequest) {
       triggeredBy: user.id,
     });
 
-    void executeJobStructureReprocessRun(job.jobRunId, {
-      companyId: parsed.data.companyId,
-      activeOnly: parsed.data.activeOnly,
-      limit: parsed.data.limit,
+    fetch(`${req.nextUrl.origin}/api/internal/prompt-forge-reprocess`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cronSecret}`,
+      },
+      body: JSON.stringify({
+        jobRunId: job.jobRunId,
+      }),
     }).catch((error) => {
       console.error("Prompt Forge reprocess job failed:", error);
     });
@@ -54,6 +63,7 @@ export async function POST(req: NextRequest) {
       started: true,
       jobRunId: job.jobRunId,
       totalJobs: job.totalJobs,
+      message: "Reprocess job queued",
     });
   } catch (error) {
     return NextResponse.json(
