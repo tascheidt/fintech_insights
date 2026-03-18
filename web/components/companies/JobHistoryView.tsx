@@ -12,7 +12,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { format, subDays, subMonths } from "date-fns";
 import {
@@ -20,7 +20,6 @@ import {
   Briefcase,
   MapPin,
   Calendar,
-  Clock,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -30,7 +29,6 @@ import {
   NotionCard,
   NotionCardContent,
   NotionCardTitle,
-  NotionCardDescription,
   NotionCardFooter,
   NotionCardTag,
 } from "@/components/ui/notion-card";
@@ -52,7 +50,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { getCategoryLabel } from "@/lib/analysis/function-categories";
+import { getCategoryLabel, getCategoryGroup, ROLE_CATEGORIES, type RoleCategory } from "@/lib/analysis/function-categories";
 
 /** Job posting data structure */
 export interface JobData {
@@ -94,12 +92,30 @@ export function JobHistoryView({
   initialStatus = "all",
   pageSize = 12,
 }: JobHistoryViewProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [view, setView] = useViewPreference(`jobs-${companySlug}`, "table");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(initialStatus);
   const [timeFilter, setTimeFilter] = React.useState<TimeFilter>("all");
   const [companyFilter, setCompanyFilter] = React.useState<string>("all");
+  const [functionFilter, setFunctionFilter] = React.useState<string>(() => {
+    return searchParams.get("function") ?? "all";
+  });
   const [currentPage, setCurrentPage] = React.useState(1);
+
+  // Sync function filter to URL
+  const updateFunctionFilter = React.useCallback((value: string) => {
+    setFunctionFilter(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "all") {
+      params.delete("function");
+    } else {
+      params.set("function", value);
+    }
+    const query = params.toString();
+    router.replace(query ? `?${query}` : window.location.pathname, { scroll: false });
+  }, [router, searchParams]);
 
   // Extract unique companies for filter (only when viewing all companies)
   const availableCompanies = React.useMemo(() => {
@@ -116,6 +132,17 @@ export function JobHistoryView({
     return Array.from(companies.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [jobs, companySlug]);
 
+  // Extract unique function groups from job data for the dropdown
+  const availableFunctionGroups = React.useMemo(() => {
+    const groups = new Set<string>();
+    jobs.forEach((job) => {
+      if (job.function_category && ROLE_CATEGORIES.includes(job.function_category as RoleCategory)) {
+        groups.add(getCategoryGroup(job.function_category as RoleCategory));
+      }
+    });
+    return Array.from(groups).sort((a, b) => a.localeCompare(b));
+  }, [jobs]);
+
   // Filter jobs based on current filters
   const filteredJobs = React.useMemo(() => {
     let result = [...jobs];
@@ -123,6 +150,16 @@ export function JobHistoryView({
     // Company filter (only when viewing all companies)
     if (companySlug === "all" && companyFilter !== "all") {
       result = result.filter((j) => j.companySlug === companyFilter);
+    }
+
+    // Function filter
+    if (functionFilter !== "all") {
+      result = result.filter((j) => {
+        if (!j.function_category || !ROLE_CATEGORIES.includes(j.function_category as RoleCategory)) {
+          return false;
+        }
+        return getCategoryGroup(j.function_category as RoleCategory) === functionFilter;
+      });
     }
 
     // Status filter
@@ -178,7 +215,7 @@ export function JobHistoryView({
     }
 
     return result;
-  }, [jobs, companySlug, companyFilter, statusFilter, timeFilter, searchQuery]);
+  }, [jobs, companySlug, companyFilter, functionFilter, statusFilter, timeFilter, searchQuery]);
 
   // Pagination
   const totalPages = Math.ceil(filteredJobs.length / pageSize);
@@ -190,11 +227,12 @@ export function JobHistoryView({
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, timeFilter, companyFilter, searchQuery]);
+  }, [statusFilter, timeFilter, companyFilter, functionFilter, searchQuery]);
 
-  const hasFilters = 
-    statusFilter !== "all" || 
-    timeFilter !== "all" || 
+  const hasFilters =
+    statusFilter !== "all" ||
+    timeFilter !== "all" ||
+    functionFilter !== "all" ||
     (companySlug === "all" && companyFilter !== "all") ||
     searchQuery.trim();
 
@@ -202,6 +240,7 @@ export function JobHistoryView({
     setStatusFilter("all");
     setTimeFilter("all");
     setCompanyFilter("all");
+    updateFunctionFilter("all");
     setSearchQuery("");
   };
 
@@ -276,6 +315,23 @@ export function JobHistoryView({
             <SelectItem value="1year">Last Year</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Function filter */}
+        {availableFunctionGroups.length > 0 && (
+          <Select value={functionFilter} onValueChange={updateFunctionFilter}>
+            <SelectTrigger className="w-full sm:w-[180px] min-h-[44px]">
+              <SelectValue placeholder="Function" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Functions</SelectItem>
+              {availableFunctionGroups.map((group) => (
+                <SelectItem key={group} value={group}>
+                  {group}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Clear filters */}
         {hasFilters && (
