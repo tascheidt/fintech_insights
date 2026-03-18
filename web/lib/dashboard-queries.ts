@@ -495,7 +495,7 @@ export async function getNetThisWeek(
   cutoffs: Map<string, Date>
 ): Promise<{ newCount: number; closedCount: number }> {
   const supabase = await createClient();
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
+  const weekStart = subDays(new Date(), 7).toISOString();
 
   const [{ data: newJobs }, { count: closedCount }] = await Promise.all([
     supabase
