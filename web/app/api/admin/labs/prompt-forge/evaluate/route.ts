@@ -4,18 +4,20 @@ import { requireAdminApi } from "@/lib/auth/admin";
 import {
   JobStructureAiConfigSchema,
   TechStackAiConfigSchema,
+  WeeklyDigestAiConfigSchema,
   validatePromptTemplate,
 } from "@/lib/ai/prompt-config";
 import {
   evaluateJobStructurePrompt,
   evaluateTechStackPrompt,
+  evaluateWeeklyDigestPrompt,
   savePromptForgeRun,
 } from "@/lib/labs/prompt-forge";
 
 export const maxDuration = 180;
 
 const requestSchema = z.object({
-  stage: z.enum(["job-structure", "tech-stack"]),
+  stage: z.enum(["job-structure", "tech-stack", "weekly-digest"]),
   companyId: z.string().uuid(),
   arena: z.string().min(2).max(50),
   sampleSize: z.number().int().min(1).max(12).optional(),
@@ -102,7 +104,54 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const configResult = TechStackAiConfigSchema.safeParse(parsed.data.config);
+    if (stage === "tech-stack") {
+      const configResult = TechStackAiConfigSchema.safeParse(parsed.data.config);
+      if (!configResult.success) {
+        return NextResponse.json(
+          { error: configResult.error.issues[0]?.message ?? "Invalid config" },
+          { status: 400 }
+        );
+      }
+
+      const promptCheck = validatePromptTemplate(stage, configResult.data.promptTemplate);
+      if (!promptCheck.isValid) {
+        return NextResponse.json(
+          {
+            error: `Prompt is missing required placeholders: ${promptCheck.missingPlaceholders.join(", ")}`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const result = await evaluateTechStackPrompt({
+        companyId,
+        companyName: company.name,
+        arena,
+        candidateConfig: configResult.data,
+      });
+
+      const run = await savePromptForgeRun({
+        stage,
+        arena,
+        companyId,
+        companyName: company.name,
+        model: configResult.data.model,
+        candidateConfig: configResult.data,
+        baselineConfig: result.baselineConfig,
+        candidateOutput: result.candidateOutput,
+        baselineOutput: result.baselineOutput,
+        battle: result.candidate,
+        userId: user.id,
+      });
+
+      return NextResponse.json({
+        ...result,
+        runId: run.id,
+        runCreatedAt: run.created_at,
+      });
+    }
+
+    const configResult = WeeklyDigestAiConfigSchema.safeParse(parsed.data.config);
     if (!configResult.success) {
       return NextResponse.json(
         { error: configResult.error.issues[0]?.message ?? "Invalid config" },
@@ -120,7 +169,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await evaluateTechStackPrompt({
+    const result = await evaluateWeeklyDigestPrompt({
       companyId,
       companyName: company.name,
       arena,

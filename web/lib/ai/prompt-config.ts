@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export const PROMPT_STAGES = ["job-structure", "tech-stack"] as const;
+export const PROMPT_STAGES = ["job-structure", "tech-stack", "weekly-digest"] as const;
 export type PromptStage = (typeof PROMPT_STAGES)[number];
 
 export const AI_MODEL_OPTIONS = [
@@ -9,13 +9,13 @@ export const AI_MODEL_OPTIONS = [
     value: "gemini-3-flash-preview",
     label: "Gemini 3 Flash",
     summary: "Fastest for extraction and iteration rounds.",
-    recommendedStages: ["job-structure", "tech-stack"],
+    recommendedStages: ["job-structure", "tech-stack", "weekly-digest"],
   },
   {
     value: "gemini-pro-latest",
     label: "Gemini Pro",
     summary: "Best for deeper reasoning and narrative quality.",
-    recommendedStages: ["job-structure", "tech-stack"],
+    recommendedStages: ["job-structure", "tech-stack", "weekly-digest"],
   },
 ] as const;
 
@@ -44,12 +44,18 @@ export const TechStackAiConfigSchema = BaseAiConfigSchema.extend({
   stage: z.literal("tech-stack"),
 });
 
+export const WeeklyDigestAiConfigSchema = BaseAiConfigSchema.extend({
+  stage: z.literal("weekly-digest"),
+});
+
 export type JobStructureAiConfig = z.infer<typeof JobStructureAiConfigSchema>;
 export type TechStackAiConfig = z.infer<typeof TechStackAiConfigSchema>;
+export type WeeklyDigestAiConfig = z.infer<typeof WeeklyDigestAiConfigSchema>;
 
 export const SYSTEM_PROMPT_KEYS = {
   jobStructure: "job_structure_ai",
   techStack: "tech_stack_ai",
+  weeklyDigest: "weekly_digest_ai",
 } as const;
 
 const REQUIRED_PLACEHOLDERS: Record<PromptStage, string[]> = {
@@ -61,6 +67,18 @@ const REQUIRED_PLACEHOLDERS: Record<PromptStage, string[]> = {
     "{total_jobs}",
     "{period_start}",
     "{period_end}",
+  ],
+  "weekly-digest": [
+    "{company_name}",
+    "{week_job_count}",
+    "{current_open_job_count}",
+    "{year_to_date_job_count}",
+    "{weekly_role_themes}",
+    "{open_role_themes}",
+    "{year_to_date_role_themes}",
+    "{continuing_themes}",
+    "{new_themes}",
+    "{sample_titles}",
   ],
 };
 
@@ -180,6 +198,49 @@ The narrative should answer:
 - Where does the company appear opinionated or unusually finance-specific?
 - What important uncertainty remains because hiring data and strategic context are both incomplete?`;
 
+export const DEFAULT_WEEKLY_DIGEST_PROMPT = `You are writing a weekly hiring brief for fintech professionals.
+
+Use simple, objective language. Start with what the company is hiring for. Then say whether this week's jobs continue an existing pattern or suggest something new. Only call out a new signal when the evidence clearly supports it.
+
+Company: {company_name}
+
+Weekly job count: {week_job_count}
+Current open jobs: {current_open_job_count}
+Year-to-date jobs observed: {year_to_date_job_count}
+
+Weekly role themes:
+{weekly_role_themes}
+
+Current open role themes:
+{open_role_themes}
+
+Year-to-date role themes:
+{year_to_date_role_themes}
+
+Continuing themes:
+{continuing_themes}
+
+Potentially new themes this week:
+{new_themes}
+
+Representative job titles:
+{sample_titles}
+
+Write JSON with exactly these fields:
+{
+  "headline": "6-12 words, plain and specific",
+  "body": "2-3 sentences. Sentence 1 should describe the current hiring pattern. Sentence 2 should say whether it continues an existing pattern or indicates something new. Sentence 3 is optional if there is a clearly supported new signal."
+}
+
+Writing rules:
+- Prefer "continues to hire" or "is still hiring" when the pattern is established.
+- Do not use hype, slang, emojis, or dramatic strategic language.
+- Do not mention tech stacks unless they are essential to describing the role type.
+- Mention exact role families or representative titles when helpful.
+- If there is no clear change this week, say that directly.
+
+Respond with ONLY valid JSON.`;
+
 export const DEFAULT_JOB_STRUCTURE_AI_CONFIG: JobStructureAiConfig = {
   stage: "job-structure",
   model: "gemini-3-flash-preview",
@@ -200,8 +261,20 @@ export const DEFAULT_TECH_STACK_AI_CONFIG: TechStackAiConfig = {
   benchmarkScore: 93,
 };
 
+export const DEFAULT_WEEKLY_DIGEST_AI_CONFIG: WeeklyDigestAiConfig = {
+  stage: "weekly-digest",
+  model: "gemini-3-flash-preview",
+  promptTemplate: DEFAULT_WEEKLY_DIGEST_PROMPT,
+  temperature: 0.2,
+  maxOutputTokens: 2048,
+  version: "digest-default-v1",
+  benchmarkScore: 82,
+};
+
 function getStageSchema(stage: PromptStage) {
-  return stage === "job-structure" ? JobStructureAiConfigSchema : TechStackAiConfigSchema;
+  if (stage === "job-structure") return JobStructureAiConfigSchema;
+  if (stage === "tech-stack") return TechStackAiConfigSchema;
+  return WeeklyDigestAiConfigSchema;
 }
 
 export function getRequiredPlaceholders(stage: PromptStage) {
@@ -226,12 +299,12 @@ export function buildConfigVersion(stage: PromptStage) {
 export function parsePromptConfig(
   stage: PromptStage,
   input: unknown
-): JobStructureAiConfig | TechStackAiConfig {
+): JobStructureAiConfig | TechStackAiConfig | WeeklyDigestAiConfig {
   const schema = getStageSchema(stage);
   return schema.parse(input);
 }
 
-function parseStoredConfig<T extends JobStructureAiConfig | TechStackAiConfig>(
+function parseStoredConfig<T extends JobStructureAiConfig | TechStackAiConfig | WeeklyDigestAiConfig>(
   stage: PromptStage,
   value: unknown,
   fallback: T
@@ -253,7 +326,11 @@ export async function getActivePromptConfigs() {
   const { data } = await supabase
     .from("system_settings")
     .select("setting_key, setting_value, updated_at")
-    .in("setting_key", [SYSTEM_PROMPT_KEYS.jobStructure, SYSTEM_PROMPT_KEYS.techStack]);
+    .in("setting_key", [
+      SYSTEM_PROMPT_KEYS.jobStructure,
+      SYSTEM_PROMPT_KEYS.techStack,
+      SYSTEM_PROMPT_KEYS.weeklyDigest,
+    ]);
 
   const settingsMap = new Map((data ?? []).map((row) => [row.setting_key, row.setting_value]));
 
@@ -268,6 +345,11 @@ export async function getActivePromptConfigs() {
       settingsMap.get(SYSTEM_PROMPT_KEYS.techStack),
       DEFAULT_TECH_STACK_AI_CONFIG
     ),
+    weeklyDigest: parseStoredConfig(
+      "weekly-digest",
+      settingsMap.get(SYSTEM_PROMPT_KEYS.weeklyDigest),
+      DEFAULT_WEEKLY_DIGEST_AI_CONFIG
+    ),
   };
 }
 
@@ -281,9 +363,14 @@ export async function getActiveTechStackAiConfig() {
   return configs.techStack;
 }
 
+export async function getActiveWeeklyDigestAiConfig() {
+  const configs = await getActivePromptConfigs();
+  return configs.weeklyDigest;
+}
+
 export async function savePromptConfig(options: {
   stage: PromptStage;
-  config: JobStructureAiConfig | TechStackAiConfig;
+  config: JobStructureAiConfig | TechStackAiConfig | WeeklyDigestAiConfig;
   userId: string;
   benchmarkScore?: number | null;
 }) {
@@ -291,7 +378,9 @@ export async function savePromptConfig(options: {
   const key =
     options.stage === "job-structure"
       ? SYSTEM_PROMPT_KEYS.jobStructure
-      : SYSTEM_PROMPT_KEYS.techStack;
+      : options.stage === "tech-stack"
+        ? SYSTEM_PROMPT_KEYS.techStack
+        : SYSTEM_PROMPT_KEYS.weeklyDigest;
 
   const settingValue = {
     ...options.config,
@@ -331,7 +420,9 @@ export async function savePromptConfig(options: {
       description:
         options.stage === "job-structure"
           ? "Active AI runtime configuration for per-job structure extraction"
-          : "Active AI runtime configuration for company tech stack synthesis",
+          : options.stage === "tech-stack"
+            ? "Active AI runtime configuration for company tech stack synthesis"
+            : "Active AI runtime configuration for weekly digest company summaries",
       updated_by: options.userId,
     })
     .select()

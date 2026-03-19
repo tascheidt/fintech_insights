@@ -10,7 +10,7 @@ import {
   Link,
   Hr,
 } from "@react-email/components";
-import type { WeeklyDigest, CompanyWeeklySummary, GlobalSummary, StrategySignal, IndustryTrend } from "@/lib/analysis/digest";
+import type { WeeklyDigest, CompanyWeeklySummary, GlobalSummary } from "@/lib/analysis/digest";
 
 interface WeeklyDigestEmailProps {
   digest: WeeklyDigest;
@@ -30,15 +30,10 @@ function formatDateRange(start: string, end: string): string {
 }
 
 /**
- * Get the primary department focus from department breakdown
+ * Get the leading role theme for display
  */
-function getPrimaryFocus(departments: Record<string, number>): string {
-  const entries = Object.entries(departments);
-  if (entries.length === 0) return "Various";
-  
-  // Sort by count and take top department
-  entries.sort((a, b) => b[1] - a[1]);
-  return entries[0][0];
+function getLeadingTheme(company: CompanyWeeklySummary): string {
+  return company.hiring_pattern.weekly_role_themes[0]?.label || "Various roles";
 }
 
 /**
@@ -74,9 +69,14 @@ function GlobalSummarySection({ summary }: { summary: GlobalSummary }) {
  * Company section component
  */
 function CompanySection({ company, appUrl = "https://fintech-talent-brief.vercel.app" }: { company: CompanyWeeklySummary; appUrl?: string }) {
-  const primaryFocus = getPrimaryFocus(company.departments);
-  const techList = company.dominant_tech.slice(0, 3).join(", ") || "Various";
+  const primaryFocus = getLeadingTheme(company);
   const companyUrl = `${appUrl}/companies/${company.company_slug}`;
+  const continuityLine =
+    company.hiring_pattern.continuity === "continuing"
+      ? `This continues an existing hiring pattern for ${company.company_name}.`
+      : company.hiring_pattern.new_themes.length > 0
+        ? `New this week: ${company.hiring_pattern.new_themes.join(", ")}.`
+        : "This week's mix is close to the company's recent hiring pattern.";
 
   return (
     <Section style={companySection}>
@@ -94,11 +94,16 @@ function CompanySection({ company, appUrl = "https://fintech-talent-brief.vercel
       <Text style={bodyText}>
         {company.ai_commentary.body}
       </Text>
+
+      <Text style={{ ...statsLine, marginBottom: "12px", color: "#4b5563" }}>
+        {continuityLine}
+      </Text>
       
       {/* Stats Footer */}
       <Text style={statsLine}>
         <span style={statLabel}>New Jobs:</span> {String(company.new_job_count)} | 
-        <span style={statLabel}> Top Tech:</span> {techList} | 
+        <span style={statLabel}> Open Now:</span> {String(company.current_open_job_count)} | 
+        <span style={statLabel}> 2026 Total:</span> {String(company.year_to_date_job_count)} | 
         <span style={statLabel}> Focus:</span> {primaryFocus}
       </Text>
     </Section>
@@ -163,13 +168,13 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
             </table>
           </Section>
 
-          {/* Strategy Signals - Key Differentiator */}
+          {/* New This Week */}
           {digest.strategy_signals && Array.isArray(digest.strategy_signals) && digest.strategy_signals.length > 0 && (
             <>
               <Hr style={divider} />
               <Section style={companySection}>
                 <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px" }}>
-                  Strategy Signals
+                  New This Week
                 </Heading>
                 {digest.strategy_signals.slice(0, 3).map((signal, idx) => (
                   <div key={idx} style={{ marginBottom: "16px", paddingBottom: "16px", borderBottom: idx < Math.min(digest.strategy_signals!.length - 1, 2) ? "1px solid #e5e7eb" : "none" }}>
@@ -193,21 +198,21 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
             </>
           )}
 
-          {/* Hiring Activity */}
+          {/* Role Focus This Week */}
           {digest.industry_trends && Array.isArray(digest.industry_trends) && digest.industry_trends.length > 0 && (
             <>
               <Hr style={divider} />
               <Section style={companySection}>
                 <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "4px" }}>
-                  Hiring Activity
+                  Role Focus This Week
                 </Heading>
                 <Text style={{ fontSize: "13px", color: "#6b7280", marginBottom: "12px" }}>
-                  Department activity across tracked companies this week
+                  The role areas that showed up across multiple companies this week
                 </Text>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
-                      <th style={{ textAlign: "left", padding: "6px 8px 6px 0", fontWeight: "600", color: "#6b7280" }}>Dept</th>
+                      <th style={{ textAlign: "left", padding: "6px 8px 6px 0", fontWeight: "600", color: "#6b7280" }}>Theme</th>
                       <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: "600", color: "#6b7280" }}>Roles</th>
                       <th style={{ textAlign: "left", padding: "6px 0 6px 8px", fontWeight: "600", color: "#6b7280" }}>Companies</th>
                     </tr>
@@ -216,7 +221,7 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
                     {digest.industry_trends.slice(0, 5).map((trend, idx) => (
                       <tr key={idx} style={{ borderBottom: idx < Math.min(digest.industry_trends!.length - 1, 4) ? "1px solid #f3f4f6" : "none" }}>
                         <td style={{ padding: "8px 8px 8px 0", fontWeight: "500" }}>
-                          {trend.trend.replace(/ hiring surge$/, "").replace(/ adoption$/, "")}
+                          {trend.trend}
                         </td>
                         <td style={{ padding: "8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                           {String(trend.jobCount)}

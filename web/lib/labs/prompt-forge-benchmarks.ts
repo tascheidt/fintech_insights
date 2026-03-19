@@ -1,4 +1,5 @@
 import type { CompanyTechStack } from "@/lib/ai/tech-stack-extraction";
+import type { TLDRCommentary, WeeklyDigestCompanyInput } from "@/lib/analysis/digest";
 
 export interface JobStructureBenchmarkCase {
   id: string;
@@ -25,6 +26,15 @@ export interface TechStackBenchmarkCase {
   expectedCategories: string[];
   expectedTechnologies: string[];
   expectedNarrativeTerms: string[];
+}
+
+export interface WeeklyDigestBenchmarkCase {
+  id: string;
+  companyName: string;
+  input: WeeklyDigestCompanyInput;
+  expectedContinuity: "continuing" | "mixed" | "new_focus";
+  expectedInclude: string[];
+  expectedExclude: string[];
 }
 
 export const JOB_STRUCTURE_BENCHMARKS: JobStructureBenchmarkCase[] = [
@@ -106,6 +116,65 @@ Named strategic evidence:
   },
 ];
 
+export const WEEKLY_DIGEST_BENCHMARKS: WeeklyDigestBenchmarkCase[] = [
+  {
+    id: "continued-field-sales",
+    companyName: "Neo Financial",
+    input: {
+      company_name: "Neo Financial",
+      week_job_count: 7,
+      current_open_job_count: 34,
+      year_to_date_job_count: 58,
+      weekly_role_themes: [
+        { id: "in_person_sales", label: "In-person sales", count: 5, sample_titles: ["Sales Representative - Yorkdale", "Sales Representative - Chinook Centre"] },
+        { id: "lending_mortgage", label: "Lending and mortgage", count: 2, sample_titles: ["Mortgage Fulfillment Specialist", "Mortgage Advisor"] },
+      ],
+      open_role_themes: [
+        { id: "in_person_sales", label: "In-person sales", count: 18, sample_titles: ["Sales Representative - Yorkdale"] },
+      ],
+      year_to_date_role_themes: [
+        { id: "in_person_sales", label: "In-person sales", count: 29, sample_titles: ["Sales Representative - Yorkdale"] },
+        { id: "lending_mortgage", label: "Lending and mortgage", count: 6, sample_titles: ["Mortgage Advisor"] },
+      ],
+      continuing_themes: ["In-person sales", "Lending and mortgage"],
+      new_themes: [],
+      sample_titles: ["Sales Representative - Yorkdale", "Sales Representative - Chinook Centre", "Mortgage Fulfillment Specialist"],
+      continuity: "continuing",
+    },
+    expectedContinuity: "continuing",
+    expectedInclude: ["continues", "in-person sales", "year"],
+    expectedExclude: ["pivot", "new direction", "surprise move"],
+  },
+  {
+    id: "new-risk-ai-signal",
+    companyName: "EQ Bank",
+    input: {
+      company_name: "EQ Bank",
+      week_job_count: 6,
+      current_open_job_count: 21,
+      year_to_date_job_count: 31,
+      weekly_role_themes: [
+        { id: "ai_ml_risk", label: "AI and machine learning for risk", count: 2, sample_titles: ["Senior Machine Learning Engineer, Fraud", "Manager, Credit Risk Models"] },
+        { id: "sales", label: "Sales", count: 3, sample_titles: ["Business Development Manager, Prairies"] },
+      ],
+      open_role_themes: [
+        { id: "sales", label: "Sales", count: 8, sample_titles: ["Business Development Manager, Prairies"] },
+      ],
+      year_to_date_role_themes: [
+        { id: "sales", label: "Sales", count: 12, sample_titles: ["Business Development Manager, Prairies"] },
+        { id: "risk_fraud", label: "Risk and fraud", count: 2, sample_titles: ["Director, Special Loans and Restructuring"] },
+      ],
+      continuing_themes: ["Sales"],
+      new_themes: ["AI and machine learning for risk"],
+      sample_titles: ["Senior Machine Learning Engineer, Fraud", "Manager, Credit Risk Models", "Business Development Manager, Prairies"],
+      continuity: "mixed",
+    },
+    expectedContinuity: "mixed",
+    expectedInclude: ["sales", "new", "risk"],
+    expectedExclude: ["transformation", "bets big", "dramatic shift"],
+  },
+];
+
 export function scoreJobStructureBenchmark(output: string[], benchmark: JobStructureBenchmarkCase) {
   const lower = output.map((item) => item.toLowerCase());
   const includeHits = benchmark.expectedInclude.filter((item) => lower.includes(item.toLowerCase())).length;
@@ -140,4 +209,22 @@ export function scoreTechStackBenchmark(output: CompanyTechStack, benchmark: Tec
   const narrativeScore = Math.round((narrativeHits / Math.max(1, benchmark.expectedNarrativeTerms.length)) * 100);
 
   return Math.round((categoryScore * 0.35) + (techScore * 0.35) + (narrativeScore * 0.3));
+}
+
+export function scoreWeeklyDigestBenchmark(output: TLDRCommentary, benchmark: WeeklyDigestBenchmarkCase) {
+  const text = `${output.headline} ${output.body}`.toLowerCase();
+  const includeHits = benchmark.expectedInclude.filter((item) => text.includes(item.toLowerCase())).length;
+  const excludeHits = benchmark.expectedExclude.filter((item) => text.includes(item.toLowerCase())).length;
+  const continuityTerms =
+    benchmark.expectedContinuity === "continuing"
+      ? /(continue|continuing|still|remains)/i.test(text)
+      : benchmark.expectedContinuity === "new_focus"
+        ? /(new|first|different|shift)/i.test(text)
+        : /(continue|continuing|still|remains|new|shift)/i.test(text);
+
+  const includeScore = Math.round((includeHits / Math.max(1, benchmark.expectedInclude.length)) * 100);
+  const excludeScore = Math.max(0, 100 - Math.round((excludeHits / Math.max(1, benchmark.expectedExclude.length)) * 100));
+  const continuityScore = continuityTerms ? 100 : 30;
+
+  return Math.round((includeScore * 0.45) + (excludeScore * 0.3) + (continuityScore * 0.25));
 }

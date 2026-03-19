@@ -8,13 +8,14 @@
 
 ## Overview
 
-`Prompt Forge` is the admin-only lab for improving the AI prompts that power the tech stack pipeline.
+`Prompt Forge` is the admin-only lab for improving the AI prompts that power the tech stack pipeline and the weekly digest.
 
 It serves two goals:
 
 1. Help admins iteratively tune the prompts and Gemini model choices used in:
    - Stage 1: per-job technology extraction
    - Stage 2: company-level tech stack synthesis
+   - Stage 3: weekly digest company summaries
 2. Give the product and engineering team a safe operational system for evaluating, saving, replaying, reprocessing, and promoting prompt changes.
 
 This document is intentionally split into two parts:
@@ -30,6 +31,7 @@ This document is intentionally split into two parts:
 
 - **Stage 1** reads each job description and writes structured fields, including `job_postings.tech_stack`
 - **Stage 2** reads the per-job tech arrays and synthesizes a company-level stack into `companies.tech_stack`
+- **Stage 3** reads weekly hiring evidence and writes role-focused company summaries into the weekly digest flow
 
 ### What Prompt Forge does not change
 
@@ -109,6 +111,21 @@ Use this when you want to improve:
 - fintech architecture interpretation
 - stack maturity commentary
 - build-vs-buy, platform, and regulated-fintech perspective
+
+### Stage 3: Weekly Digest Summary
+
+Purpose:
+
+- Reads weekly hiring evidence for one company
+- Compares this week's roles against current open roles and year-to-date history
+- Produces a simple, objective summary that distinguishes continuing patterns from genuinely new signals
+
+Use this when you want to improve:
+
+- continuity detection
+- plain-language role summaries
+- objective wording
+- avoiding overclaimed novelty
 
 ---
 

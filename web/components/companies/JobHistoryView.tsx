@@ -74,12 +74,18 @@ interface JobHistoryViewProps {
   showHeader?: boolean;
   /** Initial status filter */
   initialStatus?: "all" | "active" | "inactive";
+  /** Initial time filter */
+  initialTimeFilter?: TimeFilter;
   /** Items per page */
   pageSize?: number;
 }
 
 type StatusFilter = "all" | "active" | "inactive";
 type TimeFilter = "all" | "7days" | "30days" | "90days" | "6months" | "1year";
+
+function isRoleCategory(value: string | null): value is RoleCategory {
+  return value !== null && ROLE_CATEGORIES.includes(value as RoleCategory);
+}
 
 /**
  * Main JobHistoryView component
@@ -90,6 +96,7 @@ export function JobHistoryView({
   className,
   showHeader = true,
   initialStatus = "all",
+  initialTimeFilter = "all",
   pageSize = 12,
 }: JobHistoryViewProps) {
   const router = useRouter();
@@ -97,7 +104,7 @@ export function JobHistoryView({
   const [view, setView] = useViewPreference(`jobs-${companySlug}`, "table");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(initialStatus);
-  const [timeFilter, setTimeFilter] = React.useState<TimeFilter>("all");
+  const [timeFilter, setTimeFilter] = React.useState<TimeFilter>(initialTimeFilter);
   const [companyFilter, setCompanyFilter] = React.useState<string>("all");
   const [functionFilter, setFunctionFilter] = React.useState<string>(() => {
     return searchParams.get("function") ?? "all";
@@ -208,7 +215,8 @@ export function JobHistoryView({
           j.title.toLowerCase().includes(query) ||
           j.standardized_department?.toLowerCase().includes(query) ||
           j.function_category?.toLowerCase().includes(query) ||
-          (j.function_category && getCategoryLabel(j.function_category as any).toLowerCase().includes(query)) ||
+          (isRoleCategory(j.function_category) &&
+            getCategoryLabel(j.function_category).toLowerCase().includes(query)) ||
           j.location?.toLowerCase().includes(query) ||
           j.companyName?.toLowerCase().includes(query)
       );
@@ -450,7 +458,11 @@ function JobsCardView({ jobs, source }: { jobs: JobData[]; source: string }) {
                 {job.function_category && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Briefcase className="h-3 w-3" />
-                    <span>{getCategoryLabel(job.function_category as any)}</span>
+                    <span>
+                      {isRoleCategory(job.function_category)
+                        ? getCategoryLabel(job.function_category)
+                        : job.function_category}
+                    </span>
                   </div>
                 )}
                 {job.location && (
@@ -533,7 +545,9 @@ function JobsTableView({ jobs, source }: { jobs: JobData[]; source: string }) {
               )}
               <TableCell className="hidden sm:table-cell">{job.standardized_department ?? "—"}</TableCell>
               <TableCell className="hidden sm:table-cell">
-                {job.function_category ? getCategoryLabel(job.function_category as any) : "—"}
+                {isRoleCategory(job.function_category)
+                  ? getCategoryLabel(job.function_category)
+                  : job.function_category ?? "—"}
               </TableCell>
               <TableCell className="hidden md:table-cell">{job.location ?? "—"}</TableCell>
               <TableCell className="hidden md:table-cell">

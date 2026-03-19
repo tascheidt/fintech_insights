@@ -1,5 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractJobStructure } from "@/lib/analysis/structure";
+import {
+  aggregateRoleThemes,
+  buildWeeklyDigestCompanyInput,
+  generateWeeklyDigestCommentary,
+  getWeeklyData,
+  type TLDRCommentary,
+  type WeeklyDigestCompanyInput,
+} from "@/lib/analysis/digest";
 import { buildTechStackStrategicContext } from "@/lib/analysis/strategic-context";
 import { enrichTechStackWithAnalysis, normalizeTechName, type CompanyTechStack } from "@/lib/ai/tech-stack-extraction";
 import {
@@ -8,9 +16,11 @@ import {
   getActiveJobStructureAiConfig,
   getActivePromptConfigs,
   getActiveTechStackAiConfig,
+  getActiveWeeklyDigestAiConfig,
   type JobStructureAiConfig,
   type PromptStage,
   type TechStackAiConfig,
+  type WeeklyDigestAiConfig,
 } from "@/lib/ai/prompt-config";
 import { aggregateTechStackFromJobs } from "@/lib/ai/tech-stack-aggregation";
 import { createGitHubIssue, triggerCodeGenWorkflow } from "@/lib/github";
@@ -18,8 +28,10 @@ import { extractAndUpdateStructure } from "@/lib/jobs/processor";
 import {
   JOB_STRUCTURE_BENCHMARKS,
   TECH_STACK_BENCHMARKS,
+  WEEKLY_DIGEST_BENCHMARKS,
   scoreJobStructureBenchmark,
   scoreTechStackBenchmark,
+  scoreWeeklyDigestBenchmark,
 } from "./prompt-forge-benchmarks";
 
 const GENERIC_TERMS = new Set([
@@ -125,6 +137,11 @@ export interface TechStackCategoryPreview {
   narrativeSummary?: string;
 }
 
+export interface WeeklyDigestPreview {
+  headline: string;
+  body: string;
+}
+
 export interface PromptForgeRunRecord {
   id: string;
   stage: PromptStage;
@@ -145,6 +162,14 @@ interface CompanyJobSample {
   description_text: string | null;
   department: string | null;
   tech_stack: string[] | null;
+}
+
+interface HistoricalContextSample {
+  company_id: string;
+  title: string;
+  standardized_department: string | null;
+  is_active: boolean;
+  first_seen_date: string;
 }
 
 function clampScore(value: number) {
@@ -292,6 +317,78 @@ function getNarrativeMetrics(
   };
 }
 
+function getWeeklyDigestMetrics(
+  input: WeeklyDigestCompanyInput,
+  commentary: TLDRCommentary
+): PromptForgeBattleSummary {
+  const text = `${commentary.headline} ${commentary.body}`.toLowerCase();
+  const roleMentions = input.weekly_role_themes.filter((theme) =>
+    text.includes(theme.label.toLowerCase()) ||
+    theme.sample_titles.some((title) => text.includes(title.toLowerCase()))
+  ).length;
+  const groundedCounts = [input.week_job_count, input.current_open_job_count, input.year_to_date_job_count]
+    .filter((value) => text.includes(String(value))).length;
+  const continuityWords =
+    input.continuity === "continuing"
+      ? /(continue|continuing|still|remain)/i.test(text)
+      : input.continuity === "new_focus"
+        ? /(new|first|shift|different)/i.test(text)
+        : /(continue|continuing|still|remain|new|shift|different)/i.test(text);
+  const hypeHits = ["pivot", "aggressive", "bets big", "dramatic", "signals a strategic", "transformative"].filter(
+    (phrase) => text.includes(phrase)
+  ).length;
+  const simpleLanguage = commentary.body.length <= 360 ? 90 : 65;
+
+  const roleFocus = clampScore((roleMentions / Math.max(1, input.weekly_role_themes.length)) * 100);
+  const factualGrounding = clampScore(((groundedCounts * 30) + Math.min(40, input.sample_titles.length * 6)));
+  const continuity = continuityWords ? 90 : 35;
+  const antiHype = clampScore(Math.max(0, 100 - hypeHits * 35));
+
+  const metrics: PromptForgeMetric[] = [
+    {
+      id: "roleFocus",
+      label: "Role Focus",
+      value: roleFocus,
+      tone: toneForScore(roleFocus),
+      helper: "Rewards outputs that stay anchored to role families and representative titles.",
+    },
+    {
+      id: "factualGrounding",
+      label: "Factual Grounding",
+      value: factualGrounding,
+      tone: toneForScore(factualGrounding),
+      helper: "Looks for concrete counts and job evidence instead of abstract claims.",
+    },
+    {
+      id: "continuityDetection",
+      label: "Continuity Detection",
+      value: continuity,
+      tone: toneForScore(continuity),
+      helper: "Checks whether the copy correctly distinguishes continuation from change.",
+    },
+    {
+      id: "antiHype",
+      label: "Anti-Hype",
+      value: antiHype,
+      tone: toneForScore(antiHype),
+      helper: "Penalizes inflated strategic phrasing and overclaimed novelty.",
+    },
+    {
+      id: "clarity",
+      label: "Clarity",
+      value: simpleLanguage,
+      tone: toneForScore(simpleLanguage),
+      helper: "Rewards shorter, plainer language that reads like a hiring brief.",
+    },
+  ];
+
+  return {
+    score: clampScore(average(metrics.map((metric) => metric.value))),
+    metrics,
+    latencyMs: 0,
+  };
+}
+
 function configsMatch(a: unknown, b: unknown) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -329,6 +426,70 @@ async function scoreTechStackBenchmarks(config: TechStackAiConfig) {
   );
 
   return clampScore(average(scores));
+}
+
+async function scoreWeeklyDigestBenchmarks(config: WeeklyDigestAiConfig) {
+  const scores = await Promise.all(
+    WEEKLY_DIGEST_BENCHMARKS.map(async (benchmark) => {
+      const result = await generateWeeklyDigestCommentary(benchmark.input, config);
+      return scoreWeeklyDigestBenchmark(result, benchmark);
+    })
+  );
+
+  return clampScore(average(scores));
+}
+
+function getPreviousWeekStart() {
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = new Date(now);
+  weekStart.setUTCDate(now.getUTCDate() - daysToMonday - 7);
+  weekStart.setUTCHours(0, 0, 0, 0);
+  return weekStart;
+}
+
+async function buildWeeklyDigestEvaluationInput(companyId: string): Promise<WeeklyDigestCompanyInput> {
+  const supabase = createAdminClient();
+  const weeklyData = await getWeeklyData(7);
+  const companyData = weeklyData.get(companyId);
+  if (!companyData) {
+    throw new Error("No weekly digest data found for this company.");
+  }
+
+  const weekStart = getPreviousWeekStart();
+  const yearStart = new Date(Date.UTC(weekStart.getUTCFullYear(), 0, 1, 0, 0, 0, 0));
+
+  const [ytdResponse, activeResponse] = await Promise.all([
+    supabase
+      .from("job_postings")
+      .select("company_id, title, standardized_department, is_active, first_seen_date")
+      .eq("company_id", companyId)
+      .gte("first_seen_date", yearStart.toISOString())
+      .lt("first_seen_date", weekStart.toISOString()),
+    supabase
+      .from("job_postings")
+      .select("company_id, title, standardized_department, is_active, first_seen_date")
+      .eq("company_id", companyId)
+      .eq("is_active", true),
+  ]);
+
+  if (ytdResponse.error) {
+    throw new Error(ytdResponse.error.message);
+  }
+
+  if (activeResponse.error) {
+    throw new Error(activeResponse.error.message);
+  }
+
+  const historicalContext = {
+    currentOpenJobCount: (activeResponse.data ?? []).length,
+    yearToDateJobCount: (ytdResponse.data ?? []).length,
+    openRoleThemes: aggregateRoleThemes((activeResponse.data ?? []) as HistoricalContextSample[]),
+    yearToDateRoleThemes: aggregateRoleThemes((ytdResponse.data ?? []) as HistoricalContextSample[]),
+  };
+
+  return buildWeeklyDigestCompanyInput(companyData, historicalContext);
 }
 
 export async function evaluateJobStructurePrompt(options: {
@@ -551,14 +712,73 @@ export async function evaluateTechStackPrompt(options: {
   };
 }
 
+export async function evaluateWeeklyDigestPrompt(options: {
+  companyId: string;
+  companyName: string;
+  arena: string;
+  candidateConfig: WeeklyDigestAiConfig;
+}) {
+  const digestInput = await buildWeeklyDigestEvaluationInput(options.companyId);
+  const baselineConfig = await getActiveWeeklyDigestAiConfig();
+
+  const baselineStart = Date.now();
+  const baselineOutput = await generateWeeklyDigestCommentary(digestInput, baselineConfig);
+  const baselineLatencyMs = Date.now() - baselineStart;
+
+  const candidateStart = Date.now();
+  const candidateOutput = await generateWeeklyDigestCommentary(digestInput, options.candidateConfig);
+  const candidateLatencyMs = Date.now() - candidateStart;
+
+  const baselineBattle = getWeeklyDigestMetrics(digestInput, baselineOutput);
+  baselineBattle.latencyMs = baselineLatencyMs;
+  const candidateBattle = getWeeklyDigestMetrics(digestInput, candidateOutput);
+  candidateBattle.latencyMs = candidateLatencyMs;
+
+  const baselineBenchmark = await scoreWeeklyDigestBenchmarks(baselineConfig);
+  const candidateBenchmark = await scoreWeeklyDigestBenchmarks(options.candidateConfig);
+
+  baselineBattle.metrics.push({
+    id: "benchmarkFit",
+    label: "Benchmark Fit",
+    value: baselineBenchmark,
+    tone: toneForScore(baselineBenchmark),
+    helper: "Checks objective wording and continuity detection against curated digest fixtures.",
+  });
+  candidateBattle.metrics.push({
+    id: "benchmarkFit",
+    label: "Benchmark Fit",
+    value: candidateBenchmark,
+    tone: toneForScore(candidateBenchmark),
+    helper: "Checks objective wording and continuity detection against curated digest fixtures.",
+  });
+  baselineBattle.score = clampScore(average(baselineBattle.metrics.map((metric) => metric.value)));
+  candidateBattle.score = clampScore(average(candidateBattle.metrics.map((metric) => metric.value)));
+
+  return {
+    stage: "weekly-digest" as const,
+    arena: options.arena,
+    companyId: options.companyId,
+    companyName: options.companyName,
+    baseline: baselineBattle,
+    candidate: candidateBattle,
+    previews: [{
+      headline: candidateOutput.headline,
+      body: candidateOutput.body,
+    }] as WeeklyDigestPreview[],
+    candidateOutput,
+    baselineOutput,
+    baselineConfig,
+  };
+}
+
 export async function savePromptForgeRun(options: {
   stage: PromptStage;
   arena: string;
   companyId: string;
   companyName: string;
   model: string;
-  candidateConfig: JobStructureAiConfig | TechStackAiConfig;
-  baselineConfig: JobStructureAiConfig | TechStackAiConfig;
+  candidateConfig: JobStructureAiConfig | TechStackAiConfig | WeeklyDigestAiConfig;
+  baselineConfig: JobStructureAiConfig | TechStackAiConfig | WeeklyDigestAiConfig;
   candidateOutput: unknown;
   baselineOutput: unknown;
   battle: PromptForgeBattleSummary;
@@ -1004,13 +1224,17 @@ export function buildPromptPromotionIssue(options: {
   const targetFile =
     options.stage === "job-structure"
       ? "web/lib/analysis/structure.ts"
-      : "web/lib/ai/tech-stack-extraction.ts";
+      : options.stage === "tech-stack"
+        ? "web/lib/ai/tech-stack-extraction.ts"
+        : "web/lib/analysis/digest.ts";
 
   const settingsFile = "web/lib/ai/prompt-config.ts";
   const stageLabel =
     options.stage === "job-structure"
       ? "Stage 1 job structure extraction"
-      : "Stage 2 company tech stack synthesis";
+      : options.stage === "tech-stack"
+        ? "Stage 2 company tech stack synthesis"
+        : "Weekly digest company summary generation";
 
   return `## Summary
 - Promote the approved Prompt Forge configuration for ${stageLabel} into source-controlled defaults.
@@ -1059,7 +1283,9 @@ export async function promotePromptConfig(options: {
     title:
       options.stage === "job-structure"
         ? "Sync approved Prompt Forge job extraction config"
-        : "Sync approved Prompt Forge tech stack synthesis config",
+        : options.stage === "tech-stack"
+          ? "Sync approved Prompt Forge tech stack synthesis config"
+          : "Sync approved Prompt Forge weekly digest config",
     body: buildPromptPromotionIssue(options),
     labels: ["feedback", "improvement"],
   });

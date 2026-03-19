@@ -73,6 +73,8 @@ export default async function DigestDetailPage({
         company_name: company?.name || "Unknown",
         company_slug: company?.slug || "",
         new_job_count: c.new_job_count,
+        current_open_job_count: c.current_open_job_count || 0,
+        year_to_date_job_count: c.year_to_date_job_count || 0,
         departments: c.departments || {},
         dominant_tech: c.dominant_tech || [],
         seniority_breakdown: c.seniority_breakdown || {},
@@ -81,6 +83,19 @@ export default async function DigestDetailPage({
           body: c.body,
         },
         jobs: [], // Jobs not stored in digest_companies table
+        hiring_pattern: {
+          company_name: company?.name || "Unknown",
+          week_job_count: c.new_job_count || 0,
+          current_open_job_count: c.current_open_job_count || 0,
+          year_to_date_job_count: c.year_to_date_job_count || 0,
+          weekly_role_themes: c.weekly_role_themes || [],
+          open_role_themes: c.open_role_themes || [],
+          year_to_date_role_themes: c.year_to_date_role_themes || [],
+          continuing_themes: c.continuing_themes || [],
+          new_themes: c.new_themes || [],
+          sample_titles: [],
+          continuity: c.continuity || "continuing",
+        },
       };
     }),
   };

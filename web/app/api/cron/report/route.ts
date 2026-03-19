@@ -1,10 +1,10 @@
 /**
  * Weekly Report Cron Job
  * 
- * Generates and sends the weekly TLDR-style digest email.
+ * Generates and sends the weekly hiring digest email.
  * Also persists the digest to the database for web UI display.
  * 
- * Runs: Weekly on Monday at 8 AM UTC (configured in vercel.json)
+ * Runs: Weekly on Monday (configured in vercel.json)
  * Trigger: GET /api/cron/report with Authorization: Bearer {CRON_SECRET}
  */
 
@@ -133,9 +133,17 @@ async function insertCompanySummaries(digestId: string, digest: WeeklyDigest): P
     headline: company.ai_commentary.headline,
     body: company.ai_commentary.body,
     new_job_count: company.new_job_count,
+    current_open_job_count: company.current_open_job_count,
+    year_to_date_job_count: company.year_to_date_job_count,
     departments: company.departments,
     dominant_tech: company.dominant_tech,
     seniority_breakdown: company.seniority_breakdown,
+    weekly_role_themes: company.hiring_pattern.weekly_role_themes,
+    open_role_themes: company.hiring_pattern.open_role_themes,
+    year_to_date_role_themes: company.hiring_pattern.year_to_date_role_themes,
+    continuity: company.hiring_pattern.continuity,
+    continuing_themes: company.hiring_pattern.continuing_themes,
+    new_themes: company.hiring_pattern.new_themes,
     job_ids: company.jobs.map((j) => j.id),
   }));
 

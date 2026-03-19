@@ -74,102 +74,71 @@ export function DigestViewer({ digest }: DigestViewerProps) {
         </Link>
       </div>
 
-      {/* Hiring Activity */}
+      {/* Role Focus This Week */}
       {industryTrends.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Hiring Activity
+              Role Focus This Week
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Department activity across tracked companies this week
+              Role areas that appeared across multiple companies this week
             </p>
           </CardHeader>
           <CardContent>
-            {/* Department activity table */}
-            {industryTrends.filter((t) => t.direction !== "new").length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 pr-4 font-medium text-muted-foreground">
-                        Department
-                      </th>
-                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">
-                        Roles
-                      </th>
-                      <th className="text-left py-2 pl-4 font-medium text-muted-foreground">
-                        Companies
-                      </th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 pr-4 font-medium text-muted-foreground">
+                      Theme
+                    </th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">
+                      Roles
+                    </th>
+                    <th className="text-left py-2 pl-4 font-medium text-muted-foreground">
+                      Companies
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {industryTrends.map((trend, idx) => (
+                    <tr key={idx} className="border-b last:border-b-0">
+                      <td className="py-2.5 pr-4 font-medium">
+                        {trend.trend}
+                      </td>
+                      <td className="py-2.5 px-3 text-right tabular-nums">
+                        {trend.jobCount}
+                      </td>
+                      <td className="py-2.5 pl-4">
+                        <div className="flex flex-wrap gap-1">
+                          {trend.companies.map((company) => (
+                            <span
+                              key={company}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground"
+                            >
+                              {company}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {industryTrends
-                      .filter((t) => t.direction !== "new")
-                      .map((trend, idx) => (
-                        <tr key={idx} className="border-b last:border-b-0">
-                          <td className="py-2.5 pr-4 font-medium">
-                            {trend.trend.replace(/ hiring surge$/, "")}
-                          </td>
-                          <td className="py-2.5 px-3 text-right tabular-nums">
-                            {trend.jobCount}
-                          </td>
-                          <td className="py-2.5 pl-4">
-                            <div className="flex flex-wrap gap-1">
-                              {trend.companies.map((company) => (
-                                <span
-                                  key={company}
-                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground"
-                                >
-                                  {company}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Tech convergence signals */}
-            {industryTrends.filter((t) => t.direction === "new").length > 0 && (
-              <div className={industryTrends.filter((t) => t.direction !== "new").length > 0 ? "mt-4 pt-4 border-t" : ""}>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                  Tech Convergence
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {industryTrends
-                    .filter((t) => t.direction === "new")
-                    .map((trend, idx) => (
-                      <div
-                        key={idx}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 dark:bg-blue-950 text-sm"
-                      >
-                        <span className="font-medium">
-                          {trend.trend.replace(/ adoption$/, "")}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {trend.jobCount} roles, {trend.companies.length} companies
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Strategy Signals */}
+      {/* New This Week */}
       {strategySignals.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
-              Strategy Signals
+              New This Week
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -267,13 +236,9 @@ export function DigestViewer({ digest }: DigestViewerProps) {
                       >
                         {company.new_job_count} new jobs →
                       </Link>
-                      <Link 
-                        href={`/companies/${company.company_slug}/insights`}
-                        className="hover:text-primary transition-colors"
-                      >
-                        View 90-day analysis →
-                      </Link>
-                      <span>Top tech: {company.dominant_tech.slice(0, 3).join(", ") || "Various"}</span>
+                      <span>{company.current_open_job_count} open now</span>
+                      <span>{company.year_to_date_job_count} year-to-date before this week</span>
+                      <span>Focus: {company.hiring_pattern.weekly_role_themes[0]?.label || "Various roles"}</span>
                     </div>
                   </div>
                 </div>

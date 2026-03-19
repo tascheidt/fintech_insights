@@ -18,7 +18,7 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
-type PromptStage = "job-structure" | "tech-stack";
+type PromptStage = "job-structure" | "tech-stack" | "weekly-digest";
 
 interface PromptConfig {
   stage: PromptStage;
@@ -74,6 +74,11 @@ interface CategoryPreview {
   narrativeSummary?: string;
 }
 
+interface DigestPreview {
+  headline: string;
+  body: string;
+}
+
 interface RunRecord {
   id: string;
   stage: PromptStage;
@@ -107,6 +112,7 @@ interface PromptForgeInitialData {
   activeConfigs: {
     jobStructure: PromptConfig;
     techStack: PromptConfig;
+    weeklyDigest: PromptConfig;
   };
   runs: readonly RunRecord[];
   modelOptions: readonly ModelOption[];
@@ -156,6 +162,26 @@ const ARENA_OPTIONS: Record<
       recommendedSampleSize: 1,
     },
   ],
+  "weekly-digest": [
+    {
+      value: "continuity-check",
+      label: "Continuity Check",
+      summary: "Reward prompts that distinguish continuing hiring from actual change.",
+      recommendedSampleSize: 1,
+    },
+    {
+      value: "plain-language",
+      label: "Plain Language",
+      summary: "Push for simpler, objective writing grounded in the open roles.",
+      recommendedSampleSize: 1,
+    },
+    {
+      value: "new-signal-scan",
+      label: "New Signal Scan",
+      summary: "Stress-test whether the prompt only calls out new signals when earned.",
+      recommendedSampleSize: 1,
+    },
+  ],
 };
 
 const PLACEHOLDERS: Record<PromptStage, string[]> = {
@@ -168,6 +194,18 @@ const PLACEHOLDERS: Record<PromptStage, string[]> = {
     "{period_start}",
     "{period_end}",
   ],
+  "weekly-digest": [
+    "{company_name}",
+    "{week_job_count}",
+    "{current_open_job_count}",
+    "{year_to_date_job_count}",
+    "{weekly_role_themes}",
+    "{open_role_themes}",
+    "{year_to_date_role_themes}",
+    "{continuing_themes}",
+    "{new_themes}",
+    "{sample_titles}",
+  ],
 };
 
 function toneClass(tone: Metric["tone"]) {
@@ -177,7 +215,15 @@ function toneClass(tone: Metric["tone"]) {
 }
 
 function stageKey(stage: PromptStage) {
-  return stage === "job-structure" ? "jobStructure" : "techStack";
+  if (stage === "job-structure") return "jobStructure";
+  if (stage === "tech-stack") return "techStack";
+  return "weeklyDigest";
+}
+
+function stageLabel(stage: PromptStage) {
+  if (stage === "job-structure") return "Stage 1 extractor";
+  if (stage === "tech-stack") return "Stage 2 synthesis";
+  return "Weekly digest";
 }
 
 function formatRelativeTime(value: string) {
@@ -198,6 +244,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
   const [drafts, setDrafts] = useState({
     jobStructure: initialData.activeConfigs.jobStructure,
     techStack: initialData.activeConfigs.techStack,
+    weeklyDigest: initialData.activeConfigs.weeklyDigest,
   });
   const [activeConfigs, setActiveConfigs] = useState(drafts);
   const [runs, setRuns] = useState(initialData.runs);
@@ -333,7 +380,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
           run.id === battle?.runId ? { ...run, savedAsActive: true } : run
         )
       );
-      setStatusMessage(`Saved ${stage === "job-structure" ? "Stage 1" : "Stage 2"} live config with model ${data.model}.`);
+      setStatusMessage(`Saved ${stageLabel(stage)} live config with model ${data.model}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -501,7 +548,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
                 <p className="text-sm text-muted-foreground">Choose the stage, arena, and model for your next run.</p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-2 sm:grid-cols-3">
                   <Button
                     type="button"
                     variant={stage === "job-structure" ? "default" : "outline"}
@@ -515,6 +562,13 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
                     onClick={() => handleStageChange("tech-stack")}
                   >
                     Stage 2 synthesis
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={stage === "weekly-digest" ? "default" : "outline"}
+                    onClick={() => handleStageChange("weekly-digest")}
+                  >
+                    Weekly digest
                   </Button>
                 </div>
 
@@ -711,7 +765,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-muted-foreground">
                 <p><strong className="text-foreground">Company:</strong> {selectedCompany?.name ?? "Select one above"}</p>
-                <p><strong className="text-foreground">Stage:</strong> {stage === "job-structure" ? "Stage 1 extraction" : "Stage 2 synthesis"}</p>
+                <p><strong className="text-foreground">Stage:</strong> {stageLabel(stage)}</p>
                 <p><strong className="text-foreground">Model:</strong> {currentDraft.model}</p>
                 {stage === "job-structure" && (
                   <p><strong className="text-foreground">Jobs sampled:</strong> {sampleSize}</p>
@@ -780,7 +834,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
                             </div>
                           </div>
                         ))
-                      ) : (
+                      ) : battle.stage === "tech-stack" ? (
                         (battle.previews as CategoryPreview[]).map((category) => (
                           <div key={category.category} className="rounded-2xl border p-4">
                             <p className="font-medium">{category.label}</p>
@@ -792,6 +846,14 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
                                 <span key={tech} className="rounded-full bg-muted px-2 py-1 text-xs">{tech}</span>
                               ))}
                             </div>
+                          </div>
+                        ))
+                      ) : (
+                        (battle.previews as unknown as DigestPreview[]).map((preview, index) => (
+                          <div key={index} className="rounded-2xl border p-4">
+                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Digest preview</p>
+                            <p className="mt-2 font-medium">{preview.headline}</p>
+                            <p className="mt-2 text-sm text-muted-foreground">{preview.body}</p>
                           </div>
                         ))
                       )}
@@ -834,7 +896,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
                       <div>
                         <p className="font-medium">{run.companyName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {run.stage === "job-structure" ? "Stage 1" : "Stage 2"} | {run.arena} | {run.model}
+                          {stageLabel(run.stage)} | {run.arena} | {run.model}
                         </p>
                       </div>
                     </div>
@@ -874,7 +936,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
                       <div>
                         <p className="font-medium">{run.companyName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {run.stage === "job-structure" ? "Stage 1 extractor" : "Stage 2 synthesis"} | {run.model}
+                          {stageLabel(run.stage)} | {run.model}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -915,7 +977,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-2xl border bg-muted/20 p-4 text-sm">
-                  <p><strong>Stage:</strong> {stage === "job-structure" ? "Stage 1 extractor" : "Stage 2 synthesis"}</p>
+                  <p><strong>Stage:</strong> {stageLabel(stage)}</p>
                   <p><strong>Model:</strong> {currentDraft.model}</p>
                   <p><strong>Battle score:</strong> {battle?.candidate.score ?? "Not run yet"}</p>
                 </div>
@@ -925,49 +987,51 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
               </CardContent>
             </Card>
 
-            <Card className="xl:col-span-1">
-              <CardHeader>
-                <h3 className="text-lg font-semibold">Silver layer reprocess</h3>
-                <p className="text-sm text-muted-foreground">Re-run Stage 1 across existing job postings, then refresh company tech stacks for the affected companies.</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Scope</label>
-                  <Select value={reprocessScope} onValueChange={(value: "company" | "all") => setReprocessScope(value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="company">Selected company only</SelectItem>
-                      <SelectItem value="all">All companies</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Limit jobs (optional)</label>
-                  <Input
-                    value={reprocessLimit}
-                    onChange={(event) => setReprocessLimit(event.target.value)}
-                    placeholder="Leave blank for full scope"
-                    type="number"
-                    min={1}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between rounded-2xl border p-3">
-                  <div>
-                    <p className="text-sm font-medium">Active jobs only</p>
-                    <p className="text-xs text-muted-foreground">Skip closed roles unless you need a full rebuild.</p>
+            {stage === "job-structure" && (
+              <Card className="xl:col-span-1">
+                <CardHeader>
+                  <h3 className="text-lg font-semibold">Silver layer reprocess</h3>
+                  <p className="text-sm text-muted-foreground">Re-run Stage 1 across existing job postings, then refresh company tech stacks for the affected companies.</p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Scope</label>
+                    <Select value={reprocessScope} onValueChange={(value: "company" | "all") => setReprocessScope(value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="company">Selected company only</SelectItem>
+                        <SelectItem value="all">All companies</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Switch checked={activeOnly} onCheckedChange={setActiveOnly} />
-                </div>
 
-                <Button onClick={triggerReprocess} disabled={loading === "reprocess"}>
-                  {loading === "reprocess" ? "Reprocessing..." : "Kick off reprocess"}
-                </Button>
-              </CardContent>
-            </Card>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Limit jobs (optional)</label>
+                    <Input
+                      value={reprocessLimit}
+                      onChange={(event) => setReprocessLimit(event.target.value)}
+                      placeholder="Leave blank for full scope"
+                      type="number"
+                      min={1}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-2xl border p-3">
+                    <div>
+                      <p className="text-sm font-medium">Active jobs only</p>
+                      <p className="text-xs text-muted-foreground">Skip closed roles unless you need a full rebuild.</p>
+                    </div>
+                    <Switch checked={activeOnly} onCheckedChange={setActiveOnly} />
+                  </div>
+
+                  <Button onClick={triggerReprocess} disabled={loading === "reprocess"}>
+                    {loading === "reprocess" ? "Reprocessing..." : "Kick off reprocess"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="xl:col-span-1">
               <CardHeader>

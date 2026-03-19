@@ -4,6 +4,7 @@ import { requireAdminApi } from "@/lib/auth/admin";
 import {
   JobStructureAiConfigSchema,
   TechStackAiConfigSchema,
+  WeeklyDigestAiConfigSchema,
   savePromptConfig,
   validatePromptTemplate,
 } from "@/lib/ai/prompt-config";
@@ -11,7 +12,7 @@ import { markPromptRunSaved } from "@/lib/labs/prompt-forge";
 
 const requestSchema = z.object({
   runId: z.string().uuid().optional(),
-  stage: z.enum(["job-structure", "tech-stack"]),
+  stage: z.enum(["job-structure", "tech-stack", "weekly-digest"]),
   benchmarkScore: z.number().min(0).max(100).nullable().optional(),
   config: z.unknown(),
 });
@@ -39,7 +40,9 @@ export async function POST(req: NextRequest) {
   const configResult =
     parsed.data.stage === "job-structure"
       ? JobStructureAiConfigSchema.safeParse(parsed.data.config)
-      : TechStackAiConfigSchema.safeParse(parsed.data.config);
+      : parsed.data.stage === "tech-stack"
+        ? TechStackAiConfigSchema.safeParse(parsed.data.config)
+        : WeeklyDigestAiConfigSchema.safeParse(parsed.data.config);
 
   if (!configResult.success) {
     return NextResponse.json(
