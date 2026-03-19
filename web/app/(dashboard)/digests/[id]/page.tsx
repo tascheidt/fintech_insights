@@ -61,7 +61,7 @@ export default async function DigestDetailPage({
     global_summary: globalSummary ? {
       headline: globalSummary.headline || "",
       body: globalSummary.body || "",
-      key_insight: globalSummary.key_insight || globalSummary.body?.substring(0, 200) || "",
+      key_insight: globalSummary.key_insight || (globalSummary.body ? (globalSummary.body.length > 300 ? `${globalSummary.body.substring(0, 300).trim()}…` : globalSummary.body) : "") || "",
     } : null,
     industry_trends: industryTrends,
     strategy_signals: strategySignals,

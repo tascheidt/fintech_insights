@@ -316,8 +316,8 @@ function parseTLDRResponse(text: string, companyName: string): TLDRCommentary {
     const parsed = JSON.parse(cleaned);
     if (parsed.headline && parsed.body) {
       return {
-        headline: String(parsed.headline).slice(0, 100),
-        body: String(parsed.body).slice(0, 500),
+        headline: String(parsed.headline).replace(/\s+/g, " ").trim(),
+        body: String(parsed.body).replace(/\s+/g, " ").trim(),
       };
     }
   } catch {
@@ -325,8 +325,8 @@ function parseTLDRResponse(text: string, companyName: string): TLDRCommentary {
     const bodyMatch = text.match(/"body":\s*"([^"]+)"/);
     if (headlineMatch && bodyMatch) {
       return {
-        headline: headlineMatch[1].slice(0, 100),
-        body: bodyMatch[1].slice(0, 500),
+        headline: headlineMatch[1].replace(/\s+/g, " ").trim(),
+        body: bodyMatch[1].replace(/\s+/g, " ").trim(),
       };
     }
   }
@@ -429,7 +429,7 @@ function buildGlobalSummary(
   return {
     headline,
     key_insight: keyInsight,
-    body: bodyParts.join(" ").slice(0, 600),
+    body: bodyParts.join(" ").replace(/\s+/g, " ").trim(),
   };
 }
 
