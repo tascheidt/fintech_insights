@@ -6,14 +6,14 @@ const BASE = "https://api.ashbyhq.com/posting-api/job-board";
 interface AshbyJob {
   id: string;
   title: string;
-  departmentName?: string;
-  teamName?: string;
-  locationName?: string;
+  department?: string;
+  team?: string;
+  location?: string;
   employmentType?: string;
   isRemote?: boolean;
   descriptionHtml?: string;
   publishedAt?: string;
-  applicationUrl?: string;
+  applyUrl?: string;
   jobUrl?: string;
 }
 
@@ -36,7 +36,7 @@ export async function fetchAshbyJobs(atsIdentifier: string): Promise<JobData[]> 
   const jobs: JobData[] = [];
   
   for (const job of list) {
-    const location = job.locationName ?? "";
+    const location = job.location ?? "";
     const descriptionHtml = job.descriptionHtml ?? "";
     
     // Determine location type
@@ -67,15 +67,15 @@ export async function fetchAshbyJobs(atsIdentifier: string): Promise<JobData[]> 
     jobs.push({
       external_id: job.id,
       title: job.title,
-      department: job.departmentName ?? null,
-      team: job.teamName ?? null,
+      department: job.department ?? null,
+      team: job.team ?? null,
       location: location || null,
       location_type: locationType,
       description_html: descriptionHtml || null,
       description_text: htmlToText(descriptionHtml),
       commitment: commitment || null,
       posted_date: postedDate,
-      url: job.jobUrl ?? job.applicationUrl ?? null,
+      url: job.jobUrl ?? job.applyUrl ?? null,
     });
   }
 

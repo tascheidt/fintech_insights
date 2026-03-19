@@ -3,9 +3,9 @@ companies:
   - name: Wealthsimple
     slug: wealthsimple
     country: CA
-    ats_type: lever
+    ats_type: ashby
     ats_identifier: wealthsimple
-    careers_url: https://www.wealthsimple.com/en-ca/careers
+    careers_url: https://jobs.ashbyhq.com/wealthsimple
 
   # Note: Koho's ATS identifier needs investigation - currently disabled
   # - name: Koho

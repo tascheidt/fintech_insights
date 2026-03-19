@@ -70,16 +70,14 @@ export function StatsCards({
       sparkline: sparklineData,
     },
     {
-      label: "Net This Week",
+      label: "7-Day Net",
       value: (
-        <span>
-          <span className="text-green-600">+{netThisWeek.newCount}</span>
-          <span className="text-muted-foreground mx-1">/</span>
-          <span className="text-red-500">-{netThisWeek.closedCount}</span>
+        <span className={net >= 0 ? "text-green-600" : "text-red-500"}>
+          {net >= 0 ? "+" : ""}{net}
         </span>
       ),
-      subtitle: `Net ${net >= 0 ? "+" : ""}${net}`,
-      href: "/jobs?date=week",
+      subtitle: `${netThisWeek.newCount} new · ${netThisWeek.closedCount} closed`,
+      href: "/jobs?time=7days",
     },
     {
       label: "Avg Weekly Velocity",

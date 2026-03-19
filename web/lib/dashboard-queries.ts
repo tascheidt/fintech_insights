@@ -6,6 +6,12 @@ import {
 } from "@/lib/analysis/function-categories";
 import { startOfWeek, format, subDays, parseISO, addHours } from "date-fns";
 
+const ROLLING_WEEK_DAYS = 7;
+
+function getRollingWeekStartIso(now: Date = new Date()): string {
+  return subDays(now, ROLLING_WEEK_DAYS).toISOString();
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -260,29 +266,48 @@ export async function getNetHiringFlow(
 }
 
 /**
- * Get competitive matrix data: active jobs per company per function group.
- * Includes ALL active companies, even those with uncategorized jobs.
+ * Get competitive matrix data: jobs per company per function group.
+ * Always includes ALL active tracked companies (even those with zero jobs).
+ * Supports historical windows that include closed jobs overlapping the period.
  */
 export async function getCompetitiveMatrixData(
-  cutoffs: Map<string, Date>
+  cutoffs: Map<string, Date>,
+  options?: {
+    windowDays?: number | null; // null = current active snapshot
+    includeClosed?: boolean;
+  }
 ): Promise<CompetitiveMatrixRow[]> {
   const supabase = await createClient();
-  const oneWeekAgo = subDays(new Date(), 7).toISOString();
+  const isHistorical = options?.windowDays != null;
+  const includeClosed = isHistorical && (options?.includeClosed ?? false);
+  const rollingWeekStart = getRollingWeekStartIso();
 
-  // Fetch all active companies and all active jobs (including uncategorized)
-  const [{ data: allCompanies }, { data: jobs }] = await Promise.all([
-    supabase
-      .from("companies")
-      .select("id, name, slug")
-      .eq("is_active", true),
-    supabase
-      .from("job_postings")
-      .select(
-        "company_id, function_category, first_seen_date, is_active, companies!inner(id, name, slug, is_active)"
-      )
-      .eq("is_active", true)
-      .eq("companies.is_active", true),
-  ]);
+  // Always seed from active companies
+  const { data: allCompanies } = await supabase
+    .from("companies")
+    .select("id, name, slug")
+    .eq("is_active", true);
+
+  // Build jobs query based on mode
+  let jobsQuery = supabase
+    .from("job_postings")
+    .select(
+      "company_id, function_category, first_seen_date, is_active, companies!inner(id, name, slug, is_active)"
+    )
+    .eq("companies.is_active", true);
+
+  if (includeClosed) {
+    // Jobs that overlapped the window: active OR closed within the window
+    const startDate = subDays(new Date(), options!.windowDays!).toISOString();
+    jobsQuery = jobsQuery.or(
+      `is_active.eq.true,closed_date.gte.${startDate}`
+    );
+  } else {
+    // Only currently active jobs
+    jobsQuery = jobsQuery.eq("is_active", true);
+  }
+
+  const { data: jobs } = await jobsQuery;
 
   // Seed the map with all active companies so none are missing
   const companyMap = new Map<
@@ -324,7 +349,6 @@ export async function getCompetitiveMatrixData(
     const entry = companyMap.get(job.company_id)!;
 
     if (!job.function_category) {
-      // Count uncategorized jobs toward total but not in any group column
       entry.uncategorized++;
       continue;
     }
@@ -336,37 +360,42 @@ export async function getCompetitiveMatrixData(
     }
     entry.groups[group].current++;
 
+    // Only track weekly new for current (non-historical) mode
     if (
+      !isHistorical &&
       job.first_seen_date &&
-      job.first_seen_date >= oneWeekAgo &&
+      job.first_seen_date >= rollingWeekStart &&
       !isBackfill(job.company_id, job.first_seen_date, cutoffs)
     ) {
       entry.groups[group].newThisWeek++;
     }
   }
 
-  // Get closed this week for WoW change
-  const { data: closedThisWeek } = await supabase
-    .from("job_postings")
-    .select("company_id, function_category")
-    .gte("closed_date", oneWeekAgo);
-
+  // Only compute 7d closed delta for current (non-historical) mode
   const closedByCompanyGroup = new Map<string, Record<string, number>>();
-  let closedUncategorized = new Map<string, number>();
-  for (const job of closedThisWeek ?? []) {
-    if (!job.function_category) {
-      closedUncategorized.set(
-        job.company_id,
-        (closedUncategorized.get(job.company_id) || 0) + 1
-      );
-      continue;
+  const closedUncategorized = new Map<string, number>();
+
+  if (!isHistorical) {
+    const { data: closedThisWeek } = await supabase
+      .from("job_postings")
+      .select("company_id, function_category")
+      .gte("closed_date", rollingWeekStart);
+
+    for (const job of closedThisWeek ?? []) {
+      if (!job.function_category) {
+        closedUncategorized.set(
+          job.company_id,
+          (closedUncategorized.get(job.company_id) || 0) + 1
+        );
+        continue;
+      }
+      const group = getCategoryGroup(job.function_category as RoleCategory);
+      if (!closedByCompanyGroup.has(job.company_id)) {
+        closedByCompanyGroup.set(job.company_id, {});
+      }
+      const groups = closedByCompanyGroup.get(job.company_id)!;
+      groups[group] = (groups[group] || 0) + 1;
     }
-    const group = getCategoryGroup(job.function_category as RoleCategory);
-    if (!closedByCompanyGroup.has(job.company_id)) {
-      closedByCompanyGroup.set(job.company_id, {});
-    }
-    const groups = closedByCompanyGroup.get(job.company_id)!;
-    groups[group] = (groups[group] || 0) + 1;
   }
 
   const functionGroups = Object.keys(CATEGORY_GROUPS).filter(
@@ -376,29 +405,32 @@ export async function getCompetitiveMatrixData(
   return Array.from(companyMap.entries())
     .map(([companyId, data]) => {
       const groups: Record<string, { current: number; change: number }> = {};
-      let total = data.uncategorized; // Include uncategorized in total
-      let weekChange = -(closedUncategorized.get(companyId) || 0);
+      let total = data.uncategorized;
+      let weekChange = isHistorical
+        ? 0
+        : -(closedUncategorized.get(companyId) || 0);
 
       for (const group of functionGroups) {
         const current = data.groups[group]?.current || 0;
         const newThisWeek = data.groups[group]?.newThisWeek || 0;
-        const closedThisWeekCount =
-          closedByCompanyGroup.get(companyId)?.[group] || 0;
-        const change = newThisWeek - closedThisWeekCount;
+        const closedThisWeekCount = isHistorical
+          ? 0
+          : (closedByCompanyGroup.get(companyId)?.[group] || 0);
+        const change = isHistorical ? 0 : newThisWeek - closedThisWeekCount;
 
         groups[group] = { current, change };
         total += current;
         weekChange += change;
       }
 
-      // Include "Other" if present
       if (data.groups["Other"]) {
         const otherNew = data.groups["Other"].newThisWeek || 0;
-        const otherClosed =
-          closedByCompanyGroup.get(companyId)?.["Other"] || 0;
+        const otherClosed = isHistorical
+          ? 0
+          : (closedByCompanyGroup.get(companyId)?.["Other"] || 0);
         groups["Other"] = {
           current: data.groups["Other"].current,
-          change: otherNew - otherClosed,
+          change: isHistorical ? 0 : otherNew - otherClosed,
         };
         total += data.groups["Other"].current;
         weekChange += groups["Other"].change;
@@ -413,7 +445,7 @@ export async function getCompetitiveMatrixData(
         weekChange,
       };
     })
-    .filter((row) => row.total > 0) // Only show companies with active jobs
+    // Always include all active companies, even with zero jobs
     .sort((a, b) => b.total - a.total);
 }
 
@@ -489,23 +521,23 @@ export async function getHotRoles(
 }
 
 /**
- * Get net new/closed jobs this week, excluding backfill from new count.
+ * Get net new/closed jobs in the last 7 days, excluding backfill from new count.
  */
 export async function getNetThisWeek(
   cutoffs: Map<string, Date>
 ): Promise<{ newCount: number; closedCount: number }> {
   const supabase = await createClient();
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
+  const rollingWeekStart = getRollingWeekStartIso();
 
   const [{ data: newJobs }, { count: closedCount }] = await Promise.all([
     supabase
       .from("job_postings")
       .select("company_id, first_seen_date")
-      .gte("first_seen_date", weekStart),
+      .gte("first_seen_date", rollingWeekStart),
     supabase
       .from("job_postings")
       .select("*", { count: "exact", head: true })
-      .gte("closed_date", weekStart),
+      .gte("closed_date", rollingWeekStart),
   ]);
 
   const filteredNew = (newJobs ?? []).filter(

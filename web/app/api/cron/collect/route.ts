@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies } from "@/lib/jobs";
 import { requireCronAuth } from "@/lib/cron/auth";
+import { checkAndAlertScraperHealth } from "@/lib/email/scraper-health";
 
 export const maxDuration = 300;
 
@@ -101,6 +102,12 @@ export async function GET(req: NextRequest) {
     const result = await executeCollectionJob(jobRunId);
 
     console.log("Collection completed:", result.stats);
+
+    // Check scraper health and alert admins if any companies have issues.
+    // Runs for both completed and failed runs so failed tasks are also caught.
+    checkAndAlertScraperHealth(jobRunId).catch((err) =>
+      console.error("Scraper health check error:", err)
+    );
 
     // Only trigger analysis/news once all collection tasks are terminal.
     if (result.status === "completed") {

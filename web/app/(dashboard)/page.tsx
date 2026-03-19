@@ -41,11 +41,22 @@ const RANGE_TO_DAYS: Record<string, number> = {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{
+    range?: string;
+    matrixWindow?: string;
+    matrixScope?: string;
+  }>;
 }) {
   const params = await searchParams;
   const range = params.range || "3m";
   const days = RANGE_TO_DAYS[range] ?? 90;
+
+  // Matrix-specific params (independent of chart time range)
+  const matrixWindow = params.matrixWindow || "current";
+  const matrixWindowDays =
+    matrixWindow === "current" ? null : parseInt(matrixWindow, 10) || null;
+  const matrixScope = params.matrixScope || "active";
+  const matrixIncludeClosed = matrixScope === "all";
 
   const supabase = await createClient();
 
@@ -79,7 +90,10 @@ export default async function DashboardPage({
     // Raw function data for donut chart
     getRawFunctionData(days, cutoffs),
     // Competitive matrix
-    getCompetitiveMatrixData(cutoffs),
+    getCompetitiveMatrixData(cutoffs, {
+      windowDays: matrixWindowDays,
+      includeClosed: matrixIncludeClosed,
+    }),
     // Latest digest
     getLatestDigest(),
     // Hot roles feed
@@ -140,6 +154,8 @@ export default async function DashboardPage({
       <div className="grid gap-6 lg:grid-cols-3">
         <CompetitiveMatrix
           data={competitiveMatrix}
+          matrixWindow={matrixWindow}
+          matrixScope={matrixScope}
           className="lg:col-span-2"
         />
         <FunctionBreakdownContainer

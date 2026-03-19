@@ -28,8 +28,22 @@ export function NetHiringFlowChart({
     <Card>
       <CardHeader>
         <CardTitle>Net Hiring Flow</CardTitle>
-        <CardDescription>
-          New vs closed job postings per week
+        <CardDescription className="flex items-center gap-4">
+          <span>New vs closed job postings per week</span>
+          <span className="flex items-center gap-3 text-xs ml-auto">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+              New
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-full bg-red-400" />
+              Closed
+            </span>
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <span className="inline-block w-3 border-t border-dashed border-slate-500" />
+              Net
+            </span>
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent className="pl-2">
@@ -56,7 +70,7 @@ export function NetHiringFlowChart({
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.12} />
                     <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                   </linearGradient>
                 </defs>
@@ -114,7 +128,7 @@ export function NetHiringFlowChart({
                   type="monotone"
                   dataKey="closedJobs"
                   stroke="#ef4444"
-                  strokeWidth={1.5}
+                  strokeWidth={1}
                   fillOpacity={1}
                   fill="url(#colorClosed)"
                   name="Closed"
@@ -122,7 +136,7 @@ export function NetHiringFlowChart({
                 <Line
                   type="monotone"
                   dataKey="net"
-                  stroke="#2563eb"
+                  stroke="#64748b"
                   strokeWidth={2}
                   strokeDasharray="4 2"
                   dot={false}

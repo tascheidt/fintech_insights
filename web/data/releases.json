@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.7.0",
+    "date": "2026-03-18",
+    "changes": [
+      { "type": "feature", "description": "Competitive matrix now supports historical comparison across 30/60/90/180/360 day windows with an option to include closed roles." },
+      { "type": "fix", "description": "All active tracked companies now always appear in the competitive matrix, even when they have zero current job postings." },
+      { "type": "fix", "description": "Dashboard weekly net-job metrics now use a consistent rolling 7-day window for closed-job counts, including the competitive matrix delta." }
+    ]
+  },
+  {
     "version": "1.6.0",
     "date": "2026-03-06",
     "changes": [

@@ -4,6 +4,7 @@ from .base import BaseScraper, JobData
 from .lever import LeverScraper
 from .greenhouse import GreenhouseScraper
 from .workable import WorkableScraper
+from .ashby import AshbyScraper
 from .custom import TangerineScraper
 
 __all__ = [
@@ -12,6 +13,7 @@ __all__ = [
     "LeverScraper",
     "GreenhouseScraper",
     "WorkableScraper",
+    "AshbyScraper",
     "TangerineScraper",
 ]
 
@@ -22,6 +24,7 @@ def get_scraper(ats_type: str, ats_identifier: str, company_name: str) -> BaseSc
         "lever": LeverScraper,
         "greenhouse": GreenhouseScraper,
         "workable": WorkableScraper,
+        "ashby": AshbyScraper,
     }
 
     # Custom scrapers by company
