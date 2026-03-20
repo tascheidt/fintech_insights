@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies } from "@/lib/jobs";
 import { requireCronAuth } from "@/lib/cron/auth";
 import { checkAndAlertScraperHealth } from "@/lib/email/scraper-health";
+import { STALE_JOB_THRESHOLD_MS } from "@/lib/jobs/constants";
 
 export const maxDuration = 300;
 
@@ -21,8 +22,8 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createAdminClient();
 
-    // Inline cleanup: mark any job_runs/tasks stuck in "running" for >20 min as failed
-    const staleThreshold = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    // Inline cleanup: mark any job_runs/tasks stuck in "running" past the stale threshold as failed
+    const staleThreshold = new Date(Date.now() - STALE_JOB_THRESHOLD_MS).toISOString();
     const { data: staleTasks } = await supabase
       .from("job_run_tasks")
       .select("id, job_run_id")
@@ -72,9 +73,9 @@ export async function GET(req: NextRequest) {
     console.log(`Processing ${companies.length} companies:`, companies.map(c => `${c.name} (${c.ats_type})`));
 
     // Phase 1: Collection
-    // Resume a recent in-flight collect run (started within last 20 min) to avoid starving
-    // tail companies. Older "running" jobs are stale (Vercel killed them) — don't resume.
-    const resumeWindow = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    // Resume a recent in-flight collect run (started within STALE_JOB_THRESHOLD_MS) to avoid
+    // starving tail companies. Older "running" jobs are stale (Vercel killed them) — don't resume.
+    const resumeWindow = new Date(Date.now() - STALE_JOB_THRESHOLD_MS).toISOString();
     const { data: existingRun } = await supabase
       .from("job_runs")
       .select("id")

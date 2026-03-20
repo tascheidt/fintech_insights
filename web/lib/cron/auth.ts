@@ -1,13 +1,14 @@
 /**
  * Cron Job Authentication Helper
- * 
+ *
  * Validates requests from Vercel Cron Jobs.
- * 
+ *
  * Vercel automatically adds:
  * - Authorization: Bearer {CRON_SECRET} header when CRON_SECRET env var is set
  * - User-Agent: vercel-cron/1.0 header
- * 
- * This function checks both to ensure the request is legitimate.
+ *
+ * This function checks the bearer token exclusively. The User-Agent header
+ * is a public string and must not be used as an auth signal.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -24,8 +25,8 @@ export interface CronAuthResult {
 }
 
 /**
- * Validates that a request is from Vercel Cron
- * 
+ * Validates that a request carries a valid CRON_SECRET bearer token.
+ *
  * @param req - The incoming request
  * @returns Auth result with authorization status and diagnostic details
  */
@@ -36,7 +37,6 @@ export function validateCronRequest(req: NextRequest): CronAuthResult {
   const cronSecret = process.env.CRON_SECRET;
 
   const hasAuthHeader = !!authHeader;
-  // Check User-Agent (trim whitespace in case of any formatting issues)
   const hasUserAgent = userAgent?.trim() === "vercel-cron/1.0";
   const hasCronSecret = !!cronSecret;
 
@@ -54,19 +54,14 @@ export function validateCronRequest(req: NextRequest): CronAuthResult {
     };
   }
 
-  // Primary check: Authorization header with Bearer token
+  // Bearer token is required — User-Agent alone is not sufficient
   const expectedAuth = `Bearer ${cronSecret}`;
   const authValid = authHeader === expectedAuth;
 
-  // Secondary check: User-Agent header (Vercel always sends this)
-  const userAgentValid = hasUserAgent;
-
-  // Require both checks to pass for security
-  // In production, Vercel should send both, but we're lenient for debugging
-  if (!authValid && !userAgentValid) {
+  if (!authValid) {
     return {
       authorized: false,
-      error: "Invalid authentication. Missing or incorrect Authorization header and User-Agent.",
+      error: "Invalid authentication. Missing or incorrect Authorization header.",
       details: {
         hasAuthHeader,
         hasUserAgent,
@@ -76,52 +71,10 @@ export function validateCronRequest(req: NextRequest): CronAuthResult {
     };
   }
 
-  // If we have a valid auth header, that's sufficient
-  if (authValid) {
-    return {
-      authorized: true,
-      details: {
-        hasAuthHeader: true,
-        hasUserAgent,
-        hasCronSecret: true,
-        userAgent: userAgent || undefined,
-      },
-    };
-  }
-
-  // Fallback: If User-Agent is valid but auth header is missing/wrong,
-  // allow it since Vercel cron jobs always send vercel-cron/1.0 User-Agent
-  // This handles cases where CRON_SECRET might not be properly configured in Vercel
-  // but the request is still from Vercel's cron service
-  if (userAgentValid) {
-    if (!authValid) {
-      console.warn(
-        "Cron request authenticated via User-Agent only. Authorization header missing or incorrect.",
-        {
-          hasAuthHeader,
-          receivedAuth: authHeader ? `${authHeader.substring(0, 20)}...` : "missing",
-          userAgent,
-          expectedAuthPrefix: expectedAuth.substring(0, 20) + "...", // Don't log full secret
-        }
-      );
-    }
-    return {
-      authorized: true,
-      details: {
-        hasAuthHeader,
-        hasUserAgent: true,
-        hasCronSecret: true,
-        userAgent,
-      },
-    };
-  }
-
-  // Should not reach here, but handle edge case
   return {
-    authorized: false,
-    error: "Authentication validation failed",
+    authorized: true,
     details: {
-      hasAuthHeader,
+      hasAuthHeader: true,
       hasUserAgent,
       hasCronSecret: true,
       userAgent: userAgent || undefined,
@@ -131,7 +84,7 @@ export function validateCronRequest(req: NextRequest): CronAuthResult {
 
 /**
  * Middleware function that returns 401 if cron auth fails
- * 
+ *
  * @param req - The incoming request
  * @returns NextResponse with 401 if unauthorized, null if authorized
  */

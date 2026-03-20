@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.7.1",
+    "date": "2026-03-20",
+    "changes": [
+      { "type": "fix", "description": "Admin dashboard stats now load correctly after migrating from the removed cron_logs table to job_runs." },
+      { "type": "fix", "description": "Cron endpoints now require a valid bearer token; User-Agent alone no longer grants access." },
+      { "type": "fix", "description": "Job collection and report triggers from the admin panel are now visible in the job log." }
+    ]
+  },
+  {
     "version": "1.7.0",
     "date": "2026-03-18",
     "changes": [

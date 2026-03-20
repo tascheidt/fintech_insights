@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+
+const emailPreferencesSchema = z.object({
+  weekly_digest: z.boolean(),
+});
 
 /**
  * GET /api/user/email-preferences
@@ -43,17 +48,19 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { weekly_digest?: boolean };
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Build email_preferences object
-  const emailPreferences: { weekly_digest: boolean } = {
-    weekly_digest: body.weekly_digest ?? true,
-  };
+  const parsed = emailPreferencesSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid request body", issues: parsed.error.issues }, { status: 400 });
+  }
+
+  const emailPreferences = parsed.data;
 
   const { data, error } = await supabase
     .from("profiles")

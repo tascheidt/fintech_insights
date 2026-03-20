@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdminApi } from "@/lib/auth/admin";
 
 // Default descriptions for known system settings (matches migration seed data)
 const DEFAULT_DESCRIPTIONS: Record<string, string> = {
@@ -12,23 +12,9 @@ const DEFAULT_DESCRIPTIONS: Record<string, string> = {
 
 // GET /api/admin/settings - Fetch all system settings
 export async function GET() {
-  const supabase = await createClient();
-  
-  // Check if user is admin
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-    
-  if (profile?.role !== "admin") {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
-  }
+  const auth = await requireAdminApi();
+  if ("error" in auth) return auth.error;
+  const { supabase } = auth;
 
   const { data: settings, error } = await supabase
     .from("system_settings")
@@ -54,23 +40,9 @@ export async function GET() {
 
 // PUT /api/admin/settings - Update a specific setting
 export async function PUT(req: NextRequest) {
-  const supabase = await createClient();
-  
-  // Check if user is admin
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-    
-  if (profile?.role !== "admin") {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
-  }
+  const auth = await requireAdminApi();
+  if ("error" in auth) return auth.error;
+  const { supabase, user } = auth;
 
   const body = await req.json();
   const { key, value } = body;
@@ -94,7 +66,7 @@ export async function PUT(req: NextRequest) {
     // Row exists - update it using user session (respects RLS)
     const { data: updated, error: updateError } = await supabase
       .from("system_settings")
-      .update({ 
+      .update({
         setting_value: value,
         updated_by: user.id,
       })

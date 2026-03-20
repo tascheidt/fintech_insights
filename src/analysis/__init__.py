@@ -1,6 +1,7 @@
-"""Analysis module for strategic insights and job categorization."""
+"""Analysis module.
 
-from .strategic import StrategicAnalyzer
-from .categorizer import JobCategorizer
+AI analysis has moved to the TypeScript layer (web/lib/analysis/).
+The Python CLI remains as a developer debugging tool for scraper testing only.
+"""
 
-__all__ = ["StrategicAnalyzer", "JobCategorizer"]
+__all__: list[str] = []

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { STALE_JOB_THRESHOLD_MS } from "./constants";
 import { processCollectionTask } from "./processor";
 import { processAnalysisTask } from "./analyzer";
 import { updateJobRunStats } from "./progress";
@@ -92,7 +93,7 @@ export async function executeCollectionJob(jobRunId: string): Promise<JobRunResu
   try {
     // Inline stale cleanup: tasks stuck in "running" for >20 minutes are failed tasks
     // (e.g. Vercel killed the function mid-run, or GitHub Actions never called back)
-    const staleThreshold = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    const staleThreshold = new Date(Date.now() - STALE_JOB_THRESHOLD_MS).toISOString();
     await supabase
       .from('job_run_tasks')
       .update({

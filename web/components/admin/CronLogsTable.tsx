@@ -36,7 +36,7 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
     try {
       const params = new URLSearchParams({ limit: "20" });
       if (filter !== "all") params.set("job_type", filter);
-      const res = await fetch(`/api/admin/cron-logs?${params}`);
+      const res = await fetch(`/api/admin/job-runs?${params}`);
       const data = await res.json();
       setLogs(data.logs ?? []);
     } catch (e) {
@@ -180,7 +180,7 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
 
     setDeletingId(jobRunId);
     try {
-      const res = await fetch("/api/admin/cron-logs", {
+      const res = await fetch("/api/admin/job-runs", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRunId }),

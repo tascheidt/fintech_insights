@@ -1,32 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdminApi } from "@/lib/auth/admin";
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") {
-    return { error: NextResponse.json({ error: "Admin access required" }, { status: 403 }) };
-  }
-
-  return { supabase };
-}
-
-// GET /api/admin/cron-logs - Fetch recent cron execution logs
+// GET /api/admin/job-runs - Fetch recent job execution logs
 export async function GET(req: NextRequest) {
-  const auth = await requireAdmin();
-  if ("error" in auth) {
-    return auth.error;
-  }
+  const auth = await requireAdminApi();
+  if ("error" in auth) return auth.error;
   const { supabase } = auth;
 
   const searchParams = req.nextUrl.searchParams;
@@ -85,12 +63,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ logs });
 }
 
-// DELETE /api/admin/cron-logs - Delete a job run
+// DELETE /api/admin/job-runs - Delete a job run
 export async function DELETE(req: NextRequest) {
-  const auth = await requireAdmin();
-  if ("error" in auth) {
-    return auth.error;
-  }
+  const auth = await requireAdminApi();
+  if ("error" in auth) return auth.error;
   const { supabase } = auth;
 
   const body = await req.json().catch(() => ({})) as { jobRunId?: string };

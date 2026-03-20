@@ -3,7 +3,7 @@
 import json
 import csv
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -48,7 +48,7 @@ class ReportGenerator:
             Dictionary with report data
         """
         if since_date is None:
-            since_date = datetime.utcnow() - timedelta(days=7)
+            since_date = datetime.now(timezone.utc) - timedelta(days=7)
 
         # Get new postings
         new_postings = self.db.get_new_postings_since(since_date, strategic_only=strategic_only)
@@ -113,9 +113,9 @@ class ReportGenerator:
         trends = self.db.get_posting_trends(days=30)
 
         return {
-            "report_date": datetime.utcnow().strftime("%Y-%m-%d"),
+            "report_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "period_start": since_date.strftime("%Y-%m-%d"),
-            "period_end": datetime.utcnow().strftime("%Y-%m-%d"),
+            "period_end": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "summary": {
                 "new_postings_count": len(new_postings),
                 "closed_postings_count": len(closed_postings),
@@ -262,7 +262,7 @@ class ReportGenerator:
         Returns:
             Path to the created CSV file
         """
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
         postings = self.db.get_new_postings_since(since, strategic_only=False)
 
         with open(output_path, 'w', newline='', encoding='utf-8') as f:

@@ -3,6 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { buildHistoricalContext, formatHistoricalContextForPrompt } from "@/lib/analysis/context-builder";
+import { z } from "zod";
+
+const chatSchema = z.object({
+  question: z.string().min(1).max(2000),
+});
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -17,11 +22,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { question } = await req.json();
-
-    if (!question || typeof question !== "string") {
-      return NextResponse.json({ error: "Question is required" }, { status: 400 });
+    const parsed = chatSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid request body", issues: parsed.error.issues }, { status: 400 });
     }
+    const { question } = parsed.data;
 
     const supabase = await createClient();
     const adminSupabase = createAdminClient();

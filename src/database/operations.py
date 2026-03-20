@@ -1,7 +1,7 @@
 """Database operations for CRUD functionality."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session, joinedload
@@ -48,9 +48,9 @@ class DatabaseOperations:
             return session.query(Company).all()
 
     def get_active_companies(self) -> List[Company]:
-        """Get active companies."""
+        """Get all companies."""
         with self.get_session() as session:
-            return session.query(Company).filter_by(is_active=True).all()
+            return session.query(Company).all()
 
     # Job posting operations
     def upsert_job_posting(self, company_id: int, job_data: Dict[str, Any]) -> tuple[JobPosting, bool]:
@@ -68,7 +68,7 @@ class DatabaseOperations:
 
             if existing:
                 # Update existing posting
-                existing.last_seen_date = datetime.utcnow()
+                existing.last_seen_date = datetime.now(timezone.utc)
                 existing.is_active = True
                 # Update other fields if they changed
                 for key, value in job_data.items():
@@ -107,7 +107,7 @@ class DatabaseOperations:
 
             for posting in active_postings:
                 posting.is_active = False
-                posting.closed_date = datetime.utcnow()
+                posting.closed_date = datetime.now(timezone.utc)
 
                 # Record closed event
                 event = PostingEvent(
@@ -137,8 +137,6 @@ class DatabaseOperations:
             ).filter(
                 JobPosting.first_seen_date >= since
             )
-            if strategic_only:
-                query = query.join(Company).filter(Company.is_active == True)
             # Use list() to ensure all data is loaded before session closes
             return list(query.all())
 
@@ -150,8 +148,6 @@ class DatabaseOperations:
             ).filter(
                 JobPosting.closed_date >= since
             )
-            if strategic_only:
-                query = query.join(Company).filter(Company.is_active == True)
             return list(query.all())
 
     def get_postings_without_insights(self, strategic_only: bool = True) -> List[JobPosting]:
@@ -165,8 +161,6 @@ class DatabaseOperations:
                 StrategicInsight.id == None,
                 JobPosting.is_active == True
             )
-            if strategic_only:
-                query = query.join(Company).filter(Company.is_active == True)
             return list(query.all())
 
     # Strategic insight operations
@@ -230,7 +224,7 @@ class DatabaseOperations:
         """Get posting trends over the last N days."""
         from datetime import timedelta
         with self.get_session() as session:
-            since = datetime.utcnow() - timedelta(days=days)
+            since = datetime.now(timezone.utc) - timedelta(days=days)
 
             new_count = session.query(JobPosting).filter(
                 JobPosting.first_seen_date >= since

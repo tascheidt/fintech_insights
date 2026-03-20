@@ -23,17 +23,18 @@ companies:
   #   ats_identifier: neofinancial
   #   careers_url: https://www.neofinancial.com/careers
 
-  - name: Questrade
-    slug: questrade
-    country: CA
-    ats_type: dayforce
-    ats_identifier: qfg
-    careers_url: https://jobs.dayforcehcm.com/en-US/qfg/CANDIDATEPORTAL
+  # Note: Questrade uses Dayforce ATS — no DayforceScraper exists, currently disabled
+  # - name: Questrade
+  #   slug: questrade
+  #   country: CA
+  #   ats_type: dayforce
+  #   ats_identifier: qfg
+  #   careers_url: https://jobs.dayforcehcm.com/en-US/qfg/CANDIDATEPORTAL
 
   - name: Tangerine
     slug: tangerine
     country: CA
-    ats_type: scotiabank
+    ats_type: custom
     ats_identifier: Tangerine
     careers_url: https://jobs.scotiabank.com/Tangerine/search/
 

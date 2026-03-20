@@ -7,7 +7,7 @@ import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ class EmailDelivery:
             True if sent successfully
         """
         if report_date is None:
-            report_date = datetime.utcnow().strftime("%Y-%m-%d")
+            report_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         subject = f"The Fintech Talent Brief - {report_date}"
 

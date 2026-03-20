@@ -3,7 +3,7 @@
 import os
 import sys
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, List
 
@@ -232,7 +232,7 @@ def report(ctx, report_type, days, preview, output):
     db = ctx.obj["db"]
     config = ctx.obj["config"]
 
-    since_date = datetime.utcnow() - timedelta(days=days)
+    since_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     logger.info(f"Generating {report_type} report for last {days} days...")
 

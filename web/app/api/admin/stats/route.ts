@@ -23,7 +23,6 @@ export async function GET() {
   }
 
   const weekAgo = subDays(new Date(), 7).toISOString();
-  const dayAgo = subDays(new Date(), 1).toISOString();
 
   // Fetch all stats in parallel
   const [
@@ -46,8 +45,8 @@ export async function GET() {
     supabase.from("strategic_insights").select("*", { count: "exact", head: true }),
     supabase.from("strategic_insights").select("*", { count: "exact", head: true }).gte("run_date", weekAgo),
     supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase.from("cron_logs").select("*").eq("job_type", "collect").eq("status", "success").order("completed_at", { ascending: false }).limit(1),
-    supabase.from("cron_logs").select("*").eq("job_type", "report").eq("status", "success").order("completed_at", { ascending: false }).limit(1),
+    supabase.from("job_runs").select("*").eq("job_type", "collect").eq("status", "completed").order("completed_at", { ascending: false }).limit(1),
+    supabase.from("job_runs").select("*").eq("job_type", "report").eq("status", "completed").order("completed_at", { ascending: false }).limit(1),
   ]);
 
   return NextResponse.json({
