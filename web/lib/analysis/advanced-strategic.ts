@@ -98,6 +98,21 @@ export interface AnalyzeJobOptions {
   historicalContext?: HistoricalContext;
   /** Pre-fetched web research context. If omitted, performWebSearch is called automatically. */
   webSearchContext?: WebSearchContext;
+  /**
+   * Gemini model for the main analysis JSON call. Default: `gemini-pro-latest`.
+   */
+  analysisModel?: string;
+  /**
+   * If true, attach Google Search grounding on the analysis call (production default).
+   * Set false to measure “prompt + context only” cost and behavior.
+   */
+  analysisGoogleSearch?: boolean;
+  /**
+   * When the primary analysis model is Pro, fall back to Flash on quota errors.
+   * Set false for A/B evaluations so a Pro failure does not swap in Flash mid-run.
+   * Default: true.
+   */
+  analysisQuotaFallback?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -422,13 +437,28 @@ export async function performWebSearch(companyName: string): Promise<WebSearchCo
 export async function analyzeJobAdvanced(
   options: AnalyzeJobOptions
 ): Promise<AdvancedAnalyzeResult | null> {
-  const { companyId, companyName, job, historicalContext, webSearchContext } = options;
+  const {
+    companyId,
+    companyName,
+    job,
+    historicalContext,
+    webSearchContext,
+    analysisModel = PRO_MODEL,
+    analysisGoogleSearch = true,
+    analysisQuotaFallback = true,
+  } = options;
   const key = process.env.GEMINI_API_KEY;
 
   if (!key) {
     console.error("GEMINI_API_KEY not configured");
     return null;
   }
+
+  const generationConfig = {
+    temperature: 0.4,
+    maxOutputTokens: 8192,
+    responseMimeType: "application/json" as const,
+  };
 
   try {
     const context =
@@ -445,18 +475,19 @@ export async function analyzeJobAdvanced(
 
     const genAI = new GoogleGenerativeAI(key);
 
-    // Two-stage research: analysis model can do targeted follow-up searches
-    // in addition to the pre-fetched context passed in the prompt.
-    let model: GenerativeModel = genAI.getGenerativeModel({
-      model: PRO_MODEL,
-      // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
-      tools: [{ googleSearch: {} }],
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 8192,
-        responseMimeType: "application/json",
-      },
-    });
+    const buildAnalysisModel = (modelId: string, withSearch: boolean): GenerativeModel =>
+      genAI.getGenerativeModel({
+        model: modelId,
+        ...(withSearch
+          ? {
+              // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
+              tools: [{ googleSearch: {} }],
+            }
+          : {}),
+        generationConfig,
+      });
+
+    let model: GenerativeModel = buildAnalysisModel(analysisModel, analysisGoogleSearch);
 
     let result;
     try {
@@ -464,16 +495,16 @@ export async function analyzeJobAdvanced(
         contents: [{ role: "user", parts: [{ text: prompt }] }],
       });
     } catch (error: unknown) {
-      if (isQuotaError(error)) {
+      const allowFallback =
+        analysisQuotaFallback &&
+        analysisModel === PRO_MODEL &&
+        analysisGoogleSearch;
+      if (allowFallback && isQuotaError(error)) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.warn(`${PRO_MODEL} quota exceeded: ${msg}. Falling back to ${FLASH_MODEL}.`);
+        console.warn(`${analysisModel} quota exceeded: ${msg}. Falling back to ${FLASH_MODEL}.`);
         model = genAI.getGenerativeModel({
           model: FLASH_MODEL,
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 8192,
-            responseMimeType: "application/json",
-          },
+          generationConfig,
         });
         result = await model.generateContent({
           contents: [{ role: "user", parts: [{ text: prompt }] }],

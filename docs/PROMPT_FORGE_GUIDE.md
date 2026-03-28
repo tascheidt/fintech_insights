@@ -39,6 +39,8 @@ This document is intentionally split into two parts:
 - It does not directly modify source code when you save a prompt
 - It does not expose prompt editing to non-admin users
 
+- It does not tune **per-job strategic insights** (the `analyzeJobAdvanced` pipeline used after collection to populate `strategic_insights`). To compare Gemini models for that path—for example `gemini-pro-latest` vs `gemini-3-flash-preview` or `gemini-flash-latest`—use the dev script `web/scripts/compare-job-analysis-models.ts` with shared historical and web context so both arms see identical inputs.
+
 ### Core product idea
 
 Prompt changes should:

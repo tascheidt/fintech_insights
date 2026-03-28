@@ -12,6 +12,9 @@
  * Examples:
  *   npx tsx --env-file=.env.local scripts/test-advanced-analysis.ts
  *   npx tsx --env-file=.env.local scripts/test-advanced-analysis.ts "Wealthsimple"
+ *
+ * For Pro vs Flash on the same jobs with shared context, see:
+ *   scripts/compare-job-analysis-models.ts
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
