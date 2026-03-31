@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getVoiceDirective } from "@/lib/ai/voice";
 
 /**
  * Strategy Analysis Pipeline
@@ -59,7 +60,9 @@ export interface StrategyAnalysisResult {
 // Prompt
 // ============================================================================
 
-const STRATEGY_PROMPT = `You are a senior competitive intelligence analyst at a fintech-focused investment firm. Your specialty is reverse-engineering corporate strategy from public hiring data.
+const STRATEGY_PROMPT_BODY = `{voice_block}
+
+You are a senior competitive intelligence analyst at a fintech-focused investment firm. Your specialty is reverse-engineering corporate strategy from public hiring data. Apply the VOICE rules above to initiative names, descriptions, signals, and overall_assessment text.
 
 Given the following job postings for {company_name}, identify distinct strategic initiatives the company appears to be pursuing. Group related roles together and explain what each cluster reveals about company direction.
 
@@ -99,6 +102,12 @@ Guidelines:
 - Roles that don't fit any initiative can be omitted
 - Confidence should be "high" only when 3+ roles clearly support the initiative
 - The overall_assessment should synthesize the initiatives into a coherent strategic narrative`;
+
+function buildStrategyPrompt(companyName: string, jobData: string): string {
+  return STRATEGY_PROMPT_BODY.replace("{voice_block}", getVoiceDirective("narrative"))
+    .replace("{company_name}", companyName)
+    .replace("{job_data}", jobData);
+}
 
 // ============================================================================
 // Helpers
@@ -153,10 +162,7 @@ export async function analyzeCompanyStrategy(
     )
     .join("\n");
 
-  const prompt = STRATEGY_PROMPT.replace("{company_name}", companyName).replace(
-    "{job_data}",
-    jobData
-  );
+  const prompt = buildStrategyPrompt(companyName, jobData);
 
   try {
     const genAI = new GoogleGenerativeAI(key);

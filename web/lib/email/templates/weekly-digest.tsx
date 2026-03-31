@@ -37,7 +37,7 @@ function getLeadingTheme(company: CompanyWeeklySummary): string {
 }
 
 /**
- * Global summary section - the "TL;DR of TL;DRs"
+ * Global summary section — cross-company overview
  * Displays cross-company trend analysis at the top of the email
  */
 function GlobalSummarySection({ summary }: { summary: GlobalSummary }) {
@@ -113,7 +113,7 @@ function CompanySection({ company, appUrl = "https://fintech-talent-brief.vercel
 /**
  * Weekly Digest Email Template
  * 
- * Clean, minimal design with TLDR-style AI commentary for each company
+ * Clean, minimal design with neutral AI commentary per company
  */
 export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-talent-brief.vercel.app", version }: WeeklyDigestEmailProps) {
   const dateRange = formatDateRange(digest.week_start, digest.week_end);

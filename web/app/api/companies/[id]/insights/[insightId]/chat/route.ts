@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getVoiceDirective } from "@/lib/ai/voice";
 import { z } from "zod";
 
 const messageSchema = z.object({
@@ -140,7 +141,9 @@ ${insight.strategic_implications}
       .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
       .join("\n\n");
 
-    const prompt = `You are a competitive intelligence analyst helping a user understand this company insight analysis.
+    const prompt = `${getVoiceDirective("chat")}
+
+You are a competitive intelligence analyst helping a user understand this company insight analysis.
 
 ## Company Insight Context
 ${insightContext}

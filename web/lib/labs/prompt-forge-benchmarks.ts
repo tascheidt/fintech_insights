@@ -1,5 +1,5 @@
 import type { CompanyTechStack } from "@/lib/ai/tech-stack-extraction";
-import type { TLDRCommentary, WeeklyDigestCompanyInput } from "@/lib/analysis/digest";
+import type { DigestCommentary, WeeklyDigestCompanyInput } from "@/lib/analysis/digest";
 
 export interface JobStructureBenchmarkCase {
   id: string;
@@ -211,7 +211,7 @@ export function scoreTechStackBenchmark(output: CompanyTechStack, benchmark: Tec
   return Math.round((categoryScore * 0.35) + (techScore * 0.35) + (narrativeScore * 0.3));
 }
 
-export function scoreWeeklyDigestBenchmark(output: TLDRCommentary, benchmark: WeeklyDigestBenchmarkCase) {
+export function scoreWeeklyDigestBenchmark(output: DigestCommentary, benchmark: WeeklyDigestBenchmarkCase) {
   const text = `${output.headline} ${output.body}`.toLowerCase();
   const includeHits = benchmark.expectedInclude.filter((item) => text.includes(item.toLowerCase())).length;
   const excludeHits = benchmark.expectedExclude.filter((item) => text.includes(item.toLowerCase())).length;

@@ -131,6 +131,10 @@ Use this when you want to improve:
 
 ---
 
+## Editorial voice
+
+All Prompt Forge outputs that become user-visible prose should align with **[voice.md](voice.md)** (neutral, evidence-first). Weekly digest Arena runs now include a **Voice compliance** metric derived from shared rules in `web/lib/ai/voice-validator.ts`.
+
 ## Supported Models
 
 Prompt Forge currently supports these approved Gemini 3 models:

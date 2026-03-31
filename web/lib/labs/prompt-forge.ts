@@ -5,7 +5,7 @@ import {
   buildWeeklyDigestCompanyInput,
   generateWeeklyDigestCommentary,
   getWeeklyData,
-  type TLDRCommentary,
+  type DigestCommentary,
   type WeeklyDigestCompanyInput,
 } from "@/lib/analysis/digest";
 import { buildTechStackStrategicContext } from "@/lib/analysis/strategic-context";
@@ -23,6 +23,7 @@ import {
   type WeeklyDigestAiConfig,
 } from "@/lib/ai/prompt-config";
 import { aggregateTechStackFromJobs } from "@/lib/ai/tech-stack-aggregation";
+import { checkVoice, voiceComplianceScore } from "@/lib/ai/voice-validator";
 import { createGitHubIssue, triggerCodeGenWorkflow } from "@/lib/github";
 import { extractAndUpdateStructure } from "@/lib/jobs/processor";
 import {
@@ -319,7 +320,7 @@ function getNarrativeMetrics(
 
 function getWeeklyDigestMetrics(
   input: WeeklyDigestCompanyInput,
-  commentary: TLDRCommentary
+  commentary: DigestCommentary
 ): PromptForgeBattleSummary {
   const text = `${commentary.headline} ${commentary.body}`.toLowerCase();
   const roleMentions = input.weekly_role_themes.filter((theme) =>
@@ -381,6 +382,23 @@ function getWeeklyDigestMetrics(
       helper: "Rewards shorter, plainer language that reads like a hiring brief.",
     },
   ];
+
+  const voiceCheck = checkVoice({
+    headline: commentary.headline,
+    body: commentary.body,
+  });
+  const voiceScore = voiceComplianceScore(voiceCheck.warnings);
+  const voiceHelper =
+    voiceCheck.warnings.length > 0
+      ? voiceCheck.warnings.slice(0, 4).join("; ").slice(0, 240)
+      : "Aligned with shared voice rules (docs/voice.md).";
+  metrics.push({
+    id: "voiceCompliance",
+    label: "Voice compliance",
+    value: voiceScore,
+    tone: toneForScore(voiceScore),
+    helper: voiceHelper,
+  });
 
   return {
     score: clampScore(average(metrics.map((metric) => metric.value))),

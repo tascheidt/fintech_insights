@@ -1,15 +1,8 @@
 "use client";
 
 /**
- * WeeklyDigestsList - Displays recent weekly digests/company insights.
- * 
- * TLDR-style redesign:
- * - Punchy headlines with emoji as primary display
- * - Clean, minimal card design
- * - Plain-language takeaways
- * 
- * Shows company insights grouped by generation date, serving as a digest overview.
- * Links to full insight details for each company.
+ * WeeklyDigestsList - Recent company-level insights grouped by date.
+ * Headlines follow neutral editorial voice (docs/voice.md): plain, specific, no emoji.
  */
 
 import * as React from "react";
@@ -28,19 +21,15 @@ import {
 
 /**
  * Company insight data for display
- * 
- * TLDR-style additions:
- * - headline: Punchy, emoji-forward headline (e.g., "🚀 Koho bets big on small businesses!")
- * - whatItMeans: Plain-language one-liner takeaway
  */
 export interface DigestInsight {
   id: string;
   companyName: string;
   companySlug: string;
   generatedAt: string;
-  /** Punchy headline with emoji for TLDR-style display */
+  /** Short analytical headline (plain language) */
   headline?: string;
-  /** Plain-language takeaway */
+  /** Key takeaway line when available */
   whatItMeans?: string;
   executiveSummary: string;
   confidence: "high" | "medium" | "low";
@@ -76,7 +65,7 @@ export function WeeklyDigestsList({ insights, className }: WeeklyDigestsListProp
       <div className={cn("space-y-4", className)}>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">🎯 This week&apos;s highlights</h2>
+            <h2 className="text-lg font-semibold">This week&apos;s highlights</h2>
             <p className="text-sm text-muted-foreground">
               What&apos;s happening in Canadian fintech
             </p>
@@ -94,10 +83,10 @@ export function WeeklyDigestsList({ insights, className }: WeeklyDigestsListProp
 
   return (
     <div className={cn("space-y-4", className)}>
-      {/* Header - TLDR style */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">🎯 This week&apos;s highlights</h2>
+          <h2 className="text-lg font-semibold">This week&apos;s highlights</h2>
           <p className="text-sm text-muted-foreground">
             What&apos;s happening in Canadian fintech
           </p>
@@ -163,10 +152,7 @@ function DigestDateGroup({
 }
 
 /**
- * Individual insight card - TLDR style
- * 
- * Displays punchy headline as primary text, with company as secondary.
- * Clean, minimal design matching the email template.
+ * Individual insight card — headline, excerpt, company footer.
  */
 function DigestInsightCard({ insight }: { insight: DigestInsight }) {
   const confidenceStyles = {
@@ -176,13 +162,13 @@ function DigestInsightCard({ insight }: { insight: DigestInsight }) {
   };
 
   // Use headline if available, fallback to company name
-  const displayHeadline = insight.headline || `📊 ${insight.companyName} is hiring`;
+  const displayHeadline = insight.headline || `${insight.companyName} — company insight`;
 
   return (
     <Link href={`/companies/${insight.companySlug}/insights/${insight.id}`}>
       <NotionCard className="h-full hover:shadow-md transition-shadow">
         <NotionCardContent className="space-y-3">
-          {/* Punchy headline - the star of the show */}
+          {/* Headline */}
           <NotionCardTitle className="text-sm font-semibold leading-snug">
             {displayHeadline}
           </NotionCardTitle>

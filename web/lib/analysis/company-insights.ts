@@ -9,6 +9,8 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getVoiceDirective } from "@/lib/ai/voice";
+import { checkVoice } from "@/lib/ai/voice-validator";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildExtendedHistoricalContext,
@@ -51,7 +53,7 @@ export interface CompanyInsight {
   confidence: "high" | "medium" | "low";
 
   // Display fields for dashboard highlights
-  headline: string | null;           // Punchy 5-8 word headline with emoji
+  headline: string | null;           // Plain analytical headline (6–12 words, no emoji)
   significanceScore: number | null;  // 1-10 ranking for dashboard sorting
   keySignal: string | null;          // One-liner explaining strategic signal
 
@@ -385,12 +387,14 @@ interface GeneratedInsightContent {
   strategicImplications: string;
   modelReasoning: string;
   // Display fields for dashboard highlights
-  headline: string;          // Punchy 5-8 word headline with emoji
+  headline: string;          // Plain 6–12 word headline, no emoji
   significanceScore: number; // 1-10 ranking
   keySignal: string;         // One-liner explaining strategic signal
 }
 
-const COMPANY_INSIGHT_PROMPT = `You are a fintech strategy analyst. Produce an evidence-backed company insight from hiring signals and external research.
+const COMPANY_INSIGHT_PROMPT = `{voice_block}
+
+You are a fintech strategy analyst. Produce an evidence-backed company insight from hiring signals and external research. Obey the VOICE rules above for every user-visible string.
 
 {hiring_context}
 
@@ -408,14 +412,13 @@ const COMPANY_INSIGHT_PROMPT = `You are a fintech strategy analyst. Produce an e
 
 ## Analysis Tasks
 
-1. **Headline** (CRITICAL for dashboard display):
-   - Write a punchy 5-8 word headline with ONE emoji at the start
-   - Examples: "🎯 Koho doubles down on SMB", "🚀 Neo's engineering surge begins", "💡 Wealthsimple names its new core platform bet"
-   - Be specific about the strategic move, not generic "Company is hiring"
+1. **Headline** (dashboard display):
+   - 6–12 words, plain and specific; no emoji or exclamation marks
+   - Name the strategic signal (role cluster, function shift, or platform bet), not generic "Company is hiring"
 
 2. **Key Signal** (one-liner):
-   - A brief explanation of what the headline means strategically, anchored in named evidence when available
-   - Example: "Pivoting from consumer to small business banking while modernizing onboarding on Engine by Starling"
+   - What the headline means strategically; anchor in named evidence when available
+   - Example: "Consumer hiring shifts toward small-business banking and onboarding modernization on Engine by Starling."
 
 3. **Significance Score** (1-10):
    - How noteworthy is this insight for industry observers?
@@ -460,8 +463,8 @@ const COMPANY_INSIGHT_PROMPT = `You are a fintech strategy analyst. Produce an e
 
 Respond with JSON:
 {
-  "headline": "🎯 Punchy 5-8 word headline",
-  "key_signal": "One-liner explaining the strategic signal",
+  "headline": "6-12 words, plain and specific",
+  "key_signal": "One-line strategic explanation",
   "significance_score": 7,
   "executive_summary": "...",
   "strategic_hypothesis": "...",
@@ -550,7 +553,7 @@ async function generateInsightWithLLM(
   const researchContext = formatResearchForPrompt(research);
   const previousInsightContext = formatPreviousInsightContext(previousInsight);
 
-  const prompt = COMPANY_INSIGHT_PROMPT
+  const prompt = COMPANY_INSIGHT_PROMPT.replace("{voice_block}", getVoiceDirective("analysis"))
     .replace("{hiring_context}", hiringContext)
     .replace("{research_context}", researchContext)
     .replace("{previous_insight_context}", previousInsightContext);
@@ -631,7 +634,7 @@ async function generateInsightWithLLM(
       throw new Error("Failed to parse LLM response");
     }
 
-    return {
+    const out = {
       executiveSummary: String(parsed.executive_summary || ""),
       strategicHypothesis: String(parsed.strategic_hypothesis || ""),
       confidence: validateConfidence(parsed.confidence),
@@ -641,10 +644,24 @@ async function generateInsightWithLLM(
       strategicImplications: String(parsed.strategic_implications || ""),
       modelReasoning: String(parsed.model_reasoning || ""),
       // Display fields for dashboard highlights
-      headline: String(parsed.headline || `📊 ${companyName} hiring update`),
+      headline: String(parsed.headline || `Company insight: ${companyName}`),
       significanceScore: validateSignificanceScore(parsed.significance_score),
       keySignal: String(parsed.key_signal || ""),
     };
+
+    const voice = checkVoice({
+      headline: out.headline,
+      key_signal: out.keySignal,
+      executive_summary: out.executiveSummary,
+    });
+    if (!voice.passed) {
+      console.warn(
+        `[voice] company insight warnings for ${companyName}:`,
+        voice.warnings.join("; ")
+      );
+    }
+
+    return out;
   } catch (error) {
     console.error("LLM generation error:", error);
     throw new Error(`Failed to generate insight with LLM: ${error instanceof Error ? error.message : String(error)}`);

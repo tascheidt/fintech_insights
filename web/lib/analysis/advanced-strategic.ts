@@ -8,6 +8,8 @@
  */
 
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import { checkVoice } from "@/lib/ai/voice-validator";
+import { getVoiceDirective } from "@/lib/ai/voice";
 import { buildHistoricalContext, formatHistoricalContextForPrompt, type HistoricalContext } from "./context-builder";
 
 // ---------------------------------------------------------------------------
@@ -60,17 +62,13 @@ export interface WebSearchContext {
 }
 
 /**
- * Result from advanced job analysis
- *
- * TLDR-style additions:
- * - headline: Punchy, emoji-forward headline for digest display
- * - what_it_means: Plain-language takeaway for readers
+ * Result from advanced job analysis (neutral, evidence-first voice — see docs/voice.md).
  */
 export interface AdvancedAnalyzeResult {
-  /** Punchy headline with emoji (e.g., "🚀 Koho bets big on small businesses!") */
+  /** Short plain headline (6–12 words), no emoji — specific to the hiring signal */
   headline: string;
   category: AnalysisCategory;
-  /** Conversational 2-3 sentence summary */
+  /** 2–3 sentence analytical summary */
   insight_summary: string;
   /** Plain-language one-liner takeaway */
   what_it_means: string;
@@ -119,15 +117,9 @@ export interface AnalyzeJobOptions {
 // Prompt
 // ---------------------------------------------------------------------------
 
-/**
- * Advanced analysis prompt with TLDR-style punchy voice
- *
- * Key additions for TLDR style:
- * - headline: Punchy, emoji-forward headline (e.g., "🚀 Koho bets big on small businesses!")
- * - Conversational insight_summary in plain language
- * - what_it_means: Plain-language takeaway for the reader
- */
-const ADVANCED_PROMPT = `You are a sharp fintech analyst who writes like Wealthsimple's TLDR newsletter - punchy, conversational, and fun to read. You spot strategic moves in hiring patterns and explain them in plain language.
+const ADVANCED_PROMPT_BODY = `{voice_block}
+
+You are a competitive intelligence analyst reviewing fintech hiring. Apply the VOICE rules above to every user-visible string in your JSON output.
 
 ## Company Historical Context
 {historical_context}
@@ -144,60 +136,38 @@ Location: {location}
 Full Job Description:
 {description}
 
-## Your Analysis Tasks
+## Analysis Tasks
 
-1. PUNCHY HEADLINE:
-   - Write a catchy, emoji-forward headline (8 words max) that captures the strategic signal
-   - Start with ONE relevant emoji that fits the vibe
-   - Use active, punchy language like TLDR newsletter does
-   - Examples: "🤖 Wealthsimple doubles down on AI", "💼 Koho bets big on small businesses!", "🚀 Neo's hiring spree continues"
+1. **Headline**: One plain, specific line (about 6–12 words) summarizing the main hiring signal. No emoji or exclamation marks.
 
-2. NOVELTY ASSESSMENT (1-10 scale):
-   - Compare this role against the company's historical hiring patterns
-   - Is this a continuation of existing strategy (1-4)?
-   - Is this a new direction or pivot (7-10)?
-   - Is this an expansion/scale of existing approach (5-6)?
-   - Provide detailed reasoning for your score
+2. **Novelty (1–10)**: Compare this role to the company’s historical hiring in context. Low = continuation; high = clear new direction or unusual cluster. Explain in novelty_reasoning.
 
-3. EXECUTIVE MOVEMENT DETECTION:
-   - Is this a leadership/C-suite/VP+ level hire?
-   - Does this signal a new function, reorganization, or strategic shift?
-   - What does this executive hire imply about company direction?
+3. **Executive movement**: Identify VP+ / C-level / director-level strategic hires and implications.
 
-4. STRATEGIC HYPOTHESIS:
-   - What is the most likely strategic reason for this hire?
-   - How does it fit (or not fit) with recent company news and strategy?
-   - What does this signal about the company's priorities?
+4. **Strategic hypothesis**: Most likely reason for this role; connect to news evidence where possible; flag uncertainty.
 
-5. WEB-GROUNDED CONTEXT:
-   - How does this role correlate with recent company news, funding, product launches, or market moves?
-   - Does the web context support or contradict the signals from this posting?
+5. **Web grounding**: Relate the posting to recent news, products, or public strategy; note contradictions.
 
-6. CONFIDENCE & REASONING:
-   - How confident are you in this analysis? (high/medium/low)
-   - Provide detailed reasoning for your confidence level
+6. **Confidence**: high / medium / low with detailed model_reasoning.
 
-## Writing Style Rules
-- Write insight_summary in 2-3 casual, conversational sentences - like you're explaining to a smart friend
-- Avoid corporate jargon - say "betting big" not "making strategic investments"
-- what_it_means should be one plain-language takeaway a reader can immediately understand
+**Writing:** insight_summary = 2–3 neutral analytical sentences. what_it_means = one clear takeaway. strategic_signals = short factual bullets tied to the posting (no hype).
 
-Respond with a JSON object containing:
+Respond with a JSON object only:
 {
-  "headline": "🚀 Punchy 8-word-max headline with ONE emoji at start",
+  "headline": "6-12 words, plain and specific",
   "category": "one of: expansion, new-product, technology, operational, compliance, customer, data, marketing, leadership, other",
-  "insight_summary": "2-3 casual sentences explaining what this hire signals - write like you're texting a smart friend",
-  "what_it_means": "One plain-language sentence: what should readers take away from this?",
+  "insight_summary": "2-3 analytical sentences",
+  "what_it_means": "One sentence takeaway",
   "strategic_signals": ["signal 1", "signal 2", "signal 3", "signal 4"],
   "is_new_direction": true or false,
   "confidence": "high, medium, or low",
   "novelty_score": 1-10 integer,
-  "novelty_reasoning": "detailed explanation of why this score was assigned",
+  "novelty_reasoning": "why this score",
   "is_executive_movement": true or false,
-  "executive_context": "significance of this executive hire, or null if not an executive role",
-  "strategic_hypothesis": "your best hypothesis about why this role exists and what it signals",
-  "web_corroboration": "how recent company news/strategy relates to this posting",
-  "model_reasoning": "your detailed reasoning process and confidence assessment"
+  "executive_context": "significance if executive role, else null",
+  "strategic_hypothesis": "hypothesis with evidence caveats",
+  "web_corroboration": "how news/strategy relates",
+  "model_reasoning": "reasoning and confidence rationale"
 }`;
 
 function buildPrompt(
@@ -206,7 +176,7 @@ function buildPrompt(
   historicalText: string,
   webText: string
 ): string {
-  return ADVANCED_PROMPT
+  return ADVANCED_PROMPT_BODY.replace("{voice_block}", getVoiceDirective("analysis"))
     .replace("{historical_context}", historicalText)
     .replace("{web_context}", webText)
     .replace("{company_name}", companyName)
@@ -311,7 +281,7 @@ function parseAnalysisResult(
       : 5;
 
   return {
-    headline: String(parsed["headline"] ?? `📊 ${companyName} is hiring`),
+    headline: String(parsed["headline"] ?? `Hiring activity at ${companyName}`),
     category: normalizeCategory(parsed["category"]),
     insight_summary: String(parsed["insight_summary"] ?? ""),
     what_it_means: String(parsed["what_it_means"] ?? ""),
@@ -516,7 +486,19 @@ export async function analyzeJobAdvanced(
 
     const text = result.response.text()?.trim() ?? "{}";
     const parsed = JSON.parse(text) as Record<string, unknown>;
-    return parseAnalysisResult(parsed, companyName);
+    const analyzed = parseAnalysisResult(parsed, companyName);
+    const voice = checkVoice({
+      headline: analyzed.headline,
+      insight_summary: analyzed.insight_summary,
+      what_it_means: analyzed.what_it_means,
+    });
+    if (!voice.passed) {
+      console.warn(
+        `[voice] job analysis warnings for ${companyName}:`,
+        voice.warnings.join("; ")
+      );
+    }
+    return analyzed;
   } catch (error: unknown) {
     console.error("Advanced Gemini analysis error:", error);
     return null;

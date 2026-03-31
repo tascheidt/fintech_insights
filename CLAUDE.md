@@ -11,6 +11,9 @@ The Fintech Talent Brief - a hiring intelligence platform tracking job postings 
 ## Project Asthetic 
 "Notion-sytle" - Clean white or very subtle off-white/light gray theme with clean, high contrast typography, or a refined dark theme if strictly required
 
+## Editorial voice (AI copy)
+User-facing AI prose (digests, job/company insights, chat, strategy narrative) follows **docs/voice.md**. Runtime rules live in `web/lib/ai/voice.ts`; heuristic checks in `web/lib/ai/voice-validator.ts`. When changing tone, update the doc and keep `voice.ts` in sync in the same PR.
+
 ## Common Commands
 
 ### Web App (Next.js)
