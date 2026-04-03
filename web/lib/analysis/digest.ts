@@ -324,14 +324,29 @@ function parseDigestCommentaryResponse(text: string, companyName: string): Diges
       };
     }
   } catch {
-    const headlineMatch = text.match(/"headline":\s*"([^"]+)"/);
-    const bodyMatch = text.match(/"body":\s*"([^"]+)"/);
-    if (headlineMatch && bodyMatch) {
-      return {
-        headline: headlineMatch[1].replace(/\s+/g, " ").trim(),
-        body: bodyMatch[1].replace(/\s+/g, " ").trim(),
-      };
-    }
+    // JSON was malformed or truncated — extract whatever fields are present
+  }
+
+  const headlineMatch = text.match(/"headline":\s*"([^"]+)"/);
+  const bodyMatch = text.match(/"body":\s*"([^"]+)"/);
+  if (headlineMatch && bodyMatch) {
+    return {
+      headline: headlineMatch[1].replace(/\s+/g, " ").trim(),
+      body: bodyMatch[1].replace(/\s+/g, " ").trim(),
+    };
+  }
+
+  // Truncated response: headline present but body cut off mid-string
+  if (headlineMatch) {
+    const partialBody = text.match(/"body":\s*"([\s\S]+)/);
+    const recovered = partialBody
+      ? partialBody[1].replace(/["}\s]+$/, "").replace(/\s+/g, " ").trim()
+      : `${companyName} posted new roles this week.`;
+    console.warn(`[digest] Recovered truncated response for ${companyName}`);
+    return {
+      headline: headlineMatch[1].replace(/\s+/g, " ").trim(),
+      body: recovered,
+    };
   }
 
   throw new Error(`Failed to parse weekly digest response for ${companyName}. Raw response: ${text.substring(0, 200)}`);
@@ -680,7 +695,7 @@ export async function generateWeeklyReport(
 
   for (let i = 0; i < companyDataArray.length; i += parallelRequests) {
     const batch = companyDataArray.slice(i, i + parallelRequests);
-    const batchResults = await Promise.all(
+    const batchResults = await Promise.allSettled(
       batch.map(async (companyData) => {
         const historicalContext = historicalContexts.get(companyData.company_id) ?? {
           currentOpenJobCount: companyData.jobs.filter((job) => job.is_active).length,
@@ -708,7 +723,13 @@ export async function generateWeeklyReport(
       })
     );
 
-    companies.push(...batchResults);
+    for (const result of batchResults) {
+      if (result.status === "fulfilled") {
+        companies.push(result.value);
+      } else {
+        console.error(`[digest] Skipping company due to AI error:`, result.reason);
+      }
+    }
   }
 
   companies.sort((a, b) => b.new_job_count - a.new_job_count);
