@@ -3,6 +3,8 @@
     "version": "1.7.2",
     "date": "2026-03-28",
     "changes": [
+      { "type": "improvement", "description": "Weekly digest cron supports WEEKLY_DIGEST_REDIRECT_TO for local testing when profile emails use domains Resend blocks (e.g. @example.com), and logs a warning when those addresses are detected." },
+      { "type": "fix", "description": "Weekly digest cron now checks Resend API errors (the SDK does not throw), aligns digest recipients with settings opt-out semantics, and returns skip reasons in the JSON and job_runs details." },
       { "type": "improvement", "description": "Supabase auth and REST calls from the server and proxy now retry on transient network errors (e.g. connection reset) to reduce random 401s and AuthRetryableFetchError noise on flaky networks." },
       { "type": "improvement", "description": "Unified neutral editorial voice across AI copy: shared docs/voice.md, runtime voice injection, heuristic voice checks, and Prompt Forge Voice compliance for weekly digest." },
       { "type": "improvement", "description": "Job-level and company-level strategic insights now use plain analytical headlines and summaries aligned with the weekly digest tone." }

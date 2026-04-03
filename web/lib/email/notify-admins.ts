@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getResendError } from "@/lib/email/resend-result";
 import { FeedbackNotificationEmail } from "./templates/feedback-notification";
 
 interface FeedbackNotification {
@@ -57,7 +58,12 @@ export async function notifyAdminsOfNewFeedback(feedback: FeedbackNotification):
       }),
     }));
 
-    await resend.batch.send(emails);
+    const result = await resend.batch.send(emails);
+    const err = getResendError(result);
+    if (err) {
+      console.error("Resend batch error (admin notification):", err);
+      return;
+    }
     console.log(`Admin notification sent to ${adminEmails.length} admin(s)`);
   } catch (err) {
     console.error("Failed to send admin feedback notification:", err);

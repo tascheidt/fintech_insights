@@ -161,6 +161,7 @@ Each company needs: `name`, `slug`, `country`, `ats_type`, `ats_identifier`
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase client
 - `SUPABASE_SERVICE_ROLE_KEY` - Server-side operations
 - `RESEND_API_KEY` - Email delivery
+- `WEEKLY_DIGEST_REDIRECT_TO` (optional) - For local digest runs: send all digests to this address instead of profile emails (Resend blocks placeholder domains like `@example.com` on `to`).
 - `CRON_SECRET` - Vercel cron authentication
 
 ## Adding New ATS Support
