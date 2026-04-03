@@ -18,7 +18,6 @@ import {
 } from "@/lib/analysis/company-insights";
 import { getWeeklyData, generateWeeklyReport, WeeklyDigest } from "@/lib/analysis/digest";
 import { isOptedInToWeeklyDigest } from "@/lib/email/digest-recipients";
-import { isLikelyResendBlockedRecipientEmail } from "@/lib/email/resend-recipients";
 import { getResendError } from "@/lib/email/resend-result";
 import { WeeklyDigestEmail } from "@/lib/email/templates/weekly-digest";
 import { getLatestVersion } from "@/lib/releases";
@@ -160,17 +159,6 @@ async function insertCompanySummaries(digestId: string, digest: WeeklyDigest): P
 }
 
 /**
- * Chunks an array into smaller arrays of specified size
- */
-function chunk<T>(array: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
-}
-
-/**
  * Tracks email delivery status in the database
  */
 async function trackDeliveries(
@@ -269,24 +257,10 @@ export async function GET(req: NextRequest) {
       `Found ${optedInUsers.length} users opted in to weekly digest (${(users || []).length} profiles total)`
     );
 
-    // Send emails using Resend Batch API
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fintech-talent-brief.vercel.app";
     const from = process.env.RESEND_FROM || "onboarding@resend.dev";
     const resendKey = process.env.RESEND_API_KEY;
-    /** When set (e.g. local dev), every digest is addressed to this inbox instead of profile emails — avoids Resend rejecting @example.com test users. */
-    const digestRedirectTo = process.env.WEEKLY_DIGEST_REDIRECT_TO?.trim() || null;
     const subject = `The Fintech Talent Brief – ${format(new Date(), "MMM d, yyyy")}`;
-
-    if (digestRedirectTo) {
-      console.warn(
-        `WEEKLY_DIGEST_REDIRECT_TO=${digestRedirectTo}: all digest deliveries use this address (not profile emails).`
-      );
-    } else if (optedInUsers.some((u) => isLikelyResendBlockedRecipientEmail(u.email))) {
-      console.warn(
-        "One or more recipients use a domain Resend blocks (e.g. @example.com). " +
-          "Set WEEKLY_DIGEST_REDIRECT_TO to a real inbox in .env.local, or update profiles.email in Supabase."
-      );
-    }
 
     let emailSent = false;
     let successCount = 0;
@@ -296,96 +270,69 @@ export async function GET(req: NextRequest) {
     const deliveryTracking: Array<{ user_id: string; email: string; status: "sent" | "failed"; error_message?: string }> = [];
 
     if (resendKey && optedInUsers.length > 0) {
+      const resend = new Resend(resendKey);
+
+      console.log(
+        `Sending digest to ${optedInUsers.length} recipient(s), from=${from}, to=[${optedInUsers.map((u) => u.email).join(", ")}]`
+      );
+
+      const batchEmails = optedInUsers.map((user) => ({
+        from,
+        to: user.email,
+        subject,
+        react: WeeklyDigestEmail({ digest, digestId: savedDigestId, appUrl, version: getLatestVersion() }),
+      }));
+
       try {
-        const resend = new Resend(resendKey);
-        
-        // Chunk users into batches of 100 (Resend batch limit)
-        const userChunks = chunk(optedInUsers, 100);
-        console.log(`Sending emails in ${userChunks.length} batch(es) of up to 100 users each`);
-
-        // Process each chunk
-        for (let chunkIndex = 0; chunkIndex < userChunks.length; chunkIndex++) {
-          const chunk = userChunks[chunkIndex];
-          console.log(`Processing batch ${chunkIndex + 1}/${userChunks.length} (${chunk.length} users)...`);
-
-          try {
-            // Prepare batch email payload
-            const batchEmails = chunk.map((user) => ({
-              from,
-              to: digestRedirectTo ?? user.email,
-              subject: digestRedirectTo
-                ? `[dev → ${user.email}] ${subject}`
-                : subject,
-              react: WeeklyDigestEmail({ digest, digestId: savedDigestId, appUrl, version: getLatestVersion() }),
-            }));
-
-            const sendResult = await resend.batch.send(batchEmails);
-            const batchErr = getResendError(sendResult);
-            if (batchErr) {
-              throw new Error(batchErr);
-            }
-
-            // Track successful deliveries
-            chunk.forEach((user) => {
-              deliveryTracking.push({
-                user_id: user.id,
-                email: user.email,
-                status: "sent",
-              });
-              successCount++;
-            });
-
-            console.log(`Batch ${chunkIndex + 1} sent successfully (${chunk.length} emails)`);
-          } catch (chunkError) {
-            console.error(`Error sending batch ${chunkIndex + 1}:`, chunkError);
-            const errorMessage =
-              chunkError instanceof Error ? chunkError.message : "Unknown error";
-            lastResendError = errorMessage;
-            chunk.forEach((user) => {
-              deliveryTracking.push({
-                user_id: user.id,
-                email: user.email,
-                status: "failed",
-                error_message: errorMessage,
-              });
-              failureCount++;
-            });
-          }
+        const sendResult = await resend.batch.send(batchEmails);
+        const batchErr = getResendError(sendResult);
+        if (batchErr) {
+          throw new Error(batchErr);
         }
 
-        emailSent = successCount > 0;
-        console.log(`Email sending completed: ${successCount} sent, ${failureCount} failed`);
-
-        // Track all deliveries in database
-        if (deliveryTracking.length > 0) {
-          await trackDeliveries(savedDigestId, deliveryTracking);
-        }
-
-        // Update digest record with email status
-        await supabase
-          .from("weekly_digests")
-          .update({
-            email_sent: emailSent,
-            email_recipient: emailSent ? `${successCount} users` : null,
-            email_sent_at: emailSent ? new Date().toISOString() : null,
-          })
-          .eq("id", savedDigestId);
-
-      } catch (e) {
-        console.error("Resend batch error:", e);
-        lastResendError =
-          e instanceof Error ? e.message : "Resend batch error";
-        // Don't fail the whole job if email fails - digest is already saved
+        optedInUsers.forEach((user) => {
+          deliveryTracking.push({ user_id: user.id, email: user.email, status: "sent" });
+          successCount++;
+        });
+        console.log(`Batch sent successfully (${successCount} emails)`);
+      } catch (sendError) {
+        const errorMessage =
+          sendError instanceof Error ? sendError.message : "Unknown error";
+        console.error("Resend batch send failed:", errorMessage);
+        lastResendError = errorMessage;
+        optedInUsers.forEach((user) => {
+          deliveryTracking.push({
+            user_id: user.id,
+            email: user.email,
+            status: "failed",
+            error_message: errorMessage,
+          });
+          failureCount++;
+        });
       }
+
+      emailSent = successCount > 0;
+      console.log(`Email sending completed: ${successCount} sent, ${failureCount} failed`);
+
+      if (deliveryTracking.length > 0) {
+        await trackDeliveries(savedDigestId, deliveryTracking);
+      }
+
+      await supabase
+        .from("weekly_digests")
+        .update({
+          email_sent: emailSent,
+          email_recipient: emailSent ? `${successCount} users` : null,
+          email_sent_at: emailSent ? new Date().toISOString() : null,
+        })
+        .eq("id", savedDigestId);
     } else {
       if (!resendKey) {
         emailSkipReason = "missing_resend_api_key";
         console.warn("Email not sent: RESEND_API_KEY not configured");
       } else if (optedInUsers.length === 0) {
-        emailSkipReason = "no_recipients_no_email_or_all_opted_out";
-        console.warn(
-          "Email not sent: no recipients (profiles missing email or all opted out of weekly digest)"
-        );
+        emailSkipReason = "no_opted_in_recipients";
+        console.warn("Email not sent: no recipients opted in to weekly digest");
       }
     }
 
