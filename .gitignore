@@ -11,6 +11,8 @@ build/
 .DS_Store
 
 # Web app (Next.js)
+# Claude Code agent memory (local / machine-specific)
+web/.claude/
 web/node_modules/
 web/.next/
 web/.env.local

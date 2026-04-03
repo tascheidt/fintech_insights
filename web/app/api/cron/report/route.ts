@@ -17,6 +17,9 @@ import {
   getNextCompanyForInsight,
 } from "@/lib/analysis/company-insights";
 import { getWeeklyData, generateWeeklyReport, WeeklyDigest } from "@/lib/analysis/digest";
+import { isOptedInToWeeklyDigest } from "@/lib/email/digest-recipients";
+import { isLikelyResendBlockedRecipientEmail } from "@/lib/email/resend-recipients";
+import { getResendError } from "@/lib/email/resend-result";
 import { WeeklyDigestEmail } from "@/lib/email/templates/weekly-digest";
 import { getLatestVersion } from "@/lib/releases";
 import { requireCronAuth } from "@/lib/cron/auth";
@@ -258,31 +261,38 @@ export async function GET(req: NextRequest) {
       throw new Error(`Failed to fetch users: ${usersError.message}`);
     }
 
-    // Filter users: include if email_preferences is null (default true) or weekly_digest is true
     const optedInUsers = (users || [])
-      .filter((u) => {
-        if (!u.email) return false;
-        
-        // If email_preferences is null, default is true (opted in)
-        if (!u.email_preferences) return true;
-        
-        // Check if weekly_digest is explicitly set to true
-        const weeklyDigest = u.email_preferences?.weekly_digest;
-        return weeklyDigest === true || weeklyDigest === "true";
-      })
-      .map((u) => ({ id: u.id, email: u.email }));
+      .filter((u) => isOptedInToWeeklyDigest(u))
+      .map((u) => ({ id: u.id, email: u.email! }));
 
-    console.log(`Found ${optedInUsers.length} users opted in to weekly digest`);
+    console.log(
+      `Found ${optedInUsers.length} users opted in to weekly digest (${(users || []).length} profiles total)`
+    );
 
     // Send emails using Resend Batch API
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fintech-talent-brief.vercel.app";
     const from = process.env.RESEND_FROM || "onboarding@resend.dev";
     const resendKey = process.env.RESEND_API_KEY;
+    /** When set (e.g. local dev), every digest is addressed to this inbox instead of profile emails — avoids Resend rejecting @example.com test users. */
+    const digestRedirectTo = process.env.WEEKLY_DIGEST_REDIRECT_TO?.trim() || null;
     const subject = `The Fintech Talent Brief – ${format(new Date(), "MMM d, yyyy")}`;
+
+    if (digestRedirectTo) {
+      console.warn(
+        `WEEKLY_DIGEST_REDIRECT_TO=${digestRedirectTo}: all digest deliveries use this address (not profile emails).`
+      );
+    } else if (optedInUsers.some((u) => isLikelyResendBlockedRecipientEmail(u.email))) {
+      console.warn(
+        "One or more recipients use a domain Resend blocks (e.g. @example.com). " +
+          "Set WEEKLY_DIGEST_REDIRECT_TO to a real inbox in .env.local, or update profiles.email in Supabase."
+      );
+    }
 
     let emailSent = false;
     let successCount = 0;
     let failureCount = 0;
+    let emailSkipReason: string | null = null;
+    let lastResendError: string | null = null;
     const deliveryTracking: Array<{ user_id: string; email: string; status: "sent" | "failed"; error_message?: string }> = [];
 
     if (resendKey && optedInUsers.length > 0) {
@@ -302,13 +312,18 @@ export async function GET(req: NextRequest) {
             // Prepare batch email payload
             const batchEmails = chunk.map((user) => ({
               from,
-              to: user.email,
-              subject,
+              to: digestRedirectTo ?? user.email,
+              subject: digestRedirectTo
+                ? `[dev → ${user.email}] ${subject}`
+                : subject,
               react: WeeklyDigestEmail({ digest, digestId: savedDigestId, appUrl, version: getLatestVersion() }),
             }));
 
-            // Send batch using Resend Batch API
-            await resend.batch.send(batchEmails);
+            const sendResult = await resend.batch.send(batchEmails);
+            const batchErr = getResendError(sendResult);
+            if (batchErr) {
+              throw new Error(batchErr);
+            }
 
             // Track successful deliveries
             chunk.forEach((user) => {
@@ -323,9 +338,9 @@ export async function GET(req: NextRequest) {
             console.log(`Batch ${chunkIndex + 1} sent successfully (${chunk.length} emails)`);
           } catch (chunkError) {
             console.error(`Error sending batch ${chunkIndex + 1}:`, chunkError);
-            
-            // Track failed deliveries for this chunk
-            const errorMessage = chunkError instanceof Error ? chunkError.message : "Unknown error";
+            const errorMessage =
+              chunkError instanceof Error ? chunkError.message : "Unknown error";
+            lastResendError = errorMessage;
             chunk.forEach((user) => {
               deliveryTracking.push({
                 user_id: user.id,
@@ -358,13 +373,19 @@ export async function GET(req: NextRequest) {
 
       } catch (e) {
         console.error("Resend batch error:", e);
+        lastResendError =
+          e instanceof Error ? e.message : "Resend batch error";
         // Don't fail the whole job if email fails - digest is already saved
       }
     } else {
       if (!resendKey) {
+        emailSkipReason = "missing_resend_api_key";
         console.warn("Email not sent: RESEND_API_KEY not configured");
       } else if (optedInUsers.length === 0) {
-        console.log("No users opted in to weekly digest emails");
+        emailSkipReason = "no_recipients_no_email_or_all_opted_out";
+        console.warn(
+          "Email not sent: no recipients (profiles missing email or all opted out of weekly digest)"
+        );
       }
     }
 
@@ -409,6 +430,8 @@ export async function GET(req: NextRequest) {
             emailSent,
             recipients: emailSent ? successCount : 0,
             failures: failureCount,
+            emailSkipReason,
+            resendError: lastResendError,
             companyInsight: companyInsightResult,
           },
         })
@@ -421,6 +444,8 @@ export async function GET(req: NextRequest) {
       emailsSent: successCount,
       emailsFailed: failureCount,
       totalRecipients: optedInUsers.length,
+      emailSkipReason,
+      resendError: lastResendError,
       digestId: savedDigestId,
       digest: {
         totalJobs: digest.total_jobs,

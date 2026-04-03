@@ -6,6 +6,8 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getVoiceDirective } from "@/lib/ai/voice";
+import { checkVoice } from "@/lib/ai/voice-validator";
 import {
   getActiveWeeklyDigestAiConfig,
   type WeeklyDigestAiConfig,
@@ -54,7 +56,8 @@ interface HistoricalJobRow {
   first_seen_date: string;
 }
 
-export interface TLDRCommentary {
+/** AI-generated weekly company commentary (neutral voice — see docs/voice.md). */
+export interface DigestCommentary {
   headline: string;
   body: string;
 }
@@ -92,7 +95,7 @@ export interface CompanyWeeklySummary {
   departments: Record<string, number>;
   dominant_tech: string[];
   seniority_breakdown: Record<string, number>;
-  ai_commentary: TLDRCommentary;
+  ai_commentary: DigestCommentary;
   jobs: WeeklyJob[];
   hiring_pattern: CompanyHiringPattern;
 }
@@ -121,7 +124,7 @@ export interface NotableMovement {
   sourceTitle?: string;
 }
 
-export interface GlobalSummary extends TLDRCommentary {
+export interface GlobalSummary extends DigestCommentary {
   key_insight: string;
 }
 
@@ -309,7 +312,7 @@ function cleanJsonText(text: string): string {
   return cleaned.trim();
 }
 
-function parseTLDRResponse(text: string, companyName: string): TLDRCommentary {
+function parseDigestCommentaryResponse(text: string, companyName: string): DigestCommentary {
   const cleaned = cleanJsonText(text);
 
   try {
@@ -354,14 +357,15 @@ function buildWeeklyDigestPrompt(
 export async function generateWeeklyDigestCommentary(
   input: WeeklyDigestCompanyInput,
   config?: WeeklyDigestAiConfig
-): Promise<TLDRCommentary> {
+): Promise<DigestCommentary> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     throw new Error("GEMINI_API_KEY not configured - cannot generate weekly digest commentary");
   }
 
   const activeConfig = config ?? await getActiveWeeklyDigestAiConfig();
-  const prompt = buildWeeklyDigestPrompt(input, activeConfig);
+  const taskPrompt = buildWeeklyDigestPrompt(input, activeConfig);
+  const prompt = `${getVoiceDirective("digest")}\n\n${taskPrompt}`;
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
     model: activeConfig.model,
@@ -380,7 +384,18 @@ export async function generateWeeklyDigestCommentary(
     throw new Error(`Empty response from Gemini for ${input.company_name}`);
   }
 
-  return parseTLDRResponse(text, input.company_name);
+  const commentary = parseDigestCommentaryResponse(text, input.company_name);
+  const voice = checkVoice({
+    headline: commentary.headline,
+    body: commentary.body,
+  });
+  if (!voice.passed) {
+    console.warn(
+      `[voice] weekly digest commentary for ${input.company_name}:`,
+      voice.warnings.join("; ")
+    );
+  }
+  return commentary;
 }
 
 function buildGlobalSummary(

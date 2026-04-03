@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getResendError } from "@/lib/email/resend-result";
 import { ScraperAlertEmail, type ScraperIssue } from "./templates/scraper-alert";
 
 /**
@@ -137,7 +138,12 @@ export async function checkAndAlertScraperHealth(
       react: ScraperAlertEmail({ issues, jobRunId, appUrl }),
     }));
 
-    await resend.batch.send(emails);
+    const result = await resend.batch.send(emails);
+    const err = getResendError(result);
+    if (err) {
+      console.error("Resend batch error (scraper alert):", err);
+      return;
+    }
     console.log(
       `Scraper health alert sent to ${adminEmails.length} admin(s)`
     );

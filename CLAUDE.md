@@ -11,6 +11,9 @@ The Fintech Talent Brief - a hiring intelligence platform tracking job postings 
 ## Project Asthetic 
 "Notion-sytle" - Clean white or very subtle off-white/light gray theme with clean, high contrast typography, or a refined dark theme if strictly required
 
+## Editorial voice (AI copy)
+User-facing AI prose (digests, job/company insights, chat, strategy narrative) follows **docs/voice.md**. Runtime rules live in `web/lib/ai/voice.ts`; heuristic checks in `web/lib/ai/voice-validator.ts`. When changing tone, update the doc and keep `voice.ts` in sync in the same PR.
+
 ## Common Commands
 
 ### Web App (Next.js)
@@ -158,6 +161,7 @@ Each company needs: `name`, `slug`, `country`, `ats_type`, `ats_identifier`
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase client
 - `SUPABASE_SERVICE_ROLE_KEY` - Server-side operations
 - `RESEND_API_KEY` - Email delivery
+- `WEEKLY_DIGEST_REDIRECT_TO` (optional) - For local digest runs: send all digests to this address instead of profile emails (Resend blocks placeholder domains like `@example.com` on `to`).
 - `CRON_SECRET` - Vercel cron authentication
 
 ## Adding New ATS Support

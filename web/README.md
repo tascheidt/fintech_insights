@@ -14,6 +14,9 @@ GEMINI_API_KEY=your-gemini-api-key
 CRON_SECRET=your-random-secret-string
 RESEND_API_KEY=your-resend-api-key
 RESEND_FROM=reports@yourdomain.com
+# Optional: local digest testing — Resend rejects @example.com etc. as `to`.
+# Sends every digest to this address; subject is prefixed with the profile email.
+WEEKLY_DIGEST_REDIRECT_TO=you@yourdomain.com
 REPORT_EMAIL=team@yourdomain.com
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```

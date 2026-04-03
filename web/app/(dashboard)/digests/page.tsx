@@ -14,7 +14,7 @@ export default async function DigestsPage() {
     .limit(1)
     .single();
 
-  // If we have a digest, redirect to it (Wealthsimple TLDR style - show content by default)
+  // If we have a digest, redirect to it (show latest content by default)
   if (latestDigest) {
     redirect(`/digests/${latestDigest.id}`);
   }

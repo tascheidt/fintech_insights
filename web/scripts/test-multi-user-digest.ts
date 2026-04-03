@@ -11,6 +11,7 @@
  *   npx tsx --env-file=.env.local web/scripts/test-multi-user-digest.ts
  */
 
+import { isOptedInToWeeklyDigest } from "../lib/email/digest-recipients";
 import { createAdminClient } from "../lib/supabase/admin";
 
 // Check environment variables
@@ -92,19 +93,9 @@ async function testUserQuery() {
   
   console.log(`✅ Found ${users?.length || 0} total users`);
   
-  // Apply the same filtering logic as in route.ts
   const optedInUsers = (users || [])
-    .filter((u) => {
-      if (!u.email) return false;
-      
-      // If email_preferences is null, default is true (opted in)
-      if (!u.email_preferences) return true;
-      
-      // Check if weekly_digest is explicitly set to true
-      const weeklyDigest = u.email_preferences?.weekly_digest;
-      return weeklyDigest === true || weeklyDigest === "true";
-    })
-    .map((u) => ({ id: u.id, email: u.email }));
+    .filter((u) => isOptedInToWeeklyDigest(u))
+    .map((u) => ({ id: u.id, email: u.email! }));
   
   console.log(`✅ Found ${optedInUsers.length} users opted in to weekly digest`);
   
@@ -117,7 +108,9 @@ async function testUserQuery() {
       console.log(`   ... and ${optedInUsers.length - 5} more`);
     }
   } else {
-    console.log("⚠️  No users opted in (all users will receive emails by default)");
+    console.log(
+      "⚠️  No recipients: every profile is missing email or opted out of weekly digest"
+    );
   }
   
   // Test chunking logic

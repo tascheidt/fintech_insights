@@ -102,7 +102,7 @@ export default async function DigestDetailPage({
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Header - Wealthsimple TLDR style */}
+      {/* Header */}
       <header className="text-center mb-8 pt-4">
         <p className="text-muted-foreground mb-4">{format(weekStart, "MMMM d, yyyy")}</p>
         

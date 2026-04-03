@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { buildHistoricalContext, formatHistoricalContextForPrompt } from "@/lib/analysis/context-builder";
+import { getVoiceDirective } from "@/lib/ai/voice";
 import { z } from "zod";
 
 const chatSchema = z.object({
@@ -98,7 +99,9 @@ export async function POST(
     const historicalContext = await buildHistoricalContext(company.id, 90);
     const historicalText = formatHistoricalContextForPrompt(historicalContext);
 
-    const systemPrompt = `You are an expert competitive intelligence analyst helping a user understand strategic insights from job postings.
+    const systemPrompt = `${getVoiceDirective("chat")}
+
+You are an expert competitive intelligence analyst helping a user understand strategic insights from job postings.
 
 ## Current Insight Context
 Company: ${company.name}
