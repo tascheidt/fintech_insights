@@ -49,9 +49,9 @@ export const JobStructureSchema = z.object({
 export type JobStructure = z.infer<typeof JobStructureSchema>;
 
 const GEMINI_REQUEST_TIMEOUT_MS = 30000;
-const MAX_STAGE1_DESCRIPTION_CHARS = 8000;
-const MIN_STAGE1_DESCRIPTION_CHARS = 4000;
-const STAGE1_RETRY_DESCRIPTION_STEP = 2000;
+const MAX_STAGE1_DESCRIPTION_CHARS = 6000;
+const MIN_STAGE1_DESCRIPTION_CHARS = 3000;
+const STAGE1_RETRY_DESCRIPTION_STEP = 1500;
 const MAX_STAGE1_OUTPUT_TOKENS = 4096;
 
 // Extended type for database insertion (flattened salary fields)

@@ -175,7 +175,7 @@ export async function detectCompanyType(
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 64000,
+        maxOutputTokens: 256,
         responseMimeType: "application/json",
       },
     });
