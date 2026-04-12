@@ -123,23 +123,22 @@ ${job.description_text || "No description available"}
 
 Your role is to answer follow-up questions about this insight, provide deeper analysis, and help the user understand the strategic implications. Use web search when needed to get the latest information about the company.`;
 
-    // Initialize Gemini with fallback (pro -> flash)
+    // Initialize Gemini — use Flash for cost efficiency (supports Google Search grounding)
     const key = process.env.GEMINI_API_KEY;
     if (!key) {
       return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
     }
 
     const genAI = new GoogleGenerativeAI(key);
-    
-    // Try pro model first, fallback to flash if quota exceeded
-    let model = genAI.getGenerativeModel({
-      model: "gemini-pro-latest",
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-3-flash-preview",
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
       systemInstruction: systemPrompt,
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 64000,
+        maxOutputTokens: 16384,
       },
     });
 
@@ -150,34 +149,12 @@ Your role is to answer follow-up questions about this insight, provide deeper an
     }));
 
     // Start chat with history
-    let chat = model.startChat({
+    const chat = model.startChat({
       history: history as any,
     });
 
-    // Stream the response with error handling
-    let stream;
-    try {
-      stream = await chat.sendMessageStream(question);
-    } catch (error: any) {
-      // If we get a quota error during generation, try flash model as fallback
-      if (error?.status === 429 || error?.message?.includes("quota") || error?.message?.includes("limit") || error?.message?.includes("exceeded")) {
-        console.warn(`gemini-pro-latest quota exceeded: ${error.message}. Falling back to gemini-3-flash-preview.`);
-        model = genAI.getGenerativeModel({
-          model: "gemini-3-flash-preview",
-          systemInstruction: systemPrompt,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 64000,
-          },
-        });
-        chat = model.startChat({
-          history: history as any,
-        });
-        stream = await chat.sendMessageStream(question);
-      } else {
-        throw error;
-      }
-    }
+    // Stream the response
+    const stream = await chat.sendMessageStream(question);
 
     // Create a readable stream for the response
     const encoder = new TextEncoder();

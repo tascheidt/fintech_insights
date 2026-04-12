@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.7.3",
+    "date": "2026-04-12",
+    "changes": [
+      { "type": "improvement", "description": "Switched company news fetching and chat from Gemini Pro to Flash, significantly reducing daily AI costs while maintaining quality." },
+      { "type": "improvement", "description": "Tightened maxOutputTokens across all Gemini calls and reduced job description sizes sent for extraction to cut per-job token costs." }
+    ]
+  },
+  {
     "version": "1.7.2",
     "date": "2026-03-28",
     "changes": [

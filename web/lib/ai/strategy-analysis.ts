@@ -170,7 +170,7 @@ export async function analyzeCompanyStrategy(
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 64000,
+        maxOutputTokens: 8192,
         responseMimeType: "application/json",
       },
     });
