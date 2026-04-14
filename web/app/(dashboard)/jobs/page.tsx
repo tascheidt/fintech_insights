@@ -1,8 +1,17 @@
 /**
  * Jobs Page
- * 
+ *
  * Shows all job postings across all companies with search and filters.
  * Uses the same JobHistoryView component as company pages.
+ *
+ * Accepts query parameters so that deep links from the weekly digest email
+ * can land users in a pre-filtered view with a context banner for
+ * orientation. Supported params:
+ *   - status, time, date (legacy)
+ *   - theme (role theme id)
+ *   - company (company slug)
+ *   - inDigest (weekly_digests UUID — scopes to the digest's captured jobs)
+ *   - from, to (ISO date strings)
  */
 
 import { redirect } from "next/navigation";
@@ -13,6 +22,11 @@ type JobsPageSearchParams = {
   status?: string;
   time?: string;
   date?: string;
+  theme?: string;
+  company?: string;
+  inDigest?: string;
+  from?: string;
+  to?: string;
 };
 
 type JobRow = {
@@ -28,6 +42,11 @@ type JobRow = {
     | { id: string; name: string; slug: string }
     | { id: string; name: string; slug: string }[]
     | null;
+};
+
+type DigestCompanyRow = {
+  company_id: string;
+  job_ids: unknown;
 };
 
 function getInitialStatus(status?: string): "all" | "active" | "inactive" {
@@ -53,6 +72,14 @@ function getInitialTimeFilter(
   return "all";
 }
 
+/** Parse an ISO date param and return the normalized string, or null if invalid. */
+function parseIsoDateParam(value?: string): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return value;
+}
+
 export default async function JobsPage({
   searchParams,
 }: {
@@ -63,14 +90,101 @@ export default async function JobsPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const initialStatus = getInitialStatus(params.status);
-  const initialTimeFilter = getInitialTimeFilter(params.time, params.date);
+  const themeParam = params.theme?.trim() || null;
+  const companyParam = params.company?.trim() || null;
+  const inDigestParam = params.inDigest?.trim() || null;
+  const fromParam = parseIsoDateParam(params.from);
+  const toParam = parseIsoDateParam(params.to);
+
+  // When viewing a digest snapshot, the job_ids list is already the scope —
+  // we must show closed jobs as well because the digest is a historical
+  // frame, so force status to "all" regardless of the incoming status param.
+  const initialStatus = inDigestParam
+    ? "all"
+    : getInitialStatus(params.status);
+
+  // Explicit from/to overrides the preset time filter (mutually exclusive).
+  const initialTimeFilter =
+    fromParam || toParam
+      ? "all"
+      : getInitialTimeFilter(params.time, params.date);
+
+  // If inDigest is present, look up the job_ids captured by that digest (or
+  // the single matching company's job_ids if company is also set).
+  let digestJobIds: string[] | null = null;
+  if (inDigestParam) {
+    let companyId: string | null = null;
+    if (companyParam) {
+      const { data: companyRow } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("slug", companyParam)
+        .maybeSingle();
+      companyId = companyRow?.id ?? null;
+    }
+
+    let digestCompaniesQuery = supabase
+      .from("weekly_digest_companies")
+      .select("company_id, job_ids")
+      .eq("digest_id", inDigestParam);
+
+    if (companyParam && companyId) {
+      digestCompaniesQuery = digestCompaniesQuery.eq("company_id", companyId);
+    }
+
+    const { data: digestCompanyRows } = await digestCompaniesQuery;
+
+    const jobIdSet = new Set<string>();
+    for (const row of (digestCompanyRows ?? []) as DigestCompanyRow[]) {
+      const rawIds = Array.isArray(row.job_ids) ? row.job_ids : [];
+      for (const id of rawIds) {
+        if (typeof id === "string" && id) jobIdSet.add(id);
+      }
+    }
+    digestJobIds = Array.from(jobIdSet);
+  }
 
   // Fetch all jobs with company information
-  const { data: jobsRaw } = await supabase
+  let jobsQuery = supabase
     .from("job_postings")
-    .select("id, title, standardized_department, function_category, location, is_active, first_seen_date, url, companies(id, name, slug)")
+    .select(
+      "id, title, standardized_department, function_category, location, is_active, first_seen_date, url, companies(id, name, slug)"
+    )
     .order("first_seen_date", { ascending: false });
+
+  if (digestJobIds !== null) {
+    if (digestJobIds.length === 0) {
+      // Digest exists but captured nothing (or doesn't exist). Short-circuit
+      // to an empty list — the banner will still render and show 0 of 0.
+      const emptyJobs: JobData[] = [];
+      return (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">All Jobs</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Browse job postings across all companies
+            </p>
+          </div>
+          <JobHistoryView
+            jobs={emptyJobs}
+            companySlug="all"
+            initialStatus={initialStatus}
+            initialTimeFilter={initialTimeFilter}
+            initialThemeFilter={themeParam}
+            initialCompanyFilter={companyParam}
+            initialInDigest={inDigestParam}
+            initialFromDate={fromParam}
+            initialToDate={toParam}
+            showHeader={true}
+            pageSize={24}
+          />
+        </div>
+      );
+    }
+    jobsQuery = jobsQuery.in("id", digestJobIds);
+  }
+
+  const { data: jobsRaw } = await jobsQuery;
 
   // Transform jobs data for JobHistoryView
   const jobs: JobData[] = ((jobsRaw ?? []) as JobRow[]).map((j) => {
@@ -102,6 +216,11 @@ export default async function JobsPage({
         companySlug="all"
         initialStatus={initialStatus}
         initialTimeFilter={initialTimeFilter}
+        initialThemeFilter={themeParam}
+        initialCompanyFilter={companyParam}
+        initialInDigest={inDigestParam}
+        initialFromDate={fromParam}
+        initialToDate={toParam}
         showHeader={true}
         pageSize={24}
       />

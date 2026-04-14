@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { getCategoryLabel, getCategoryGroup, ROLE_CATEGORIES, type RoleCategory } from "@/lib/analysis/function-categories";
+import { classifyJob, getThemeLabel } from "@/lib/analysis/role-themes";
 
 /** Job posting data structure */
 export interface JobData {
@@ -76,6 +77,22 @@ interface JobHistoryViewProps {
   initialStatus?: "all" | "active" | "inactive";
   /** Initial time filter */
   initialTimeFilter?: TimeFilter;
+  /**
+   * Initial role theme filter (from URL). Not exposed as a dropdown —
+   * URL-driven only, surfaced to the user via the digest context banner.
+   */
+  initialThemeFilter?: string | null;
+  /** Initial company filter (company slug, or null). Seeds the existing dropdown. */
+  initialCompanyFilter?: string | null;
+  /**
+   * When set, indicates the page was entered from a weekly digest with this
+   * digest UUID. Used by the context banner to read "from this digest".
+   */
+  initialInDigest?: string | null;
+  /** Initial from-date filter (ISO string) applied to first_seen_date. */
+  initialFromDate?: string | null;
+  /** Initial to-date filter (ISO string) applied to first_seen_date. */
+  initialToDate?: string | null;
   /** Items per page */
   pageSize?: number;
 }
@@ -97,6 +114,11 @@ export function JobHistoryView({
   showHeader = true,
   initialStatus = "all",
   initialTimeFilter = "all",
+  initialThemeFilter = null,
+  initialCompanyFilter = null,
+  initialInDigest = null,
+  initialFromDate = null,
+  initialToDate = null,
   pageSize = 12,
 }: JobHistoryViewProps) {
   const router = useRouter();
@@ -105,10 +127,24 @@ export function JobHistoryView({
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(initialStatus);
   const [timeFilter, setTimeFilter] = React.useState<TimeFilter>(initialTimeFilter);
-  const [companyFilter, setCompanyFilter] = React.useState<string>("all");
+  const [companyFilter, setCompanyFilter] = React.useState<string>(
+    initialCompanyFilter ?? "all"
+  );
   const [functionFilter, setFunctionFilter] = React.useState<string>(() => {
     return searchParams.get("function") ?? "all";
   });
+  const [themeFilter, setThemeFilter] = React.useState<string | null>(
+    initialThemeFilter
+  );
+  const [fromDateFilter, setFromDateFilter] = React.useState<string | null>(
+    initialFromDate
+  );
+  const [toDateFilter, setToDateFilter] = React.useState<string | null>(
+    initialToDate
+  );
+  const [inDigestFilter, setInDigestFilter] = React.useState<string | null>(
+    initialInDigest
+  );
   const [currentPage, setCurrentPage] = React.useState(1);
 
   // Sync function filter to URL
@@ -176,8 +212,18 @@ export function JobHistoryView({
       result = result.filter((j) => !j.isActive);
     }
 
-    // Time filter
-    if (timeFilter !== "all") {
+    // Time filter — from/to overrides the preset (mutually exclusive).
+    if (fromDateFilter || toDateFilter) {
+      const fromCutoff = fromDateFilter ? new Date(fromDateFilter) : null;
+      const toCutoff = toDateFilter ? new Date(toDateFilter) : null;
+      result = result.filter((j) => {
+        if (!j.firstSeenDate) return false;
+        const seen = new Date(j.firstSeenDate);
+        if (fromCutoff && seen < fromCutoff) return false;
+        if (toCutoff && seen > toCutoff) return false;
+        return true;
+      });
+    } else if (timeFilter !== "all") {
       const now = new Date();
       let cutoffDate: Date;
 
@@ -207,6 +253,15 @@ export function JobHistoryView({
       });
     }
 
+    // Role theme filter (URL-driven, from digest deep links). Uses the
+    // shared classifier from @/lib/analysis/role-themes — no theme tags are
+    // persisted on job rows.
+    if (themeFilter) {
+      result = result.filter((j) =>
+        classifyJob(j.title, j.standardized_department).includes(themeFilter)
+      );
+    }
+
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -223,7 +278,18 @@ export function JobHistoryView({
     }
 
     return result;
-  }, [jobs, companySlug, companyFilter, functionFilter, statusFilter, timeFilter, searchQuery]);
+  }, [
+    jobs,
+    companySlug,
+    companyFilter,
+    functionFilter,
+    statusFilter,
+    timeFilter,
+    searchQuery,
+    themeFilter,
+    fromDateFilter,
+    toDateFilter,
+  ]);
 
   // Pagination
   const totalPages = Math.ceil(filteredJobs.length / pageSize);
@@ -235,13 +301,33 @@ export function JobHistoryView({
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, timeFilter, companyFilter, functionFilter, searchQuery]);
+  }, [
+    statusFilter,
+    timeFilter,
+    companyFilter,
+    functionFilter,
+    searchQuery,
+    themeFilter,
+    fromDateFilter,
+    toDateFilter,
+  ]);
+
+  const hasDigestContext =
+    Boolean(themeFilter) ||
+    Boolean(inDigestFilter) ||
+    Boolean(fromDateFilter) ||
+    Boolean(toDateFilter) ||
+    (companySlug === "all" && Boolean(initialCompanyFilter));
 
   const hasFilters =
     statusFilter !== "all" ||
     timeFilter !== "all" ||
     functionFilter !== "all" ||
     (companySlug === "all" && companyFilter !== "all") ||
+    Boolean(themeFilter) ||
+    Boolean(fromDateFilter) ||
+    Boolean(toDateFilter) ||
+    Boolean(inDigestFilter) ||
     searchQuery.trim();
 
   const clearFilters = () => {
@@ -250,7 +336,92 @@ export function JobHistoryView({
     setCompanyFilter("all");
     updateFunctionFilter("all");
     setSearchQuery("");
+    setThemeFilter(null);
+    setFromDateFilter(null);
+    setToDateFilter(null);
+    setInDigestFilter(null);
+    // Reset URL-level params introduced for digest deep links by navigating
+    // to the bare /jobs page.
+    if (hasDigestContext) {
+      router.push("/jobs");
+    }
   };
+
+  // Derive the display name for the active company filter (for the banner).
+  // We prefer the slug currently held in companyFilter over the initial prop
+  // so that the banner stays accurate if the user changes it via the
+  // dropdown before clearing digest context.
+  const activeCompanyName = React.useMemo(() => {
+    const slug =
+      companySlug === "all" && companyFilter !== "all"
+        ? companyFilter
+        : initialCompanyFilter;
+    if (!slug) return null;
+    const match = jobs.find((j) => j.companySlug === slug);
+    return match?.companyName ?? slug;
+  }, [jobs, initialCompanyFilter, companyFilter, companySlug]);
+
+  // Build the descriptive context-banner sentence. Fragments are assembled in
+  // a deterministic order so the resulting sentence reads naturally no
+  // matter which subset of filters is active:
+  //   "Viewing {Company}'s jobs in {Theme}, from this digest"
+  //   "Viewing jobs in {Theme}, between {from} and {to}"
+  const contextBannerFragments = React.useMemo(() => {
+    const parts: React.ReactNode[] = [];
+    if (activeCompanyName) {
+      parts.push(
+        <>
+          <span className="font-semibold text-foreground">
+            {activeCompanyName}
+          </span>
+          &rsquo;s jobs
+        </>
+      );
+    } else {
+      parts.push(<>jobs</>);
+    }
+
+    if (themeFilter) {
+      parts.push(
+        <>
+          {" "}in{" "}
+          <span className="font-semibold text-foreground">
+            {getThemeLabel(themeFilter)}
+          </span>
+        </>
+      );
+    }
+
+    if (inDigestFilter) {
+      parts.push(<>, from this digest</>);
+    } else if (fromDateFilter || toDateFilter) {
+      const fromLabel = fromDateFilter
+        ? format(new Date(fromDateFilter), "MMM d")
+        : null;
+      const toLabel = toDateFilter
+        ? format(new Date(toDateFilter), "MMM d, yyyy")
+        : null;
+      if (fromLabel && toLabel) {
+        parts.push(
+          <>
+            , between {fromLabel} and {toLabel}
+          </>
+        );
+      } else if (fromLabel) {
+        parts.push(<>, from {fromLabel} onward</>);
+      } else if (toLabel) {
+        parts.push(<>, through {toLabel}</>);
+      }
+    }
+
+    return parts;
+  }, [
+    activeCompanyName,
+    themeFilter,
+    inDigestFilter,
+    fromDateFilter,
+    toDateFilter,
+  ]);
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -264,6 +435,37 @@ export function JobHistoryView({
             </p>
           </div>
           <ViewToggle view={view} onViewChange={setView} />
+        </div>
+      )}
+
+      {/* Digest context banner — shown when the user lands on /jobs from a
+          weekly-digest deep link with any of theme / company / inDigest /
+          from / to active. This is the orientation cue that makes arriving
+          from an email feel intentional instead of mysterious. */}
+      {hasDigestContext && (
+        <div className="rounded-lg border bg-muted/40 px-4 py-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="text-sm text-muted-foreground">
+              <div>
+                Viewing{" "}
+                {contextBannerFragments.map((fragment, idx) => (
+                  <React.Fragment key={idx}>{fragment}</React.Fragment>
+                ))}
+              </div>
+              <div className="mt-1 text-xs">
+                {filteredJobs.length} of {jobs.length}{" "}
+                {jobs.length === 1 ? "job" : "jobs"} match
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="shrink-0"
+            >
+              Clear filters
+            </Button>
+          </div>
         </div>
       )}
 
