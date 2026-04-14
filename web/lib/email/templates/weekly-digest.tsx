@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Html,
   Head,
@@ -11,12 +12,26 @@ import {
   Hr,
 } from "@react-email/components";
 import type { WeeklyDigest, CompanyWeeklySummary, GlobalSummary } from "@/lib/analysis/digest";
+import { buildDigestLink } from "@/lib/email/links";
+import { getThemeIdByLabel } from "@/lib/analysis/role-themes";
 
 interface WeeklyDigestEmailProps {
   digest: WeeklyDigest;
   digestId: string;  // NEW - for deep linking
   appUrl?: string;
   version?: string;
+}
+
+/**
+ * Look up a company slug by its display name. Used to resolve strategy signal
+ * / industry trend company references back into linkable slugs.
+ */
+function findCompanySlug(
+  companies: CompanyWeeklySummary[],
+  companyName: string
+): string | null {
+  const match = companies.find((entry) => entry.company_name === companyName);
+  return match?.company_slug ?? null;
 }
 
 /**
@@ -68,15 +83,51 @@ function GlobalSummarySection({ summary }: { summary: GlobalSummary }) {
 /**
  * Company section component
  */
-function CompanySection({ company, appUrl = "https://fintech-talent-brief.vercel.app" }: { company: CompanyWeeklySummary; appUrl?: string }) {
+function CompanySection({
+  company,
+  digestId,
+  yearStartIso,
+  appUrl = "https://fintech-talent-brief.vercel.app",
+}: {
+  company: CompanyWeeklySummary;
+  digestId: string;
+  yearStartIso: string;
+  appUrl?: string;
+}) {
   const primaryFocus = getLeadingTheme(company);
-  const companyUrl = `${appUrl}/companies/${company.company_slug}`;
-  const continuityLine =
-    company.hiring_pattern.continuity === "continuing"
-      ? `This continues an existing hiring pattern for ${company.company_name}.`
-      : company.hiring_pattern.new_themes.length > 0
-        ? `New this week: ${company.hiring_pattern.new_themes.join(", ")}.`
-        : "This week's mix is close to the company's recent hiring pattern.";
+  const primaryFocusThemeId = company.hiring_pattern.weekly_role_themes[0]?.id ?? null;
+  const slug = company.company_slug;
+  const companyUrl = buildDigestLink({
+    surface: "email",
+    digestId,
+    appUrl,
+    target: { kind: "company", slug },
+  });
+  const newJobsUrl = buildDigestLink({
+    surface: "email",
+    digestId,
+    appUrl,
+    target: { kind: "jobs", company: slug, inDigest: true },
+  });
+  const yearTotalUrl = buildDigestLink({
+    surface: "email",
+    digestId,
+    appUrl,
+    target: { kind: "jobs", company: slug, from: yearStartIso },
+  });
+  const focusUrl = primaryFocusThemeId
+    ? buildDigestLink({
+        surface: "email",
+        digestId,
+        appUrl,
+        target: { kind: "jobs", company: slug, theme: primaryFocusThemeId, inDigest: true },
+      })
+    : null;
+  const yearLabel = yearStartIso.slice(0, 4);
+
+  const newThemes = company.hiring_pattern.new_themes;
+  const isContinuing = company.hiring_pattern.continuity === "continuing";
+  const hasNewThemes = newThemes.length > 0;
 
   return (
     <Section style={companySection}>
@@ -84,27 +135,80 @@ function CompanySection({ company, appUrl = "https://fintech-talent-brief.vercel
       <Link href={companyUrl} style={{ ...companyName, color: "#000", textDecoration: "none" }}>
         {company.company_name}
       </Link>
-      
+
       {/* AI Headline */}
       <Heading as="h3" style={headline}>
         {company.ai_commentary.headline}
       </Heading>
-      
+
       {/* AI Body */}
       <Text style={bodyText}>
         {company.ai_commentary.body}
       </Text>
 
       <Text style={{ ...statsLine, marginBottom: "12px", color: "#4b5563" }}>
-        {continuityLine}
+        {isContinuing ? (
+          `This continues an existing hiring pattern for ${company.company_name}.`
+        ) : hasNewThemes ? (
+          <>
+            {"New this week: "}
+            {newThemes.map((themeLabel, idx) => {
+              const themeId = getThemeIdByLabel(themeLabel);
+              const separator = idx < newThemes.length - 1 ? ", " : ".";
+              if (!themeId) {
+                return (
+                  <React.Fragment key={`${themeLabel}-${idx}`}>
+                    {themeLabel}
+                    {separator}
+                  </React.Fragment>
+                );
+              }
+              const href = buildDigestLink({
+                surface: "email",
+                digestId,
+                appUrl,
+                target: { kind: "jobs", company: slug, theme: themeId, inDigest: true },
+              });
+              return (
+                <React.Fragment key={`${themeLabel}-${idx}`}>
+                  <Link href={href} style={inlineLink}>
+                    {themeLabel}
+                  </Link>
+                  {separator}
+                </React.Fragment>
+              );
+            })}
+          </>
+        ) : (
+          "This week's mix is close to the company's recent hiring pattern."
+        )}
       </Text>
-      
+
       {/* Stats Footer */}
       <Text style={statsLine}>
-        <span style={statLabel}>New Jobs:</span> {String(company.new_job_count)} | 
-        <span style={statLabel}> Open Now:</span> {String(company.current_open_job_count)} | 
-        <span style={statLabel}> 2026 Total:</span> {String(company.year_to_date_job_count)} | 
-        <span style={statLabel}> Focus:</span> {primaryFocus}
+        <span style={statLabel}>New Jobs:</span>{" "}
+        <Link href={newJobsUrl} style={inlineLink}>
+          {String(company.new_job_count)}
+        </Link>
+        {" | "}
+        <span style={statLabel}>Open Now:</span>{" "}
+        <Link href={companyUrl} style={inlineLink}>
+          {String(company.current_open_job_count)}
+        </Link>
+        {" | "}
+        <span style={statLabel}>{yearLabel} Total:</span>{" "}
+        <Link href={yearTotalUrl} style={inlineLink}>
+          {String(company.year_to_date_job_count)}
+        </Link>
+        {" | "}
+        <span style={statLabel}>Focus:</span>{" "}
+        {focusUrl ? (
+          <Link href={focusUrl} style={inlineLink}>
+            {primaryFocus}
+          </Link>
+        ) : (
+          primaryFocus
+        )}
       </Text>
     </Section>
   );
@@ -118,7 +222,25 @@ function CompanySection({ company, appUrl = "https://fintech-talent-brief.vercel
 export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-talent-brief.vercel.app", version }: WeeklyDigestEmailProps) {
   const dateRange = formatDateRange(digest.week_start, digest.week_end);
   const previewText = `The Fintech Talent Brief: ${digest.total_jobs} new jobs across ${digest.total_companies} companies this week`;
-  const digestUrl = `${appUrl}/digests/${digestId}`;
+  const digestUrl = buildDigestLink({
+    surface: "email",
+    digestId,
+    appUrl,
+    target: { kind: "digest" },
+  });
+  const jobsInDigestUrl = buildDigestLink({
+    surface: "email",
+    digestId,
+    appUrl,
+    target: { kind: "jobs", inDigest: true },
+  });
+  const releasesUrl = buildDigestLink({
+    surface: "email",
+    digestId,
+    appUrl,
+    target: { kind: "releases" },
+  });
+  const yearStartIso = `${new Date(digest.week_end).getUTCFullYear()}-01-01`;
 
   return (
     <Html>
@@ -156,12 +278,16 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
               <tbody>
                 <tr>
                   <td style={statCell}>
-                    <Text style={statNumber}>{String(digest.total_jobs)}</Text>
-                    <Text style={statDescription}>New Jobs</Text>
+                    <Link href={jobsInDigestUrl} style={statCellLink}>
+                      <span style={statNumberSpan}>{String(digest.total_jobs)}</span>
+                      <span style={statDescriptionSpan}>New Jobs</span>
+                    </Link>
                   </td>
                   <td style={statCell}>
-                    <Text style={statNumber}>{String(digest.total_companies)}</Text>
-                    <Text style={statDescription}>Companies</Text>
+                    <Link href={digestUrl} style={statCellLink}>
+                      <span style={statNumberSpan}>{String(digest.total_companies)}</span>
+                      <span style={statDescriptionSpan}>Companies</span>
+                    </Link>
                   </td>
                 </tr>
               </tbody>
@@ -176,22 +302,55 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
                 <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px" }}>
                   New This Week
                 </Heading>
-                {digest.strategy_signals.slice(0, 3).map((signal, idx) => (
-                  <div key={idx} style={{ marginBottom: "16px", paddingBottom: "16px", borderBottom: idx < Math.min(digest.strategy_signals!.length - 1, 2) ? "1px solid #e5e7eb" : "none" }}>
-                    <Text style={{ fontWeight: "600", marginBottom: "4px" }}>
-                      {signal.company}
-                    </Text>
-                    <Text style={{ fontSize: "14px", color: "#6b7280", marginBottom: "8px" }}>
-                      {signal.signal}
-                    </Text>
-                    <Text style={{ fontSize: "13px", color: "#374151" }}>
-                      {signal.interpretation}
-                    </Text>
-                  </div>
-                ))}
+                {digest.strategy_signals.slice(0, 3).map((signal, idx) => {
+                  const signalSlug = findCompanySlug(digest.companies, signal.company);
+                  const companyHref = signalSlug
+                    ? buildDigestLink({
+                        surface: "email",
+                        digestId,
+                        appUrl,
+                        target: { kind: "company", slug: signalSlug },
+                      })
+                    : null;
+                  const signalHref = signalSlug
+                    ? buildDigestLink({
+                        surface: "email",
+                        digestId,
+                        appUrl,
+                        target: { kind: "jobs", company: signalSlug, inDigest: true },
+                      })
+                    : null;
+                  return (
+                    <div key={idx} style={{ marginBottom: "16px", paddingBottom: "16px", borderBottom: idx < Math.min(digest.strategy_signals!.length - 1, 2) ? "1px solid #e5e7eb" : "none" }}>
+                      <Text style={{ fontWeight: "600", marginBottom: "4px" }}>
+                        {companyHref ? (
+                          <Link href={companyHref} style={inlineLink}>
+                            {signal.company}
+                          </Link>
+                        ) : (
+                          signal.company
+                        )}
+                      </Text>
+                      <Text style={{ fontSize: "14px", color: "#6b7280", marginBottom: "8px" }}>
+                        {signalHref ? (
+                          <Link href={signalHref} style={inlineLink}>
+                            {signal.signal}
+                          </Link>
+                        ) : (
+                          signal.signal
+                        )}
+                      </Text>
+                      <Text style={{ fontSize: "13px", color: "#374151" }}>
+                        {signal.interpretation}
+                      </Text>
+                    </div>
+                  );
+                })}
                 {digest.strategy_signals.length > 3 && (
                   <Text style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px" }}>
-                    +{digest.strategy_signals.length - 3} more signals in full digest
+                    <Link href={digestUrl} style={inlineLink}>
+                      +{digest.strategy_signals.length - 3} more signals in full digest
+                    </Link>
                   </Text>
                 )}
               </Section>
@@ -218,19 +377,66 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
                     </tr>
                   </thead>
                   <tbody>
-                    {digest.industry_trends.slice(0, 5).map((trend, idx) => (
-                      <tr key={idx} style={{ borderBottom: idx < Math.min(digest.industry_trends!.length - 1, 4) ? "1px solid #f3f4f6" : "none" }}>
-                        <td style={{ padding: "8px 8px 8px 0", fontWeight: "500" }}>
-                          {trend.trend}
-                        </td>
-                        <td style={{ padding: "8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                          {String(trend.jobCount)}
-                        </td>
-                        <td style={{ padding: "8px 0 8px 8px", color: "#6b7280" }}>
-                          {trend.companies.join(", ")}
-                        </td>
-                      </tr>
-                    ))}
+                    {digest.industry_trends.slice(0, 5).map((trend, idx) => {
+                      const themeId = getThemeIdByLabel(trend.trend);
+                      const trendHref = themeId
+                        ? buildDigestLink({
+                            surface: "email",
+                            digestId,
+                            appUrl,
+                            target: { kind: "jobs", theme: themeId, inDigest: true },
+                          })
+                        : null;
+                      return (
+                        <tr key={idx} style={{ borderBottom: idx < Math.min(digest.industry_trends!.length - 1, 4) ? "1px solid #f3f4f6" : "none" }}>
+                          <td style={{ padding: "8px 8px 8px 0", fontWeight: "500" }}>
+                            {trendHref ? (
+                              <Link href={trendHref} style={inlineLink}>
+                                {trend.trend}
+                              </Link>
+                            ) : (
+                              trend.trend
+                            )}
+                          </td>
+                          <td style={{ padding: "8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                            {String(trend.jobCount)}
+                          </td>
+                          <td style={{ padding: "8px 0 8px 8px", color: "#6b7280" }}>
+                            {trend.companies.map((companyName, companyIdx) => {
+                              const slug = findCompanySlug(digest.companies, companyName);
+                              const separator = companyIdx < trend.companies.length - 1 ? ", " : "";
+                              if (!slug) {
+                                return (
+                                  <React.Fragment key={`${companyName}-${companyIdx}`}>
+                                    {companyName}
+                                    {separator}
+                                  </React.Fragment>
+                                );
+                              }
+                              const href = buildDigestLink({
+                                surface: "email",
+                                digestId,
+                                appUrl,
+                                target: {
+                                  kind: "jobs",
+                                  company: slug,
+                                  ...(themeId ? { theme: themeId } : {}),
+                                  inDigest: true,
+                                },
+                              });
+                              return (
+                                <React.Fragment key={`${companyName}-${companyIdx}`}>
+                                  <Link href={href} style={inlineLink}>
+                                    {companyName}
+                                  </Link>
+                                  {separator}
+                                </React.Fragment>
+                              );
+                            })}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </Section>
@@ -241,7 +447,13 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
 
           {/* Company Sections */}
           {digest.companies.map((company) => (
-            <CompanySection key={company.company_id} company={company} appUrl={appUrl} />
+            <CompanySection
+              key={company.company_id}
+              company={company}
+              digestId={digestId}
+              yearStartIso={yearStartIso}
+              appUrl={appUrl}
+            />
           ))}
 
           {/* No companies message */}
@@ -269,7 +481,7 @@ export function WeeklyDigestEmail({ digest, digestId, appUrl = "https://fintech-
               <Text style={footerVersion}>
                 v{version}
                 {" \u2013 "}
-                <Link href={`${appUrl}/releases`} style={footerVersionLink}>
+                <Link href={releasesUrl} style={footerVersionLink}>
                   See what&apos;s new
                 </Link>
               </Text>
@@ -363,12 +575,33 @@ const statNumber: React.CSSProperties = {
   lineHeight: "1",
 };
 
+/**
+ * Inline (span) variant of statNumber used when the stat sits inside a <Link>
+ * wrapper — react-email's <Text> renders a <p>, which is invalid inside <a>.
+ */
+const statNumberSpan: React.CSSProperties = {
+  color: "#4a69bd",
+  fontSize: "32px",
+  fontWeight: "700",
+  lineHeight: "1",
+  display: "block",
+};
+
 const statDescription: React.CSSProperties = {
   color: "#6b7280",
   fontSize: "12px",
   margin: "8px 0 0",
   textTransform: "uppercase" as const,
   letterSpacing: "0.5px",
+};
+
+const statDescriptionSpan: React.CSSProperties = {
+  color: "#6b7280",
+  fontSize: "12px",
+  marginTop: "8px",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.5px",
+  display: "block",
 };
 
 const divider: React.CSSProperties = {
@@ -459,6 +692,30 @@ const footerVersionLink: React.CSSProperties = {
   color: "#9ca3af",
   fontSize: "11px",
   textDecoration: "underline",
+};
+
+/**
+ * Subtle inline underline — keeps the text in the existing typographic scale
+ * (color inherits from the parent, gains a muted underline). Used for every
+ * structural deep link inside the email body.
+ */
+const inlineLink: React.CSSProperties = {
+  color: "inherit",
+  textDecoration: "underline",
+  textDecorationColor: "#c0c0c0",
+  textUnderlineOffset: "2px",
+};
+
+/**
+ * Big-number stat cells wrap their contents in a Link. We suppress the
+ * underline so the cell looks visually identical to a non-linked cell; the
+ * clickable affordance comes from the cursor/hover state in email clients
+ * that support it.
+ */
+const statCellLink: React.CSSProperties = {
+  color: "inherit",
+  textDecoration: "none",
+  display: "block",
 };
 
 export default WeeklyDigestEmail;

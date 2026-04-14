@@ -150,7 +150,7 @@ export default async function DigestDetailPage({
       )}
 
       {/* Digest Content */}
-      <DigestViewer digest={digestData} />
+      <DigestViewer digest={digestData} digestId={id} />
     </div>
   );
 }

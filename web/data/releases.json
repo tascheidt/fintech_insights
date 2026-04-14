@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.8.0",
+    "date": "2026-04-14",
+    "changes": [
+      { "type": "feature", "description": "Weekly digest emails are now interactive: every company name, role theme, and stat number links through to a matching pre-filtered view in the app, with a context banner on /jobs that explains which digest slice you are viewing." },
+      { "type": "improvement", "description": "Deep links from email now preserve the destination through login, so clicking a company or theme while signed out lands on the intended page after Google sign-in." },
+      { "type": "improvement", "description": "The in-app digest viewer at /digests/[id] mirrors the email's link affordances one-to-one, so the same theme, company, and stat tokens are clickable in both surfaces." }
+    ]
+  },
+  {
     "version": "1.7.3",
     "date": "2026-04-12",
     "changes": [
