@@ -37,11 +37,20 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user && pathname !== "/login") {
-    return NextResponse.redirect(new URL("/login", request.url));
+    // Preserve the original destination so that links from emails (and
+    // any other deep link) land where the user intended after logging in.
+    const loginUrl = new URL("/login", request.url);
+    const destination = `${pathname}${request.nextUrl.search}`;
+    if (destination && destination !== "/") {
+      loginUrl.searchParams.set("next", destination);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
   if (user && pathname === "/login") {
-    return NextResponse.redirect(new URL("/", request.url));
+    const next = request.nextUrl.searchParams.get("next");
+    const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+    return NextResponse.redirect(new URL(safeNext, request.url));
   }
 
   return response;

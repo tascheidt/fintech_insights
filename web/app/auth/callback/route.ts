@@ -6,7 +6,10 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const error_description = searchParams.get("error_description");
   const error_code = searchParams.get("error");
-  const next = searchParams.get("next") ?? "/";
+  const rawNext = searchParams.get("next");
+  // Only honor same-origin relative paths — never follow external URLs.
+  const next =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
   const origin = new URL(request.url).origin;
 
   // Handle OAuth errors from Supabase

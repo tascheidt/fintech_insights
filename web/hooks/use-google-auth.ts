@@ -7,18 +7,25 @@ export function useGoogleAuth() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function signInWithGoogle() {
+  async function signInWithGoogle(next?: string | null) {
     try {
       setIsLoading(true);
       setError(null);
 
       const supabase = createClient();
 
-      // Build absolute redirect URL for OAuth callback
+      // Build absolute redirect URL for OAuth callback.
+      // If `next` is provided (e.g. from an email deep link), append it so
+      // the callback route can send the user back to their intended page.
+      const safeNext =
+        next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+      const callbackPath = safeNext
+        ? `/auth/callback?next=${encodeURIComponent(safeNext)}`
+        : "/auth/callback";
       const redirectTo =
         typeof window !== "undefined"
-          ? `${window.location.protocol}//${window.location.host}/auth/callback`
-          : "/auth/callback";
+          ? `${window.location.protocol}//${window.location.host}${callbackPath}`
+          : callbackPath;
 
       console.log("Initiating OAuth with redirectTo:", redirectTo);
 
