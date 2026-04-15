@@ -15,17 +15,18 @@ export function useGoogleAuth() {
       const supabase = createClient();
 
       // Build absolute redirect URL for OAuth callback.
-      // If `next` is provided (e.g. from an email deep link), append it so
-      // the callback route can send the user back to their intended page.
+      // NOTE: We keep redirectTo free of query params so it matches Supabase's
+      // allowed redirect URLs exactly. The `next` destination is stashed in a
+      // short-lived cookie that the callback route reads after code exchange.
       const safeNext =
         next && next.startsWith("/") && !next.startsWith("//") ? next : null;
-      const callbackPath = safeNext
-        ? `/auth/callback?next=${encodeURIComponent(safeNext)}`
-        : "/auth/callback";
+      if (safeNext && typeof document !== "undefined") {
+        document.cookie = `auth_next=${encodeURIComponent(safeNext)}; path=/; SameSite=Lax; max-age=300`;
+      }
       const redirectTo =
         typeof window !== "undefined"
-          ? `${window.location.protocol}//${window.location.host}${callbackPath}`
-          : callbackPath;
+          ? `${window.location.protocol}//${window.location.host}/auth/callback`
+          : "/auth/callback";
 
       console.log("Initiating OAuth with redirectTo:", redirectTo);
 
