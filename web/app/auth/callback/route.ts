@@ -6,7 +6,27 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const error_description = searchParams.get("error_description");
   const error_code = searchParams.get("error");
-  const next = searchParams.get("next") ?? "/";
+
+  // `next` may arrive as a query param (legacy) or via the auth_next cookie
+  // (set by use-google-auth before the OAuth redirect to keep redirectTo clean).
+  const rawNext =
+    searchParams.get("next") ??
+    (() => {
+      try {
+        const encoded = request.headers
+          .get("cookie")
+          ?.split("; ")
+          .find((c) => c.startsWith("auth_next="))
+          ?.split("=")[1];
+        return encoded ? decodeURIComponent(encoded) : null;
+      } catch {
+        return null;
+      }
+    })();
+
+  // Only honor same-origin relative paths — never follow external URLs.
+  const next =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
   const origin = new URL(request.url).origin;
 
   // Handle OAuth errors from Supabase
@@ -34,7 +54,9 @@ export async function GET(request: Request) {
     }
 
     if (data.session) {
-      return NextResponse.redirect(`${origin}${next}`);
+      const response = NextResponse.redirect(`${origin}${next}`);
+      response.cookies.delete("auth_next");
+      return response;
     }
   }
 

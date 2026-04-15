@@ -48,6 +48,8 @@ function GoogleIcon({ className }: { className?: string }) {
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const { signInWithGoogle, isLoading, error, setError } = useGoogleAuth();
+  const nextPath = searchParams.get("next");
+  const handleSignIn = () => signInWithGoogle(nextPath);
 
   // Check for OAuth error parameters in URL
   useEffect(() => {
@@ -85,7 +87,7 @@ export default function LoginPage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button
               size="lg"
-              onClick={signInWithGoogle}
+              onClick={handleSignIn}
               disabled={isLoading}
               className="h-12 px-8 text-base"
             >
@@ -102,7 +104,7 @@ export default function LoginPage() {
             <Button
               variant="outline"
               size="lg"
-              onClick={signInWithGoogle}
+              onClick={handleSignIn}
               disabled={isLoading}
               className="h-12 px-8 text-base gap-2"
             >
