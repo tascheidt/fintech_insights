@@ -12,6 +12,12 @@ export const AI_MODEL_OPTIONS = [
     recommendedStages: ["job-structure", "tech-stack", "weekly-digest"],
   },
   {
+    value: "gemini-flash-lite-latest",
+    label: "Gemini Flash-Lite",
+    summary: "Cheapest tier (roughly a third of Flash's token price). Enabled here for comparison against Flash on structured-extraction surfaces; swap in only where the `gemini-compare.ts` report shows L1 field agreement >= 95%.",
+    recommendedStages: ["job-structure"],
+  },
+  {
     value: "gemini-pro-latest",
     label: "Gemini Pro",
     summary: "Best for deeper reasoning and narrative quality.",

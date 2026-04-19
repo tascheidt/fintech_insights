@@ -1,0 +1,1126 @@
+{
+  "scenario": "extract-structure",
+  "mode": "baseline",
+  "gitSha": "a689dae",
+  "generatedAt": "2026-04-19T15:37:01.837Z",
+  "fixtureFile": "/Users/tscheidt/fintech_insights/fintech_insights/web/scripts/fixtures/gemini-sample-jobs.json",
+  "fixtureCount": 20,
+  "processedCount": 20,
+  "totals": {
+    "calls": 20,
+    "inputTokens": 47055,
+    "outputTokens": 4764,
+    "cachedTokens": 0,
+    "totalTokens": 51819,
+    "estimatedUsd": 0.006611,
+    "avgLatencyMs": 1547
+  },
+  "byCallSite": {
+    "extractJobStructure": {
+      "calls": 20,
+      "inputTokens": 47055,
+      "outputTokens": 4764,
+      "totalTokens": 51819,
+      "estimatedUsd": 0.0066111,
+      "avgLatencyMs": 1547,
+      "modelsServed": [
+        "gemini-flash-lite-latest"
+      ]
+    }
+  },
+  "perJob": [
+    {
+      "jobId": "c7aea83d-c1ad-4198-9195-e7e8c8b2c377",
+      "title": "Associate, Commercial Credit, Commercial Finance Group (CFG)",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2362,
+          "outputTokens": 232,
+          "cachedTokens": 0,
+          "totalTokens": 2594,
+          "estimatedUsd": 0.000329,
+          "latencyMs": 1565,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Associate, Commercial Credit, Commercial Finance Group (CFG)",
+            "jobId": "c7aea83d-c1ad-4198-9195-e7e8c8b2c377"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Associate, Commercial Credit supports the underwriting team by managing document fulfillment, due diligence, and credit submission preparation for commercial mortgage transactions. This role acts as a key liaison between internal departments and external partners to ensure compliance and deal readiness.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "Cyber Query",
+          "PPlus"
+        ],
+        "keywords": [
+          "Commercial Credit",
+          "Underwriting",
+          "Commercial Mortgages",
+          "Due Diligence",
+          "Document Fulfillment",
+          "FINTRAC",
+          "Credit Risk",
+          "Lending Guidelines",
+          "Portfolio Management"
+        ],
+        "standardized_department": "Finance",
+        "function_category": "risk-management",
+        "location_structured": {
+          "city": "Montreal or Toronto",
+          "state": null,
+          "country": "Canada",
+          "formatted": "Montreal or Toronto, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "e4b91622-2162-4a87-a751-c287c9b0413b",
+      "title": "Senior Manager, Operational Risk Management",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2275,
+          "outputTokens": 252,
+          "cachedTokens": 0,
+          "totalTokens": 2527,
+          "estimatedUsd": 0.0003283,
+          "latencyMs": 1833,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Manager, Operational Risk Management",
+            "jobId": "e4b91622-2162-4a87-a751-c287c9b0413b"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Senior Manager, Operational Risk Management will lead the second line of defense for Equitable Bank, overseeing risk identification, control assessments, and GRC tool administration. This role focuses on operational resiliency, fraud risk, and third-party risk management within a challenger bank.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "Resolver"
+        ],
+        "keywords": [
+          "Operational Risk Management",
+          "Risk and Control Self-Assessment",
+          "New Initiative Risk Assessment",
+          "Key Risk Indicators",
+          "Governance Risk and Compliance",
+          "Fraud Risk Management",
+          "Business Continuity",
+          "Third Party Risk",
+          "Operational Resiliency",
+          "Regulatory Compliance",
+          "Enterprise Risk Management",
+          "Risk Reporting"
+        ],
+        "standardized_department": "Operations",
+        "function_category": "risk-management",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "Canada"
+        }
+      }
+    },
+    {
+      "jobId": "85a09b75-1ff4-439d-b0d9-670a453cd468",
+      "title": "Senior Director, Asset and Liability Management (ALM)",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2320,
+          "outputTokens": 241,
+          "cachedTokens": 0,
+          "totalTokens": 2561,
+          "estimatedUsd": 0.0003284,
+          "latencyMs": 2049,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Director, Asset and Liability Management (ALM)",
+            "jobId": "85a09b75-1ff4-439d-b0d9-670a453cd468"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Senior Director, ALM will lead balance sheet strategy, interest rate risk management, and treasury investment practices at EQ Bank. This role involves developing sophisticated ALM models, performing stress testing, and ensuring regulatory compliance with OSFI guidelines.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "Asset and Liability Management",
+          "Treasury",
+          "Interest Rate Risk",
+          "Balance Sheet Strategy",
+          "Financial Risk Management",
+          "Stress Testing",
+          "ICAAP",
+          "Hedge Accounting",
+          "Liquidity Risk",
+          "Capital Markets",
+          "Regulatory Compliance",
+          "Financial Modeling",
+          "Scenario Analysis"
+        ],
+        "standardized_department": "Finance",
+        "function_category": "capital-markets-treasury",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "Canada"
+        }
+      }
+    },
+    {
+      "jobId": "a1ab7ccd-68fe-49db-948f-e453716a8abe",
+      "title": "Senior Backend Engineer",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2236,
+          "outputTokens": 238,
+          "cachedTokens": 0,
+          "totalTokens": 2474,
+          "estimatedUsd": 0.00031880000000000005,
+          "latencyMs": 1424,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Backend Engineer",
+            "jobId": "a1ab7ccd-68fe-49db-948f-e453716a8abe"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Equitable Bank is seeking a Senior Backend Engineer to design and own end-to-end fraud decisioning systems. The role focuses on building scalable, event-driven architectures to protect customers across onboarding, transactions, and money movement within a high-growth digital banking environment.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "Java"
+        ],
+        "keywords": [
+          "fraud engineering",
+          "event-driven systems",
+          "distributed systems",
+          "API design",
+          "observability",
+          "risk management",
+          "system architecture",
+          "production support",
+          "data contracts",
+          "service ownership"
+        ],
+        "standardized_department": "Engineering",
+        "function_category": "fraud-trust-safety",
+        "location_structured": {
+          "city": "Toronto",
+          "state": "Ontario",
+          "country": "Canada",
+          "formatted": "Toronto, Ontario, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "83177ac3-270d-41e9-9ad7-983ad3ed3fd4",
+      "title": "Senior Business Analyst, Fraud Strategy",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2436,
+          "outputTokens": 273,
+          "cachedTokens": 0,
+          "totalTokens": 2709,
+          "estimatedUsd": 0.0003528,
+          "latencyMs": 1538,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Business Analyst, Fraud Strategy",
+            "jobId": "83177ac3-270d-41e9-9ad7-983ad3ed3fd4"
+          }
+        }
+      ],
+      "output": {
+        "summary": "KOHO is seeking a Senior Business Analyst to lead fraud strategy and risk mitigation. You will design fraud detection models, analyze transactional data, and collaborate cross-functionally to protect users while maintaining a seamless customer experience.",
+        "seniority_level": "senior",
+        "salary_min": 95000,
+        "salary_max": 115000,
+        "salary_currency": "CAD",
+        "tech_stack": [
+          "SQL",
+          "Python",
+          "Pandas",
+          "NumPy",
+          "dbt",
+          "Sigma"
+        ],
+        "keywords": [
+          "fraud strategy",
+          "AML",
+          "financial crime",
+          "risk mitigation",
+          "transaction monitoring",
+          "fraud detection",
+          "data analysis",
+          "payments",
+          "banking"
+        ],
+        "standardized_department": "Operations",
+        "function_category": "fraud-trust-safety",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "Canada"
+        }
+      }
+    },
+    {
+      "jobId": "3b4b39de-b7a3-4bec-8367-91bf4b95ac7e",
+      "title": "Product Manager / Sr Product Manager, Credit Building",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2472,
+          "outputTokens": 275,
+          "cachedTokens": 0,
+          "totalTokens": 2747,
+          "estimatedUsd": 0.0003572,
+          "latencyMs": 1432,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Product Manager / Sr Product Manager, Credit Building",
+            "jobId": "3b4b39de-b7a3-4bec-8367-91bf4b95ac7e"
+          }
+        }
+      ],
+      "output": {
+        "summary": "KOHO is seeking a Product Manager to lead the credit building product portfolio. This role focuses on driving the end-to-end product lifecycle, optimizing credit-related metrics, and collaborating with cross-functional teams to help Canadians build their credit scores.",
+        "seniority_level": "senior",
+        "salary_min": 130000,
+        "salary_max": 200000,
+        "salary_currency": "CAD",
+        "tech_stack": [
+          "SQL",
+          "dbt",
+          "Redshift"
+        ],
+        "keywords": [
+          "credit building",
+          "consumer credit",
+          "lending",
+          "product management",
+          "credit risk",
+          "financial compliance",
+          "adjudication models",
+          "fintech",
+          "product lifecycle",
+          "data-informed"
+        ],
+        "standardized_department": "Product",
+        "function_category": "product-management",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "Canada"
+        }
+      }
+    },
+    {
+      "jobId": "7c6f190a-7b87-4c04-8a0c-b44b9df2296f",
+      "title": "Director of Growth (Partnerships & Organic)",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2442,
+          "outputTokens": 283,
+          "cachedTokens": 0,
+          "totalTokens": 2725,
+          "estimatedUsd": 0.0003574,
+          "latencyMs": 1636,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Director of Growth (Partnerships & Organic)",
+            "jobId": "7c6f190a-7b87-4c04-8a0c-b44b9df2296f"
+          }
+        }
+      ],
+      "output": {
+        "summary": "KOHO is seeking a Director of Growth to lead partnership, affiliate, and organic growth strategies. The role focuses on scaling user acquisition through SEO, GEO, and CRO, while leveraging AI-driven search models and advanced attribution frameworks to drive sustainable, long-term growth.",
+        "seniority_level": "senior",
+        "salary_min": 170000,
+        "salary_max": 200000,
+        "salary_currency": "CAD",
+        "tech_stack": [],
+        "keywords": [
+          "Growth Marketing",
+          "Partnerships",
+          "Affiliate Marketing",
+          "SEO",
+          "GEO",
+          "ASO",
+          "CRO",
+          "Attribution Modeling",
+          "B2C",
+          "Fintech",
+          "User Acquisition",
+          "LTV",
+          "Generative AI",
+          "Performance Marketing"
+        ],
+        "standardized_department": "Marketing",
+        "function_category": "marketing-growth-performance",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "Canada"
+        }
+      }
+    },
+    {
+      "jobId": "bac85455-34f8-46ae-8c42-84ecb796215c",
+      "title": "Product and Regulatory Counsel",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2404,
+          "outputTokens": 221,
+          "cachedTokens": 0,
+          "totalTokens": 2625,
+          "estimatedUsd": 0.00032879999999999997,
+          "latencyMs": 1604,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Product and Regulatory Counsel",
+            "jobId": "bac85455-34f8-46ae-8c42-84ecb796215c"
+          }
+        }
+      ],
+      "output": {
+        "summary": "KOHO is seeking a Product and Regulatory Counsel to support its transition into a regulated bank. The role involves providing legal guidance on financial product development, regulatory strategy, and compliance with Canadian banking and consumer protection frameworks.",
+        "seniority_level": "senior",
+        "salary_min": 170000,
+        "salary_max": 200000,
+        "salary_currency": "CAD",
+        "tech_stack": [],
+        "keywords": [
+          "financial services regulation",
+          "banking law",
+          "consumer protection",
+          "regulatory strategy",
+          "compliance",
+          "AML",
+          "ATF",
+          "privacy law",
+          "RPAA",
+          "FCPF",
+          "product development",
+          "legal counsel"
+        ],
+        "standardized_department": "Legal",
+        "function_category": "legal",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "096d3a5d-e260-4204-9ae4-870d45250a9c",
+      "title": "Sales Representative - Toronto Premium Outlets",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2456,
+          "outputTokens": 248,
+          "cachedTokens": 0,
+          "totalTokens": 2704,
+          "estimatedUsd": 0.00034480000000000003,
+          "latencyMs": 1573,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Sales Representative - Toronto Premium Outlets",
+            "jobId": "096d3a5d-e260-4204-9ae4-870d45250a9c"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Neo Financial is seeking a motivated Sales Representative to drive customer acquisition for credit and banking products through in-person activation events. This role involves representing the brand at retail locations and campuses, offering a base hourly rate plus uncapped commissions.",
+        "seniority_level": "junior",
+        "salary_min": 41600,
+        "salary_max": 74880,
+        "salary_currency": "CAD",
+        "tech_stack": [
+          "Neo App"
+        ],
+        "keywords": [
+          "Direct Sales",
+          "Customer Acquisition",
+          "Retail Sales",
+          "Financial Products",
+          "Field Sales",
+          "Lead Generation",
+          "Commission-based"
+        ],
+        "standardized_department": "Sales",
+        "function_category": "sales-account-executives",
+        "location_structured": {
+          "city": "Toronto",
+          "state": "Ontario",
+          "country": "Canada",
+          "formatted": "Toronto, Ontario, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "c8fde90b-bb78-496a-aae4-a93480e391d3",
+      "title": "Product Manager, Fraud (PM / Senior / Lead)",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2564,
+          "outputTokens": 199,
+          "cachedTokens": 0,
+          "totalTokens": 2763,
+          "estimatedUsd": 0.00033600000000000004,
+          "latencyMs": 1363,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Product Manager, Fraud (PM / Senior / Lead)",
+            "jobId": "c8fde90b-bb78-496a-aae4-a93480e391d3"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Neo Financial is seeking a Product Manager to lead their fraud prevention squad. You will design and optimize intelligent fraud detection systems, manage experimentation frameworks, and balance risk mitigation with customer experience across credit, banking, and investment product surfaces.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "fraud prevention",
+          "risk management",
+          "product strategy",
+          "A/B testing",
+          "experimentation frameworks",
+          "data-driven decision making",
+          "statistical rigor",
+          "customer experience",
+          "transaction monitoring",
+          "fintech",
+          "rule engines",
+          "false positive reduction"
+        ],
+        "standardized_department": "Product",
+        "function_category": "fraud-trust-safety",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "1b5f56da-4240-4480-8abc-d5d02183d926",
+      "title": "Analyst, Treasury Operations",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2376,
+          "outputTokens": 233,
+          "cachedTokens": 0,
+          "totalTokens": 2609,
+          "estimatedUsd": 0.0003308,
+          "latencyMs": 1393,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Analyst, Treasury Operations",
+            "jobId": "1b5f56da-4240-4480-8abc-d5d02183d926"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Neo Financial is seeking a Treasury Operations Analyst to manage reconciliation, payment rails, and lending facility monitoring. The role requires 2-3 years of experience in treasury or cash management and proficiency in SQL to support operational efficiency and scaling.",
+        "seniority_level": "mid",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "SQL",
+          "Snowflake"
+        ],
+        "keywords": [
+          "Treasury Operations",
+          "Cash Management",
+          "Reconciliation",
+          "Payment Rails",
+          "Lending Facilities",
+          "Risk Management",
+          "Financial Reporting",
+          "Audit Support",
+          "Process Automation"
+        ],
+        "standardized_department": "Finance",
+        "function_category": "capital-markets-treasury",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "Calgary, Winnipeg, and Toronto, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "1e72a7e1-43e9-40b2-9a7e-22fab0ece689",
+      "title": "District Sales Manager - Calgary ",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2426,
+          "outputTokens": 230,
+          "cachedTokens": 0,
+          "totalTokens": 2656,
+          "estimatedUsd": 0.00033460000000000006,
+          "latencyMs": 1151,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "District Sales Manager - Calgary ",
+            "jobId": "1e72a7e1-43e9-40b2-9a7e-22fab0ece689"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Neo Financial is seeking a District Sales Manager in Calgary to lead field sales teams across multiple mall locations. The role focuses on driving profitability, optimizing customer acquisition costs, and managing the full lifecycle of store managers.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "field sales",
+          "sales management",
+          "customer acquisition cost",
+          "CAC",
+          "retail management",
+          "sales training",
+          "performance management",
+          "business development",
+          "financial services",
+          "credit cards",
+          "team leadership",
+          "data analysis"
+        ],
+        "standardized_department": "Sales",
+        "function_category": "sales-account-executives",
+        "location_structured": {
+          "city": "Calgary",
+          "state": "Alberta",
+          "country": "Canada",
+          "formatted": "Calgary, Alberta, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "fdc2e7bc-b36c-488b-8dde-a4c2c6b214f5",
+      "title": "Senior Analyst, Procurement & Vendor Management",
+      "companySlug": "questrade",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2273,
+          "outputTokens": 220,
+          "cachedTokens": 0,
+          "totalTokens": 2493,
+          "estimatedUsd": 0.0003153,
+          "latencyMs": 2420,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Analyst, Procurement & Vendor Management",
+            "jobId": "fdc2e7bc-b36c-488b-8dde-a4c2c6b214f5"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Questrade Financial Group is seeking a Senior Analyst to manage the end-to-end procurement and vendor lifecycle. The role involves negotiating agreements, conducting due diligence, and ensuring compliance within a hybrid work environment.",
+        "seniority_level": "senior",
+        "salary_min": 80000,
+        "salary_max": 90000,
+        "salary_currency": "CAD",
+        "tech_stack": [
+          "OneTrust"
+        ],
+        "keywords": [
+          "Procurement",
+          "Vendor Management",
+          "Contract Negotiation",
+          "Due Diligence",
+          "Vendor Lifecycle Management",
+          "Risk Management",
+          "Compliance",
+          "RFP",
+          "SLA Monitoring",
+          "Vendor Tiering"
+        ],
+        "standardized_department": "Finance",
+        "function_category": "business-operations",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "2f6a19a7-acee-4224-8ca9-8d45a89a66d0",
+      "title": "Procurement Strategy & Innovation Lead",
+      "companySlug": "questrade",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2302,
+          "outputTokens": 202,
+          "cachedTokens": 0,
+          "totalTokens": 2504,
+          "estimatedUsd": 0.00031099999999999997,
+          "latencyMs": 1297,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Procurement Strategy & Innovation Lead",
+            "jobId": "2f6a19a7-acee-4224-8ca9-8d45a89a66d0"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Questrade Financial Group is seeking a Procurement Strategy & Innovation Lead to overhaul its vendor management office. This role focuses on process modernization, AI-driven workflow automation, and managing the end-to-end procurement lifecycle within a hybrid work environment.",
+        "seniority_level": "lead",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "Gemini",
+          "ClickUp"
+        ],
+        "keywords": [
+          "Procurement",
+          "Vendor Management",
+          "Process Mapping",
+          "Business Analysis",
+          "Workflow Automation",
+          "Contract Negotiation",
+          "Strategic Sourcing",
+          "Project Management",
+          "Systems Thinking",
+          "Compliance",
+          "Data Integrity"
+        ],
+        "standardized_department": "Operations",
+        "function_category": "business-operations",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "bee6e083-e735-4702-9edf-d33f6611a81b",
+      "title": "Analyst, P&S & Buyins, Trade Operations",
+      "companySlug": "questrade",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2355,
+          "outputTokens": 302,
+          "cachedTokens": 0,
+          "totalTokens": 2657,
+          "estimatedUsd": 0.00035630000000000004,
+          "latencyMs": 1789,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Analyst, P&S & Buyins, Trade Operations",
+            "jobId": "bee6e083-e735-4702-9edf-d33f6611a81b"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Questrade is seeking a Trade Operations Analyst to manage daily trade capture, reconciliation, and settlement processes. The role involves collaborating with internal teams and external counterparties to resolve disputes and mitigate risk within the Canadian and US securities markets.",
+        "seniority_level": "mid",
+        "salary_min": 55000,
+        "salary_max": 60000,
+        "salary_currency": "CAD",
+        "tech_stack": [
+          "Broadridge",
+          "Power BI",
+          "SQL",
+          "Python",
+          "Google Apps Script",
+          "Arrow",
+          "CDS",
+          "DTC",
+          "Apex"
+        ],
+        "keywords": [
+          "trade operations",
+          "trade settlement",
+          "trade reconciliation",
+          "buy-ins",
+          "securities",
+          "broker-dealer",
+          "custodians",
+          "regulatory compliance",
+          "SLA management",
+          "risk management"
+        ],
+        "standardized_department": "Operations",
+        "function_category": "customer-operations",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "Canada"
+        }
+      }
+    },
+    {
+      "jobId": "ebb98abf-e790-4328-af02-27a665080f17",
+      "title": "Business Development Manager",
+      "companySlug": "questrade",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2254,
+          "outputTokens": 186,
+          "cachedTokens": 0,
+          "totalTokens": 2440,
+          "estimatedUsd": 0.0002998,
+          "latencyMs": 1226,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Business Development Manager",
+            "jobId": "ebb98abf-e790-4328-af02-27a665080f17"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Questrade Financial Group is seeking a Business Development Manager to drive growth in their mortgage underwriting and fulfillment division. The role focuses on building broker partnerships, executing sales strategies, and ensuring compliance with AML and KYC regulatory requirements.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "Business Development",
+          "Mortgage Underwriting",
+          "Alternative Lending",
+          "Sales Strategy",
+          "Broker Relations",
+          "AML",
+          "KYC",
+          "Regulatory Compliance",
+          "Portfolio Growth",
+          "Financial Services",
+          "Risk Management"
+        ],
+        "standardized_department": "Sales",
+        "function_category": "business-development-partnerships",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "05723ea6-b50a-467a-a2d3-64d812d74d87",
+      "title": "Senior Product Analyst, Secured Lending",
+      "companySlug": "tangerine",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2384,
+          "outputTokens": 250,
+          "cachedTokens": 0,
+          "totalTokens": 2634,
+          "estimatedUsd": 0.0003384,
+          "latencyMs": 1614,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Product Analyst, Secured Lending",
+            "jobId": "05723ea6-b50a-467a-a2d3-64d812d74d87"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Tangerine is seeking a Senior Product Analyst to support its secured lending and mortgage strategy. The role focuses on data-driven insights, journey optimization, and cross-functional collaboration to drive acquisition and portfolio growth within the Canadian digital banking market.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "Tableau",
+          "Power BI",
+          "SQL",
+          "Python"
+        ],
+        "keywords": [
+          "Secured Lending",
+          "Mortgage",
+          "Product Strategy",
+          "Data Analytics",
+          "Client Journey Mapping",
+          "Process Optimization",
+          "Business Case Development",
+          "Campaign Analytics",
+          "Financial Services",
+          "Portfolio Growth"
+        ],
+        "standardized_department": "Product",
+        "function_category": "data-analytics-bi",
+        "location_structured": {
+          "city": "Toronto",
+          "state": "Ontario",
+          "country": "Canada",
+          "formatted": "Toronto, Ontario, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "7f26c2e3-a760-43a1-89b6-9b6dac57a186",
+      "title": "Customer Experience Advisor",
+      "companySlug": "tangerine",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2308,
+          "outputTokens": 249,
+          "cachedTokens": 0,
+          "totalTokens": 2557,
+          "estimatedUsd": 0.0003304,
+          "latencyMs": 1216,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Customer Experience Advisor",
+            "jobId": "7f26c2e3-a760-43a1-89b6-9b6dac57a186"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Customer Experience Advisor will provide professional service to Tangerine clients via inbound, outbound, and eService channels. The role involves managing complex financial transactions, educating clients on banking products, and ensuring compliance with regulatory and risk standards.",
+        "seniority_level": "junior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "customer service",
+          "contact center",
+          "financial services",
+          "banking products",
+          "TFSA",
+          "RSP",
+          "RIF",
+          "client relationship management",
+          "AML",
+          "compliance",
+          "risk management",
+          "inbound sales",
+          "outbound sales",
+          "eService"
+        ],
+        "standardized_department": "Support",
+        "function_category": "customer-support-cx",
+        "location_structured": {
+          "city": "Santo Domingo",
+          "state": "Distrito Nacional",
+          "country": "Dominican Republic",
+          "formatted": "Santo Domingo, Dominican Republic"
+        }
+      }
+    },
+    {
+      "jobId": "2eac4d10-ab20-45f0-96b7-867f344c4090",
+      "title": "Mortgage Solutions Manager - Tangerine",
+      "companySlug": "tangerine",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2290,
+          "outputTokens": 182,
+          "cachedTokens": 0,
+          "totalTokens": 2472,
+          "estimatedUsd": 0.0003018,
+          "latencyMs": 1290,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Mortgage Solutions Manager - Tangerine",
+            "jobId": "2eac4d10-ab20-45f0-96b7-867f344c4090"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Tangerine is seeking a Mortgage Solutions Manager to manage the end-to-end mortgage acquisition process. This role focuses on driving sales, providing consultative mortgage advice, and managing client pipelines from lead generation to funding.",
+        "seniority_level": "mid",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "Mortgage Origination",
+          "Secured Lending",
+          "Sales",
+          "HELOC",
+          "Underwriting",
+          "Client Acquisition",
+          "Relationship Management",
+          "Financial Advisory",
+          "Lead Conversion",
+          "Residential Mortgages"
+        ],
+        "standardized_department": "Sales",
+        "function_category": "sales-account-executives",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "f3a3502b-9da2-4d26-b280-822eb5e40213",
+      "title": "Manager, Fraud Analytics",
+      "companySlug": "tangerine",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2120,
+          "outputTokens": 248,
+          "cachedTokens": 0,
+          "totalTokens": 2368,
+          "estimatedUsd": 0.00031120000000000003,
+          "latencyMs": 1525,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Manager, Fraud Analytics",
+            "jobId": "f3a3502b-9da2-4d26-b280-822eb5e40213"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Tangerine is seeking a Manager of Fraud Analytics to develop and monitor fraud mitigation strategies for retail banking products. The role involves leveraging data mining tools to analyze trends, minimize losses, and collaborate with IT and business partners to enhance fraud operations.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "SQL",
+          "Python",
+          "R",
+          "PRM"
+        ],
+        "keywords": [
+          "Fraud Analytics",
+          "Risk Management",
+          "Retail Banking",
+          "Unsecured Lending",
+          "Secured Lending",
+          "Data Mining",
+          "Statistical Analysis",
+          "Payment Industry",
+          "Fraud Mitigation",
+          "Risk Appetite"
+        ],
+        "standardized_department": "Operations",
+        "function_category": "fraud-trust-safety",
+        "location_structured": {
+          "city": "Toronto",
+          "state": "Ontario",
+          "country": "Canada",
+          "formatted": "Toronto, Ontario, Canada"
+        }
+      }
+    }
+  ]
+}
