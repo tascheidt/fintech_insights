@@ -12,7 +12,7 @@
  *   --company=<slug-or-name>   Alternative to positional company arg
  *   --limit=N                  Jobs to sample (default 3)
  *   --arm-a=<model_id>         Default: gemini-pro-latest
- *   --arm-b=<model_id>         Default: gemini-3-flash-preview
+ *   --arm-b=<model_id>         Default: gemini-flash-latest
  *   --no-analysis-search       Omit Google Search tool on the analysis call (context-only)
  *   --skip-prefetch-web        Empty web context (fast/cheap; not representative of production)
  *   --json                     Print one JSON object per job to stdout
@@ -33,7 +33,7 @@ function parseArgs(argv: string[]) {
   let positional: string | undefined;
   let limit = 3;
   let armA = "gemini-pro-latest";
-  let armB = "gemini-3-flash-preview";
+  let armB = "gemini-flash-latest";
   let companyArg: string | undefined;
   let noAnalysisSearch = false;
   let skipPrefetchWeb = false;

@@ -43,7 +43,7 @@ This analysis compares two different categorization approaches:
 
 **Location:** `web/lib/analysis/structure.ts`
 
-- **Method:** `extractJobStructure()` - Gemini 3 Flash AI extraction from job descriptions
+- **Method:** `extractJobStructure()` - Gemini Flash AI extraction from job descriptions
 - **AI-powered** - extracts from full job description context
 - **Granularity:** High-level organizational departments:
   - Common values: "Engineering", "Sales", "Marketing", "Product", "Operations", "Finance", "Legal", "HR", "Customer Success", "Support"

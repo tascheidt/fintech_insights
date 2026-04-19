@@ -3,7 +3,7 @@
  * Backfill Insight Display Fields
  * 
  * Generates headline, significance_score, and key_signal for existing
- * company_insights that don't have them yet. Uses Gemini 3 Flash for generation.
+ * company_insights that don't have them yet. Uses Gemini Flash for generation.
  * 
  * Usage:
  *   npx tsx --env-file=.env.local web/scripts/backfill-insight-display-fields.ts
@@ -85,7 +85,7 @@ async function generateDisplayFields(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: "gemini-3-flash-preview",
+    model: "gemini-flash-latest",
     generationConfig: {
       temperature: 0.5,
       maxOutputTokens: 64000,

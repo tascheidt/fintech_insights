@@ -86,7 +86,7 @@ async function extractAndUpdateStructure(
 **Location:** `web/lib/analysis/structure.ts:82-206`
 
 - AI extracts `standardized_department` from job title + description
-- Uses Gemini 3 Flash with structured JSON output
+- Uses Gemini Flash with structured JSON output
 - Normalizes to common values: "Engineering", "Sales", "Marketing", etc.
 - **BUT**: Does not use raw `department` field as input/hint
 

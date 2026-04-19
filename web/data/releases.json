@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.9.0",
+    "date": "2026-04-19",
+    "changes": [
+      { "type": "improvement", "description": "Switched all Gemini calls from the pinned `gemini-3-flash-preview` preview ID to the floating `gemini-flash-latest` alias, so model upgrades now roll through without code changes." },
+      { "type": "improvement", "description": "Refreshed CLAUDE.md `AI Model Requirements` to require `-latest` aliases across Flash, Flash-Lite, and Pro tiers, and updated Prompt Forge's approved-models list accordingly." }
+    ]
+  },
+  {
     "version": "1.8.0",
     "date": "2026-04-14",
     "changes": [

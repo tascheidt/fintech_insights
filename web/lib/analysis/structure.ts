@@ -9,7 +9,7 @@ import {
 /**
  * Job Structure Extractor
  * 
- * Extracts structured data ("Silver Layer") from job descriptions using Gemini 3 Flash.
+ * Extracts structured data ("Silver Layer") from job descriptions using Gemini Flash.
  * Provides standardized fields for job_postings table.
  */
 
@@ -144,7 +144,7 @@ export async function extractJobStructure(
   try {
     const genAI = new GoogleGenerativeAI(key);
 
-    // Use Gemini 3 Flash with JSON mode for guaranteed structured output
+    // Use Gemini Flash with JSON mode for guaranteed structured output
     const model = genAI.getGenerativeModel({
       model: config.model,
       generationConfig: {

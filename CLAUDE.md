@@ -72,7 +72,7 @@ Vercel runs strict TypeScript checking during builds. Common issues:
 - **Backend**: Python with Click CLI, SQLAlchemy 2.0, BeautifulSoup4
 - **Database**: Supabase (PostgreSQL) with RLS
 - **Auth**: Supabase SSR with Google OAuth
-- **AI**: Gemini 3 Flash/Pro for strategic analysis
+- **AI**: Google Gemini via floating `-latest` aliases (`gemini-flash-latest`, `gemini-pro-latest`) for strategic analysis
 - **Email**: Resend API
 - **Scraping**: Puppeteer Core (serverless) + BeautifulSoup4
 
@@ -198,19 +198,20 @@ Each company needs: `name`, `slug`, `country`, `ats_type`, `ats_identifier`
 
 ## AI Model Requirements
 
-**IMPORTANT: Always use the latest Gemini 3 models. Never use Gemini 2.x or older.**
+**IMPORTANT: Always use the floating `-latest` model aliases. Never pin a versioned or preview model ID.**
+
+Using `-latest` aliases means new model generations roll through without code changes. The tradeoff is that Google may rotate the alias to a preview/experimental release; the Phase-1 comparison harness (`web/scripts/gemini-compare.ts`) and Phase-5 production telemetry are how we detect regressions.
 
 ### Approved Models
-- `gemini-pro-latest` - For advanced analysis with web search/grounding (always uses the latest Pro version)
-- `gemini-3-flash-preview` - For fast, cost-effective analysis
+- `gemini-pro-latest` — Advanced analysis with web search/grounding; deeper reasoning and narrative quality
+- `gemini-flash-latest` — Fast, cost-effective analysis; default for extraction, classification, digest, chat
+- `gemini-flash-lite-latest` — Cheapest tier for high-volume, low-stakes calls (use only where the comparison report confirms ≥95% L1 field agreement)
 
 ### Rules
-1. **Never use Gemini 2.x models** (gemini-2.0-flash, gemini-2.5-*, etc.)
-2. **Never use Gemini 1.x models** (gemini-1.5-pro, gemini-1.5-flash, etc.)
-3. All AI analysis code must use `gemini-3-flash-preview` or `gemini-pro-latest`
-4. Use Pro (`gemini-pro-latest`) for features requiring web search/grounding tools
-5. Use Flash for standard JSON generation and analysis
-
+1. **Never pin a versioned or preview model ID** (e.g. `gemini-3-flash-preview`, `gemini-2.0-flash`, `gemini-1.5-pro`). Always use the `-latest` alias.
+2. All AI code must resolve its model through the `AI_MODEL_OPTIONS` enum in `web/lib/ai/prompt-config.ts` — do not hardcode strings outside that module.
+3. Use Pro (`gemini-pro-latest`) only for features requiring web-search grounding or deep synthesis; Flash covers standard JSON generation and analysis.
+4. When adding a new call site, verify whether an upstream call already enables `googleSearch` grounding — two grounded Pro calls in series cost as much as one and produce duplicate work.
 
 ### Quota Errors
 If you see `limit: 0` quota errors, the API key may need:

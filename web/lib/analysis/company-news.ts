@@ -220,7 +220,7 @@ async function fetchFreshNewsContext(companyName: string): Promise<CompanyNewsCo
     // Use Gemini Flash with grounding for web search (Flash supports Google Search
     // and is significantly cheaper than Pro — company-research.ts already uses this pattern)
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
       generationConfig: {

@@ -9,7 +9,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const MODELS_TO_TEST = [
   // Gemini Pro latest (REQUIRED - always use this)
   "gemini-pro-latest",
-  "gemini-3-flash-preview",
+  "gemini-flash-latest",
   // Older models (DO NOT USE - listed only for verification)
   "gemini-2.5-pro-preview-06-05",
   "gemini-2.5-flash-preview-05-20",

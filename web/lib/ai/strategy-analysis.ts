@@ -167,7 +167,7 @@ export async function analyzeCompanyStrategy(
   try {
     const genAI = new GoogleGenerativeAI(key);
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 8192,

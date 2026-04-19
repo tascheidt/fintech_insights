@@ -19,7 +19,7 @@
 2. **`categorizePosting()`** - AI-based, more accurate
    - **Location:** `web/lib/analysis/categorizer.ts`
    - **Input:** Job title + company name + full description
-   - **Method:** Gemini 3 Flash AI analysis
+   - **Method:** Gemini Flash AI analysis
    - **Pros:** More accurate, handles edge cases, consistent
    - **Cons:** API costs, slower, requires description
 
@@ -169,7 +169,7 @@ Respond ONLY with valid JSON.
 - ✅ **Better for ambiguous titles**
 
 **Cons:**
-- ❌ **API costs** (~$0.0001 per job with Gemini 3 Flash)
+- ❌ **API costs** (~$0.0001 per job with Gemini Flash)
 - ❌ **Slower** (API call per job)
 - ❌ **Requires description** (won't work for jobs without descriptions)
 
@@ -245,7 +245,7 @@ function categorizeWithContext(
 
 2. **Already extracting other fields:** We're already calling `extractJobStructure()` for every job (extracts `standardized_department`, `seniority_level`, etc.) - we can add function_category to that same AI call
 
-3. **Cost is minimal:** Gemini 3 Flash is very cheap (~$0.0001 per job). For 10,000 jobs = $1.00
+3. **Cost is minimal:** Gemini Flash is very cheap (~$0.0001 per job). For 10,000 jobs = $1.00
 
 4. **Better user experience:** Users see accurate, consistent function labels
 

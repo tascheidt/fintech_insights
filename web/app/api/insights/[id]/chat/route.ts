@@ -132,7 +132,7 @@ Your role is to answer follow-up questions about this insight, provide deeper an
     const genAI = new GoogleGenerativeAI(key);
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
       systemInstruction: systemPrompt,
