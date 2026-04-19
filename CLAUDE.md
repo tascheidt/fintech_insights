@@ -228,10 +228,12 @@ Rules for every Gemini call. These exist because Gemini cost drifted above targe
 The live per-job hot path after `collect` runs is:
 
 ```
-processor.ts  → extractAndUpdateStructure  → extractJobStructure  (Flash)
+processor.ts  → [description_hash gate]  → extractAndUpdateStructure  → extractJobStructure  (Flash)
 analyzer.ts   → analyzeJobAdvanced  → performWebSearch (Pro+grounded, pre-fetch)
                                    → analyzeJobAdvanced main call (Pro+grounded)
 ```
+
+The `description_hash` gate in [processor.ts](web/lib/jobs/processor.ts) skips `extractAndUpdateStructure` when the scraped description SHA-1 matches what's already stored on the `job_postings` row. Null stored hashes are treated as "changed" so the first scrape post-deploy still populates everything.
 
 `analyzeJob` in [web/lib/analysis/strategic.ts](web/lib/analysis/strategic.ts) and `categorizePosting` in [web/lib/analysis/categorizer.ts](web/lib/analysis/categorizer.ts) are **not** on the live ingestion path — they exist for backfill and legacy flows. Do not wire into those functions without an explicit decision; do not assume the 8000-char cap in `strategic.ts` applies to production analyses.
 

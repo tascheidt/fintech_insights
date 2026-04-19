@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.10.0",
+    "date": "2026-04-19",
+    "changes": [
+      { "type": "improvement", "description": "Job ingestion now skips AI re-extraction when a scraped description matches the stored SHA-1 hash, eliminating the bulk of unchanged-description Gemini calls from the daily collection cron." }
+    ]
+  },
+  {
     "version": "1.9.0",
     "date": "2026-04-19",
     "changes": [
