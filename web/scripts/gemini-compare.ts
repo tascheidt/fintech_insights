@@ -18,6 +18,11 @@
  * Flags:
  *   --scenario=extract-structure | analyze-advanced
  *   --mode=baseline                  (compare mode ships with Phase 2)
+ *   --variant=default | no-prefetch  For analyze-advanced: `no-prefetch` skips
+ *                                    the Pro+grounded performWebSearch call by
+ *                                    passing an empty `webSearchContext`.
+ *                                    Used in Phase 3 to measure the savings
+ *                                    from dropping the duplicate grounded call.
  *   --model=<alias>                  For extract-structure: override the default
  *                                    model (`gemini-flash-latest`) with a Phase 4
  *                                    candidate (e.g. `gemini-flash-lite-latest`).
@@ -41,10 +46,12 @@ import type { UsageRecord } from "@/lib/ai/gemini-meter";
 
 type Scenario = "extract-structure" | "analyze-advanced";
 type Mode = "baseline";
+type Variant = "default" | "no-prefetch";
 
 interface Flags {
   scenario: Scenario;
   mode: Mode;
+  variant: Variant;
   limit: number | null;
   dryRun: boolean;
   model: string | null;
@@ -73,6 +80,7 @@ interface PerJobResult {
 interface Artifact {
   scenario: Scenario;
   mode: Mode;
+  variant: Variant;
   gitSha: string;
   generatedAt: string;
   fixtureFile: string;
@@ -105,6 +113,7 @@ interface Artifact {
 function parseFlags(argv: string[]): Flags {
   let scenario: Scenario | null = null;
   let mode: Mode = "baseline";
+  let variant: Variant = "default";
   let limit: number | null = null;
   let dryRun = false;
   let model: string | null = null;
@@ -122,6 +131,12 @@ function parseFlags(argv: string[]): Flags {
         throw new Error(`Unknown mode: ${v} (compare mode ships with Phase 2)`);
       }
       mode = v;
+    } else if (a.startsWith("--variant=")) {
+      const v = a.slice("--variant=".length);
+      if (v !== "default" && v !== "no-prefetch") {
+        throw new Error(`Unknown variant: ${v}`);
+      }
+      variant = v;
     } else if (a.startsWith("--limit=")) {
       limit = Math.max(1, parseInt(a.slice("--limit=".length), 10) || 0);
     } else if (a.startsWith("--model=")) {
@@ -137,11 +152,15 @@ function parseFlags(argv: string[]): Flags {
     );
   }
 
+  if (variant === "no-prefetch" && scenario !== "analyze-advanced") {
+    throw new Error(`--variant=no-prefetch only applies to --scenario=analyze-advanced`);
+  }
+
   if (model && scenario !== "extract-structure") {
     throw new Error(`--model override only applies to --scenario=extract-structure`);
   }
 
-  return { scenario, mode, limit, dryRun, model };
+  return { scenario, mode, variant, limit, dryRun, model };
 }
 
 function gitSha(): string {
@@ -350,6 +369,13 @@ async function runAnalyzeAdvanced(
           location: job.location,
           description_text: job.description_text,
         },
+        // Phase 3: `no-prefetch` passes an empty webSearchContext to skip
+        // the duplicate Pro+grounded performWebSearch call. The main
+        // analysis call still has googleSearch enabled so the model can
+        // ground via its own tool invocations.
+        ...(flags.variant === "no-prefetch"
+          ? { webSearchContext: { synthesis: "", results: [] } }
+          : {}),
         onUsage: (u) => callsForJob.push({ ...u, extra: { ...u.extra, jobId: job.id } }),
       });
       results.push({
@@ -398,6 +424,7 @@ async function main() {
   const artifact: Artifact = {
     scenario: flags.scenario,
     mode: flags.mode,
+    variant: flags.variant,
     gitSha: gitSha(),
     generatedAt: new Date().toISOString(),
     fixtureFile,
@@ -410,10 +437,11 @@ async function main() {
 
   const artifactDir = resolve(process.cwd(), "scripts/artifacts");
   await mkdir(artifactDir, { recursive: true });
+  const variantSuffix = flags.variant === "default" ? "" : `-${flags.variant}`;
   const modelSuffix = flags.model ? `-${flags.model.replace(/[^a-z0-9-]/gi, "_")}` : "";
   const artifactPath = resolve(
     artifactDir,
-    `${flags.mode}-${flags.scenario}${modelSuffix}-${artifact.gitSha}.json`
+    `${flags.mode}-${flags.scenario}${variantSuffix}${modelSuffix}-${artifact.gitSha}.json`
   );
   await writeFile(artifactPath, JSON.stringify(artifact, null, 2));
   console.error(`\nartifact: ${artifactPath}`);
