@@ -1,0 +1,676 @@
+{
+  "scenario": "analyze-advanced",
+  "mode": "baseline",
+  "gitSha": "ce4ff9a",
+  "generatedAt": "2026-04-19T15:01:33.185Z",
+  "fixtureFile": "/Users/tscheidt/fintech_insights/fintech_insights/web/scripts/fixtures/gemini-sample-jobs.json",
+  "fixtureCount": 20,
+  "processedCount": 10,
+  "totals": {
+    "calls": 20,
+    "inputTokens": 53350,
+    "outputTokens": 11851,
+    "cachedTokens": 128,
+    "totalTokens": 106337,
+    "estimatedUsd": 0.885198,
+    "avgLatencyMs": 29396
+  },
+  "byCallSite": {
+    "performWebSearch+grounding": {
+      "calls": 10,
+      "inputTokens": 3692,
+      "outputTokens": 7137,
+      "totalTokens": 35824,
+      "estimatedUsd": 0.42598500000000006,
+      "avgLatencyMs": 37937,
+      "modelsServed": [
+        "gemini-pro-latest"
+      ]
+    },
+    "analyzeJobAdvanced+grounding": {
+      "calls": 10,
+      "inputTokens": 49658,
+      "outputTokens": 4714,
+      "totalTokens": 70513,
+      "estimatedUsd": 0.4592125,
+      "avgLatencyMs": 20855,
+      "modelsServed": [
+        "gemini-pro-latest"
+      ]
+    }
+  },
+  "perJob": [
+    {
+      "jobId": "c7aea83d-c1ad-4198-9195-e7e8c8b2c377",
+      "title": "Associate, Commercial Credit, Commercial Finance Group (CFG)",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "performWebSearch",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 430,
+          "outputTokens": 652,
+          "cachedTokens": 0,
+          "totalTokens": 3844,
+          "estimatedUsd": 0.042057500000000005,
+          "latencyMs": 39513,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobId": "c7aea83d-c1ad-4198-9195-e7e8c8b2c377"
+          }
+        },
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 4712,
+          "outputTokens": 465,
+          "cachedTokens": 0,
+          "totalTokens": 6348,
+          "estimatedUsd": 0.045540000000000004,
+          "latencyMs": 15865,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "Associate, Commercial Credit, Commercial Finance Group (CFG)",
+            "fellBackToFlash": false,
+            "jobId": "c7aea83d-c1ad-4198-9195-e7e8c8b2c377"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank adds commercial credit associate to support underwriting operations",
+        "category": "operational",
+        "insight_summary": "EQ Bank is hiring an Associate for its Commercial Finance Group to support underwriting, document fulfillment, and due diligence. The position requires five years of commercial mortgage administration experience and prefers bilingual candidates. This hiring activity aligns with the bank's recent expansion into nationwide business banking and reported loan growth.",
+        "what_it_means": "The addition of commercial credit support staff indicates sustained deal volume in EQ Bank's commercial lending divisions.",
+        "strategic_signals": [
+          "Requires five years of commercial mortgage administration experience",
+          "Supports the commercial underwriting team with document fulfillment and due diligence",
+          "Bilingual preference suggests operational coverage across Quebec and the rest of Canada",
+          "Coordinates deal flow between origination, credit, risk, and funding departments"
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 2,
+        "novelty_reasoning": "The role represents standard operational support for the existing Commercial Finance Group, continuing established hiring patterns in operations rather than indicating a strategic pivot.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "EQ Bank is scaling its commercial credit operations to manage increased deal flow following its October 2025 Business Banking launch and Q1 2026 loan expansions. The specific requirement for commercial mortgage administration experience suggests a focus on real estate-backed commercial lending.",
+        "web_corroboration": "The October 2025 launch of EQ Bank's nationwide Business Banking platform and Q1 2026 reports of loan expansions directly contextualize the need for additional commercial credit underwriting support.",
+        "model_reasoning": "The job description explicitly outlines support duties for commercial underwriting and originations. Combined with recent public statements regarding loan expansions and the recent rollout of business banking services, the hiring signal clearly points to volume management in commercial lending. Confidence is high due to the direct alignment between the job duties and recent corporate milestones."
+      }
+    },
+    {
+      "jobId": "e4b91622-2162-4a87-a751-c287c9b0413b",
+      "title": "Senior Manager, Operational Risk Management",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "performWebSearch",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 466,
+          "outputTokens": 830,
+          "cachedTokens": 0,
+          "totalTokens": 3190,
+          "estimatedUsd": 0.043882500000000005,
+          "latencyMs": 50582,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobId": "e4b91622-2162-4a87-a751-c287c9b0413b"
+          }
+        },
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 4997,
+          "outputTokens": 445,
+          "cachedTokens": 0,
+          "totalTokens": 7085,
+          "estimatedUsd": 0.04569625000000001,
+          "latencyMs": 19764,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "Senior Manager, Operational Risk Management",
+            "fellBackToFlash": false,
+            "jobId": "e4b91622-2162-4a87-a751-c287c9b0413b"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank adds operational risk leadership ahead of acquisition integration",
+        "category": "operational",
+        "insight_summary": "EQ Bank is hiring a Senior Manager of Operational Risk Management to oversee fraud, technology, and third-party risk. This follows recent leadership appointments in anti-money laundering, credit risk, and security operations. The focus on change management and operational resiliency corresponds with the bank's pending integration of PC Financial.",
+        "what_it_means": "EQ Bank is strengthening its second line of defense and operational risk frameworks to support its expanding customer base and upcoming acquisition integration.",
+        "strategic_signals": [
+          "Role oversees operational resiliency, change management, and third-party risk.",
+          "Responsibilities include guiding fraud risk management, aligning with the recent DataVisor partnership.",
+          "Follows recent director-level hires in credit risk, security operations, and anti-money laundering.",
+          "Requires management of the Governance, Risk Management and Compliance tool."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 4,
+        "novelty_reasoning": "Operational risk is a standard banking function, but the specific focus on change management and third-party risk is highly relevant to the pending PC Financial acquisition.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "EQ Bank is scaling its operational risk and fraud oversight capabilities to manage the integration of PC Financial and mitigate risks associated with its late 2025 restructuring.",
+        "web_corroboration": "The role's focus on fraud and change management directly supports the October 2024 DataVisor partnership and the December 2025 agreement to acquire PC Financial.",
+        "model_reasoning": "The job description explicitly mentions fraud, technology, and change management. Connecting this to the known PC Financial acquisition and recent risk-related leadership hires provides a high-confidence assessment of the role's strategic purpose."
+      }
+    },
+    {
+      "jobId": "85a09b75-1ff4-439d-b0d9-670a453cd468",
+      "title": "Senior Director, Asset and Liability Management (ALM)",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "performWebSearch",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 403,
+          "outputTokens": 662,
+          "cachedTokens": 0,
+          "totalTokens": 2699,
+          "estimatedUsd": 0.04212375,
+          "latencyMs": 29182,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobId": "85a09b75-1ff4-439d-b0d9-670a453cd468"
+          }
+        },
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 4753,
+          "outputTokens": 481,
+          "cachedTokens": 0,
+          "totalTokens": 7096,
+          "estimatedUsd": 0.04575125000000001,
+          "latencyMs": 26539,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "Senior Director, Asset and Liability Management (ALM)",
+            "fellBackToFlash": false,
+            "jobId": "85a09b75-1ff4-439d-b0d9-670a453cd468"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank hires Senior Director to manage expanded balance sheet post-acquisition",
+        "category": "leadership",
+        "insight_summary": "EQ Bank is recruiting a Senior Director of Asset and Liability Management to oversee balance sheet strategy and interest rate risk. This follows the recent clearance of its PC Financial acquisition, which alters the bank's asset mix and liquidity profile. The role requires 15 years of experience and deep knowledge of OSFI guidelines, indicating a focus on regulatory compliance during scale.",
+        "what_it_means": "EQ Bank is strengthening its treasury leadership to manage increased balance sheet complexity following its recent retail expansion.",
+        "strategic_signals": [
+          "Requires 15 years of ALM experience within bank treasury.",
+          "Focuses on OSFI B-12 Interest Rate Risk Management Guideline compliance.",
+          "Involves developing ALM models and managing hedge accounting strategies.",
+          "Supports stress testing programs including EWST, MST, and ICAAP."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 4,
+        "novelty_reasoning": "ALM is a standard banking function, but hiring at the Senior Director level reflects the increased complexity of EQ Bank's balance sheet following recent acquisitions.",
+        "is_executive_movement": true,
+        "executive_context": "This Senior Director role adds strategic oversight to treasury and risk management, aligning with recent leadership additions in credit risk and anti-money laundering.",
+        "strategic_hypothesis": "EQ Bank is expanding its treasury capabilities to handle the integration of PC Financial's customer base and new credit card assets. The emphasis on OSFI compliance and stress testing suggests preparation for heightened regulatory requirements as the bank scales.",
+        "web_corroboration": "The March 2026 Competition Bureau clearance of the PC Financial acquisition directly correlates with the need for advanced balance sheet and liquidity management.",
+        "model_reasoning": "High confidence. The job description explicitly details balance sheet strategy, stress testing, and OSFI compliance. Connecting this to the recently cleared PC Financial acquisition provides a clear, evidence-based rationale for the timing of this senior treasury hire."
+      }
+    },
+    {
+      "jobId": "a1ab7ccd-68fe-49db-948f-e453716a8abe",
+      "title": "Senior Backend Engineer",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "performWebSearch",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 383,
+          "outputTokens": 654,
+          "cachedTokens": 128,
+          "totalTokens": 3096,
+          "estimatedUsd": 0.04201875,
+          "latencyMs": 43236,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobId": "a1ab7ccd-68fe-49db-948f-e453716a8abe"
+          }
+        },
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 4442,
+          "outputTokens": 465,
+          "cachedTokens": 0,
+          "totalTokens": 6526,
+          "estimatedUsd": 0.04520250000000001,
+          "latencyMs": 21394,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "Senior Backend Engineer",
+            "fellBackToFlash": false,
+            "jobId": "a1ab7ccd-68fe-49db-948f-e453716a8abe"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank hires backend engineer to scale fraud systems amid expansion",
+        "category": "technology",
+        "insight_summary": "EQ Bank is recruiting a senior backend engineer to design and scale event-driven fraud decisioning systems. This role focuses on improving system observability and API contracts to handle increased transaction volumes. The position supports the bank's requirement to secure customer onboarding and money movement as its user base grows.",
+        "what_it_means": "EQ Bank is upgrading its fraud engineering infrastructure to support higher transaction volumes and complex integrations.",
+        "strategic_signals": [
+          "Role focuses on building scalable, event-driven fraud pipelines and APIs.",
+          "Engineering department hiring remains stable with nine postings in the last 90 days.",
+          "Follows recent leadership additions in security operations and cyber platform engineering.",
+          "System upgrades align with the anticipated integration of PC Financial accounts."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 4,
+        "novelty_reasoning": "While backend engineering roles are standard, the specific focus on scaling fraud architecture and event-driven pipelines reflects operational requirements tied to recent customer base expansion.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "EQ Bank is restructuring its fraud and risk decisioning architecture to handle the incoming volume from the PC Financial acquisition. By focusing on event-driven systems and decoupled fraud logic, the bank aims to process onboarding and transactions for its projected 3.3 million customers without increasing latency.",
+        "web_corroboration": "The March 2026 clearance of the PC Financial acquisition will quadruple EQ Bank's customer base, directly necessitating the scalable onboarding and transaction protection systems outlined in this posting.",
+        "model_reasoning": "The job description explicitly mentions scaling systems for onboarding, transactions, and money movement. Combined with the recent Competition Bureau clearance for the PC Financial acquisition, the need for robust, decoupled fraud architecture is clear. Confidence is high due to the direct alignment between the technical requirements and the public acquisition timeline."
+      }
+    },
+    {
+      "jobId": "83177ac3-270d-41e9-9ad7-983ad3ed3fd4",
+      "title": "Senior Business Analyst, Fraud Strategy",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "performWebSearch",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 357,
+          "outputTokens": 644,
+          "cachedTokens": 0,
+          "totalTokens": 4722,
+          "estimatedUsd": 0.04188625,
+          "latencyMs": 41197,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobId": "83177ac3-270d-41e9-9ad7-983ad3ed3fd4"
+          }
+        },
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 5379,
+          "outputTokens": 457,
+          "cachedTokens": 0,
+          "totalTokens": 7671,
+          "estimatedUsd": 0.04629375000000001,
+          "latencyMs": 22467,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Senior Business Analyst, Fraud Strategy",
+            "fellBackToFlash": false,
+            "jobId": "83177ac3-270d-41e9-9ad7-983ad3ed3fd4"
+          }
+        }
+      ],
+      "output": {
+        "headline": "KOHO adds fraud strategy analyst amid bank license application process",
+        "category": "compliance",
+        "insight_summary": "KOHO is hiring a Senior Business Analyst for Fraud Strategy to manage data-driven fraud controls and AML challenges. This role aligns with the company's recent regulatory milestones, including its application for a Schedule 1 bank license. The position emphasizes balancing risk mitigation with user experience to minimize false declines.",
+        "what_it_means": "KOHO is strengthening its internal fraud and AML capabilities to support its transition to a regulated banking entity.",
+        "strategic_signals": [
+          "Targets end-to-end fraud control and AML challenges",
+          "Requires technical proficiency in SQL, DBT, and Python",
+          "Emphasizes reducing false declines to maintain customer experience",
+          "Indicates cross-functional integration with product and compliance teams"
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 4,
+        "novelty_reasoning": "While risk management is standard for fintechs, this specific focus on advanced fraud modeling and AML aligns with KOHO's recent transition toward becoming a Schedule 1 bank.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "KOHO is upgrading its fraud detection infrastructure to satisfy the compliance and AML standards required for a Schedule 1 bank. The emphasis on Python and DBT indicates a transition toward automated risk modeling.",
+        "web_corroboration": "Recent news indicates KOHO became a supervised member of Payments Canada in January 2026 and advanced its Schedule 1 bank license application in March 2026, necessitating bank-grade fraud controls.",
+        "model_reasoning": "The job description explicitly mentions AML challenges and fraud detection models. Combined with historical context showing a recent VP of Credit Risk hire and public news about banking license applications, the evidence strongly supports a focus on regulatory readiness. Confidence is high due to direct alignment between the job's duties and public regulatory filings."
+      }
+    },
+    {
+      "jobId": "3b4b39de-b7a3-4bec-8367-91bf4b95ac7e",
+      "title": "Product Manager / Sr Product Manager, Credit Building",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "performWebSearch",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 334,
+          "outputTokens": 721,
+          "cachedTokens": 0,
+          "totalTokens": 3721,
+          "estimatedUsd": 0.042627500000000006,
+          "latencyMs": 33097,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobId": "3b4b39de-b7a3-4bec-8367-91bf4b95ac7e"
+          }
+        },
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 4520,
+          "outputTokens": 443,
+          "cachedTokens": 0,
+          "totalTokens": 6745,
+          "estimatedUsd": 0.04508,
+          "latencyMs": 23233,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Product Manager / Sr Product Manager, Credit Building",
+            "fellBackToFlash": false,
+            "jobId": "3b4b39de-b7a3-4bec-8367-91bf4b95ac7e"
+          }
+        }
+      ],
+      "output": {
+        "headline": "KOHO adds product management role to scale credit building portfolio",
+        "category": "expansion",
+        "insight_summary": "KOHO is expanding its product management team to oversee its credit building portfolio, including rent reporting and secured credit. The role emphasizes reducing delinquency and unlocking incremental gross profit. This aligns with the company's stated goal of scaling its lending business.",
+        "what_it_means": "KOHO is optimizing its consumer credit products to drive revenue growth and support its banking license application.",
+        "strategic_signals": [
+          "Role manages five distinct credit building products including rent reporting.",
+          "Requires familiarity with OSFI regulations and Equifax reporting.",
+          "Focuses on reducing user delinquency and increasing gross profit.",
+          "Follows a January 2026 executive hire in credit risk management."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "The role aligns with KOHO's established lending strategy and follows a recent 190 million capital raise dedicated to scaling credit products.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "KOHO is optimizing its credit building products to improve unit economics and gross profit margins. The emphasis on OSFI compliance and reducing delinquency suggests preparation for tighter regulatory scrutiny as the company pursues a Schedule 1 banking license.",
+        "web_corroboration": "October 2024 financial news confirms KOHO raised 190 million specifically to bolster its banking license efforts and scale its credit and lending portfolio.",
+        "model_reasoning": "High confidence. The job description's focus on credit building, OSFI compliance, and gross profit directly matches public reporting on KOHO's 190 million funding round and its pursuit of a Schedule 1 banking license. The recent hiring of a VP of Credit Risk further supports a coordinated expansion in the credit segment."
+      }
+    },
+    {
+      "jobId": "7c6f190a-7b87-4c04-8a0c-b44b9df2296f",
+      "title": "Director of Growth (Partnerships & Organic)",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "performWebSearch",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 310,
+          "outputTokens": 874,
+          "cachedTokens": 0,
+          "totalTokens": 4053,
+          "estimatedUsd": 0.0441275,
+          "latencyMs": 40046,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobId": "7c6f190a-7b87-4c04-8a0c-b44b9df2296f"
+          }
+        },
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 5290,
+          "outputTokens": 526,
+          "cachedTokens": 0,
+          "totalTokens": 7625,
+          "estimatedUsd": 0.046872500000000004,
+          "latencyMs": 25884,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Director of Growth (Partnerships & Organic)",
+            "fellBackToFlash": false,
+            "jobId": "7c6f190a-7b87-4c04-8a0c-b44b9df2296f"
+          }
+        }
+      ],
+      "output": {
+        "headline": "KOHO adds Director of Growth for partnerships and generative engine optimization",
+        "category": "marketing",
+        "insight_summary": "KOHO is recruiting a Director of Growth to manage partnerships, affiliates, and organic acquisition channels. The posting explicitly mandates a transition from traditional SEO to Generative Engine Optimization (GEO) to capture traffic from AI-driven search models. This indicates a structural update to the company's user acquisition framework.",
+        "what_it_means": "KOHO is adapting its user acquisition strategy to prioritize AI-driven search discoverability and partnership-led growth.",
+        "strategic_signals": [
+          "Targets Generative Engine Optimization (GEO) and LLM discoverability over traditional SEO.",
+          "Focuses on scaling affiliate and partnership programs for high-LTV user acquisition.",
+          "Treats organic search and discoverability as a core product strategy.",
+          "Advertises a budgeted salary range of $170,000 to $200,000 CAD."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 6,
+        "novelty_reasoning": "While marketing hiring remains stable, the explicit mandate to transition from traditional SEO to Generative Engine Optimization (GEO) represents a distinct tactical shift in acquisition strategy.",
+        "is_executive_movement": true,
+        "executive_context": "As a director-level role, this position joins a recent cluster of senior hires, including a VP of Growth, signaling a maturation of KOHO's marketing leadership structure.",
+        "strategic_hypothesis": "KOHO is restructuring its organic acquisition channels to adapt to changing search behaviors. The explicit focus on GEO suggests the company anticipates AI models will increasingly mediate financial product discovery.",
+        "web_corroboration": "The emphasis on partnership growth aligns with recent initiatives like the March 2025 Canada Post collaboration. The focus on AI discoverability parallels KOHO's existing use of AI in its Equifax-partnered credit tools.",
+        "model_reasoning": "The job description clearly outlines specific responsibilities, including GEO, ASO, and affiliate management, alongside a defined salary range. The company's recent $190M funding and new product launches provide clear context for scaling high-LTV acquisition channels. Confidence is high due to the alignment between the detailed posting and recent verified strategic milestones."
+      }
+    },
+    {
+      "jobId": "bac85455-34f8-46ae-8c42-84ecb796215c",
+      "title": "Product and Regulatory Counsel",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "performWebSearch",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 327,
+          "outputTokens": 598,
+          "cachedTokens": 0,
+          "totalTokens": 3473,
+          "estimatedUsd": 0.04138875,
+          "latencyMs": 35044,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobId": "bac85455-34f8-46ae-8c42-84ecb796215c"
+          }
+        },
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 5204,
+          "outputTokens": 515,
+          "cachedTokens": 0,
+          "totalTokens": 7171,
+          "estimatedUsd": 0.046655,
+          "latencyMs": 16592,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Product and Regulatory Counsel",
+            "fellBackToFlash": false,
+            "jobId": "bac85455-34f8-46ae-8c42-84ecb796215c"
+          }
+        }
+      ],
+      "output": {
+        "headline": "KOHO adds regulatory counsel to support Schedule 1 bank transition",
+        "category": "compliance",
+        "insight_summary": "KOHO is hiring a Product and Regulatory Counsel to support its transition into a regulated financial institution. The role explicitly mentions operationalizing 'KOHO Bank' and engaging with OSFI, FCAC, and the Bank of Canada. This aligns with the company's stated objective of securing a Schedule 1 banking license following its late 2024 funding round.",
+        "what_it_means": "KOHO is actively building the internal legal infrastructure required to operate as a fully regulated Canadian bank.",
+        "strategic_signals": [
+          "Role explicitly tasks the hire with operationalizing 'KOHO Bank'",
+          "Requires direct engagement with OSFI, FCAC, and the Bank of Canada",
+          "Cites familiarity with the Retail Payment Activities Act (RPAA)",
+          "Represents a new hiring area with Legal showing its first recent posting"
+        ],
+        "is_new_direction": true,
+        "confidence": "high",
+        "novelty_score": 8,
+        "novelty_reasoning": "Legal is a newly tracked department for KOHO, and the role's explicit focus on operationalizing a regulated bank and engaging with OSFI represents a distinct structural shift from previous product and engineering hires.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The addition of this role suggests KOHO is advancing its Schedule 1 banking license application. The explicit division of responsibilities between 'KOHO Tech' and 'KOHO Bank' indicates the company is structuring its legal and compliance frameworks to meet OSFI requirements for a chartered bank.",
+        "web_corroboration": "The posting directly corroborates October 2024 reports of KOHO securing $190 million to pursue a banking license. The job description's mention of RPAA familiarity also aligns with KOHO's November 2025 registration as a Payment Service Provider under the Bank of Canada.",
+        "model_reasoning": "High confidence. The job description explicitly names the strategic objective of operationalizing a regulated bank and lists the relevant regulatory bodies. This perfectly matches recent public funding announcements and regulatory milestones, providing clear evidence of active preparation for a Schedule 1 bank launch."
+      }
+    },
+    {
+      "jobId": "096d3a5d-e260-4204-9ae4-870d45250a9c",
+      "title": "Sales Representative - Toronto Premium Outlets",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "performWebSearch",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 354,
+          "outputTokens": 897,
+          "cachedTokens": 0,
+          "totalTokens": 3364,
+          "estimatedUsd": 0.04441250000000001,
+          "latencyMs": 31407,
+          "status": "ok",
+          "extra": {
+            "companyName": "Neo Financial",
+            "jobId": "096d3a5d-e260-4204-9ae4-870d45250a9c"
+          }
+        },
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 4678,
+          "outputTokens": 442,
+          "cachedTokens": 0,
+          "totalTokens": 6198,
+          "estimatedUsd": 0.0452675,
+          "latencyMs": 15212,
+          "status": "ok",
+          "extra": {
+            "companyName": "Neo Financial",
+            "jobTitle": "Sales Representative - Toronto Premium Outlets",
+            "fellBackToFlash": false,
+            "jobId": "096d3a5d-e260-4204-9ae4-870d45250a9c"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Neo Financial continues frontline sales hiring for retail customer acquisition",
+        "category": "customer",
+        "insight_summary": "Neo Financial is hiring a frontline sales representative for the Toronto Premium Outlets. This aligns with the company's established strategy of using in-person activations at malls and retail partners to drive customer acquisition. Sales remains the company's highest-volume hiring department over the past 180 days.",
+        "what_it_means": "Neo Financial maintains a steady reliance on physical retail activations to acquire new users for its credit and banking products.",
+        "strategic_signals": [
+          "Sales is the highest-volume hiring department with 99 postings in the last 180 days.",
+          "The role focuses on in-person customer acquisition at a specific retail location.",
+          "Compensation includes a 20 CAD hourly base with an average on-target earnings of 36 CAD per hour.",
+          "Recent product launches provide new offerings for frontline sales teams to distribute."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 2,
+        "novelty_reasoning": "Frontline sales roles at specific retail locations represent the bulk of Neo Financial's recent hiring volume, indicating a continuation of existing strategy rather than a new direction.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The company uses physical retail kiosks and activations as a primary channel for user growth, requiring a continuous pipeline of frontline sales staff to maintain customer acquisition rates.",
+        "web_corroboration": "While recent news highlights structural milestones like Interac integration and institutional funding, the company's operational focus remains heavily tied to direct consumer acquisition to distribute its credit products.",
+        "model_reasoning": "High confidence. The job description explicitly outlines frontline retail sales duties, which directly matches the historical hiring data showing 99 sales postings and multiple recent hires for specific mall locations."
+      }
+    },
+    {
+      "jobId": "c8fde90b-bb78-496a-aae4-a93480e391d3",
+      "title": "Product Manager, Fraud (PM / Senior / Lead)",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "performWebSearch",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 328,
+          "outputTokens": 605,
+          "cachedTokens": 0,
+          "totalTokens": 3662,
+          "estimatedUsd": 0.041460000000000004,
+          "latencyMs": 36063,
+          "status": "ok",
+          "extra": {
+            "companyName": "Neo Financial",
+            "jobId": "c8fde90b-bb78-496a-aae4-a93480e391d3"
+          }
+        },
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 5683,
+          "outputTokens": 475,
+          "cachedTokens": 0,
+          "totalTokens": 8048,
+          "estimatedUsd": 0.04685375,
+          "latencyMs": 21603,
+          "status": "ok",
+          "extra": {
+            "companyName": "Neo Financial",
+            "jobTitle": "Product Manager, Fraud (PM / Senior / Lead)",
+            "fellBackToFlash": false,
+            "jobId": "c8fde90b-bb78-496a-aae4-a93480e391d3"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Neo Financial adds fraud product manager to support expanding credit portfolio",
+        "category": "operational",
+        "insight_summary": "Neo Financial is recruiting a Product Manager for its Fraud squad to optimize detection systems across its platform. The position requires technical experimentation and data analysis to balance risk reduction with user experience. This hiring aligns with the company's recent capital raise intended to scale its lending operations.",
+        "what_it_means": "Neo is maturing its financial crime infrastructure to manage increased transaction volumes and complex credit products.",
+        "strategic_signals": [
+          "Role reports to the Group Product Manager of Fincrime, indicating a structured risk organization.",
+          "Focuses on optimizing fraud detection across credit, banking, and transfers using A/B testing.",
+          "Product department hiring has tripled in the last 90 days compared to the prior period.",
+          "Company explicitly targets candidates with data optimization backgrounds over traditional finance experience."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 4,
+        "novelty_reasoning": "Hiring a fraud product manager is a standard operational requirement for a scaling financial institution, reflecting maturation rather than a strategic pivot.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "Neo is strengthening its fraud and financial crime capabilities to support the rapid scaling of its credit portfolio and recent co-branded card launches. The emphasis on minimizing customer friction suggests a focus on retention alongside risk mitigation.",
+        "web_corroboration": "Recent news highlights Neo's $68.5 million equity raise to scale its lending model and the launch of a United Airlines co-branded credit card. Expanding credit products necessitates advanced, data-driven fraud prevention systems.",
+        "model_reasoning": "The job description details the need for a technical product manager to handle fraud across credit and banking. Combined with news of a recent funding round aimed at scaling the lending portfolio and a major airline partnership, the hiring signal points to operational maturation to support increased transaction volume. Confidence is high due to direct alignment between the job description and recent strategic announcements."
+      }
+    }
+  ]
+}
