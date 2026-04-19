@@ -11,6 +11,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { checkVoice } from "@/lib/ai/voice-validator";
+import { recordUsage } from "@/lib/ai/gemini-meter";
+import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildExtendedHistoricalContext,
@@ -559,12 +561,25 @@ async function generateInsightWithLLM(
     .replace("{previous_insight_context}", previousInsightContext);
 
   try {
+    const _startMs = Date.now();
     const result = await withTimeout(
       model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
       }),
       COMPANY_INSIGHT_TIMEOUT_MS,
       `Gemini company insight generation for "${companyName}"`
+    );
+
+    writeUsageEvent(
+      recordUsage({
+        callSite: "generateCompanyInsight",
+        modelRequested: "gemini-flash-latest",
+        groundingEnabled: false,
+        usageMetadata: result.response.usageMetadata,
+        latencyMs: Date.now() - _startMs,
+        status: "ok",
+        extra: { companyName },
+      })
     );
 
     const text = result.response.text()?.trim() ?? "";

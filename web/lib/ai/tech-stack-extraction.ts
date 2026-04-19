@@ -1,4 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { recordUsage } from "./gemini-meter";
+import { writeUsageEvent } from "./gemini-telemetry";
 import {
   DEFAULT_TECH_STACK_AI_CONFIG,
   type TechStackAiConfig,
@@ -295,9 +297,22 @@ export async function extractCompanyTechStack(
     const prompt = EXTRACTION_PROMPT.replace("{job_data}", jobData);
 
     try {
+      const _startMs = Date.now();
       const result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
       });
+
+      writeUsageEvent(
+        recordUsage({
+          callSite: "extractCompanyTechStack",
+          modelRequested: "gemini-flash-latest",
+          groundingEnabled: false,
+          usageMetadata: result.response.usageMetadata,
+          latencyMs: Date.now() - _startMs,
+          status: "ok",
+          extra: { batchSize: batch.length, batchIndex: i / BATCH_SIZE },
+        })
+      );
 
       const text = result.response.text()?.trim() ?? "{}";
       const parsed = JSON.parse(text) as JobTechExtraction;
@@ -667,12 +682,25 @@ export async function enrichTechStackWithAnalysis(
         },
       });
 
+      const _startMs = Date.now();
       const result = await withTimeout(
         model.generateContent({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
         }),
         GEMINI_REQUEST_TIMEOUT_MS,
         `Gemini tech stack enrichment for "${companyName}" (attempt ${attempt + 1})`
+      );
+
+      writeUsageEvent(
+        recordUsage({
+          callSite: "enrichTechStackWithAnalysis",
+          modelRequested: config.model,
+          groundingEnabled: false,
+          usageMetadata: result.response.usageMetadata,
+          latencyMs: Date.now() - _startMs,
+          status: "ok",
+          extra: { companyName, attempt },
+        })
       );
 
       const text = result.response.text()?.trim() ?? "{}";

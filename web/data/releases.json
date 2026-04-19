@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.12.0",
+    "date": "2026-04-19",
+    "changes": [
+      { "type": "improvement", "description": "Every production Gemini call now logs token usage, model served, grounding flag, latency, and a USD cost estimate to the new `gemini_usage_events` table — enabling per-feature spend visibility and drift detection without waiting for the Google Cloud billing dashboard." }
+    ]
+  },
+  {
     "version": "1.11.0",
     "date": "2026-04-19",
     "changes": [

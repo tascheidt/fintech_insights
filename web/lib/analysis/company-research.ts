@@ -10,6 +10,8 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { recordUsage } from "@/lib/ai/gemini-meter";
+import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { scoreRankedSource } from "./source-scoring";
 
 // ============================================================================
@@ -192,7 +194,21 @@ Respond with JSON:
 
 Only say high confidence if you are certain. Most fintech startups are private.`;
 
+    const _startMs = Date.now();
     const result = await model.generateContent(prompt);
+
+    writeUsageEvent(
+      recordUsage({
+        callSite: "detectCompanyType",
+        modelRequested: "gemini-flash-latest",
+        groundingEnabled: false,
+        usageMetadata: result.response.usageMetadata,
+        latencyMs: Date.now() - _startMs,
+        status: "ok",
+        extra: { companyName, retryCount },
+      })
+    );
+
     const text = result.response.text()?.trim() ?? "";
 
     // Handle empty response
@@ -412,12 +428,25 @@ export async function performDeepResearch(
         tools: [{ googleSearch: {} }],
       });
 
+      const _searchStartMs = Date.now();
       const result = await model.generateContent({
         contents: [{
           role: "user",
           parts: [{ text: `Search for: ${query}\n\nReturn the top 3 most relevant results with their titles, snippets, and URLs. Format as JSON array: [{"title": "...", "snippet": "...", "url": "..."}]` }],
         }],
       });
+
+      writeUsageEvent(
+        recordUsage({
+          callSite: "performDeepResearch.search",
+          modelRequested: "gemini-flash-latest",
+          groundingEnabled: true,
+          usageMetadata: result.response.usageMetadata,
+          latencyMs: Date.now() - _searchStartMs,
+          status: "ok",
+          extra: { sourceType, query },
+        })
+      );
 
       const responseText = result.response.text();
       
@@ -746,9 +775,23 @@ ${sourceText}
 
 If there's not enough information to summarize a strategy, say "Insufficient public information to determine stated strategy."`;
 
+    const _startMs = Date.now();
     const result = await model.generateContent(prompt);
+
+    writeUsageEvent(
+      recordUsage({
+        callSite: "extractStatedStrategy",
+        modelRequested: "gemini-flash-latest",
+        groundingEnabled: false,
+        usageMetadata: result.response.usageMetadata,
+        latencyMs: Date.now() - _startMs,
+        status: "ok",
+        extra: { companyName, sourceCount: sources.length },
+      })
+    );
+
     const text = result.response.text()?.trim();
-    
+
     if (text && !text.toLowerCase().includes("insufficient")) {
       return text;
     }
@@ -807,7 +850,21 @@ async function extractFinancialContext(
 Only include fields where you found actual data. Sources:
 ${sourceText}`;
 
+    const _startMs = Date.now();
     const result = await model.generateContent(prompt);
+
+    writeUsageEvent(
+      recordUsage({
+        callSite: "extractFinancialContext",
+        modelRequested: "gemini-flash-latest",
+        groundingEnabled: false,
+        usageMetadata: result.response.usageMetadata,
+        latencyMs: Date.now() - _startMs,
+        status: "ok",
+        extra: { companyName, sourceCount: fundingSources.length },
+      })
+    );
+
     const text = result.response.text()?.trim() ?? "";
 
     // Handle empty response

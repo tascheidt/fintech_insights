@@ -8,6 +8,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { checkVoice } from "@/lib/ai/voice-validator";
+import { recordUsage } from "@/lib/ai/gemini-meter";
+import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import {
   getActiveWeeklyDigestAiConfig,
   type WeeklyDigestAiConfig,
@@ -302,9 +304,22 @@ export async function generateWeeklyDigestCommentary(
     },
   });
 
+  const _startMs = Date.now();
   const result = await model.generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
   });
+
+  writeUsageEvent(
+    recordUsage({
+      callSite: "generateWeeklyDigestCommentary",
+      modelRequested: activeConfig.model,
+      groundingEnabled: false,
+      usageMetadata: result.response.usageMetadata,
+      latencyMs: Date.now() - _startMs,
+      status: "ok",
+      extra: { companyName: input.company_name },
+    })
+  );
 
   const text = result.response.text()?.trim();
   if (!text) {

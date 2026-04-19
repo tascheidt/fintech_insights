@@ -1,5 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getVoiceDirective } from "@/lib/ai/voice";
+import { recordUsage } from "@/lib/ai/gemini-meter";
+import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 
 /**
  * Strategy Analysis Pipeline
@@ -175,9 +177,22 @@ export async function analyzeCompanyStrategy(
       },
     });
 
+    const _startMs = Date.now();
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
+
+    writeUsageEvent(
+      recordUsage({
+        callSite: "analyzeCompanyStrategy",
+        modelRequested: "gemini-flash-latest",
+        groundingEnabled: false,
+        usageMetadata: result.response.usageMetadata,
+        latencyMs: Date.now() - _startMs,
+        status: "ok",
+        extra: { companyName },
+      })
+    );
 
     const text = result.response.text()?.trim() ?? "{}";
     const parsed = JSON.parse(text) as Record<string, unknown>;

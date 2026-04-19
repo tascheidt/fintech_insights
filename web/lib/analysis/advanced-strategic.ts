@@ -11,6 +11,7 @@ import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 import { checkVoice } from "@/lib/ai/voice-validator";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
+import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { buildHistoricalContext, formatHistoricalContextForPrompt, type HistoricalContext } from "./context-builder";
 
 // ---------------------------------------------------------------------------
@@ -378,19 +379,17 @@ export async function performWebSearch(
       }],
     });
 
-    if (opts?.onUsage) {
-      opts.onUsage(
-        recordUsage({
-          callSite: "performWebSearch",
-          modelRequested: PRO_MODEL,
-          groundingEnabled: true,
-          usageMetadata: result.response.usageMetadata,
-          latencyMs: Date.now() - _startMs,
-          status: "ok",
-          extra: { companyName },
-        })
-      );
-    }
+    const _webSearchUsage = recordUsage({
+      callSite: "performWebSearch",
+      modelRequested: PRO_MODEL,
+      groundingEnabled: true,
+      usageMetadata: result.response.usageMetadata,
+      latencyMs: Date.now() - _startMs,
+      status: "ok",
+      extra: { companyName },
+    });
+    writeUsageEvent(_webSearchUsage);
+    opts?.onUsage?.(_webSearchUsage);
 
     // The model's text response is the synthesized research narrative
     const synthesis = result.response.text()?.trim() ?? "";
@@ -529,24 +528,22 @@ export async function analyzeJobAdvanced(
       }
     }
 
-    if (onUsage) {
-      onUsage(
-        recordUsage({
-          callSite: "analyzeJobAdvanced",
-          modelRequested: analysisModel,
-          modelServed,
-          groundingEnabled: groundingServed,
-          usageMetadata: result.response.usageMetadata,
-          latencyMs: Date.now() - _analyzeStartMs,
-          status: "ok",
-          extra: {
-            companyName,
-            jobTitle: job.title,
-            fellBackToFlash: modelServed !== analysisModel,
-          },
-        })
-      );
-    }
+    const _analyzeUsage = recordUsage({
+      callSite: "analyzeJobAdvanced",
+      modelRequested: analysisModel,
+      modelServed,
+      groundingEnabled: groundingServed,
+      usageMetadata: result.response.usageMetadata,
+      latencyMs: Date.now() - _analyzeStartMs,
+      status: "ok",
+      extra: {
+        companyName,
+        jobTitle: job.title,
+        fellBackToFlash: modelServed !== analysisModel,
+      },
+    });
+    writeUsageEvent(_analyzeUsage);
+    onUsage?.(_analyzeUsage);
 
     const text = result.response.text()?.trim() ?? "{}";
     const parsed = JSON.parse(text) as Record<string, unknown>;
