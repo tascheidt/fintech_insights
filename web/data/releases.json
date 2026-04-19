@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.11.0",
+    "date": "2026-04-19",
+    "changes": [
+      { "type": "improvement", "description": "Advanced strategic analysis no longer pre-fetches a duplicate grounded web search call — the main analysis already grounds in-flight, cutting per-job Gemini spend roughly in half without regressing the hard signals (is_new_direction, is_executive_movement, confidence, novelty_score)." }
+    ]
+  },
+  {
     "version": "1.10.0",
     "date": "2026-04-19",
     "changes": [

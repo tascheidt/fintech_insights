@@ -95,7 +95,11 @@ export interface AnalyzeJobOptions {
     description_text?: string | null;
   };
   historicalContext?: HistoricalContext;
-  /** Pre-fetched web research context. If omitted, performWebSearch is called automatically. */
+  /**
+   * Pre-fetched web research context. If omitted, **no pre-fetch runs** — the
+   * main call's googleSearch tool handles grounding in-flight. See Phase 3
+   * notes on `analyzeJobAdvanced` for why the default changed.
+   */
   webSearchContext?: WebSearchContext;
   /**
    * Gemini model for the main analysis JSON call. Default: `gemini-pro-latest`.
@@ -425,9 +429,18 @@ export async function performWebSearch(
  * Advanced job analysis using Gemini Pro with web search grounding.
  * Falls back to Flash if the Pro quota is exceeded.
  *
- * Two-stage web research:
- * 1. Pre-fetch: performWebSearch provides a synthesized company overview
- * 2. Analysis: the Pro model can do additional targeted searches during reasoning
+ * By default does NOT pre-fetch web context — the main call has the
+ * `googleSearch` tool enabled and grounds its reasoning in-flight. Phase 3
+ * of the Gemini cost-reduction effort removed the default pre-fetch: it
+ * duplicated the main call's grounding and nearly doubled per-job cost.
+ * Callers can still pass a pre-fetched `webSearchContext` explicitly — the
+ * batch helper `analyzeJobsAdvanced` does so to share one pre-fetch across
+ * a chunk of jobs.
+ *
+ * See `web/scripts/artifacts/diff-analyze-*.json` for the comparison
+ * against the pre-Phase-3 baseline (51% cost cut, 10/10 agreement on
+ * `is_new_direction` / `is_executive_movement` / `confidence` / `novelty_score`,
+ * `web_corroboration` still populated on every call via in-flight grounding).
  */
 export async function analyzeJobAdvanced(
   options: AnalyzeJobOptions
@@ -459,8 +472,9 @@ export async function analyzeJobAdvanced(
   try {
     const context =
       historicalContext ?? (await buildHistoricalContext(companyId, HISTORICAL_CONTEXT_DAYS));
-    const webCtx =
-      webSearchContext ?? (await performWebSearch(companyName, { onUsage }));
+    // Phase 3: no default pre-fetch. Callers that want a shared pre-fetch
+    // (batch helper, eval scripts) pass `webSearchContext` explicitly.
+    const webCtx = webSearchContext ?? { synthesis: "", results: [] };
 
     const prompt = buildPrompt(
       companyName,
