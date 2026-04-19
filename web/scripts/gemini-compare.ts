@@ -23,6 +23,11 @@
  *                                    passing an empty `webSearchContext`.
  *                                    Used in Phase 3 to measure the savings
  *                                    from dropping the duplicate grounded call.
+ *   --model=<alias>                  For extract-structure: override the default
+ *                                    model (`gemini-flash-latest`) with a Phase 4
+ *                                    candidate (e.g. `gemini-flash-lite-latest`).
+ *                                    The model appears in the artifact filename
+ *                                    so Flash vs Flash-Lite runs don't stomp.
  *   --limit=N                        Cap jobs processed (defaults: 20 for extract, 10 for analyze)
  *   --dry-run                        Skip Gemini calls; still emits the artifact skeleton
  */
@@ -33,6 +38,10 @@ import { execSync } from "child_process";
 
 import { extractJobStructure, type JobStructureForDB } from "@/lib/analysis/structure";
 import { analyzeJobAdvanced, type AdvancedAnalyzeResult } from "@/lib/analysis/advanced-strategic";
+import {
+  DEFAULT_JOB_STRUCTURE_AI_CONFIG,
+  type AllowedAiModel,
+} from "@/lib/ai/prompt-config";
 import type { UsageRecord } from "@/lib/ai/gemini-meter";
 
 type Scenario = "extract-structure" | "analyze-advanced";
@@ -45,6 +54,7 @@ interface Flags {
   variant: Variant;
   limit: number | null;
   dryRun: boolean;
+  model: string | null;
 }
 
 interface FixtureJob {
@@ -106,6 +116,7 @@ function parseFlags(argv: string[]): Flags {
   let variant: Variant = "default";
   let limit: number | null = null;
   let dryRun = false;
+  let model: string | null = null;
 
   for (const a of argv) {
     if (a.startsWith("--scenario=")) {
@@ -128,6 +139,8 @@ function parseFlags(argv: string[]): Flags {
       variant = v;
     } else if (a.startsWith("--limit=")) {
       limit = Math.max(1, parseInt(a.slice("--limit=".length), 10) || 0);
+    } else if (a.startsWith("--model=")) {
+      model = a.slice("--model=".length);
     } else if (a === "--dry-run") {
       dryRun = true;
     }
@@ -143,7 +156,11 @@ function parseFlags(argv: string[]): Flags {
     throw new Error(`--variant=no-prefetch only applies to --scenario=analyze-advanced`);
   }
 
-  return { scenario, mode, variant, limit, dryRun };
+  if (model && scenario !== "extract-structure") {
+    throw new Error(`--model override only applies to --scenario=extract-structure`);
+  }
+
+  return { scenario, mode, variant, limit, dryRun, model };
 }
 
 function gitSha(): string {
@@ -287,7 +304,17 @@ async function runExtractStructure(
       continue;
     }
     try {
+      // Phase 4: allow --model= override to route extraction through a
+      // different model (e.g. gemini-flash-lite-latest) without editing the
+      // default config.
+      const configOverride = flags.model
+        ? {
+            ...DEFAULT_JOB_STRUCTURE_AI_CONFIG,
+            model: flags.model as AllowedAiModel,
+          }
+        : undefined;
       const out = await extractJobStructure(job.title, job.description_text, job.department, {
+        ...(configOverride ? { config: configOverride } : {}),
         onUsage: (u) => callsForJob.push({ ...u, extra: { ...u.extra, jobId: job.id } }),
       });
       results.push({
@@ -411,9 +438,10 @@ async function main() {
   const artifactDir = resolve(process.cwd(), "scripts/artifacts");
   await mkdir(artifactDir, { recursive: true });
   const variantSuffix = flags.variant === "default" ? "" : `-${flags.variant}`;
+  const modelSuffix = flags.model ? `-${flags.model.replace(/[^a-z0-9-]/gi, "_")}` : "";
   const artifactPath = resolve(
     artifactDir,
-    `${flags.mode}-${flags.scenario}${variantSuffix}-${artifact.gitSha}.json`
+    `${flags.mode}-${flags.scenario}${variantSuffix}${modelSuffix}-${artifact.gitSha}.json`
   );
   await writeFile(artifactPath, JSON.stringify(artifact, null, 2));
   console.error(`\nartifact: ${artifactPath}`);
