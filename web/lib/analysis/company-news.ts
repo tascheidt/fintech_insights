@@ -9,6 +9,8 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { recordUsage } from "@/lib/ai/gemini-meter";
+import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface NewsItem {
@@ -259,9 +261,22 @@ Be concise but specific. Always include sourceUrl when you can cite a specific a
 If information is not available, use null or empty arrays.
 `;
 
+    const _startMs = Date.now();
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
+
+    writeUsageEvent(
+      recordUsage({
+        callSite: "fetchCompanyNews",
+        modelRequested: "gemini-flash-latest",
+        groundingEnabled: true,
+        usageMetadata: result.response.usageMetadata,
+        latencyMs: Date.now() - _startMs,
+        status: "ok",
+        extra: { companyName },
+      })
+    );
 
     const text = result.response.text()?.trim() || "{}";
     

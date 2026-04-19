@@ -6,6 +6,7 @@ import {
   type JobStructureAiConfig,
 } from "@/lib/ai/prompt-config";
 import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
+import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 
 /**
  * Job Structure Extractor
@@ -169,19 +170,20 @@ export async function extractJobStructure(
       `Gemini extraction for "${jobTitle}"`
     );
 
-    if (onUsage) {
-      onUsage(
-        recordUsage({
-          callSite: "extractJobStructure",
-          modelRequested: config.model,
-          groundingEnabled: false,
-          usageMetadata: result.response.usageMetadata,
-          latencyMs: Date.now() - _startMs,
-          status: "ok",
-          extra: { retryCount, jobTitle },
-        })
-      );
-    }
+    // Record the usage once. Production telemetry always fires (fire-and-
+    // forget DB write); the optional `onUsage` observer runs in parallel
+    // for scripts that capture records in-memory.
+    const _usage = recordUsage({
+      callSite: "extractJobStructure",
+      modelRequested: config.model,
+      groundingEnabled: false,
+      usageMetadata: result.response.usageMetadata,
+      latencyMs: Date.now() - _startMs,
+      status: "ok",
+      extra: { retryCount, jobTitle },
+    });
+    writeUsageEvent(_usage);
+    onUsage?.(_usage);
 
     const text = result.response.text()?.trim() ?? "";
     

@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { buildHistoricalContext, formatHistoricalContextForPrompt } from "@/lib/analysis/context-builder";
 import { getVoiceDirective } from "@/lib/ai/voice";
+import { recordUsage } from "@/lib/ai/gemini-meter";
+import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { z } from "zod";
 
 const chatSchema = z.object({
@@ -154,6 +156,7 @@ Your role is to answer follow-up questions about this insight, provide deeper an
     });
 
     // Stream the response
+    const _chatStartMs = Date.now();
     const stream = await chat.sendMessageStream(question);
 
     // Create a readable stream for the response
@@ -170,6 +173,26 @@ Your role is to answer follow-up questions about this insight, provide deeper an
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
             }
           }
+
+          // After the stream drains, `stream.response` resolves with the final
+          // aggregated response including usageMetadata.
+          try {
+            const aggregated = await stream.response;
+            writeUsageEvent(
+              recordUsage({
+                callSite: "insightChat",
+                modelRequested: "gemini-flash-latest",
+                groundingEnabled: true,
+                usageMetadata: aggregated.usageMetadata,
+                latencyMs: Date.now() - _chatStartMs,
+                status: "ok",
+                extra: { insightId: id, streamed: true },
+              })
+            );
+          } catch (meterErr) {
+            console.error("[gemini-telemetry] insightChat usage read failed:", meterErr);
+          }
+
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
 

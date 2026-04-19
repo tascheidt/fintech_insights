@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getVoiceDirective } from "@/lib/ai/voice";
+import { recordUsage } from "@/lib/ai/gemini-meter";
+import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { z } from "zod";
 
 const messageSchema = z.object({
@@ -156,7 +158,21 @@ ${message}
 
 Provide a helpful, insightful response based on the company insight data. Be specific and reference the data when relevant. If you don't have enough information to answer, say so.`;
 
+    const _chatStartMs = Date.now();
     const result = await model.generateContent(prompt);
+
+    writeUsageEvent(
+      recordUsage({
+        callSite: "companyInsightChat",
+        modelRequested: "gemini-flash-latest",
+        groundingEnabled: false,
+        usageMetadata: result.response.usageMetadata,
+        latencyMs: Date.now() - _chatStartMs,
+        status: "ok",
+        extra: { companyId: company.id, insightId: insight.id },
+      })
+    );
+
     const aiResponse = result.response.text()?.trim() || "I apologize, but I couldn't generate a response.";
 
     // Update conversation with new messages
