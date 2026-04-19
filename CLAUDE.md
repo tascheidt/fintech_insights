@@ -213,6 +213,28 @@ Using `-latest` aliases means new model generations roll through without code ch
 3. Use Pro (`gemini-pro-latest`) only for features requiring web-search grounding or deep synthesis; Flash covers standard JSON generation and analysis.
 4. When adding a new call site, verify whether an upstream call already enables `googleSearch` grounding — two grounded Pro calls in series cost as much as one and produce duplicate work.
 
+### AI call-site hygiene
+
+Rules for every Gemini call. These exist because Gemini cost drifted above target in April 2026 and cost the team a round of debugging we don't want to repeat:
+
+1. **Every new call-site must be observable.** Production analysis functions accept an optional `onUsage: OnUsage` callback from `@/lib/ai/gemini-meter` and fire it with the real `usageMetadata` after each call. When you add a new call-site, wire the hook the same way. Production callers pass nothing; tools pass an observer. Phase 5 of the cost-reduction plan will turn this into unconditional telemetry to `gemini_usage_events`.
+2. **PRs touching `web/lib/ai/**` or `web/lib/analysis/**` must run `gemini-compare.ts` and attach the markdown report to the PR description.** Use `npx tsx --env-file=.env.local scripts/gemini-compare.ts --scenario=<name> --mode=baseline` (or `--mode=compare --baseline=<prior-artifact>`) and commit the resulting JSON under `web/scripts/artifacts/`. The seeded 20-job fixture at `web/scripts/fixtures/gemini-sample-jobs.json` is the source of truth — regenerate annually, not per change.
+3. **Before adding a new grounded (`googleSearch`) call, check whether an upstream call already enables grounding.** The Apr 2026 incident was two grounded Pro calls firing per new job in `analyzeJobAdvanced` — avoid duplicating grounded calls.
+4. **Response caches must include `prompt_config_version` in the cache key.** Otherwise prompt tweaks silently serve stale outputs forever.
+5. **The voice directive from `web/lib/ai/voice.ts` is mandatory on user-facing surfaces** (digest, company insight, chat, narrative) and forbidden on internal extraction/classification prompts. Extraction output is never shown to users; the voice rules only eat tokens there.
+
+### Ingestion pipeline reality
+
+The live per-job hot path after `collect` runs is:
+
+```
+processor.ts  → extractAndUpdateStructure  → extractJobStructure  (Flash)
+analyzer.ts   → analyzeJobAdvanced  → performWebSearch (Pro+grounded, pre-fetch)
+                                   → analyzeJobAdvanced main call (Pro+grounded)
+```
+
+`analyzeJob` in [web/lib/analysis/strategic.ts](web/lib/analysis/strategic.ts) and `categorizePosting` in [web/lib/analysis/categorizer.ts](web/lib/analysis/categorizer.ts) are **not** on the live ingestion path — they exist for backfill and legacy flows. Do not wire into those functions without an explicit decision; do not assume the 8000-char cap in `strategic.ts` applies to production analyses.
+
 ### Quota Errors
 If you see `limit: 0` quota errors, the API key may need:
 1. Billing enabled on the Google Cloud project

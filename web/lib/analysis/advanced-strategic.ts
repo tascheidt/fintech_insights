@@ -10,6 +10,7 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 import { checkVoice } from "@/lib/ai/voice-validator";
 import { getVoiceDirective } from "@/lib/ai/voice";
+import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
 import { buildHistoricalContext, formatHistoricalContextForPrompt, type HistoricalContext } from "./context-builder";
 
 // ---------------------------------------------------------------------------
@@ -111,6 +112,12 @@ export interface AnalyzeJobOptions {
    * Default: true.
    */
   analysisQuotaFallback?: boolean;
+  /**
+   * Optional observer for token/cost usage. Production default is undefined (no-op).
+   * Fired once per Gemini call inside analyzeJobAdvanced — including the pre-fetch
+   * performWebSearch call and the quota-fallback Flash call when it happens.
+   */
+  onUsage?: OnUsage;
 }
 
 // ---------------------------------------------------------------------------
@@ -322,7 +329,10 @@ function parseAnalysisResult(
  * complementary: the pre-fetch provides general company context, while the
  * analysis model can dig deeper on specific signals it encounters.
  */
-export async function performWebSearch(companyName: string): Promise<WebSearchContext> {
+export async function performWebSearch(
+  companyName: string,
+  opts?: { onUsage?: OnUsage }
+): Promise<WebSearchContext> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     console.warn("GEMINI_API_KEY not configured, skipping web search");
@@ -351,6 +361,7 @@ export async function performWebSearch(companyName: string): Promise<WebSearchCo
       `from ${fmt(cutoff)} to ${fmt(now)}. ` +
       `Prioritise results from ${fmt(recentCutoff)} to ${fmt(now)} first.`;
 
+    const _startMs = Date.now();
     const result = await model.generateContent({
       contents: [{
         role: "user",
@@ -362,6 +373,20 @@ export async function performWebSearch(companyName: string): Promise<WebSearchCo
         }],
       }],
     });
+
+    if (opts?.onUsage) {
+      opts.onUsage(
+        recordUsage({
+          callSite: "performWebSearch",
+          modelRequested: PRO_MODEL,
+          groundingEnabled: true,
+          usageMetadata: result.response.usageMetadata,
+          latencyMs: Date.now() - _startMs,
+          status: "ok",
+          extra: { companyName },
+        })
+      );
+    }
 
     // The model's text response is the synthesized research narrative
     const synthesis = result.response.text()?.trim() ?? "";
@@ -416,6 +441,7 @@ export async function analyzeJobAdvanced(
     analysisModel = PRO_MODEL,
     analysisGoogleSearch = true,
     analysisQuotaFallback = true,
+    onUsage,
   } = options;
   const key = process.env.GEMINI_API_KEY;
 
@@ -434,7 +460,7 @@ export async function analyzeJobAdvanced(
     const context =
       historicalContext ?? (await buildHistoricalContext(companyId, HISTORICAL_CONTEXT_DAYS));
     const webCtx =
-      webSearchContext ?? (await performWebSearch(companyName));
+      webSearchContext ?? (await performWebSearch(companyName, { onUsage }));
 
     const prompt = buildPrompt(
       companyName,
@@ -460,6 +486,9 @@ export async function analyzeJobAdvanced(
     let model: GenerativeModel = buildAnalysisModel(analysisModel, analysisGoogleSearch);
 
     let result;
+    let modelServed = analysisModel;
+    let groundingServed = analysisGoogleSearch;
+    const _analyzeStartMs = Date.now();
     try {
       result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -476,12 +505,33 @@ export async function analyzeJobAdvanced(
           model: FLASH_MODEL,
           generationConfig,
         });
+        modelServed = FLASH_MODEL;
+        groundingServed = false;
         result = await model.generateContent({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
         });
       } else {
         throw error;
       }
+    }
+
+    if (onUsage) {
+      onUsage(
+        recordUsage({
+          callSite: "analyzeJobAdvanced",
+          modelRequested: analysisModel,
+          modelServed,
+          groundingEnabled: groundingServed,
+          usageMetadata: result.response.usageMetadata,
+          latencyMs: Date.now() - _analyzeStartMs,
+          status: "ok",
+          extra: {
+            companyName,
+            jobTitle: job.title,
+            fellBackToFlash: modelServed !== analysisModel,
+          },
+        })
+      );
     }
 
     const text = result.response.text()?.trim() ?? "{}";

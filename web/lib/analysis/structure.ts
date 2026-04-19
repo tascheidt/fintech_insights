@@ -5,6 +5,7 @@ import {
   DEFAULT_JOB_STRUCTURE_AI_CONFIG,
   type JobStructureAiConfig,
 } from "@/lib/ai/prompt-config";
+import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
 
 /**
  * Job Structure Extractor
@@ -72,11 +73,13 @@ export interface JobStructureForDB extends Omit<JobStructure, "salary" | "locati
 interface ExtractJobStructureOptions {
   config?: JobStructureAiConfig;
   retryCount?: number;
+  /** Optional observer for token/cost usage. Production default is undefined (no-op). */
+  onUsage?: OnUsage;
 }
 
 function resolveExtractOptions(
   options?: number | ExtractJobStructureOptions
-): Required<ExtractJobStructureOptions> {
+): { config: JobStructureAiConfig; retryCount: number; onUsage?: OnUsage } {
   if (typeof options === "number") {
     return {
       config: DEFAULT_JOB_STRUCTURE_AI_CONFIG,
@@ -87,6 +90,7 @@ function resolveExtractOptions(
   return {
     config: options?.config ?? DEFAULT_JOB_STRUCTURE_AI_CONFIG,
     retryCount: options?.retryCount ?? 0,
+    onUsage: options?.onUsage,
   };
 }
 
@@ -121,7 +125,7 @@ export async function extractJobStructure(
   rawDepartment?: string | null,
   options?: number | ExtractJobStructureOptions
 ): Promise<JobStructureForDB | null> {
-  const { config, retryCount } = resolveExtractOptions(options);
+  const { config, retryCount, onUsage } = resolveExtractOptions(options);
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     console.error("GEMINI_API_KEY not configured");
@@ -156,6 +160,7 @@ export async function extractJobStructure(
       },
     });
 
+    const _startMs = Date.now();
     const result = await withTimeout(
       model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -163,6 +168,20 @@ export async function extractJobStructure(
       GEMINI_REQUEST_TIMEOUT_MS,
       `Gemini extraction for "${jobTitle}"`
     );
+
+    if (onUsage) {
+      onUsage(
+        recordUsage({
+          callSite: "extractJobStructure",
+          modelRequested: config.model,
+          groundingEnabled: false,
+          usageMetadata: result.response.usageMetadata,
+          latencyMs: Date.now() - _startMs,
+          status: "ok",
+          extra: { retryCount, jobTitle },
+        })
+      );
+    }
 
     const text = result.response.text()?.trim() ?? "";
     
@@ -178,9 +197,10 @@ export async function extractJobStructure(
         return extractJobStructure(jobTitle, description, rawDepartment, {
           config,
           retryCount: retryCount + 1,
+          onUsage,
         });
       }
-      
+
       return null;
     }
 
@@ -256,6 +276,7 @@ export async function extractJobStructure(
               return extractJobStructure(jobTitle, description, rawDepartment, {
                 config,
                 retryCount: nextRetryCount,
+                onUsage,
               });
             }
             
@@ -306,9 +327,10 @@ export async function extractJobStructure(
             return extractJobStructure(jobTitle, description, rawDepartment, {
               config,
               retryCount: retryCount + 1,
+              onUsage,
             });
           }
-          
+
           return null;
         }
       }
@@ -363,10 +385,11 @@ export async function extractJobStructure(
         return extractJobStructure(jobTitle, description, rawDepartment, {
           config,
           retryCount: retryCount + 1,
+          onUsage,
         });
       }
     }
-    
+
     return null;
   }
 }
