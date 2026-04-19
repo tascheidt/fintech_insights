@@ -39,7 +39,7 @@ This document is intentionally split into two parts:
 - It does not directly modify source code when you save a prompt
 - It does not expose prompt editing to non-admin users
 
-- It does not tune **per-job strategic insights** (the `analyzeJobAdvanced` pipeline used after collection to populate `strategic_insights`). To compare Gemini models for that path—for example `gemini-pro-latest` vs `gemini-3-flash-preview` or `gemini-flash-latest`—use the dev script `web/scripts/compare-job-analysis-models.ts` with shared historical and web context so both arms see identical inputs.
+- It does not tune **per-job strategic insights** (the `analyzeJobAdvanced` pipeline used after collection to populate `strategic_insights`). To compare Gemini models for that path—for example `gemini-pro-latest` vs `gemini-flash-latest`—use the dev script `web/scripts/compare-job-analysis-models.ts` with shared historical and web context so both arms see identical inputs.
 
 ### Core product idea
 
@@ -137,14 +137,14 @@ All Prompt Forge outputs that become user-visible prose should align with **[voi
 
 ## Supported Models
 
-Prompt Forge currently supports these approved Gemini 3 models:
+Prompt Forge currently supports these approved Gemini models (all floating `-latest` aliases — the concrete version rolls with Google's releases; see CLAUDE.md `AI Model Requirements`):
 
-- `gemini-3-flash-preview`
+- `gemini-flash-latest`
 - `gemini-pro-latest`
 
 Recommended usage:
 
-- Use `gemini-3-flash-preview` for fast extraction and quick iteration
+- Use `gemini-flash-latest` for fast extraction and quick iteration
 - Use `gemini-pro-latest` when deeper synthesis quality matters more than speed
 
 ---
@@ -709,7 +709,7 @@ Admin access is enforced by:
 
 Model values are restricted by schema validation in `web/lib/ai/prompt-config.ts`.
 
-Only approved Gemini 3 models should be accepted.
+Only approved Gemini `-latest` alias models should be accepted (see CLAUDE.md `AI Model Requirements`).
 
 ### Prompt validation
 

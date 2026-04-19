@@ -172,7 +172,7 @@ export async function detectCompanyType(
   try {
     const genAI = new GoogleGenerativeAI(key);
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 256,
@@ -407,7 +407,7 @@ export async function performDeepResearch(
 
     try {
       const model = genAI.getGenerativeModel({
-        model: "gemini-3-flash-preview",
+        model: "gemini-flash-latest",
         // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
         tools: [{ googleSearch: {} }],
       });
@@ -723,7 +723,7 @@ async function extractStatedStrategy(
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 2048,
@@ -775,7 +775,7 @@ async function extractFinancialContext(
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       generationConfig: {
         temperature: 0.2,
         maxOutputTokens: 2048,

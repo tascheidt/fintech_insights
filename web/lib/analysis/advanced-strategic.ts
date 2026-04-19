@@ -17,7 +17,7 @@ import { buildHistoricalContext, formatHistoricalContextForPrompt, type Historic
 // ---------------------------------------------------------------------------
 
 const PRO_MODEL = "gemini-pro-latest";
-const FLASH_MODEL = "gemini-3-flash-preview";
+const FLASH_MODEL = "gemini-flash-latest";
 
 /** How many days of hiring history to include as context for each job analysis. */
 const HISTORICAL_CONTEXT_DAYS = 180;

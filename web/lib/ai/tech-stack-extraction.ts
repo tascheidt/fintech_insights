@@ -262,7 +262,7 @@ export async function extractCompanyTechStack(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: "gemini-3-flash-preview",
+    model: "gemini-flash-latest",
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 8192,

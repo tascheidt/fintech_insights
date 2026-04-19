@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
  * Job Categorizer for Template Library
  * 
  * Logic ported from src/analysis/categorizer.py to TypeScript for Vercel deployment.
- * Uses Gemini 3 Flash for AI-based categorization and template extraction.
+ * Uses Gemini Flash for AI-based categorization and template extraction.
  */
 
 // Fintech-specific role categories (must match function-categories.ts)
@@ -174,7 +174,7 @@ Respond ONLY with valid JSON.`;
 
 
 /**
- * Categorize a job posting and extract template sections using Gemini 3.
+ * Categorize a job posting and extract template sections using Gemini.
  */
 export async function categorizePosting(
   jobTitle: string,
@@ -196,9 +196,9 @@ export async function categorizePosting(
   try {
     const genAI = new GoogleGenerativeAI(key);
     
-    // Using Gemini 3 Flash Preview as requested
+    // Using Gemini Flash (via `gemini-flash-latest`) as requested
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       generationConfig: {
         temperature: 0.2,
         maxOutputTokens: 64000,

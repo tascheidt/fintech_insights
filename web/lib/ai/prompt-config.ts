@@ -6,9 +6,9 @@ export type PromptStage = (typeof PROMPT_STAGES)[number];
 
 export const AI_MODEL_OPTIONS = [
   {
-    value: "gemini-3-flash-preview",
-    label: "Gemini 3 Flash",
-    summary: "Fastest for extraction and iteration rounds.",
+    value: "gemini-flash-latest",
+    label: "Gemini Flash",
+    summary: "Fastest for extraction and iteration rounds. Uses the `-latest` alias, so the active version is whatever Google currently marks as Flash-latest.",
     recommendedStages: ["job-structure", "tech-stack", "weekly-digest"],
   },
   {
@@ -243,7 +243,7 @@ Respond with ONLY valid JSON.`;
 
 export const DEFAULT_JOB_STRUCTURE_AI_CONFIG: JobStructureAiConfig = {
   stage: "job-structure",
-  model: "gemini-3-flash-preview",
+  model: "gemini-flash-latest",
   promptTemplate: DEFAULT_JOB_STRUCTURE_PROMPT,
   temperature: 0.2,
   maxOutputTokens: 4096,
@@ -253,7 +253,7 @@ export const DEFAULT_JOB_STRUCTURE_AI_CONFIG: JobStructureAiConfig = {
 
 export const DEFAULT_TECH_STACK_AI_CONFIG: TechStackAiConfig = {
   stage: "tech-stack",
-  model: "gemini-3-flash-preview",
+  model: "gemini-flash-latest",
   promptTemplate: DEFAULT_TECH_STACK_PROMPT,
   temperature: 0.25,
   maxOutputTokens: 4096,
@@ -263,7 +263,7 @@ export const DEFAULT_TECH_STACK_AI_CONFIG: TechStackAiConfig = {
 
 export const DEFAULT_WEEKLY_DIGEST_AI_CONFIG: WeeklyDigestAiConfig = {
   stage: "weekly-digest",
-  model: "gemini-3-flash-preview",
+  model: "gemini-flash-latest",
   promptTemplate: DEFAULT_WEEKLY_DIGEST_PROMPT,
   temperature: 0.2,
   maxOutputTokens: 2048,

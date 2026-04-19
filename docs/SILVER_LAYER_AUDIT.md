@@ -208,13 +208,13 @@ CREATE INDEX idx_job_postings_tech_stack ON job_postings USING GIN(tech_stack);
 
 #### ✅ Strategic Analysis (`web/lib/analysis/strategic.ts`)
 - **Function:** `analyzeJob(companyName, job)`
-- **Model:** Gemini 3 Flash Preview
+- **Model:** Gemini Flash (via `gemini-flash-latest`)
 - **Output:** `AnalyzeResult` with category, insight_summary, strategic_signals, is_new_direction, confidence
 - **Status:** ✅ **PRODUCTION READY**
 
 #### ✅ Advanced Strategic Analysis (`web/lib/analysis/advanced-strategic.ts`)
 - **Function:** `analyzeJobAdvanced(options)`
-- **Model:** Gemini 3 Pro Preview (with fallback to Flash)
+- **Model:** Gemini Pro (via `gemini-pro-latest`) (with fallback to Flash)
 - **Features:**
   - Historical context comparison
   - Web search grounding (Google Search tool)
@@ -226,7 +226,7 @@ CREATE INDEX idx_job_postings_tech_stack ON job_postings USING GIN(tech_stack);
 
 #### ✅ Job Categorization (`web/lib/analysis/categorizer.ts`)
 - **Function:** `categorizePosting(jobTitle, companyName, description)`
-- **Model:** Gemini 3 Flash Preview
+- **Model:** Gemini Flash (via `gemini-flash-latest`)
 - **Output:** `JobCategoryResult` with:
   - `role_category` (from ROLE_CATEGORIES enum)
   - `extracted_sections` (summary, responsibilities, requirements, nice_to_have, benefits)
@@ -236,7 +236,7 @@ CREATE INDEX idx_job_postings_tech_stack ON job_postings USING GIN(tech_stack);
 
 #### ✅ Company-Level Insights (`web/lib/analysis/company-insights.ts`)
 - **Function:** `generateCompanyInsight(companyId, companyName, options)`
-- **Model:** Gemini 3 Flash Preview
+- **Model:** Gemini Flash (via `gemini-flash-latest`)
 - **Features:**
   - Extended historical context (90-day periods)
   - Deep research (public company detection, financial context, analyst reports)
@@ -375,7 +375,7 @@ CREATE INDEX idx_job_postings_tech_stack ON job_postings USING GIN(tech_stack);
 **Good News:** The foundation for analysis and insights is **strongly established**:
 - ✅ Strategic analysis tables exist with advanced fields
 - ✅ Company-level insights with deep research
-- ✅ Comprehensive AI analysis functions using Gemini 3
+- ✅ Comprehensive AI analysis functions using Gemini
 - ✅ Job categorization system (36 categories)
 - ✅ Historical context and trend analysis
 

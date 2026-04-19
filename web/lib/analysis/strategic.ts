@@ -1,10 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
- * Strategic Analysis using Gemini 3 Flash
+ * Strategic Analysis using Gemini Flash
  * 
  * Uses JSON mode for guaranteed structured output.
- * Leverages Gemini 3's enhanced reasoning capabilities.
+ * Leverages Gemini 's enhanced reasoning capabilities.
  */
 
 const PROMPT = `You are a competitive intelligence analyst specializing in the fintech industry.
@@ -67,9 +67,9 @@ export async function analyzeJob(
   try {
     const genAI = new GoogleGenerativeAI(key);
     
-    // Use Gemini 3 Flash with JSON mode for guaranteed structured output
+    // Use Gemini Flash with JSON mode for guaranteed structured output
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 64000,
