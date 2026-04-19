@@ -9,6 +9,18 @@ import {
   getActiveJobStructureAiConfig,
   type JobStructureAiConfig,
 } from "@/lib/ai/prompt-config";
+import { createHash } from "crypto";
+
+/**
+ * SHA-1 hex digest of a job description. Used as a cheap content fingerprint
+ * so the ingestion pipeline can skip `extractAndUpdateStructure` when a
+ * scraped description matches what we already stored. Matches the SQL
+ * `encode(digest(description_text, 'sha1'), 'hex')` used by the backfill
+ * migration so hashes produced here and in-database are interchangeable.
+ */
+function hashDescription(description: string): string {
+  return createHash("sha1").update(description).digest("hex");
+}
 
 /**
  * Stage 1: Scrape - Fetch raw data from ATS
@@ -192,15 +204,21 @@ export async function runIngestStage(
     // Get existing job postings
     const { data: existing } = await supabase
       .from('job_postings')
-      .select('id, external_id')
+      .select('id, external_id, description_hash')
       .eq('company_id', company.id);
 
-    const existingMap = new Map((existing ?? []).map((e) => [e.external_id, e.id]));
+    const existingMap = new Map(
+      (existing ?? []).map((e) => [
+        e.external_id,
+        { id: e.id as string, descriptionHash: (e.description_hash ?? null) as string | null },
+      ])
+    );
     const fetchedIds = new Set(jobs.map((j) => j.external_id));
 
     let newJobs = 0;
     let updatedJobs = 0;
     let closedJobs = 0;
+    let extractionsSkippedByHash = 0;
     const newJobIds: string[] = [];
     const extractionPromises: Promise<void>[] = [];
 
@@ -216,9 +234,16 @@ export async function runIngestStage(
         is_active: true,
       };
 
-      const existingId = existingMap.get(job.external_id);
+      const existingEntry = existingMap.get(job.external_id);
+      // Content fingerprint for the description_hash gate (Phase 2). A null
+      // stored hash is treated as "changed" so the first scrape after deploy
+      // still populates everything, matching the intent of the SQL backfill.
+      const newDescriptionHash = row.description_text ? hashDescription(row.description_text) : null;
 
-      if (existingId) {
+      if (existingEntry) {
+        const existingId = existingEntry.id;
+        const descriptionChanged =
+          newDescriptionHash !== null && newDescriptionHash !== existingEntry.descriptionHash;
         // Update existing job
         // Note: location will be updated by extractAndUpdateStructure with validated/AI-extracted value
         // For now, validate scraper location and set to null if invalid (will be replaced by AI extraction)
@@ -229,6 +254,7 @@ export async function runIngestStage(
             last_seen_date: row.last_seen_date,
             description_html: row.description_html,
             description_text: row.description_text,
+            description_hash: newDescriptionHash,
             department: row.department,
             location: validatedLocation, // Temporary - will be replaced by AI extraction
             location_type: row.location_type,
@@ -239,9 +265,10 @@ export async function runIngestStage(
           .eq('id', existingId);
         updatedJobs++;
 
-        // Queue Silver Layer extraction for updated jobs
-        // Pass raw location for validation (AI will extract from description)
-        if (row.description_text) {
+        // Queue Silver Layer extraction only when the description actually
+        // changed (hash gate, Phase 2 cost win). Unchanged descriptions
+        // skip the Gemini call entirely — this is the core saving.
+        if (row.description_text && descriptionChanged) {
           extractionPromises.push(
             extractAndUpdateStructure(
               existingId,
@@ -252,6 +279,8 @@ export async function runIngestStage(
               activeConfig
             )
           );
+        } else if (row.description_text) {
+          extractionsSkippedByHash++;
         }
       } else {
         // Insert new job
@@ -260,6 +289,7 @@ export async function runIngestStage(
           .insert({
             ...row,
             first_seen_date: row.last_seen_date,
+            description_hash: newDescriptionHash,
           })
           .select('id')
           .single();
@@ -305,6 +335,15 @@ export async function runIngestStage(
       }
     }
 
+    // Phase 2 telemetry: how many `extractAndUpdateStructure` calls did the
+    // hash gate prevent? This is the daily-cost-saving signal; surfaces on
+    // each collect run so we can track it without full Phase-5 telemetry.
+    if (extractionsSkippedByHash > 0) {
+      console.log(
+        `Silver Layer extraction: hash gate skipped ${extractionsSkippedByHash} unchanged description(s) for ${company.name}`
+      );
+    }
+
     // Mark jobs as closed if no longer in feed
     // Only update jobs that are currently active to avoid overwriting
     // closed_date on already-closed jobs every collection run
@@ -344,6 +383,9 @@ export async function runIngestStage(
             completedAt: new Date().toISOString(),
             processed: total,
             total: total,
+            // Phase 2: surface the hash-gate saving in job_run_tasks so it's
+            // queryable alongside new/updated/closed counts without a new column.
+            extractionsSkippedByHash,
           },
         },
       })
