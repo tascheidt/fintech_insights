@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.12.1",
+    "date": "2026-04-21",
+    "changes": [
+      { "type": "fix", "description": "Job structure extraction no longer truncates responses mid-JSON on long descriptions — raised the output token cap to match the runtime config, eliminating the wasted first-call retries that were firing on ~3 EQ Bank jobs per collection run." }
+    ]
+  },
+  {
     "version": "1.12.0",
     "date": "2026-04-19",
     "changes": [
