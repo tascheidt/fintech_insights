@@ -1,25 +1,31 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { requireUser } from "@/lib/auth/guards";
 import { detectATSFromUrl, fetchJobs, SUPPORTED_ATS } from "@/lib/scrapers";
 
-export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+const bodySchema = z.object({
+  url: z.string().min(1),
+});
 
-  let body: { url?: string };
+export async function POST(req: Request) {
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { url } = body;
-  if (!url || typeof url !== "string") {
-    return NextResponse.json({ error: "URL is required" }, { status: 400 });
+  const parsed = bodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "URL is required", issues: parsed.error.issues },
+      { status: 400 }
+    );
   }
+  const { url } = parsed.data;
 
   // Detect ATS from URL
   const detection = detectATSFromUrl(url);

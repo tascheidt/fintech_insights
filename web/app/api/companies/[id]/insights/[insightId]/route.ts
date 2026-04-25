@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
 import { getCompanyInsight } from "@/lib/analysis/company-insights";
+import { requireUser } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
+
+const paramsSchema = z.object({
+  id: z.string().uuid(),
+  insightId: z.string().uuid(),
+});
 
 /**
  * GET /api/companies/[id]/insights/[insightId]
@@ -10,13 +17,15 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; insightId: string }> }
 ) {
-  const { id, insightId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const paramsParsed = paramsSchema.safeParse(await params);
+  if (!paramsParsed.success) {
+    return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
+  const { id, insightId } = paramsParsed.data;
+
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
   // Verify user has access to this company
   const { data: company, error: companyError } = await supabase
@@ -43,7 +52,7 @@ export async function GET(
 
     return NextResponse.json({ insight });
   } catch (error) {
-    console.error("Error fetching company insight:", error);
+    log.error({ err: error }, "Error fetching company insight");
     return NextResponse.json(
       { error: "Failed to fetch insight" },
       { status: 500 }

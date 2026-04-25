@@ -1,0 +1,105 @@
+name: Doc drift check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  doc-drift:
+    name: Warn if architecture changes skip docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute changed files
+        id: diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # Ensure we have both sides of the comparison.
+          git fetch --no-tags --depth=200 origin "$BASE_SHA" || true
+          git fetch --no-tags --depth=200 origin "$HEAD_SHA" || true
+
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Architecture-sensitive paths that should normally come with doc updates.
+          ARCH_HIT=$(echo "$CHANGED" | grep -E '^(web/lib/analysis/|web/app/api/cron/|web/lib/ai/|web/vercel\.json$|web/lib/auth/|web/supabase/migrations/)' || true)
+          DOC_HIT=$(echo "$CHANGED" | grep -E '\.md$' || true)
+
+          if [ -n "$ARCH_HIT" ] && [ -z "$DOC_HIT" ]; then
+            echo "needs_warning=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "arch_files<<ARCH_EOF"
+              echo "$ARCH_HIT"
+              echo "ARCH_EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_warning=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post non-blocking warning comment
+        if: steps.diff.outputs.needs_warning == 'true'
+        uses: actions/github-script@v7
+        env:
+          ARCH_FILES: ${{ steps.diff.outputs.arch_files }}
+        with:
+          script: |
+            const archFiles = (process.env.ARCH_FILES || '').trim();
+            const fileList = archFiles
+              .split('\n')
+              .filter(Boolean)
+              .map((f) => `- \`${f}\``)
+              .join('\n');
+
+            const marker = '<!-- doc-drift-check -->';
+            const body = [
+              marker,
+              '**Heads up:** this PR changes architecture/cron/auth/AI but doesn\'t update any `.md` file.',
+              'Did you forget the docs?',
+              '',
+              'Architecture-sensitive files in this PR:',
+              fileList,
+              '',
+              'Relevant docs to consider updating: root `CLAUDE.md`, `docs/AGENTS.md`, the per-area sub-CLAUDEs in `web/lib/analysis/`, `web/lib/scrapers/`, `web/lib/ai/`, `web/lib/auth/`, plus `docs/CRON_TOPOLOGY.md`, `docs/AI_HYGIENE.md`, `docs/INGESTION_PIPELINE.md`, and `web/data/releases.json`.',
+              '',
+              'This warning is **non-blocking** — a reviewer can override.',
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }

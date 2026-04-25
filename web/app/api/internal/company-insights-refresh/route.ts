@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateCompanyInsight } from "@/lib/analysis/company-insights";
+import { requireCronSecret } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 
 export const maxDuration = 300;
+
+const bodySchema = z.object({
+  jobRunId: z.string().uuid().nullable().optional(),
+});
 
 interface RefreshDetails {
   mode: "force-refresh-all";
@@ -51,11 +58,8 @@ async function queueNextInvocation(baseUrl: string, cronSecret: string, jobRunId
 }
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  const expected = `Bearer ${process.env.CRON_SECRET}`;
-  if (!authHeader || authHeader !== expected) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = requireCronSecret(req);
+  if (denied) return denied;
 
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
@@ -63,7 +67,21 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createAdminClient();
-  const body = (await req.json().catch(() => ({}))) as { jobRunId?: string | null };
+
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    raw = {};
+  }
+  const parsed = bodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid body", issues: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+  const body = parsed.data;
   const baseUrl = req.nextUrl.origin;
 
   const { data: activeCompanies, error: companiesError } = await supabase
@@ -200,7 +218,7 @@ export async function POST(req: NextRequest) {
   const remaining = companies.length - details.processedCompanyIds.length;
   if (remaining > 0) {
     queueNextInvocation(baseUrl, cronSecret, resolvedJobRunId).catch((error) => {
-      console.error("Company insight refresh chain error:", error);
+      log.error({ err: error }, "Company insight refresh chain error");
     });
   } else {
     await supabase

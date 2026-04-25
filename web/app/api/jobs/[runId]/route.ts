@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { requireUser } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
+
+const paramsSchema = z.object({ runId: z.string().uuid() });
 
 /**
  * GET /api/jobs/[runId]
@@ -10,16 +14,15 @@ export async function GET(
   { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const { runId } = await params;
-    const supabase = await createClient();
-
-    // Verify user is authenticated
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const paramsParsed = paramsSchema.safeParse(await params);
+    if (!paramsParsed.success) {
+      return NextResponse.json({ error: "Invalid runId" }, { status: 400 });
     }
+    const { runId } = paramsParsed.data;
+
+    const auth = await requireUser();
+    if (auth instanceof NextResponse) return auth;
+    const { supabase } = auth;
 
     // Get job run with tasks
     const { data: jobRun, error } = await supabase
@@ -38,7 +41,7 @@ export async function GET(
 
     return NextResponse.json(jobRun);
   } catch (error) {
-    console.error("Get job run error:", error);
+    log.error({ err: error }, "Get job run error");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

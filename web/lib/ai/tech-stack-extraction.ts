@@ -325,10 +325,7 @@ export async function extractCompanyTechStack(
       batchesSucceeded++;
       stack.totalJobsAnalyzed += batch.length;
     } catch (error) {
-      console.error(
-        `Tech stack extraction error (batch ${i / BATCH_SIZE + 1}):`,
-        error
-      );
+      log.error({ err: error }, `Tech stack extraction error (batch ${i / BATCH_SIZE + 1}):`);
       // Continue with next batch on error
     }
   }
@@ -365,6 +362,7 @@ export { NORMALIZATION_MAP, CATEGORY_LABELS, normalizeTechName };
 // ============================================================================
 
 import type { FlatTechMention } from "./tech-stack-aggregation";
+import { log } from "@/lib/log";
 
 /** Result shape from the LLM enrichment call */
 interface EnrichmentResult {
@@ -778,7 +776,7 @@ export async function enrichTechStackWithAnalysis(
       baseStack.architectSummary = buildHeuristicArchitectSummary(companyName, baseStack.categories);
     }
   } catch (error) {
-    console.error("Tech stack enrichment error:", error);
+    log.error({ err: error }, "Tech stack enrichment error:");
     baseStack.categories = buildHeuristicCategories(technologies);
 
     if (baseStack.categories.length === 0) {

@@ -12,6 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { log } from "@/lib/log";
 
 export interface CronAuthResult {
   authorized: boolean;
@@ -100,7 +101,7 @@ export function requireCronAuth(req: NextRequest): NextResponse | null {
       allHeaders[key] = value;
     });
 
-    console.error("Cron authentication failed:", {
+    log.error({ err: {
       error: authResult.error,
       details: authResult.details,
       path: req.nextUrl.pathname,
@@ -109,7 +110,7 @@ export function requireCronAuth(req: NextRequest): NextResponse | null {
       receivedUserAgent: userAgent || "missing",
       expectedAuthPrefix: process.env.CRON_SECRET ? `Bearer ${process.env.CRON_SECRET.substring(0, 10)}...` : "CRON_SECRET not set",
       allHeaders: Object.keys(allHeaders), // Log header names for debugging
-    });
+    } }, "Cron authentication failed:");
 
     return NextResponse.json(
       {
@@ -123,11 +124,11 @@ export function requireCronAuth(req: NextRequest): NextResponse | null {
 
   // Log successful authentication for debugging (only in development or when needed)
   if (process.env.NODE_ENV === "development" || process.env.LOG_CRON_AUTH === "true") {
-    console.log("Cron authentication successful:", {
+    log.info({ err: {
       path: req.nextUrl.pathname,
       hasAuthHeader: !!authResult.details?.hasAuthHeader,
       hasUserAgent: !!authResult.details?.hasUserAgent,
-    });
+    } }, "Cron authentication successful:");
   }
 
   return null;

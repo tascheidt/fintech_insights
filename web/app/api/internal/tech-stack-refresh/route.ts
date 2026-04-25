@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { refreshTechStacksForCompanies, backfillTechStacksForAllCompanies } from "@/lib/jobs";
+import { requireCronSecret } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 
 export const maxDuration = 300;
+
+const bodySchema = z.object({
+  jobRunId: z.string().uuid().nullable(),
+});
 
 /**
  * POST /api/internal/tech-stack-refresh
@@ -14,28 +21,38 @@ export const maxDuration = 300;
  * Protected by CRON_SECRET.
  */
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  const expected = `Bearer ${process.env.CRON_SECRET}`;
-  if (!authHeader || authHeader !== expected) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = requireCronSecret(req);
+  if (denied) return denied;
 
-  const body = (await req.json()) as { jobRunId: string | null };
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const parsed = bodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid body", issues: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+  const body = parsed.data;
 
   try {
     if (body.jobRunId) {
-      console.log(`Tech stack refresh started for job run: ${body.jobRunId}`);
+      log.info({ jobRunId: body.jobRunId }, "Tech stack refresh started");
       const result = await refreshTechStacksForCompanies(body.jobRunId);
-      console.log("Tech stack refresh complete:", result);
+      log.info({ result }, "Tech stack refresh complete");
       return NextResponse.json({ success: true, ...result });
     } else {
-      console.log("Tech stack backfill started for all companies");
+      log.info("Tech stack backfill started for all companies");
       const result = await backfillTechStacksForAllCompanies();
-      console.log("Tech stack backfill complete:", result);
+      log.info({ result }, "Tech stack backfill complete");
       return NextResponse.json({ success: true, ...result });
     }
   } catch (error) {
-    console.error("Tech stack refresh/backfill error:", error);
+    log.error({ err: error }, "Tech stack refresh/backfill error");
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed" },
       { status: 500 }

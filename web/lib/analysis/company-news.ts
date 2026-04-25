@@ -12,6 +12,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { log } from "@/lib/log";
 
 export interface NewsItem {
   headline: string;
@@ -158,7 +159,7 @@ export async function saveToNewsCache(
     });
   
   if (error) {
-    console.error(`Failed to cache news for ${companyName}:`, error);
+    log.error({ err: error }, `Failed to cache news for ${companyName}:`);
   }
 }
 
@@ -189,7 +190,7 @@ export async function fetchCompanyNewsContext(
   if (companyId && !options?.forceRefresh) {
     const cached = await getCachedNews(companyId);
     if (cached) {
-      console.log(`Using cached news for ${companyName}`);
+      log.info(`Using cached news for ${companyName}`);
       return cached;
     }
   }
@@ -212,7 +213,7 @@ export async function fetchCompanyNewsContext(
 async function fetchFreshNewsContext(companyName: string): Promise<CompanyNewsContext> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
-    console.warn("GEMINI_API_KEY not configured, skipping company news search");
+    log.warn("GEMINI_API_KEY not configured, skipping company news search");
     return emptyNewsContext(companyName);
   }
 
@@ -314,16 +315,16 @@ If information is not available, use null or empty arrays.
         leadershipChanges: parseNewsItems(parsed.leadership_changes || []),
       };
     } catch (parseError) {
-      console.warn(`Failed to parse company news JSON for ${companyName}:`, parseError);
+      log.warn({ err: parseError }, `Failed to parse company news JSON for ${companyName}:`);
       return emptyNewsContext(companyName);
     }
   } catch (error: unknown) {
     // Handle quota errors and other failures gracefully
     const err = error as { status?: number; message?: string };
     if (err?.status === 429 || err?.message?.includes("quota") || err?.message?.includes("limit")) {
-      console.warn(`Gemini quota exceeded for company news search: ${companyName}`);
+      log.warn(`Gemini quota exceeded for company news search: ${companyName}`);
     } else {
-      console.error(`Company news search failed for ${companyName}:`, error);
+      log.error({ err: error }, `Company news search failed for ${companyName}:`);
     }
     
     // Return empty context on failure

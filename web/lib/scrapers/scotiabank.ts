@@ -11,6 +11,7 @@
 
 import type { JobData } from "./types";
 import { htmlToText, detectLocationType } from "./utils";
+import { log } from "@/lib/log";
 
 const BASE_URL = "https://jobs.scotiabank.com";
 
@@ -36,7 +37,7 @@ export async function fetchScotiabankJobs(
       `${BASE_URL}/${atsIdentifier}/search/` +
       `?q=&sortColumn=referencedate&sortDirection=desc&startrow=${startRow}`;
 
-    console.log(`[scotiabank] Fetching page ${page}: startrow=${startRow}`);
+    log.info(`[scotiabank] Fetching page ${page}: startrow=${startRow}`);
 
     const res = await fetch(url, {
       headers: {
@@ -60,7 +61,7 @@ export async function fetchScotiabankJobs(
       const totalMatch = html.match(/Results\s+\d+\s*[–-]\s*\d+\s+of\s+(\d+)/);
       if (totalMatch) {
         totalJobs = parseInt(totalMatch[1], 10);
-        console.log(`[scotiabank] Total jobs: ${totalJobs}`);
+        log.info(`[scotiabank] Total jobs: ${totalJobs}`);
       }
     }
 
@@ -76,7 +77,7 @@ export async function fetchScotiabankJobs(
     startRow += pageSize;
   }
 
-  console.log(
+  log.info(
     `[scotiabank] Scraped ${allJobs.length} jobs for ${atsIdentifier}`
   );
 
@@ -87,15 +88,12 @@ export async function fetchScotiabankJobs(
     const withDescriptions = enriched.filter(
       (job) => !!job.description_text && job.description_text.trim().length > 0
     ).length;
-    console.log(
+    log.info(
       `[scotiabank] Enriched descriptions for ${withDescriptions}/${enriched.length} jobs`
     );
     return enriched;
   } catch (error) {
-    console.warn(
-      "[scotiabank] Description enrichment failed, continuing with listing data only:",
-      error
-    );
+    log.warn({ err: error }, "[scotiabank] Description enrichment failed, continuing with listing data only:");
     return allJobs;
   }
 }

@@ -1,33 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import * as Sentry from "@sentry/nextjs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   generateCompanyInsight,
   getNextCompanyForInsight,
 } from "@/lib/analysis/company-insights";
+import { requireCronSecret } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 
 export const maxDuration = 300; // 5 minutes max
+
+const querySchema = z.object({
+  companyId: z.string().uuid().optional(),
+});
 
 /**
  * GET /api/cron/company-insights
  * Weekly cron job to generate company insights
- * 
+ *
  * Processes one company at a time to avoid timeouts.
  * Should be called multiple times if there are many companies.
- * 
+ *
  * Uses job_runs table for unified job tracking (not cron_logs).
  */
 export async function GET(req: NextRequest) {
-  // Verify cron secret
-  const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireCronSecret(req);
+  if (denied) return denied;
+
+  const queryParsed = querySchema.safeParse({
+    companyId: req.nextUrl.searchParams.get("companyId") ?? undefined,
+  });
+  if (!queryParsed.success) {
+    return NextResponse.json(
+      { error: "Invalid query", issues: queryParsed.error.issues },
+      { status: 400 }
+    );
   }
 
+  // Sentry monitor — runs from GH Actions per docs/CRON_TOPOLOGY.md.
+  return Sentry.withMonitor(
+    "cron-company-insights",
+    () => runCompanyInsights(req, queryParsed.data.companyId ?? null),
+    { schedule: { type: "crontab", value: "0 9 * * 1" } }
+  );
+}
+
+async function runCompanyInsights(
+  _req: NextRequest,
+  companyId: string | null
+) {
   const supabase = createAdminClient();
   const startTime = Date.now();
-
-  // Check if a specific company was requested
-  const companyId = req.nextUrl.searchParams.get("companyId");
 
   // Create job_runs entry for tracking (unified job tracking system)
   const { data: jobRun } = await supabase
@@ -36,7 +60,7 @@ export async function GET(req: NextRequest) {
       job_type: "company-insights",
       trigger_type: "cron",
       scope: companyId ? "single" : "all",
-      company_id: companyId || null,
+      company_id: companyId,
       status: "running",
       started_at: new Date().toISOString(),
     })
@@ -86,7 +110,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    console.log(`Generating insight for ${company.name}...`);
+    log.info({ companyId: company.id, companyName: company.name }, "Generating insight");
 
     // Generate the insight
     const insight = await generateCompanyInsight(company.id, company.name, {
@@ -135,7 +159,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Company insights cron error:", error);
+    log.error({ err: errorMessage }, "Company insights cron error");
 
     // Update job_runs with failure (unified job tracking)
     if (jobRunId) {
@@ -146,7 +170,7 @@ export async function GET(req: NextRequest) {
           completed_at: new Date().toISOString(),
           error_message: errorMessage,
           details: {
-            companyId: companyId || null,
+            companyId,
             triggerType: "cron",
             duration: Date.now() - startTime,
           },

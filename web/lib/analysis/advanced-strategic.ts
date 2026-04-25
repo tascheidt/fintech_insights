@@ -13,6 +13,7 @@ import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { buildHistoricalContext, formatHistoricalContextForPrompt, type HistoricalContext } from "./context-builder";
+import { log } from "@/lib/log";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -340,7 +341,7 @@ export async function performWebSearch(
 ): Promise<WebSearchContext> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
-    console.warn("GEMINI_API_KEY not configured, skipping web search");
+    log.warn("GEMINI_API_KEY not configured, skipping web search");
     return { synthesis: "", results: [] };
   }
 
@@ -412,10 +413,10 @@ export async function performWebSearch(
   } catch (error: unknown) {
     if (isQuotaError(error)) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.warn(`Web search quota exceeded: ${msg}. Continuing without web context.`);
+      log.warn(`Web search quota exceeded: ${msg}. Continuing without web context.`);
       return { synthesis: "", results: [] };
     }
-    console.error("Web search error:", error);
+    log.error({ err: error }, "Web search error:");
     return { synthesis: "", results: [] };
   }
 }
@@ -458,7 +459,7 @@ export async function analyzeJobAdvanced(
   const key = process.env.GEMINI_API_KEY;
 
   if (!key) {
-    console.error("GEMINI_API_KEY not configured");
+    log.error("GEMINI_API_KEY not configured");
     return null;
   }
 
@@ -513,7 +514,7 @@ export async function analyzeJobAdvanced(
         analysisGoogleSearch;
       if (allowFallback && isQuotaError(error)) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.warn(`${analysisModel} quota exceeded: ${msg}. Falling back to ${FLASH_MODEL}.`);
+        log.warn(`${analysisModel} quota exceeded: ${msg}. Falling back to ${FLASH_MODEL}.`);
         model = genAI.getGenerativeModel({
           model: FLASH_MODEL,
           generationConfig,
@@ -554,14 +555,11 @@ export async function analyzeJobAdvanced(
       what_it_means: analyzed.what_it_means,
     });
     if (!voice.passed) {
-      console.warn(
-        `[voice] job analysis warnings for ${companyName}:`,
-        voice.warnings.join("; ")
-      );
+      log.warn({ err: voice.warnings.join("; ") }, `[voice] job analysis warnings for ${companyName}:`);
     }
     return analyzed;
   } catch (error: unknown) {
-    console.error("Advanced Gemini analysis error:", error);
+    log.error({ err: error }, "Advanced Gemini analysis error:");
     return null;
   }
 }

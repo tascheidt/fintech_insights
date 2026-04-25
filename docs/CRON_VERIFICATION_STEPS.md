@@ -1,5 +1,11 @@
 # Cron Jobs Verification Steps
 
+> **Read [CRON_TOPOLOGY.md](./CRON_TOPOLOGY.md) first.** This file documents
+> Vercel-side verification for the two Vercel crons (`collect`, `report`). The
+> `company-insights` cron now runs from GitHub Actions
+> (`.github/workflows/company-insights-cron.yml`) and is verified there
+> (Actions tab → "Company Insights Cron"), not in the Vercel dashboard.
+
 ## ✅ Step 1: Manual Test - COMPLETE
 
 Your manual curl test succeeded! This confirms:

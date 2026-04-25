@@ -10,33 +10,38 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { requireUser } from "@/lib/auth/guards";
 import {
   analyzeCompanyStrategy,
   type JobPosting,
 } from "@/lib/ai/strategy-analysis";
+import { log } from "@/lib/log";
+
+const bodySchema = z.object({
+  companyId: z.string().uuid(),
+});
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    const auth = await requireUser();
+    if (auth instanceof NextResponse) return auth;
+    const { supabase } = auth;
 
-    // Auth check
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    let raw: unknown;
+    try {
+      raw = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
-
-    // Parse body
-    const body = await req.json();
-    const companyId = body?.companyId;
-    if (!companyId || typeof companyId !== "string") {
+    const parsed = bodySchema.safeParse(raw);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "companyId is required" },
+        { error: "Invalid body", issues: parsed.error.issues },
         { status: 400 }
       );
     }
+    const { companyId } = parsed.data;
 
     // Fetch company
     const { data: company, error: companyError } = await supabase
@@ -67,7 +72,7 @@ export async function POST(req: NextRequest) {
       .order("first_seen_date", { ascending: false });
 
     if (jobsError) {
-      console.error("Error fetching jobs for strategy analysis:", jobsError);
+      log.error({ err: jobsError }, "Error fetching jobs for strategy analysis");
       return NextResponse.json(
         { error: "Failed to fetch job data" },
         { status: 500 }
@@ -97,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Strategy analysis API error:", error);
+    log.error({ err: error }, "Strategy analysis API error");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

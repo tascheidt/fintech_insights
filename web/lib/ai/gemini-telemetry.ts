@@ -18,6 +18,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UsageRecord } from "./gemini-meter";
+import { log } from "@/lib/log";
 
 export interface WriteUsageEventOptions {
   /** Optional link to the job_run that triggered this call. Null for chat / on-demand. */
@@ -58,10 +59,10 @@ export function writeUsageEvent(
         extra: record.extra ?? null,
       });
       if (error) {
-        console.error("[gemini-telemetry] insert failed:", error.message);
+        log.error({ err: error.message }, "[gemini-telemetry] insert failed:");
       }
     } catch (err) {
-      console.error("[gemini-telemetry] unexpected error:", err);
+      log.error({ err: err }, "[gemini-telemetry] unexpected error:");
     }
   })();
 }

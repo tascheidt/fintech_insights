@@ -1,245 +1,140 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (and any other coding agent) working in this repo. Keep this file scannable. Long-form content lives in `docs/` and per-area sub-CLAUDE files; this is the index.
 
-## Project Overview
+## 1. Project overview
 
-The Fintech Talent Brief - a hiring intelligence platform tracking job postings from fintech companies. Two components:
-- **Python CLI backend** (`/src`): Scraping, analysis, and reporting
-- **Next.js web app** (`/web`): Dashboard hosted on Vercel
+The Fintech Talent Brief is a hiring-intelligence platform tracking job postings from fintech companies. Two components:
+- **Python CLI backend** (`/src`) — scraping, analysis, reporting via `./run.sh`.
+- **Next.js web app** (`/web`) — dashboard hosted on Vercel; this is where almost all active development happens.
 
-## Project Asthetic 
-"Notion-sytle" - Clean white or very subtle off-white/light gray theme with clean, high contrast typography, or a refined dark theme if strictly required
+Aesthetic: Notion-style. Clean white / very subtle off-white theme, high-contrast typography. A refined dark theme is acceptable when strictly required.
 
-## Editorial voice (AI copy)
-User-facing AI prose (digests, job/company insights, chat, strategy narrative) follows **docs/voice.md**. Runtime rules live in `web/lib/ai/voice.ts`; heuristic checks in `web/lib/ai/voice-validator.ts`. When changing tone, update the doc and keep `voice.ts` in sync in the same PR.
+## 2. Tech stack
 
-## Common Commands
+- **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui, TanStack Query.
+- **Backend:** Python 3 + Click CLI, SQLAlchemy 2.0, BeautifulSoup4 (legacy CLI flow).
+- **Database:** Supabase (PostgreSQL) with RLS.
+- **Auth:** Supabase SSR with Google OAuth. Per-area rules in [`web/lib/auth/CLAUDE.md`](./web/lib/auth/CLAUDE.md).
+- **AI:** Google Gemini via floating `-latest` aliases. See section 5.
+- **Email:** Resend API. Digest architecture in [`docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md`](./docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md).
+- **Scraping:** Puppeteer Core (serverless) + BeautifulSoup4. See [`web/lib/scrapers/CLAUDE.md`](./web/lib/scrapers/CLAUDE.md).
+- **TS path alias:** `@/*` → `/web/*`.
 
-### Web App (Next.js)
+### Common commands
+
 ```bash
+# Web (Next.js)
 cd web
-npm run dev      # Dev server on port 3000
-npm run build    # Production build
-npm run lint     # ESLint
+npm run dev      # dev server on :3000
+npm run build    # production build (run before pushing — Vercel TS is strict)
+npm run lint
+
+# Python CLI
+./run.sh init
+./run.sh collect --analyze
+./run.sh report --preview
+
+# DB scripts
+npx tsx web/scripts/run-migration.ts
+npx tsx web/scripts/verify-migration.ts
 ```
 
-### Python Backend
-```bash
-./run.sh init                        # Initialize database
-./run.sh collect --analyze           # Collect jobs with AI analysis
-./run.sh collect -c wealthsimple     # Collect specific company
-./run.sh report --preview            # Preview weekly report
-./run.sh test-scraper -c company     # Test company scraper
-./run.sh test-email                  # Test email config
-```
+## 3. Active pipelines
 
-### Database Scripts
-```bash
-npx tsx web/scripts/run-migration.ts     # Run migrations
-npx tsx web/scripts/verify-migration.ts  # Verify migration
-```
-
-## Build & Deployment
-
-### Vercel Build Requirements
-
-**IMPORTANT: Always run `npm run build` locally before pushing to catch TypeScript errors.**
-
-Vercel runs strict TypeScript checking during builds. Common issues:
-
-1. **Type Errors**: Vercel's TypeScript compiler is stricter than local dev. Always verify types:
-   - Use correct property names (e.g., `ZodError.issues`, not `ZodError.errors`)
-   - Ensure all imports are typed correctly
-   - Check that optional chaining/nullish coalescing is used appropriately
-
-2. **Pre-deployment Checklist**:
-   ```bash
-   cd web
-   npm run build  # Must pass before pushing
-   npm run lint   # Check for linting issues
-   ```
-
-3. **Common TypeScript Mistakes**:
-   - Accessing non-existent properties on types (e.g., `error.errors` on `ZodError` - use `error.issues`)
-   - Missing type assertions or guards
-   - Incorrect generic type parameters
-
-## Architecture
-
-### Tech Stack
-- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui, TanStack Query
-- **Backend**: Python with Click CLI, SQLAlchemy 2.0, BeautifulSoup4
-- **Database**: Supabase (PostgreSQL) with RLS
-- **Auth**: Supabase SSR with Google OAuth
-- **AI**: Google Gemini via floating `-latest` aliases (`gemini-flash-latest`, `gemini-pro-latest`) for strategic analysis
-- **Email**: Resend API
-- **Scraping**: Puppeteer Core (serverless) + BeautifulSoup4
-
-### Key Patterns
-
-**Scraper Factory** (`src/scrapers/__init__.py`): `get_scraper()` returns appropriate scraper for ATS type (Lever, Greenhouse, Workable, custom).
-
-**API Routes**: Next.js API routes at `/web/app/api/` handle CRUD and cron jobs. All use Zod validation.
-
-**Auth Proxy** (`web/proxy.ts`): Protects all routes except `/login`, `/api`, `/auth`. Uses Next.js 16 proxy convention (runs in Node.js runtime).
-
-**Component Structure**:
-- `/web/components/ui/` - shadcn/ui primitives
-- `/web/components/{feature}/` - Feature-specific components
-
-**TypeScript Paths**: `@/*` maps to `/web/*`
-
-### Database Tables
-- `companies` - Tracked companies with ATS configs
-- `job_postings` - Job listings with descriptions
-- `strategic_insights` - AI-generated analysis
-- `posting_events` - Timeline tracking
-- `job_templates` - Categorized templates
-- `job_runs` - Unified job tracking for all scheduled/manual jobs
-
-### Job Tracking (IMPORTANT)
-
-**All scheduled jobs and manual operations MUST use the `job_runs` table for tracking.**
-
-The `cron_logs` table has been deprecated and removed. Never reference or use `cron_logs`.
-
-#### Valid job_types
-- `collect` - Job scraping/collection
-- `analyze` - AI analysis of job postings
-- `report` - Weekly digest generation
-- `company-insights` - Scheduled company insight generation
-- `insight-generation` - Manual company insight generation
-
-#### Status values
-- `pending` - Job queued but not started
-- `running` - Job currently executing
-- `completed` - Job finished successfully
-- `failed` - Job finished with error
-- `cancelled` - Job was cancelled
-
-#### Example: Logging a job run
-```typescript
-// Create job run entry at start
-const { data: jobRun } = await supabase
-  .from("job_runs")
-  .insert({
-    job_type: "report",           // One of the valid types above
-    trigger_type: "cron",         // 'cron' | 'manual' | 'admin'
-    scope: "all",                 // 'all' | 'single'
-    status: "running",
-    started_at: new Date().toISOString(),
-  })
-  .select("id")
-  .single();
-
-// Update on completion
-await supabase
-  .from("job_runs")
-  .update({
-    status: "completed",          // or "failed"
-    completed_at: new Date().toISOString(),
-    total_companies: 5,
-    total_insights: 5,
-    details: { /* job-specific metadata */ },
-  })
-  .eq("id", jobRun.id);
-```
-
-### Cron Jobs (Vercel)
-- Daily 6 AM: `/api/cron/collect` - Collect jobs and analyze
-- Weekly Monday 5 AM: `/api/cron/report` - Generate reports
-- Never create more than two cron jobs
-
-## Configuration
-
-### Company Config (`config/companies.yaml`)
-Each company needs: `name`, `slug`, `country`, `ats_type`, `ats_identifier`
-
-### Environment Variables
-- `GEMINI_API_KEY` - AI analysis
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase client
-- `SUPABASE_SERVICE_ROLE_KEY` - Server-side operations
-- `RESEND_API_KEY` - Email delivery
-- `CRON_SECRET` - Vercel cron authentication
-
-## Adding New ATS Support
-
-1. Create scraper in `src/scrapers/` implementing `BaseScraper`
-2. Add to factory in `src/scrapers/__init__.py`
-3. For web scrapers: add to `web/lib/scrapers/`
-
-## Release / Changelog
-
-**Every user-facing or notable change MUST include a changelog update.**
-
-### How to update
-1. Open `web/data/releases.json`
-2. Add a bullet to the current version's `changes` array, or create a new version entry if shipping a version bump
-3. Use the correct change type: `"feature"` (new functionality), `"fix"` (bug fix), `"improvement"` (enhancement to existing feature)
-4. Keep descriptions to one sentence
-
-### When to bump the version
-- **patch** (1.0.x): bug fixes only
-- **minor** (1.x.0): new features or improvements
-- **major** (x.0.0): breaking changes or major redesigns
-- Bump in both `web/package.json` and `web/data/releases.json`
-
-### What counts as "notable"
-- Any new page, feature, or UI component
-- Bug fixes that affected user-visible behavior
-- Performance improvements users would notice
-- Changes to the email digest format
-
-### What does NOT need a changelog entry
-- Internal refactors with no user-visible effect
-- Dev tooling, CI/CD, or test changes
-- Dependency updates (unless they change behavior)
-
-## AI Model Requirements
-
-**IMPORTANT: Always use the floating `-latest` model aliases. Never pin a versioned or preview model ID.**
-
-Using `-latest` aliases means new model generations roll through without code changes. The tradeoff is that Google may rotate the alias to a preview/experimental release; the Phase-1 comparison harness (`web/scripts/gemini-compare.ts`) and Phase-5 production telemetry are how we detect regressions.
-
-### Approved Models
-- `gemini-pro-latest` — Advanced analysis with web search/grounding; deeper reasoning and narrative quality
-- `gemini-flash-latest` — Fast, cost-effective analysis; default for extraction, classification, digest, chat
-- `gemini-flash-lite-latest` — Cheapest tier for high-volume, low-stakes calls (use only where the comparison report confirms ≥95% L1 field agreement)
-
-### Rules
-1. **Never pin a versioned or preview model ID** (e.g. `gemini-3-flash-preview`, `gemini-2.0-flash`, `gemini-1.5-pro`). Always use the `-latest` alias.
-2. All AI code must resolve its model through the `AI_MODEL_OPTIONS` enum in `web/lib/ai/prompt-config.ts` — do not hardcode strings outside that module.
-3. Use Pro (`gemini-pro-latest`) only for features requiring web-search grounding or deep synthesis; Flash covers standard JSON generation and analysis.
-4. When adding a new call site, verify whether an upstream call already enables `googleSearch` grounding — two grounded Pro calls in series cost as much as one and produce duplicate work.
-
-### AI call-site hygiene
-
-Rules for every Gemini call. These exist because Gemini cost drifted above target in April 2026 and cost the team a round of debugging we don't want to repeat:
-
-1. **Every new call-site must write to `gemini_usage_events`** via `writeUsageEvent` from `@/lib/ai/gemini-telemetry` (fire-and-forget; errors are swallowed so a flaky DB insert never breaks the user-facing call). Pattern: call `recordUsage(...)` from `@/lib/ai/gemini-meter` to build the `UsageRecord`, then pass it to `writeUsageEvent(record)`. Existing instrumented sites also fire an optional `onUsage` observer for scripts that capture records in-memory — propagate that alongside the DB write when you add a new function that scripts may drive.
-2. **PRs touching `web/lib/ai/**` or `web/lib/analysis/**` must run `gemini-compare.ts` and attach the markdown report to the PR description.** Use `npx tsx --env-file=.env.local scripts/gemini-compare.ts --scenario=<name> --mode=baseline` (or `--mode=compare --baseline=<prior-artifact>`) and commit the resulting JSON under `web/scripts/artifacts/`. The seeded 20-job fixture at `web/scripts/fixtures/gemini-sample-jobs.json` is the source of truth — regenerate annually, not per change.
-3. **Before adding a new grounded (`googleSearch`) call, check whether an upstream call already enables grounding.** The Apr 2026 incident was two grounded Pro calls firing per new job in `analyzeJobAdvanced` — avoid duplicating grounded calls.
-4. **Response caches must include `prompt_config_version` in the cache key.** Otherwise prompt tweaks silently serve stale outputs forever.
-5. **The voice directive from `web/lib/ai/voice.ts` is mandatory on user-facing surfaces** (digest, company insight, chat, narrative) and forbidden on internal extraction/classification prompts. Extraction output is never shown to users; the voice rules only eat tokens there.
-
-### Ingestion pipeline reality
-
-The live per-job hot path after `collect` runs is:
+The live per-job hot path after `collect` runs:
 
 ```
-processor.ts  → [description_hash gate]  → extractAndUpdateStructure  → extractJobStructure  (Flash)
-analyzer.ts   → analyzeJobAdvanced  (Pro+grounded; in-flight grounding, no pre-fetch)
+processor.ts  → [description_hash gate] → extractAndUpdateStructure → extractJobStructure (Flash)
+analyzer.ts   → analyzeJobAdvanced (Pro + grounded; in-flight grounding, no pre-fetch)
 ```
 
-The `description_hash` gate in [processor.ts](web/lib/jobs/processor.ts) skips `extractAndUpdateStructure` when the scraped description SHA-1 matches what's already stored on the `job_postings` row. Null stored hashes are treated as "changed" so the first scrape post-deploy still populates everything.
+Two AI calls per job. `analyzeJob` (in `web/lib/analysis/strategic.ts`) and `categorizePosting` (in `web/lib/analysis/categorizer.ts`) are **not** on this path — they're for backfill. Full details in [`docs/INGESTION_PIPELINE.md`](./docs/INGESTION_PIPELINE.md).
 
-`analyzeJobAdvanced` used to run a duplicate `performWebSearch` pre-fetch before the main call; Phase 3 dropped that default because the main call already has grounding enabled. Callers that want a shared pre-fetch (batch-analysis helper, eval scripts) still pass `webSearchContext` explicitly.
+## 4. Cron topology
 
-`analyzeJob` in [web/lib/analysis/strategic.ts](web/lib/analysis/strategic.ts) and `categorizePosting` in [web/lib/analysis/categorizer.ts](web/lib/analysis/categorizer.ts) are **not** on the live ingestion path — they exist for backfill and legacy flows. Do not wire into those functions without an explicit decision; do not assume the 8000-char cap in `strategic.ts` applies to production analyses.
+**Two Vercel crons (collect, report) + two GH Actions crons (company-insights, gemini-cost-alarm).** Hard cap: never more than two Vercel crons; everything else lives in GitHub Actions and `curl`s back into the deployed app with `Bearer ${CRON_SECRET}`.
 
-### Quota Errors
-If you see `limit: 0` quota errors, the API key may need:
-1. Billing enabled on the Google Cloud project
-2. Gemini API enabled in the project
-3. Access granted to preview models (request at https://ai.google.dev/)
+- Vercel daily 6 AM UTC: `/api/cron/collect` — collects jobs and triggers analysis.
+- Vercel weekly Mon 5 AM UTC: `/api/cron/report` — generates the weekly digest.
+- GitHub Actions weekly Mon 9 AM UTC: `company-insights-cron.yml` — scheduled company-insight regeneration.
+- GitHub Actions daily 14:00 UTC: `gemini-cost-alarm.yml` — sums last 24h `gemini_usage_events.estimated_usd` and fires `Sentry.captureMessage` over threshold.
+
+Heavy browser scraping is offloaded to GitHub Actions on demand via `triggerScrapeWorkflow` in `web/lib/github.ts` (`scrape-heavy.yml`). Full topology, secrets, and decision tree in [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md).
+
+All scheduled jobs MUST log into the `job_runs` table. `cron_logs` is deprecated — never reference it. See section 7.
+
+## 5. AI model rules
+
+Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/AI_HYGIENE.md`](./docs/AI_HYGIENE.md).
+
+- **Always use floating `-latest` aliases.** Never pin a versioned or preview model ID. The comparison harness (`web/scripts/gemini-compare.ts`) and `gemini_usage_events` telemetry are how we catch a bad alias rotation.
+- **Approved models:** `gemini-pro-latest` (grounded analysis), `gemini-flash-latest` (default), `gemini-flash-lite-latest` (high-volume low-stakes only, gated by ≥95% L1 field agreement in the harness report).
+- **All model strings resolve through `AI_MODEL_OPTIONS` in `web/lib/ai/prompt-config.ts`.** No hardcoded strings elsewhere.
+- **Every Gemini call writes to `gemini_usage_events`** via `writeUsageEvent` from `@/lib/ai/gemini-telemetry` (build the record with `recordUsage` from `@/lib/ai/gemini-meter`). Fire-and-forget; errors are swallowed.
+- **PRs touching `web/lib/ai/**` or `web/lib/analysis/**` MUST run `gemini-compare.ts`** and attach the markdown report; commit JSON artifacts under `web/scripts/artifacts/`.
+- **Don't stack grounded calls.** Before adding a new `googleSearch` call, check whether an upstream call already grounds.
+- **Cache keys must include `prompt_config_version`** or prompt tweaks silently serve stale outputs.
+- **Editorial voice** (`web/lib/ai/voice.ts`, rules in [`docs/voice.md`](./docs/voice.md)) is mandatory on user-facing surfaces (digest, company insight, chat, narrative) and forbidden on internal extraction/classification.
+
+## 6. Directory map
+
+| Where | What |
+|---|---|
+| `web/app/(dashboard)/` | Server-component dashboard pages. |
+| `web/app/api/` | API routes; cron handlers under `web/app/api/cron/`. |
+| `web/lib/ai/` | Gemini infrastructure (prompt-config, meter, telemetry, voice). See sub-CLAUDE. |
+| `web/lib/analysis/` | AI analysis modules (extract, analyze, digest, company insights). See sub-CLAUDE. |
+| `web/lib/scrapers/` | ATS scrapers (API + browser). See sub-CLAUDE. |
+| `web/lib/auth/` | Auth guards used by API routes. See sub-CLAUDE. |
+| `web/lib/jobs/` | Ingestion processor + analyzer (orchestrates the hot path). |
+| `web/lib/dashboard-queries.ts` | Supabase query layer for dashboard. |
+| `web/components/{feature}/` | Feature components. |
+| `web/components/ui/` | shadcn/ui primitives. |
+| `web/scripts/` | Operational scripts (migrations, gemini-compare, regenerate-insights). |
+| `web/data/releases.json` | Changelog. |
+| `web/supabase/migrations/` | DB migrations. |
+| `src/scrapers/` | Legacy Python CLI scrapers. |
+| `config/companies.yaml` | Company configs (`name`, `slug`, `country`, `ats_type`, `ats_identifier`). |
+| `docs/` | Long-form architecture docs. Start with `docs/AGENTS.md`. |
+
+## 7. Conventions
+
+- **Zod errors:** `result.error.issues`, never `.errors`. Vercel's TS is strict; local lint may not catch it.
+- **Logging:** `log.*` from `@/lib/log` in API routes. Avoid raw `console.*`.
+- **Job tracking:** every scheduled or manual job row goes in `job_runs`. Valid `job_type`: `collect` | `analyze` | `report` | `company-insights` | `insight-generation`. Valid `status`: `pending` | `running` | `completed` | `failed` | `cancelled`. Never reference the deprecated `cron_logs` table.
+- **Auth:** import guards from `web/lib/auth/guards.ts`. Don't reinvent.
+- **Build before push:** `cd web && npm run build` is the contract. Vercel will fail the deploy on a TS error that local dev tolerates.
+- **Changelog discipline:** every user-facing change gets an entry in `web/data/releases.json`. Types: `feature` | `fix` | `improvement`. Bump `web/package.json` version per semver: patch (1.0.x) bug fixes, minor (1.x.0) features, major (x.0.0) breaking changes.
+- **Tests:** Vitest for unit (pure functions only), Playwright for one smoke (`e2e/smoke.spec.ts`); see `docs/AGENTS.md`#Tests.
+
+## 8. Anti-patterns
+
+Things that will get a PR rejected:
+
+- Adding a third Vercel cron. The cap is two — route long-running work through GitHub Actions instead.
+- Hardcoding a model string outside `web/lib/ai/prompt-config.ts`.
+- Pinning a versioned/preview Gemini model ID (e.g. `gemini-2.0-flash`). Always `-latest`.
+- Adding a Gemini call site that doesn't write to `gemini_usage_events`.
+- Adding a second grounded Pro call per job (the April 2026 incident).
+- Adding the voice directive to internal extraction/classification prompts (it only burns tokens; users never see the output).
+- Mocking the Supabase DB in tests instead of using the test schema.
+- Referencing `cron_logs` (deprecated and removed).
+- Touching `web/lib/scrapers/browser.ts` (1131 LOC) for a refactor before launch.
+- Editing architecture/cron/AI/auth/schema without updating the relevant `.md` (see section 9).
+
+## 9. Documentation hygiene
+
+**Any PR that changes architecture, cron topology, AI model usage, schema, directory layout, scheduler venue, or auth/security model MUST update the relevant `.md` file in the same PR.** Reviewers reject PRs that drift from the docs.
+
+The relevant docs include:
+
+- Root [`CLAUDE.md`](./CLAUDE.md) (this file)
+- [`docs/AGENTS.md`](./docs/AGENTS.md) — operator's manual
+- Per-area sub-CLAUDEs: [`web/lib/analysis/CLAUDE.md`](./web/lib/analysis/CLAUDE.md), [`web/lib/scrapers/CLAUDE.md`](./web/lib/scrapers/CLAUDE.md), [`web/lib/ai/CLAUDE.md`](./web/lib/ai/CLAUDE.md), [`web/lib/auth/CLAUDE.md`](./web/lib/auth/CLAUDE.md)
+- [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md), [`docs/AI_HYGIENE.md`](./docs/AI_HYGIENE.md), [`docs/INGESTION_PIPELINE.md`](./docs/INGESTION_PIPELINE.md), [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md)
+- [`docs/voice.md`](./docs/voice.md), [`docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md`](./docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md)
+- [`web/data/releases.json`](./web/data/releases.json) — user-facing changelog
+- `web/.env.example` when env vars change
+
+When you're not sure if a change requires a doc update, ask in the PR description. The PR template (`.github/pull_request_template.md`) has a checkbox for each doc area, and a non-blocking CI check (`.github/workflows/doc-drift-check.yml`) will warn on architecture-touching PRs that ship without `.md` changes.

@@ -12,16 +12,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { format } from "date-fns";
+import * as Sentry from "@sentry/nextjs";
 import {
   generateCompanyInsight,
   getNextCompanyForInsight,
 } from "@/lib/analysis/company-insights";
 import { getWeeklyData, generateWeeklyReport, WeeklyDigest } from "@/lib/analysis/digest";
 import { isOptedInToWeeklyDigest } from "@/lib/email/digest-recipients";
-import { getResendError } from "@/lib/email/resend-result";
+import { retryResendCall } from "@/lib/email/resend-retry";
 import { WeeklyDigestEmail } from "@/lib/email/templates/weekly-digest";
 import { getLatestVersion } from "@/lib/releases";
-import { requireCronAuth } from "@/lib/cron/auth";
+import { requireCronSecret } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 
 export const maxDuration = 300; // Increased to handle company insights and AI generation
 
@@ -65,7 +67,7 @@ async function saveDigestToDatabase(
     if (digestError) {
       // If it's a duplicate, that's okay - fetch existing
       if (digestError.code === "23505") {
-        console.log("Digest already exists for this week, updating...");
+        log.info({ weekStart: digest.week_start }, "Digest already exists for this week, updating");
         const { data: existing } = await supabase
           .from("weekly_digests")
           .select("id")
@@ -104,7 +106,7 @@ async function saveDigestToDatabase(
         }
       }
       
-      console.error("Error saving digest:", digestError);
+      log.error({ err: digestError }, "Error saving digest");
       return null;
     }
 
@@ -113,10 +115,13 @@ async function saveDigestToDatabase(
     // Insert company summaries
     await insertCompanySummaries(digestId, digest);
 
-    console.log(`Saved digest ${digestId} with ${digest.total_companies} company summaries`);
+    log.info(
+      { digestId, totalCompanies: digest.total_companies },
+      "Saved digest with company summaries"
+    );
     return digestId;
   } catch (error) {
-    console.error("Error saving digest to database:", error);
+    log.error({ err: error }, "Error saving digest to database");
     return null;
   }
 }
@@ -154,7 +159,7 @@ async function insertCompanySummaries(digestId: string, digest: WeeklyDigest): P
     .insert(companySummaries);
 
   if (summaryError) {
-    console.error("Error saving company summaries:", summaryError);
+    log.error({ err: summaryError }, "Error saving company summaries");
   }
 }
 
@@ -182,21 +187,26 @@ async function trackDeliveries(
     .upsert(deliveryRecords, { onConflict: "digest_id,user_id" });
 
   if (error) {
-    console.error("Error tracking deliveries:", error);
+    log.error({ err: error }, "Error tracking deliveries");
   }
 }
 
 export async function GET(req: NextRequest) {
-  // Validate cron authentication
-  const authError = requireCronAuth(req);
-  if (authError) {
-    return authError;
-  }
+  const denied = requireCronSecret(req);
+  if (denied) return denied;
 
-  console.log("Cron job started: report", {
-    timestamp: new Date().toISOString(),
-    path: req.nextUrl.pathname,
-  });
+  // Sentry.withMonitor wraps the cron run in a check-in so the dashboard
+  // shows a missed-run if the route stops firing on schedule. The monitor
+  // slug doubles as the cron identifier for alerting rules.
+  return Sentry.withMonitor(
+    "cron-report",
+    () => runReport(req),
+    { schedule: { type: "crontab", value: "0 8 * * 1" } }
+  );
+}
+
+async function runReport(req: NextRequest) {
+  log.info({ path: req.nextUrl.pathname }, "Cron job started: report");
 
   const supabase = createAdminClient();
   
@@ -217,16 +227,16 @@ export async function GET(req: NextRequest) {
   try {
     // Generate the weekly digest with AI commentary first (critical path; company
     // insight runs after so a timeout during insight does not block digest/emails)
-    console.log("Fetching weekly job data...");
+    log.info("Fetching weekly job data");
     const weeklyData = await getWeeklyData(7);
-    console.log(`Found ${weeklyData.size} companies with new jobs`);
+    log.info({ companyCount: weeklyData.size }, "Found companies with new jobs");
 
-    console.log("Generating AI commentary for weekly digest...");
+    log.info("Generating AI commentary for weekly digest");
     const digest = await generateWeeklyReport(weeklyData);
-    console.log(`Generated digest with ${digest.total_jobs} total jobs`);
+    log.info({ totalJobs: digest.total_jobs }, "Generated digest");
 
     // Save digest to database first (before sending emails)
-    console.log("Saving digest to database...");
+    log.info("Saving digest to database");
     const savedDigestId = await saveDigestToDatabase(
       digest, 
       false, // Will update after emails are sent
@@ -239,13 +249,13 @@ export async function GET(req: NextRequest) {
 
     // Fetch users who have opted in to weekly digest emails
     // Default is opt-out model: weekly_digest is true by default (null = enabled)
-    console.log("Fetching users with weekly digest enabled...");
+    log.info("Fetching users with weekly digest enabled");
     const { data: users, error: usersError } = await supabase
       .from("profiles")
       .select("id, email, email_preferences");
 
     if (usersError) {
-      console.error("Error fetching users:", usersError);
+      log.error({ err: usersError }, "Error fetching users");
       throw new Error(`Failed to fetch users: ${usersError.message}`);
     }
 
@@ -253,8 +263,9 @@ export async function GET(req: NextRequest) {
       .filter((u) => isOptedInToWeeklyDigest(u))
       .map((u) => ({ id: u.id, email: u.email! }));
 
-    console.log(
-      `Found ${optedInUsers.length} users opted in to weekly digest (${(users || []).length} profiles total)`
+    log.info(
+      { optedIn: optedInUsers.length, totalProfiles: (users || []).length },
+      "Found users opted in to weekly digest"
     );
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fintech-talent-brief.vercel.app";
@@ -272,8 +283,9 @@ export async function GET(req: NextRequest) {
     if (resendKey && optedInUsers.length > 0) {
       const resend = new Resend(resendKey);
 
-      console.log(
-        `Sending digest to ${optedInUsers.length} recipient(s), from=${from}, to=[${optedInUsers.map((u) => u.email).join(", ")}]`
+      log.info(
+        { recipientCount: optedInUsers.length, from },
+        "Sending digest"
       );
 
       const batchEmails = optedInUsers.map((user) => ({
@@ -283,36 +295,42 @@ export async function GET(req: NextRequest) {
         react: WeeklyDigestEmail({ digest, digestId: savedDigestId, appUrl, version: getLatestVersion() }),
       }));
 
-      try {
-        const sendResult = await resend.batch.send(batchEmails);
-        const batchErr = getResendError(sendResult);
-        if (batchErr) {
-          throw new Error(batchErr);
-        }
+      // Resend's batch.send is wrapped with `retryResendCall` (3 attempts,
+      // exponential backoff 1s/4s/16s). Each retry-and-failure logs a
+      // structured warn line; the final outcome lives in `job_runs.details.email_outcome`.
+      const sendOutcome = await retryResendCall(
+        () => resend.batch.send(batchEmails),
+        { label: "weekly_digest_batch", maxAttempts: 3, baseMs: 1000 }
+      );
 
+      if (sendOutcome.ok) {
         optedInUsers.forEach((user) => {
           deliveryTracking.push({ user_id: user.id, email: user.email, status: "sent" });
           successCount++;
         });
-        console.log(`Batch sent successfully (${successCount} emails)`);
-      } catch (sendError) {
-        const errorMessage =
-          sendError instanceof Error ? sendError.message : "Unknown error";
-        console.error("Resend batch send failed:", errorMessage);
-        lastResendError = errorMessage;
+        log.info(
+          { successCount, attempts: sendOutcome.attempts },
+          "Batch sent successfully"
+        );
+      } else {
+        log.error(
+          { err: sendOutcome.error, attempts: sendOutcome.attempts },
+          "Resend batch send failed after retries"
+        );
+        lastResendError = sendOutcome.error;
         optedInUsers.forEach((user) => {
           deliveryTracking.push({
             user_id: user.id,
             email: user.email,
             status: "failed",
-            error_message: errorMessage,
+            error_message: sendOutcome.error,
           });
           failureCount++;
         });
       }
 
       emailSent = successCount > 0;
-      console.log(`Email sending completed: ${successCount} sent, ${failureCount} failed`);
+      log.info({ successCount, failureCount }, "Email sending completed");
 
       if (deliveryTracking.length > 0) {
         await trackDeliveries(savedDigestId, deliveryTracking);
@@ -329,10 +347,10 @@ export async function GET(req: NextRequest) {
     } else {
       if (!resendKey) {
         emailSkipReason = "missing_resend_api_key";
-        console.warn("Email not sent: RESEND_API_KEY not configured");
+        log.warn("Email not sent: RESEND_API_KEY not configured");
       } else if (optedInUsers.length === 0) {
         emailSkipReason = "no_opted_in_recipients";
-        console.warn("Email not sent: no recipients opted in to weekly digest");
+        log.warn("Email not sent: no recipients opted in to weekly digest");
       }
     }
 
@@ -341,7 +359,7 @@ export async function GET(req: NextRequest) {
     try {
       const company = await getNextCompanyForInsight();
       if (company) {
-        console.log(`Generating insight for ${company.name}...`);
+        log.info({ companyId: company.id, companyName: company.name }, "Generating insight");
         const insight = await generateCompanyInsight(company.id, company.name, {
           periodDays: 90,
           researchDepth: "deep",
@@ -352,8 +370,67 @@ export async function GET(req: NextRequest) {
         companyInsightResult = { success: true, message: "All companies have recent insights" };
       }
     } catch (error) {
-      console.error("Error generating company insight:", error);
+      log.error({ err: error }, "Error generating company insight");
       companyInsightResult = { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+
+    // Per-recipient outcome — stored on `job_runs.details.email_outcome` so
+    // postmortems can answer "did THIS user get the digest?" without paging
+    // through `weekly_digest_deliveries`.
+    const emailOutcome = {
+      total: optedInUsers.length,
+      sent: successCount,
+      failed: failureCount,
+      skipReason: emailSkipReason,
+      lastError: lastResendError,
+      perRecipient: deliveryTracking.map((d) => ({
+        userId: d.user_id,
+        email: d.email,
+        status: d.status,
+        ...(d.error_message ? { error: d.error_message } : {}),
+      })),
+    };
+
+    // If we attempted to send (had recipients + a key) but every send failed,
+    // mark the run as failed and re-throw so Sentry's automatic error capture
+    // picks it up. Partial success is still "completed" — the per-recipient
+    // detail above tells the operator which addresses to retry.
+    const allFailed =
+      resendKey && optedInUsers.length > 0 && successCount === 0 && failureCount > 0;
+
+    if (allFailed) {
+      if (jobRunId) {
+        await supabase
+          .from("job_runs")
+          .update({
+            status: "failed",
+            completed_at: new Date().toISOString(),
+            error_message: `Resend delivery failed for all ${failureCount} recipients: ${lastResendError ?? "unknown"}`,
+            total_companies: digest.total_companies,
+            total_insights: digest.total_companies,
+            details: {
+              totalJobs: digest.total_jobs,
+              totalCompanies: digest.total_companies,
+              digestId: savedDigestId,
+              companySummaries: digest.companies.map(c => ({
+                name: c.company_name,
+                jobCount: c.new_job_count,
+                headline: c.ai_commentary.headline,
+              })),
+              emailSent,
+              recipients: 0,
+              failures: failureCount,
+              emailSkipReason,
+              resendError: lastResendError,
+              companyInsight: companyInsightResult,
+              email_outcome: emailOutcome,
+            },
+          })
+          .eq("id", jobRunId);
+      }
+      throw new Error(
+        `Weekly digest delivery failed: 0/${optedInUsers.length} recipients (${lastResendError ?? "unknown"})`
+      );
     }
 
     // Update job_runs with success (unified job tracking)
@@ -365,7 +442,7 @@ export async function GET(req: NextRequest) {
           completed_at: new Date().toISOString(),
           total_companies: digest.total_companies,
           total_insights: digest.total_companies,
-          details: { 
+          details: {
             totalJobs: digest.total_jobs,
             totalCompanies: digest.total_companies,
             digestId: savedDigestId,
@@ -380,12 +457,13 @@ export async function GET(req: NextRequest) {
             emailSkipReason,
             resendError: lastResendError,
             companyInsight: companyInsightResult,
+            email_outcome: emailOutcome,
           },
         })
         .eq("id", jobRunId);
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true, 
       sent: emailSent,
       emailsSent: successCount,
@@ -406,7 +484,7 @@ export async function GET(req: NextRequest) {
       companyInsight: companyInsightResult,
     });
   } catch (error) {
-    console.error("Report cron error:", error);
+    log.error({ err: error }, "Report cron error");
     // Update job_runs with error (unified job tracking)
     if (jobRunId) {
       await supabase

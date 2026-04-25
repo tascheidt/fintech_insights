@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { processJobStructureReprocessBatch } from "@/lib/labs/prompt-forge";
+import { requireCronSecret } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 
 export const maxDuration = 300;
+
+const bodySchema = z.object({
+  jobRunId: z.string().uuid(),
+});
 
 async function queueNextInvocation(baseUrl: string, cronSecret: string, jobRunId: string) {
   await fetch(`${baseUrl}/api/internal/prompt-forge-reprocess`, {
@@ -15,28 +22,35 @@ async function queueNextInvocation(baseUrl: string, cronSecret: string, jobRunId
 }
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  const expected = `Bearer ${process.env.CRON_SECRET}`;
-  if (!authHeader || authHeader !== expected) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = requireCronSecret(req);
+  if (denied) return denied;
 
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
   }
 
-  const body = (await req.json().catch(() => ({}))) as { jobRunId?: string };
-  if (!body.jobRunId) {
-    return NextResponse.json({ error: "jobRunId is required" }, { status: 400 });
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    raw = {};
   }
+  const parsed = bodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid body", issues: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+  const body = parsed.data;
 
   try {
     const result = await processJobStructureReprocessBatch(body.jobRunId);
 
     if (!result.completed) {
       queueNextInvocation(req.nextUrl.origin, cronSecret, body.jobRunId).catch((error) => {
-        console.error("Prompt Forge reprocess chain error:", error);
+        log.error({ err: error }, "Prompt Forge reprocess chain error");
       });
     }
 

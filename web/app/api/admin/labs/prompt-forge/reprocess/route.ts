@@ -4,6 +4,7 @@ import { requireAdminApi } from "@/lib/auth/admin";
 import {
   createJobStructureReprocessRun,
 } from "@/lib/labs/prompt-forge";
+import { log } from "@/lib/log";
 
 export const maxDuration = 300;
 
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
         jobRunId: job.jobRunId,
       }),
     }).catch((error) => {
-      console.error("Prompt Forge reprocess job failed:", error);
+      log.error({ err: error }, "Prompt Forge reprocess job failed");
     });
 
     return NextResponse.json({

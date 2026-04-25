@@ -1,48 +1,38 @@
 "use client";
 
-import { WeeklyDigest, CompanyWeeklySummary } from "@/lib/analysis/digest";
+import type { WeeklyDigest } from "@/lib/analysis/digest";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Building2, TrendingUp, Target, Briefcase, ExternalLink } from "lucide-react";
-import { buildDigestLink } from "@/lib/email/links";
-import { getThemeIdByLabel } from "@/lib/analysis/role-themes";
+import {
+  buildCompanySectionViews,
+  buildDigestTopLinks,
+  buildIndustryTrendRows,
+  buildStrategySignalRows,
+  getYearLabel,
+  type SurfaceContext,
+} from "@/components/digests/digest-render-helpers";
 
 interface DigestViewerProps {
   digest: WeeklyDigest;
   digestId: string;
 }
 
-/** Resolve a company display name back to its slug via the digest payload. */
-function findCompanySlug(
-  companies: CompanyWeeklySummary[],
-  companyName: string
-): string | null {
-  const match = companies.find((entry) => entry.company_name === companyName);
-  return match?.company_slug ?? null;
-}
-
 /**
- * DigestViewer - Renders a weekly digest in the same format as the email
- * Uses relative paths for Next.js navigation (not appUrl which is for emails)
+ * In-app digest viewer. Thin surface-specific wrapper around the shared
+ * data-shaping helpers in `digest-render-helpers.ts`. Renders the same digest
+ * shape as the email template, using Tailwind primitives + Next `<Link>`.
  */
 export function DigestViewer({ digest, digestId }: DigestViewerProps) {
+  const ctx: SurfaceContext = { surface: "app", digestId };
   const globalSummary = digest.global_summary;
-  const industryTrends = digest.industry_trends || [];
-  const strategySignals = digest.strategy_signals || [];
   const notableMovements = digest.notable_movements || [];
-  const yearStartIso = `${new Date(digest.week_end).getUTCFullYear()}-01-01`;
-  const yearLabel = yearStartIso.slice(0, 4);
+  const yearLabel = getYearLabel(digest.week_end);
 
-  const jobsInDigestHref = buildDigestLink({
-    surface: "app",
-    digestId,
-    target: { kind: "jobs", inDigest: true },
-  });
-  const companiesHref = buildDigestLink({
-    surface: "app",
-    digestId,
-    target: { kind: "companies" },
-  });
+  const topLinks = buildDigestTopLinks(ctx);
+  const trendRows = buildIndustryTrendRows(digest, ctx);
+  const signalRows = buildStrategySignalRows(digest, ctx);
+  const companyViews = buildCompanySectionViews(digest, ctx);
 
   return (
     <div className="space-y-6">
@@ -65,7 +55,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
 
       {/* Summary Stats - Interactive */}
       <div className="grid grid-cols-2 gap-4">
-        <Link href={jobsInDigestHref}>
+        <Link href={topLinks.jobsInDigest}>
           <Card className="hover:shadow-md transition-shadow cursor-pointer group">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -81,7 +71,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
             </CardContent>
           </Card>
         </Link>
-        <Link href={companiesHref}>
+        <Link href={topLinks.companies}>
           <Card className="hover:shadow-md transition-shadow cursor-pointer group">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -100,7 +90,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
       </div>
 
       {/* Role Focus This Week */}
-      {industryTrends.length > 0 && (
+      {trendRows.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -128,71 +118,47 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {industryTrends.map((trend, idx) => {
-                    const themeId = getThemeIdByLabel(trend.trend);
-                    const trendHref = themeId
-                      ? buildDigestLink({
-                          surface: "app",
-                          digestId,
-                          target: { kind: "jobs", theme: themeId, inDigest: true },
-                        })
-                      : null;
-                    return (
-                      <tr key={idx} className="border-b last:border-b-0">
-                        <td className="py-2.5 pr-4 font-medium">
-                          {trendHref ? (
-                            <Link
-                              href={trendHref}
-                              className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
-                            >
-                              {trend.trend}
-                            </Link>
-                          ) : (
-                            trend.trend
+                  {trendRows.map((row, idx) => (
+                    <tr key={idx} className="border-b last:border-b-0">
+                      <td className="py-2.5 pr-4 font-medium">
+                        {row.href ? (
+                          <Link
+                            href={row.href}
+                            className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
+                          >
+                            {row.trend.trend}
+                          </Link>
+                        ) : (
+                          row.trend.trend
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right tabular-nums">
+                        {row.trend.jobCount}
+                      </td>
+                      <td className="py-2.5 pl-4">
+                        <div className="flex flex-wrap gap-1">
+                          {row.companies.map((badge) =>
+                            badge.href ? (
+                              <Link
+                                key={badge.companyName}
+                                href={badge.href}
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
+                              >
+                                {badge.companyName}
+                              </Link>
+                            ) : (
+                              <span
+                                key={badge.companyName}
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground"
+                              >
+                                {badge.companyName}
+                              </span>
+                            )
                           )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right tabular-nums">
-                          {trend.jobCount}
-                        </td>
-                        <td className="py-2.5 pl-4">
-                          <div className="flex flex-wrap gap-1">
-                            {trend.companies.map((companyName) => {
-                              const slug = findCompanySlug(digest.companies, companyName);
-                              if (!slug) {
-                                return (
-                                  <span
-                                    key={companyName}
-                                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground"
-                                  >
-                                    {companyName}
-                                  </span>
-                                );
-                              }
-                              const badgeHref = buildDigestLink({
-                                surface: "app",
-                                digestId,
-                                target: {
-                                  kind: "jobs",
-                                  company: slug,
-                                  ...(themeId ? { theme: themeId } : {}),
-                                  inDigest: true,
-                                },
-                              });
-                              return (
-                                <Link
-                                  key={companyName}
-                                  href={badgeHref}
-                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
-                                >
-                                  {companyName}
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -201,7 +167,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
       )}
 
       {/* New This Week */}
-      {strategySignals.length > 0 && (
+      {signalRows.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -211,68 +177,51 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {strategySignals.map((signal, idx) => {
-                const signalSlug = findCompanySlug(digest.companies, signal.company);
-                const companyHref = signalSlug
-                  ? buildDigestLink({
-                      surface: "app",
-                      digestId,
-                      target: { kind: "company", slug: signalSlug },
-                    })
-                  : null;
-                const signalHref = signalSlug
-                  ? buildDigestLink({
-                      surface: "app",
-                      digestId,
-                      target: { kind: "jobs", company: signalSlug, inDigest: true },
-                    })
-                  : null;
-                return (
-                  <div key={idx} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="font-semibold">
-                          {companyHref ? (
-                            <Link
-                              href={companyHref}
-                              className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
-                            >
-                              {signal.company}
-                            </Link>
-                          ) : (
-                            signal.company
-                          )}
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {signalHref ? (
-                            <Link
-                              href={signalHref}
-                              className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
-                            >
-                              {signal.signal}
-                            </Link>
-                          ) : (
-                            signal.signal
-                          )}
-                        </div>
-                        <div className="text-sm mt-2">{signal.detail}</div>
-                        <div className="text-sm text-muted-foreground mt-2">
-                          {signal.interpretation}
-                        </div>
+              {signalRows.map((row, idx) => (
+                <div key={idx} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="font-semibold">
+                        {row.companyHref ? (
+                          <Link
+                            href={row.companyHref}
+                            className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
+                          >
+                            {row.signal.company}
+                          </Link>
+                        ) : (
+                          row.signal.company
+                        )}
                       </div>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        signal.alignment === "aligned"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : signal.alignment === "divergent"
-                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                          : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                      }`}>
-                        {signal.alignment}
-                      </span>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {row.signalHref ? (
+                          <Link
+                            href={row.signalHref}
+                            className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
+                          >
+                            {row.signal.signal}
+                          </Link>
+                        ) : (
+                          row.signal.signal
+                        )}
+                      </div>
+                      <div className="text-sm mt-2">{row.signal.detail}</div>
+                      <div className="text-sm text-muted-foreground mt-2">
+                        {row.signal.interpretation}
+                      </div>
                     </div>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      row.signal.alignment === "aligned"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : row.signal.alignment === "divergent"
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                        : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                    }`}>
+                      {row.signal.alignment}
+                    </span>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -292,7 +241,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                   <div className="text-sm">
                     <span className="font-semibold">{movement.company}</span>: {movement.description}
                     {movement.sourceUrl && (
-                      <a 
+                      <a
                         href={movement.sourceUrl}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -311,56 +260,20 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
       )}
 
       {/* Company Highlights */}
-      {digest.companies.length > 0 && (
+      {companyViews.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Company Highlights</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {digest.companies.map((company) => {
-                const slug = company.company_slug;
-                const primaryFocus =
-                  company.hiring_pattern.weekly_role_themes[0]?.label || "Various roles";
-                const primaryFocusThemeId =
-                  company.hiring_pattern.weekly_role_themes[0]?.id ?? null;
-                const newThemes = company.hiring_pattern.new_themes;
-                const isContinuing = company.hiring_pattern.continuity === "continuing";
-                const hasNewThemes = newThemes.length > 0;
-
-                const companyHref = buildDigestLink({
-                  surface: "app",
-                  digestId,
-                  target: { kind: "company", slug },
-                });
-                const newJobsHref = buildDigestLink({
-                  surface: "app",
-                  digestId,
-                  target: { kind: "jobs", company: slug, inDigest: true },
-                });
-                const yearTotalHref = buildDigestLink({
-                  surface: "app",
-                  digestId,
-                  target: { kind: "jobs", company: slug, from: yearStartIso },
-                });
-                const focusHref = primaryFocusThemeId
-                  ? buildDigestLink({
-                      surface: "app",
-                      digestId,
-                      target: {
-                        kind: "jobs",
-                        company: slug,
-                        theme: primaryFocusThemeId,
-                        inDigest: true,
-                      },
-                    })
-                  : null;
-
+              {companyViews.map((view) => {
+                const { company, links, primaryFocus, isContinuing, hasNewThemes, newThemes } = view;
                 return (
                   <div key={company.company_id} className="border-b last:border-b-0 pb-6 last:pb-0">
                     <div className="flex items-start justify-between mb-2">
                       <Link
-                        href={companyHref}
+                        href={links.company}
                         className="font-semibold text-lg hover:underline flex items-center gap-2"
                       >
                         <Building2 className="h-4 w-4" />
@@ -378,39 +291,24 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                         ) : hasNewThemes ? (
                           <>
                             {"New this week: "}
-                            {newThemes.map((themeLabel, idx) => {
-                              const themeId = getThemeIdByLabel(themeLabel);
-                              const separator = idx < newThemes.length - 1 ? ", " : ".";
-                              if (!themeId) {
-                                return (
-                                  <span key={`${themeLabel}-${idx}`}>
-                                    {themeLabel}
-                                    {separator}
-                                  </span>
-                                );
-                              }
-                              const themeHref = buildDigestLink({
-                                surface: "app",
-                                digestId,
-                                target: {
-                                  kind: "jobs",
-                                  company: slug,
-                                  theme: themeId,
-                                  inDigest: true,
-                                },
-                              });
-                              return (
-                                <span key={`${themeLabel}-${idx}`}>
+                            {newThemes.map((chip, idx) =>
+                              chip.href ? (
+                                <span key={`${chip.label}-${idx}`}>
                                   <Link
-                                    href={themeHref}
+                                    href={chip.href}
                                     className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
                                   >
-                                    {themeLabel}
+                                    {chip.label}
                                   </Link>
-                                  {separator}
+                                  {chip.separator}
                                 </span>
-                              );
-                            })}
+                              ) : (
+                                <span key={`${chip.label}-${idx}`}>
+                                  {chip.label}
+                                  {chip.separator}
+                                </span>
+                              )
+                            )}
                           </>
                         ) : (
                           "This week's mix is close to the company's recent hiring pattern."
@@ -420,7 +318,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                         <span>
                           New jobs:{" "}
                           <Link
-                            href={newJobsHref}
+                            href={links.newJobs}
                             className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
                           >
                             {company.new_job_count}
@@ -429,7 +327,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                         <span>
                           Open now:{" "}
                           <Link
-                            href={companyHref}
+                            href={links.company}
                             className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
                           >
                             {company.current_open_job_count}
@@ -438,7 +336,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                         <span>
                           {yearLabel} total:{" "}
                           <Link
-                            href={yearTotalHref}
+                            href={links.yearTotal}
                             className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
                           >
                             {company.year_to_date_job_count}
@@ -446,9 +344,9 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                         </span>
                         <span>
                           Focus:{" "}
-                          {focusHref ? (
+                          {links.focus ? (
                             <Link
-                              href={focusHref}
+                              href={links.focus}
                               className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
                             >
                               {primaryFocus}

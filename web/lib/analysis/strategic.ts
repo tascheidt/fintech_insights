@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { log } from "@/lib/log";
 
 /**
  * Strategic Analysis using Gemini Flash
@@ -54,7 +55,7 @@ export async function analyzeJob(
 ): Promise<AnalyzeResult | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
-    console.error("GEMINI_API_KEY not configured");
+    log.error("GEMINI_API_KEY not configured");
     return null;
   }
 
@@ -95,7 +96,7 @@ export async function analyzeJob(
       reasoning: parsed.reasoning ? String(parsed.reasoning) : undefined,
     };
   } catch (error) {
-    console.error("Gemini analysis error:", error);
+    log.error({ err: error }, "Gemini analysis error:");
     return null;
   }
 }

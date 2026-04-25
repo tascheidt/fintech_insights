@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getResendError } from "@/lib/email/resend-result";
 import { ScraperAlertEmail, type ScraperIssue } from "./templates/scraper-alert";
+import { log } from "@/lib/log";
 
 /**
  * After a collection job run, detect companies with scraper issues and notify
@@ -17,7 +18,7 @@ export async function checkAndAlertScraperHealth(
 ): Promise<void> {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
-    console.warn(
+    log.warn(
       "RESEND_API_KEY not set, skipping scraper health alert"
     );
     return;
@@ -96,11 +97,11 @@ export async function checkAndAlertScraperHealth(
     }
 
     if (issues.length === 0) {
-      console.log("Scraper health check passed — no issues detected.");
+      log.info("Scraper health check passed — no issues detected.");
       return;
     }
 
-    console.warn(
+    log.warn(
       `Scraper health alert: ${issues.length} issue(s) detected for [${issues.map((i) => i.companyName).join(", ")}]`
     );
 
@@ -116,7 +117,7 @@ export async function checkAndAlertScraperHealth(
       .filter((e): e is string => Boolean(e));
 
     if (adminEmails.length === 0) {
-      console.warn("No admin users found for scraper alert");
+      log.warn("No admin users found for scraper alert");
       return;
     }
 
@@ -141,13 +142,13 @@ export async function checkAndAlertScraperHealth(
     const result = await resend.batch.send(emails);
     const err = getResendError(result);
     if (err) {
-      console.error("Resend batch error (scraper alert):", err);
+      log.error({ err: err }, "Resend batch error (scraper alert):");
       return;
     }
-    console.log(
+    log.info(
       `Scraper health alert sent to ${adminEmails.length} admin(s)`
     );
   } catch (err) {
-    console.error("Failed to send scraper health alert:", err);
+    log.error({ err: err }, "Failed to send scraper health alert:");
   }
 }

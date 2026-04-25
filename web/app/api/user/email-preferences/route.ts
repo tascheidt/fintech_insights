@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { requireUser } from "@/lib/auth/guards";
 
 const emailPreferencesSchema = z.object({
   weekly_digest: z.boolean(),
@@ -11,12 +11,9 @@ const emailPreferencesSchema = z.object({
  * Fetch current user's email preferences
  */
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { user, supabase } = auth;
 
   const { data: profile, error } = await supabase
     .from("profiles")
@@ -41,12 +38,9 @@ export async function GET() {
  * Update current user's email preferences
  */
 export async function PUT(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { user, supabase } = auth;
 
   let raw: unknown;
   try {

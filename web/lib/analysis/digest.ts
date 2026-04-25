@@ -598,15 +598,9 @@ function buildStrategySignals(companies: CompanyWeeklySummary[]): StrategySignal
     .map((company) => ({
       company: company.company_name,
       alignment: "new_direction",
-      signal: `${company.company_name} added ${company.hiring_pattern.new_themes.join(", ").toLowerCase()} roles this week`,
-      detail:
-        company.hiring_pattern.continuing_themes.length > 0
-          ? `This sits alongside continuing hiring in ${company.hiring_pattern.continuing_themes.join(", ").toLowerCase()}.`
-          : "This theme did not show up in the company's earlier year-to-date hiring pattern.",
-      interpretation:
-        company.hiring_pattern.continuity === "new_focus"
-          ? "This looks like the clearest change in role focus this week."
-          : "This is worth watching, but it appears alongside an established hiring pattern.",
+      signal: company.ai_commentary.headline,
+      detail: company.ai_commentary.body,
+      interpretation: `New this week: ${company.hiring_pattern.new_themes.join(", ").toLowerCase()}.`,
     }));
 }
 

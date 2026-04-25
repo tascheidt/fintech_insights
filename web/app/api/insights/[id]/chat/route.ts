@@ -1,16 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { buildHistoricalContext, formatHistoricalContextForPrompt } from "@/lib/analysis/context-builder";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
+import { requireUser } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 import { z } from "zod";
 
 const chatSchema = z.object({
   question: z.string().min(1).max(2000),
 });
+
+const paramsSchema = z.object({ id: z.string().uuid() });
+
+interface ChatMessage {
+  role: "user" | "model";
+  parts: Array<{ text: string }>;
+}
+
+interface InsightWithJob {
+  id: string;
+  insight_summary: string | null;
+  category: string | null;
+  novelty_score: number | null;
+  strategic_hypothesis: string | null;
+  is_executive_movement: boolean | null;
+  executive_context: string | null;
+  job_postings: {
+    id: string;
+    title: string;
+    standardized_department: string | null;
+    location: string | null;
+    description_text: string | null;
+    companies: { id: string; name: string };
+  } | null;
+}
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -24,23 +50,28 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const parsed = chatSchema.safeParse(await req.json());
+    const paramsParsed = paramsSchema.safeParse(await params);
+    if (!paramsParsed.success) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
+    const { id } = paramsParsed.data;
+
+    let raw: unknown;
+    try {
+      raw = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+    const parsed = chatSchema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid request body", issues: parsed.error.issues }, { status: 400 });
     }
     const { question } = parsed.data;
 
-    const supabase = await createClient();
+    const auth = await requireUser();
+    if (auth instanceof NextResponse) return auth;
+    const { user } = auth;
     const adminSupabase = createAdminClient();
-
-    // Get current user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     // Load insight with full context
     const { data: insight, error: insightError } = await adminSupabase
@@ -63,7 +94,8 @@ export async function POST(
       return NextResponse.json({ error: "Insight not found" }, { status: 404 });
     }
 
-    const job = (insight as any).job_postings;
+    const insightTyped = insight as unknown as InsightWithJob & Record<string, unknown>;
+    const job = insightTyped.job_postings;
     const company = job?.companies;
 
     if (!job || !company) {
@@ -79,11 +111,11 @@ export async function POST(
       .single();
 
     let conversationId: string;
-    let previousMessages: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+    let previousMessages: ChatMessage[] = [];
 
     if (existingConv) {
       conversationId = existingConv.id;
-      previousMessages = (existingConv.messages as any) || [];
+      previousMessages = (existingConv.messages as ChatMessage[] | null) ?? [];
     } else {
       const { data: newConv } = await adminSupabase
         .from("insight_conversations")
@@ -111,11 +143,11 @@ Job Title: ${job.title}
 Department: ${job.standardized_department || "Not specified"}
 Location: ${job.location || "Not specified"}
 
-Original Insight Summary: ${(insight as any).insight_summary || "N/A"}
-Category: ${(insight as any).category || "N/A"}
-Novelty Score: ${(insight as any).novelty_score || "N/A"}/10
-Strategic Hypothesis: ${(insight as any).strategic_hypothesis || "N/A"}
-${(insight as any).is_executive_movement ? `Executive Movement: ${(insight as any).executive_context || "Yes"}` : ""}
+Original Insight Summary: ${insightTyped.insight_summary || "N/A"}
+Category: ${insightTyped.category || "N/A"}
+Novelty Score: ${insightTyped.novelty_score || "N/A"}/10
+Strategic Hypothesis: ${insightTyped.strategic_hypothesis || "N/A"}
+${insightTyped.is_executive_movement ? `Executive Movement: ${insightTyped.executive_context || "Yes"}` : ""}
 
 ## Company Historical Context
 ${historicalText}
@@ -152,7 +184,7 @@ Your role is to answer follow-up questions about this insight, provide deeper an
 
     // Start chat with history
     const chat = model.startChat({
-      history: history as any,
+      history,
     });
 
     // Stream the response
@@ -190,7 +222,7 @@ Your role is to answer follow-up questions about this insight, provide deeper an
               })
             );
           } catch (meterErr) {
-            console.error("[gemini-telemetry] insightChat usage read failed:", meterErr);
+            log.error({ err: meterErr }, "[gemini-telemetry] insightChat usage read failed");
           }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -211,7 +243,7 @@ Your role is to answer follow-up questions about this insight, provide deeper an
             })
             .eq("id", conversationId);
         } catch (error) {
-          console.error("Streaming error:", error);
+          log.error({ err: error }, "Streaming error");
           controller.error(error);
         }
       },
@@ -225,7 +257,7 @@ Your role is to answer follow-up questions about this insight, provide deeper an
       },
     });
   } catch (error) {
-    console.error("Chat API error:", error);
+    log.error({ err: error }, "Chat API error");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -242,15 +274,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const paramsParsed = paramsSchema.safeParse(await params);
+    if (!paramsParsed.success) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
+    const { id } = paramsParsed.data;
+
+    const auth = await requireUser();
+    if (auth instanceof NextResponse) return auth;
+    const { user, supabase } = auth;
 
     const { data: conversation } = await supabase
       .from("insight_conversations")
@@ -268,7 +300,7 @@ export async function GET(
       conversationId: conversation.id,
     });
   } catch (error) {
-    console.error("Get conversation error:", error);
+    log.error({ err: error }, "Get conversation error");
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

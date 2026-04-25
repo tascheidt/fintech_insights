@@ -44,15 +44,63 @@ The digest no longer treats tech-stack commentary as a primary output. The main 
 
 - `web/lib/analysis/digest.ts`
   Builds the weekly digest model, historical role context, company commentary prompts, and global summary.
+  Also defines `DigestData` (alias of `WeeklyDigest`) and `DigestRendererProps` — the shared handoff contract for renderers.
+
+- `web/components/digests/digest-render-helpers.ts`
+  Shared, primitive-free data-shaping module consumed by both renderers. Owns
+  slug lookups, date-range / year-label formatting, leading-theme resolution,
+  and surface-aware link building (industry trends, strategy signals,
+  company-section view-models). See "Renderer Architecture" below.
 
 - `web/lib/email/templates/weekly-digest.tsx`
-  Renders the email version of the shared digest model.
+  Renders the email version of the shared digest model. Thin wrapper around
+  the shared helpers — owns only `@react-email/components` primitives + inline
+  styles.
 
 - `web/components/digests/DigestViewer.tsx`
-  Renders the in-app version of the shared digest model.
+  Renders the in-app version of the shared digest model. Thin wrapper around
+  the shared helpers — owns only Tailwind / shadcn primitives + Next `<Link>`.
 
 - `web/lib/ai/prompt-config.ts`
   Stores default/runtime prompt config, including the `weekly-digest` Prompt Forge stage.
+
+---
+
+## Renderer Architecture
+
+The two digest surfaces — in-app viewer and Resend email — render the same
+`WeeklyDigest` payload but cannot literally share JSX:
+
+- **Different primitives.** The viewer uses Tailwind `<div>`s + shadcn `<Card>`
+  + Next `<Link>`; the email uses `@react-email/components` (`<Section>`,
+  `<Heading>`, `<Text>`, `<Link>`) with inline-style objects.
+- **Different link semantics.** The viewer emits relative paths for Next
+  client-side navigation; the email emits absolute URLs with UTM parameters.
+
+So the dedupe boundary is **data shaping, not markup**. The shared module at
+`web/components/digests/digest-render-helpers.ts` owns:
+
+- `findCompanySlug` — resolve a display name back to a slug
+- `formatDateRange`, `getYearStartIso`, `getYearLabel`
+- `getLeadingTheme`, `getLeadingThemeId`
+- `makeLinkBuilder` / `buildDigestTopLinks` — surface-aware link builders
+  (relative for `app`, absolute + UTM for `email`)
+- `buildIndustryTrendRows` — pre-resolved view-model for the
+  "Role Focus This Week" table (theme href + per-company badge hrefs)
+- `buildStrategySignalRows` — pre-resolved view-model for "New This Week"
+- `buildCompanySectionView(s)` — pre-resolved view-model for "Company
+  Highlights" (slug, primary-focus theme, hrefs, continuity copy data,
+  inline-theme chips for "New this week: X, Y, Z.")
+
+Each renderer imports the helpers, builds the view-models, then maps them
+onto its own primitives. The helpers file is **primitive-free** — no `react`,
+no `next/link`, no `@react-email/components` imports. Adding a third surface
+later (e.g. Slack, MJML) only requires another thin wrapper.
+
+The shared handoff types (`DigestData`, `DigestRendererProps`,
+`SurfaceContext`) live in `web/lib/analysis/digest.ts` and
+`digest-render-helpers.ts`. When changing the renderer contract, update both
+files in the same PR.
 
 ---
 

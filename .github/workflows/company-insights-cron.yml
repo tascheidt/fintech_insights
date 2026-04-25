@@ -1,0 +1,85 @@
+name: Company Insights Cron
+
+# Off-Vercel scheduled trigger for /api/cron/company-insights.
+#
+# Why this lives here, not in vercel.json:
+#   The Vercel Hobby plan caps cron jobs at 2 (collect + report). This third
+#   scheduled job runs from GitHub Actions and calls the same Next.js route
+#   over HTTPS using the shared CRON_SECRET. See docs/CRON_TOPOLOGY.md.
+#
+# Required repository secrets:
+#   - APP_HOST     hostname only, no scheme (e.g. fintech-talent-brief.vercel.app)
+#   - CRON_SECRET  same value as the Vercel env var of the same name
+#
+# Schedule: Monday 09:00 UTC — matches the previous Vercel cron schedule
+# (`0 9 * * 1`) the company-insights job ran on before being moved off Vercel.
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      company_id:
+        description: "Optional company UUID to target a single company instead of next-up"
+        required: false
+        type: string
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Validate required secrets
+        env:
+          APP_HOST: ${{ secrets.APP_HOST }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_HOST" ]; then
+            echo "::error::Missing required secret APP_HOST"
+            exit 1
+          fi
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Missing required secret CRON_SECRET"
+            exit 1
+          fi
+
+      - name: Trigger /api/cron/company-insights
+        env:
+          APP_HOST: ${{ secrets.APP_HOST }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          COMPANY_ID: ${{ inputs.company_id }}
+        run: |
+          set -u
+          # The route handler is GET-only and reads ?companyId= from the query string.
+          QUERY=""
+          if [ -n "${COMPANY_ID:-}" ]; then
+            QUERY="?companyId=${COMPANY_ID}"
+          fi
+
+          URL="https://${APP_HOST}/api/cron/company-insights${QUERY}"
+          echo "POST-equivalent GET to ${URL}"
+
+          # -sS shows errors but suppresses the progress bar.
+          # --fail-with-body prints the response body even on non-2xx so we can debug.
+          # We capture status separately so we can exit non-zero on >=300.
+          HTTP_STATUS=$(curl \
+            --silent \
+            --show-error \
+            --output /tmp/response.json \
+            --write-out "%{http_code}" \
+            --max-time 540 \
+            --request GET \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            --header "User-Agent: github-actions-cron/company-insights" \
+            "${URL}")
+
+          echo "HTTP ${HTTP_STATUS}"
+          echo "--- response body ---"
+          cat /tmp/response.json || true
+          echo
+          echo "---------------------"
+
+          if [ "${HTTP_STATUS}" -lt 200 ] || [ "${HTTP_STATUS}" -ge 300 ]; then
+            echo "::error::Non-2xx response from /api/cron/company-insights (HTTP ${HTTP_STATUS})"
+            exit 1
+          fi

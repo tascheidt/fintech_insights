@@ -15,7 +15,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { requireUser } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
+
+const querySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(20).default(6),
+  days: z.coerce.number().int().min(1).max(90).default(14),
+});
 
 // ============================================================================
 // Types
@@ -52,30 +59,22 @@ interface CompanyInsightRow {
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    
-    // Parse query parameters
-    const { searchParams } = new URL(req.url);
-    const limitParam = searchParams.get("limit");
-    const daysParam = searchParams.get("days");
-    
-    // Validate and set defaults
-    let limit = 6;
-    if (limitParam) {
-      const parsed = parseInt(limitParam, 10);
-      if (!isNaN(parsed) && parsed > 0 && parsed <= 20) {
-        limit = parsed;
-      }
+    const auth = await requireUser();
+    if (auth instanceof NextResponse) return auth;
+    const { supabase } = auth;
+
+    const queryParsed = querySchema.safeParse({
+      limit: req.nextUrl.searchParams.get("limit") ?? undefined,
+      days: req.nextUrl.searchParams.get("days") ?? undefined,
+    });
+    if (!queryParsed.success) {
+      return NextResponse.json(
+        { error: "Invalid query", issues: queryParsed.error.issues },
+        { status: 400 }
+      );
     }
-    
-    let days = 14;
-    if (daysParam) {
-      const parsed = parseInt(daysParam, 10);
-      if (!isNaN(parsed) && parsed > 0 && parsed <= 90) {
-        days = parsed;
-      }
-    }
-    
+    const { limit, days } = queryParsed.data;
+
     // Calculate cutoff date
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -101,7 +100,7 @@ export async function GET(req: NextRequest) {
       .limit(limit);
     
     if (error) {
-      console.error("Error fetching highlights:", error);
+      log.error({ err: error }, "Error fetching highlights");
       return NextResponse.json(
         { error: "Failed to fetch highlights" },
         { status: 500 }
@@ -144,7 +143,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Highlights API error:", error);
+    log.error({ err: error }, "Highlights API error");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
