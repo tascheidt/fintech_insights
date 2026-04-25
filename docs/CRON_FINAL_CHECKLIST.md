@@ -1,5 +1,10 @@
 # Cron Jobs Final Checklist
 
+> **Read [CRON_TOPOLOGY.md](./CRON_TOPOLOGY.md) first.** This file is operational
+> verification steps for the two Vercel crons (`collect`, `report`). The third
+> scheduled job (`company-insights`) runs from GitHub Actions and is not covered
+> by the Vercel dashboard checks below.
+
 ## ✅ Completed Steps
 
 - [x] CRON_SECRET is set in Vercel environment variables

@@ -19,6 +19,12 @@ logging:
   level: INFO
   file: logs/fintech_talent_brief.log
 
+# DEV ONLY — production scheduler is Vercel + GitHub Actions, not this file.
+# These values are consumed only by the legacy Python CLI in src/ (see run.sh)
+# for local/dev runs. Production cron topology lives in:
+#   - web/vercel.json                              (collect + report)
+#   - .github/workflows/company-insights-cron.yml  (company-insights)
+# Editing the values below will NOT change production schedules.
 schedule:
   collection_time: "06:00"
   weekly_report_time: "08:00"
