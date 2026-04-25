@@ -77,6 +77,47 @@ Edit `web/data/releases.json`:
 3. One sentence per entry.
 4. Bump the version in both `web/package.json` and `web/data/releases.json` if appropriate (patch/minor/major — see root `CLAUDE.md`).
 
+## Tests
+
+Two test layers, kept deliberately small.
+
+### Unit (Vitest)
+
+```bash
+cd web
+npm test          # one-shot run, used by CI
+npm run test:watch
+```
+
+Six colocated `*.test.ts` files cover the highest-leverage pure functions: the `description_hash` gate in [`web/lib/jobs/processor.ts`](../web/lib/jobs/processor.ts), the digest input builder in [`web/lib/analysis/digest.ts`](../web/lib/analysis/digest.ts), the AI model resolver in [`web/lib/ai/prompt-config.ts`](../web/lib/ai/prompt-config.ts), the env validator in [`web/lib/env.ts`](../web/lib/env.ts), the voice heuristic in [`web/lib/ai/voice-validator.ts`](../web/lib/ai/voice-validator.ts), and the admin-feedback Zod schema in [`web/packages/feedback/src/validation.ts`](../web/packages/feedback/src/validation.ts).
+
+**Philosophy:** regression protection on pure functions, not coverage chase. Cron handlers are mock-heavy and low ROI — we test the helpers they consume, not the routes themselves. Per the CLAUDE.md anti-pattern list, we don't mock the Supabase DB schema in tests; the Supabase mocks here only stand in for the client object so a unit test can run hermetically against a single function. Anything more substantial belongs in production telemetry, not unit tests.
+
+When adding a new test, ask: is this function pure, deterministic, and high-leverage (cost regression, security boundary, output contract)? If yes, add it. If no, add telemetry.
+
+### E2E (Playwright)
+
+```bash
+cd web
+npm run e2e
+```
+
+Single smoke test at [`web/e2e/smoke.spec.ts`](../web/e2e/smoke.spec.ts): loads `/login` and asserts the Google OAuth button is visible.
+
+**Reduction from the original plan.** The launch plan called for a "homepage -> digest -> admin trigger" flow. We reduced it to "login page renders" because:
+
+1. The dashboard, digest, and admin routes are all auth-gated by `web/proxy.ts` — driving them needs a working OAuth round-trip in CI.
+2. The digest page expects real `weekly_digests` rows; admin trigger expects an admin user. Both require seeded DB state.
+3. A broken login page would be a fully-broken deploy, so the canary still has signal. We accept that a regression in (e.g.) the digest page would only be caught by production telemetry, not e2e — that tradeoff is documented here so the next person knows where the gap is.
+
+When auth/DB fixtures are available, expand the smoke spec to cover the originally-planned flow.
+
+### CI
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs lint (non-blocking), `tsc --noEmit`, `npm test`, and `npm run build` on every PR + push to main. The Playwright smoke runs only on push to main (it needs a built+booted app). The build step uses minimum-viable real-looking stubs (e.g. `NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321`) so [`web/lib/env.ts`](../web/lib/env.ts) accepts them; if the validator gets stricter, that env list will need updates.
+
+The migration filename check in CI is a pragmatic substitute for `supabase db diff` until we have a configured Supabase project — same posture as `doc-drift-check.yml` (warn, don't block).
+
 ## Editing this repo's docs
 
 The doc-hygiene rule is in root [`CLAUDE.md`](../CLAUDE.md). The short version: **if your PR changes architecture, cron topology, AI model usage, schema, directory layout, scheduler venue, or auth/security model, update the relevant `.md` file in the same PR.** The PR template has a checkbox for each major doc area.

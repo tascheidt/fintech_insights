@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  lint-typecheck-test-build:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        # Lint has known nags pre-launch; surface them but don't block merges.
+        # Tighten this once Stream B's lint pass lands.
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests (Vitest)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Build requires the env validator (web/lib/env.ts) to pass — see
+          # web/instrumentation.ts. Use minimum-viable real-looking values
+          # so the Zod schema accepts them. These are not real secrets.
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-service-role-key
+          GEMINI_API_KEY: ci-gemini-key
+          CRON_SECRET: ci-cron-secret
+          RESEND_API_KEY: ci-resend-key
+
+      - name: Migration filename convention check
+        # Pragmatic substitute for `supabase db diff` (which would need a
+        # configured Supabase project). Two non-blocking checks:
+        #   1. New migrations follow the timestamped-filename regex.
+        #   2. New migrations include a `# Description:` line in their header.
+        # Same posture as the doc-drift check — warn, don't block.
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        working-directory: ${{ github.workspace }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=200 origin "$BASE_SHA" || true
+          git fetch --no-tags --depth=200 origin "$HEAD_SHA" || true
+          CHANGED=$(git diff --name-only --diff-filter=A "$BASE_SHA" "$HEAD_SHA" \
+            | grep -E '^web/supabase/migrations/.+\.sql$' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No new migrations in this PR."
+            exit 0
+          fi
+          FAILED=0
+          echo "$CHANGED" | while read -r f; do
+            base=$(basename "$f")
+            if ! echo "$base" | grep -qE '^[0-9]{14}_.+\.sql$'; then
+              echo "::warning file=$f::Migration filename does not match timestamped convention (^[0-9]{14}_.+\\.sql$)"
+              FAILED=1
+            fi
+            if ! head -10 "$f" | grep -qiE '^(--|#).*Description:'; then
+              echo "::warning file=$f::Migration is missing a '-- Description:' header line"
+            fi
+          done
+          exit 0
+
+  e2e-smoke:
+    name: Playwright smoke (login page)
+    needs: lint-typecheck-test-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the app
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-service-role-key
+          GEMINI_API_KEY: ci-gemini-key
+          CRON_SECRET: ci-cron-secret
+          RESEND_API_KEY: ci-resend-key
+
+      - name: Start app
+        run: |
+          npm start &
+          echo $! > /tmp/app.pid
+          # Wait for the dev server to bind port 3000.
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 >/dev/null 2>&1; then
+              echo "App is up."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App failed to start within 60s." >&2
+          exit 1
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-service-role-key
+          GEMINI_API_KEY: ci-gemini-key
+          CRON_SECRET: ci-cron-secret
+          RESEND_API_KEY: ci-resend-key
+          PORT: "3000"
+
+      - name: Run smoke test
+        run: npm run e2e
+
+      - name: Stop app
+        if: always()
+        run: |
+          if [ -f /tmp/app.pid ]; then
+            kill "$(cat /tmp/app.pid)" || true
+          fi
