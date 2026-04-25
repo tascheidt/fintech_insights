@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TaskStage, StageProgress } from "./types";
+import { log } from "@/lib/log";
 
 /**
  * Update task stage progress (writes to DB, triggers Realtime)
@@ -56,7 +57,7 @@ export async function updateJobRunStats(jobRunId: string): Promise<void> {
   });
 
   if (error) {
-    console.error('Error updating job run stats:', error);
+    log.error({ err: error }, 'Error updating job run stats:');
     throw error;
   }
 }

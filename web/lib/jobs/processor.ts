@@ -10,6 +10,7 @@ import {
   type JobStructureAiConfig,
 } from "@/lib/ai/prompt-config";
 import { createHash } from "crypto";
+import { log } from "@/lib/log";
 
 /**
  * SHA-1 hex digest of a job description. Used as a cheap content fingerprint
@@ -175,7 +176,7 @@ export async function extractAndUpdateStructure(
       .eq('id', jobId);
   } catch (error) {
     // Log error but don't throw - ingestion should continue even if extraction fails
-    console.error(`Error extracting structure for job ${jobId}:`, error);
+    log.error({ err: error }, `Error extracting structure for job ${jobId}:`);
   }
 }
 
@@ -329,7 +330,7 @@ export async function runIngestStage(
       const results = await Promise.allSettled(extractionPromises);
       const failed = results.filter((r) => r.status === 'rejected').length;
       if (failed > 0) {
-        console.warn(
+        log.warn(
           `Silver Layer extraction: ${failed} of ${extractionPromises.length} jobs failed`
         );
       }
@@ -339,7 +340,7 @@ export async function runIngestStage(
     // hash gate prevent? This is the daily-cost-saving signal; surfaces on
     // each collect run so we can track it without full Phase-5 telemetry.
     if (extractionsSkippedByHash > 0) {
-      console.log(
+      log.info(
         `Silver Layer extraction: hash gate skipped ${extractionsSkippedByHash} unchanged description(s) for ${company.name}`
       );
     }
@@ -470,7 +471,7 @@ export async function processCollectionTask(
       // Check if this is a browser-based scraper that should be offloaded
       if (isBrowserScraper(company.ats_type)) {
         // Offload heavy browser scraping to GitHub Actions
-        console.log("Offloaded heavy scrape to GitHub Actions");
+        log.info("Offloaded heavy scrape to GitHub Actions");
         
         try {
           // Pass taskId so GitHub Actions updates the existing task instead of creating a new one
@@ -496,7 +497,7 @@ export async function processCollectionTask(
           return;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error(`❌ Failed to trigger GitHub Actions workflow: ${errorMessage}`);
+          log.error(`❌ Failed to trigger GitHub Actions workflow: ${errorMessage}`);
           
           // Update task to failed
           await supabase
@@ -528,7 +529,7 @@ export async function processCollectionTask(
       updateTaskProgress(taskId, 'ingest', {
         processed,
         total,
-      }).catch(console.error);
+      }).catch(log.error);
     });
 
     // Mark task as completed

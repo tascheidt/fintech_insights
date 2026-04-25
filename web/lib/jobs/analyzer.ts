@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { analyzeJobAdvanced } from "@/lib/analysis";
 import type { Company, AnalyzeResult } from "./types";
 import { updateTaskProgress } from "./progress";
+import { log } from "@/lib/log";
 
 /**
  * Stage 3: Analyze - Run LLM analysis on pending jobs
@@ -190,7 +191,7 @@ export async function processAnalysisTask(taskId: string): Promise<void> {
       updateTaskProgress(taskId, 'analyze', {
         analyzed,
         total,
-      }).catch(console.error);
+      }).catch(log.error);
     });
 
     // Mark task as completed

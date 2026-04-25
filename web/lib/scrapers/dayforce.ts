@@ -36,6 +36,7 @@ interface DayforceSearchResponse {
 }
 
 import type { Browser } from "puppeteer-core";
+import { log } from "@/lib/log";
 
 export async function fetchDayforceJobs(
   atsIdentifier: string,
@@ -56,7 +57,7 @@ export async function fetchDayforceJobs(
     }
   } catch (e) {
     // Browser scraping failed, try one more HTML approach
-    console.error("Browser scraping failed:", e);
+    log.error({ err: e }, "Browser scraping failed:");
   }
 
   // Last resort: try basic HTML fetch

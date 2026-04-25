@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/auth/admin";
+
+const putSchema = z.object({
+  key: z.string().min(1),
+  value: z.unknown(),
+});
 
 // Default descriptions for known system settings (matches migration seed data)
 const DEFAULT_DESCRIPTIONS: Record<string, string> = {
@@ -44,11 +50,22 @@ export async function PUT(req: NextRequest) {
   if ("error" in auth) return auth.error;
   const { supabase, user } = auth;
 
-  const body = await req.json();
-  const { key, value } = body;
-
-  if (!key || value === undefined) {
-    return NextResponse.json({ error: "Missing key or value" }, { status: 400 });
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const parsed = putSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid body", issues: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+  const { key, value } = parsed.data;
+  if (value === undefined) {
+    return NextResponse.json({ error: "Missing value" }, { status: 400 });
   }
 
   // First check if the setting exists (using user session - respects RLS)

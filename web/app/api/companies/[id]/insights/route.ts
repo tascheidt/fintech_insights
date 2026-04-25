@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 import {
   generateCompanyInsight,
   getCompanyInsights,
 } from "@/lib/analysis/company-insights";
+import { requireUser } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 
 export const maxDuration = 120; // 2 minutes for on-demand generation
+
+const paramsSchema = z.object({ id: z.string().uuid() });
+
+const querySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  since: z.string().datetime().optional(),
+  includeResearch: z.enum(["true", "false"]).optional(),
+});
 
 const generateSchema = z.object({
   periodDays: z.number().min(30).max(180).optional(),
@@ -23,13 +32,15 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const paramsParsed = paramsSchema.safeParse(await params);
+  if (!paramsParsed.success) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
+  const { id } = paramsParsed.data;
+
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
   // Verify user has access to this company
   const { data: company, error: companyError } = await supabase
@@ -43,14 +54,23 @@ export async function GET(
   }
 
   // Parse query params
-  const searchParams = req.nextUrl.searchParams;
-  const limit = parseInt(searchParams.get("limit") || "10", 10);
-  const since = searchParams.get("since");
-  const includeResearch = searchParams.get("includeResearch") === "true";
+  const queryParsed = querySchema.safeParse({
+    limit: req.nextUrl.searchParams.get("limit") ?? undefined,
+    since: req.nextUrl.searchParams.get("since") ?? undefined,
+    includeResearch: req.nextUrl.searchParams.get("includeResearch") ?? undefined,
+  });
+  if (!queryParsed.success) {
+    return NextResponse.json(
+      { error: "Invalid query", issues: queryParsed.error.issues },
+      { status: 400 }
+    );
+  }
+  const { limit, since } = queryParsed.data;
+  const includeResearch = queryParsed.data.includeResearch === "true";
 
   try {
     const insights = await getCompanyInsights(id, {
-      limit: Math.min(limit, 50),
+      limit,
       since: since ? new Date(since) : undefined,
     });
 
@@ -68,7 +88,7 @@ export async function GET(
 
     return NextResponse.json({ insights: response });
   } catch (error) {
-    console.error("Error fetching company insights:", error);
+    log.error({ err: error }, "Error fetching company insights");
     return NextResponse.json(
       { error: "Failed to fetch insights" },
       { status: 500 }
@@ -84,13 +104,15 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const paramsParsed = paramsSchema.safeParse(await params);
+  if (!paramsParsed.success) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
+  const { id } = paramsParsed.data;
+
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { user, supabase } = auth;
 
   // Get user profile and role
   const { data: profile } = await supabase
@@ -213,7 +235,7 @@ export async function POST(
 
     return NextResponse.json({ insight }, { status: 201 });
   } catch (error) {
-    console.error("Error generating company insight:", error);
+    log.error({ err: error }, "Error generating company insight");
 
     // Update job_runs with failure (unified job tracking)
     if (jobRunId) {

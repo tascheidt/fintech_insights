@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { aggregateTechStackFromJobs } from "@/lib/ai/tech-stack-aggregation";
 import { enrichTechStackWithAnalysis, type CompanyTechStack } from "@/lib/ai/tech-stack-extraction";
 import { getActiveTechStackAiConfig } from "@/lib/ai/prompt-config";
 import { buildTechStackStrategicContext } from "@/lib/analysis/strategic-context";
+import { requireUser } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 
 export const maxDuration = 120;
+
+const paramsSchema = z.object({ id: z.string().uuid() });
 
 /**
  * GET /api/companies/[id]/tech-stack
@@ -16,13 +20,15 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const paramsParsed = paramsSchema.safeParse(await params);
+  if (!paramsParsed.success) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
+  const { id } = paramsParsed.data;
+
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
   const { data: company } = await supabase
     .from("companies")
@@ -48,13 +54,15 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const paramsParsed = paramsSchema.safeParse(await params);
+  if (!paramsParsed.success) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
+  const { id } = paramsParsed.data;
+
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
   // Verify access via RLS (user can see the company)
   const { data: company } = await supabase
@@ -121,7 +129,7 @@ export async function POST(
 
     return NextResponse.json({ techStack: enrichedStack }, { status: 201 });
   } catch (error) {
-    console.error("Tech stack generation error:", error);
+    log.error({ err: error }, "Tech stack generation error");
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to generate tech stack" },
       { status: 500 }

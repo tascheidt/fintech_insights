@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
+import { requireUser } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 import { z } from "zod";
 
 const messageSchema = z.object({
   message: z.string().min(1).max(2000),
+});
+
+const paramsSchema = z.object({
+  id: z.string().uuid(),
+  insightId: z.string().uuid(),
 });
 
 /**
@@ -19,13 +25,15 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; insightId: string }> }
 ) {
-  const { id, insightId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const paramsParsed = paramsSchema.safeParse(await params);
+  if (!paramsParsed.success) {
+    return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
+  const { id, insightId } = paramsParsed.data;
+
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { user, supabase } = auth;
 
   // Verify user has access to this company
   const { data: company, error: companyError } = await supabase
@@ -86,7 +94,7 @@ export async function POST(
       .single();
 
     if (createError) {
-      console.error("Error creating conversation:", createError);
+      log.error({ err: createError }, "Error creating conversation");
       return NextResponse.json({ error: "Failed to create conversation" }, { status: 500 });
     }
     conversation = newConversation;
@@ -188,7 +196,7 @@ Provide a helpful, insightful response based on the company insight data. Be spe
       .eq("id", conversation.id);
 
     if (updateError) {
-      console.error("Error updating conversation:", updateError);
+      log.error({ err: updateError }, "Error updating conversation");
     }
 
     return NextResponse.json({
@@ -196,7 +204,7 @@ Provide a helpful, insightful response based on the company insight data. Be spe
       conversationId: conversation.id,
     });
   } catch (error) {
-    console.error("Chat error:", error);
+    log.error({ err: error }, "Chat error");
     return NextResponse.json(
       { error: "Failed to generate response" },
       { status: 500 }
@@ -212,13 +220,15 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; insightId: string }> }
 ) {
-  const { id, insightId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const paramsParsed = paramsSchema.safeParse(await params);
+  if (!paramsParsed.success) {
+    return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
+  const { id, insightId } = paramsParsed.data;
+
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { user, supabase } = auth;
 
   // Verify user has access to this company
   const { data: company, error: companyError } = await supabase

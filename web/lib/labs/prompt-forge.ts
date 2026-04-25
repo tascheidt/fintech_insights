@@ -34,6 +34,7 @@ import {
   scoreTechStackBenchmark,
   scoreWeeklyDigestBenchmark,
 } from "./prompt-forge-benchmarks";
+import { log } from "@/lib/log";
 
 const GENERIC_TERMS = new Set([
   "api",
@@ -996,7 +997,7 @@ async function refreshTechStacksForReprocessCompanies(companyIds: string[]) {
 
       refreshed++;
     } catch (error) {
-      console.error(`Prompt Forge tech stack refresh failed for ${company.name}:`, error);
+      log.error({ err: error }, `Prompt Forge tech stack refresh failed for ${company.name}:`);
       failed++;
     }
   }

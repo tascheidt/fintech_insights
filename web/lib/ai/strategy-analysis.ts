@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
+import { log } from "@/lib/log";
 
 /**
  * Strategy Analysis Pipeline
@@ -142,7 +143,7 @@ export async function analyzeCompanyStrategy(
 ): Promise<StrategyAnalysisResult | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
-    console.error("GEMINI_API_KEY not configured");
+    log.error("GEMINI_API_KEY not configured");
     return null;
   }
 
@@ -264,7 +265,7 @@ export async function analyzeCompanyStrategy(
       overallAssessment: parseAssessment(parsed.overall_assessment),
     };
   } catch (error) {
-    console.error("Strategy analysis error:", error);
+    log.error({ err: error }, "Strategy analysis error:");
     return null;
   }
 }

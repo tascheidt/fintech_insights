@@ -1,23 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies } from "@/lib/jobs";
-import { requireCronAuth } from "@/lib/cron/auth";
+import { requireCronSecret } from "@/lib/auth/guards";
 import { checkAndAlertScraperHealth } from "@/lib/email/scraper-health";
 import { STALE_JOB_THRESHOLD_MS } from "@/lib/jobs/constants";
+import { log } from "@/lib/log";
 
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
   // Validate cron authentication
-  const authError = requireCronAuth(req);
-  if (authError) {
-    return authError;
-  }
+  const denied = requireCronSecret(req);
+  if (denied) return denied;
 
-  console.log("Cron job started: collect", {
-    timestamp: new Date().toISOString(),
-    path: req.nextUrl.pathname,
-  });
+  log.info({ path: req.nextUrl.pathname }, "Cron job started: collect");
 
   try {
     const supabase = createAdminClient();
@@ -49,7 +45,7 @@ export async function GET(req: NextRequest) {
             .eq("id", runId).eq("status", "running");
         }
       }
-      console.log(`Cleaned up ${staleTasks.length} stale task(s) before collection run`);
+      log.info({ staleTaskCount: staleTasks.length }, "Cleaned up stale tasks before collection run");
     }
 
     // Get all active companies
@@ -59,7 +55,7 @@ export async function GET(req: NextRequest) {
       .eq("is_active", true);
 
     if (companiesError) {
-      console.error("Failed to fetch companies:", companiesError.message);
+      log.error({ err: companiesError.message }, "Failed to fetch companies");
       return NextResponse.json(
         { success: false, error: companiesError.message },
         { status: 500 }
@@ -70,7 +66,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, message: "No active companies to process" });
     }
 
-    console.log(`Processing ${companies.length} companies:`, companies.map(c => `${c.name} (${c.ats_type})`));
+    log.info(
+      { count: companies.length, companies: companies.map((c) => `${c.name} (${c.ats_type})`) },
+      "Processing companies"
+    );
 
     // Phase 1: Collection
     // Resume a recent in-flight collect run (started within STALE_JOB_THRESHOLD_MS) to avoid
@@ -94,20 +93,19 @@ export async function GET(req: NextRequest) {
         companyIds: companies.map((c) => c.id),
       }));
 
-    console.log(
-      existingRun?.id
-        ? `Resuming collect job run: ${jobRunId}`
-        : `Created job run: ${jobRunId}`
+    log.info(
+      { jobRunId, resumed: Boolean(existingRun?.id) },
+      existingRun?.id ? "Resuming collect job run" : "Created job run"
     );
 
     const result = await executeCollectionJob(jobRunId);
 
-    console.log("Collection completed:", result.stats);
+    log.info({ stats: result.stats }, "Collection completed");
 
     // Check scraper health and alert admins if any companies have issues.
     // Runs for both completed and failed runs so failed tasks are also caught.
     checkAndAlertScraperHealth(jobRunId).catch((err) =>
-      console.error("Scraper health check error:", err)
+      log.error({ err }, "Scraper health check error")
     );
 
     // Only trigger analysis/news once all collection tasks are terminal.
@@ -122,12 +120,10 @@ export async function GET(req: NextRequest) {
           skipIfCached: true,
         });
       } catch (err) {
-        console.error("News cache refresh error:", err);
+        log.error({ err }, "News cache refresh error");
       }
     } else {
-      console.log(
-        `Collection job ${jobRunId} still in progress; skipping analysis/news until completion`
-      );
+      log.info({ jobRunId }, "Collection job still in progress; skipping analysis/news until completion");
     }
 
     // Phase 4: Tech stack refresh — fire off in a separate serverless invocation
@@ -141,7 +137,7 @@ export async function GET(req: NextRequest) {
         Authorization: `Bearer ${process.env.CRON_SECRET}`,
       },
       body: JSON.stringify({ jobRunId }),
-    }).catch((err) => console.error("Failed to trigger tech stack refresh:", err));
+    }).catch((err) => log.error({ err }, "Failed to trigger tech stack refresh"));
 
     return NextResponse.json({
       success: true,
@@ -150,7 +146,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("Cron collect failed:", errorMessage);
+    log.error({ err: errorMessage }, "Cron collect failed");
 
     return NextResponse.json(
       { success: false, error: errorMessage },

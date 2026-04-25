@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { requireUser } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
+
+const paramsSchema = z.object({ id: z.string().uuid() });
 
 /**
  * GET /api/digests/[id]
@@ -9,13 +13,15 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const paramsParsed = paramsSchema.safeParse(await params);
+  if (!paramsParsed.success) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
+  const { id } = paramsParsed.data;
+
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
   // Fetch digest
   const { data: digest, error: digestError } = await supabase
@@ -39,7 +45,7 @@ export async function GET(
     .order("new_job_count", { ascending: false });
 
   if (companiesError) {
-    console.error("Error fetching digest companies:", companiesError);
+    log.error({ err: companiesError }, "Error fetching digest companies");
     return NextResponse.json({ error: companiesError.message }, { status: 500 });
   }
 

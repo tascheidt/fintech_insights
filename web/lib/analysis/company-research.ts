@@ -13,6 +13,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { scoreRankedSource } from "./source-scoring";
+import { log } from "@/lib/log";
 
 // ============================================================================
 // Types
@@ -167,7 +168,7 @@ export async function detectCompanyType(
 ): Promise<CompanyType> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
-    console.warn("GEMINI_API_KEY not configured, assuming private company");
+    log.warn("GEMINI_API_KEY not configured, assuming private company");
     return { isPublic: false, confidence: "low" };
   }
 
@@ -213,11 +214,11 @@ Only say high confidence if you are certain. Most fintech startups are private.`
 
     // Handle empty response
     if (!text || text.length === 0) {
-      console.warn(`Empty response from Gemini for company type detection: ${companyName}`);
+      log.warn(`Empty response from Gemini for company type detection: ${companyName}`);
       
       // Retry logic: attempt up to 2 retries for empty responses
       if (retryCount < 2) {
-        console.log(`Retrying company type detection for "${companyName}" due to empty response (attempt ${retryCount + 2}/3)`);
+        log.info(`Retrying company type detection for "${companyName}" due to empty response (attempt ${retryCount + 2}/3)`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
         return detectCompanyType(companyName, retryCount + 1);
       }
@@ -233,7 +234,7 @@ Only say high confidence if you are certain. Most fintech startups are private.`
     } catch (parseError) {
       // Log the actual response for debugging (first 200 chars)
       const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
-      console.warn(`JSON parse failed for company type detection "${companyName}". Response preview: ${responsePreview}`);
+      log.warn(`JSON parse failed for company type detection "${companyName}". Response preview: ${responsePreview}`);
       
       // Try to extract JSON from text that might have markdown code blocks or extra text
       // First, try to find JSON in markdown code blocks
@@ -241,7 +242,7 @@ Only say high confidence if you are certain. Most fintech startups are private.`
       if (codeBlockMatch) {
         try {
           parsed = JSON.parse(codeBlockMatch[1]) as Record<string, unknown>;
-          console.log(`Successfully extracted JSON from markdown code block for company type "${companyName}"`);
+          log.info(`Successfully extracted JSON from markdown code block for company type "${companyName}"`);
         } catch {
           // Fall through to next attempt
         }
@@ -256,17 +257,17 @@ Only say high confidence if you are certain. Most fintech startups are private.`
             let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
             
             parsed = JSON.parse(jsonText) as Record<string, unknown>;
-            console.log(`Successfully parsed JSON after fixing trailing commas for company type "${companyName}"`);
+            log.info(`Successfully parsed JSON after fixing trailing commas for company type "${companyName}"`);
           } catch (fixError) {
-            console.error(`Failed to parse JSON for company type "${companyName}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
+            log.error(`Failed to parse JSON for company type "${companyName}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
             // Log the problematic JSON snippet for debugging
             if (jsonMatch[0].length < 500) {
-              console.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
+              log.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
             }
             
             // Retry logic: attempt up to 2 retries for malformed JSON
             if (retryCount < 2) {
-              console.log(`Retrying company type detection for "${companyName}" due to JSON parsing failure (attempt ${retryCount + 2}/3)`);
+              log.info(`Retrying company type detection for "${companyName}" due to JSON parsing failure (attempt ${retryCount + 2}/3)`);
               await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
               return detectCompanyType(companyName, retryCount + 1);
             }
@@ -274,15 +275,15 @@ Only say high confidence if you are certain. Most fintech startups are private.`
             return { isPublic: false, confidence: "low" };
           }
         } else {
-          console.error(`No JSON found in response for company type "${companyName}". Response length: ${text.length}, Preview: ${responsePreview}`);
+          log.error(`No JSON found in response for company type "${companyName}". Response length: ${text.length}, Preview: ${responsePreview}`);
           // Log full response if it's short enough to be useful
           if (text.length < 500) {
-            console.error(`Full response: ${text}`);
+            log.error(`Full response: ${text}`);
           }
           
           // Retry logic: attempt up to 2 retries for empty/malformed responses
           if (retryCount < 2) {
-            console.log(`Retrying company type detection for "${companyName}" due to no JSON found (attempt ${retryCount + 2}/3)`);
+            log.info(`Retrying company type detection for "${companyName}" due to no JSON found (attempt ${retryCount + 2}/3)`);
             await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
             return detectCompanyType(companyName, retryCount + 1);
           }
@@ -316,7 +317,7 @@ Only say high confidence if you are certain. Most fintech startups are private.`
       confidence,
     };
   } catch (error) {
-    console.error("Error detecting company type:", error);
+    log.error({ err: error }, "Error detecting company type:");
     
     // Retry logic for API errors (rate limits, network issues, etc.)
     if (retryCount < 2 && error instanceof Error) {
@@ -329,7 +330,7 @@ Only say high confidence if you are certain. Most fintech startups are private.`
         errorMessage.includes('503') ||
         errorMessage.includes('429')
       ) {
-        console.log(`Retrying company type detection for "${companyName}" due to ${errorMessage} (attempt ${retryCount + 2}/3)`);
+        log.info(`Retrying company type detection for "${companyName}" due to ${errorMessage} (attempt ${retryCount + 2}/3)`);
         await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
         return detectCompanyType(companyName, retryCount + 1);
       }
@@ -359,7 +360,7 @@ export async function performDeepResearch(
   let searchCount = 0;
 
   if (!key) {
-    console.warn("GEMINI_API_KEY not configured, skipping deep research");
+    log.warn("GEMINI_API_KEY not configured, skipping deep research");
     return {
       sources: [],
       qualityScore: 1,
@@ -499,7 +500,7 @@ export async function performDeepResearch(
         (errorMessage.includes("recitation") || errorMessage.includes("blocked"));
 
       if (shouldRetryWithFallback) {
-        console.warn(`Search blocked for "${query}", retrying with fallback queries.`);
+        log.warn(`Search blocked for "${query}", retrying with fallback queries.`);
         for (const fallbackQuery of getFallbackQueries(query, sourceType)) {
           await performSearch(fallbackQuery, sourceType, false);
           if (searchCount >= maxSearches) {
@@ -509,7 +510,7 @@ export async function performDeepResearch(
         return;
       }
 
-      console.error(`Search error for "${query}":`, error);
+      log.error({ err: error }, `Search error for "${query}":`);
     }
   }
 
@@ -797,7 +798,7 @@ If there's not enough information to summarize a strategy, say "Insufficient pub
     }
     return null;
   } catch (error) {
-    console.error("Error extracting stated strategy:", error);
+    log.error({ err: error }, "Error extracting stated strategy:");
     return null;
   }
 }
@@ -869,7 +870,7 @@ ${sourceText}`;
 
     // Handle empty response
     if (!text || text.length === 0) {
-      console.warn(`Empty response from Gemini for financial context extraction: ${companyName}`);
+      log.warn(`Empty response from Gemini for financial context extraction: ${companyName}`);
       return null;
     }
 
@@ -881,7 +882,7 @@ ${sourceText}`;
     } catch (parseError) {
       // Log the actual response for debugging (first 200 chars)
       const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
-      console.warn(`JSON parse failed for financial context "${companyName}". Response preview: ${responsePreview}`);
+      log.warn(`JSON parse failed for financial context "${companyName}". Response preview: ${responsePreview}`);
       
       // Try to extract JSON from text that might have markdown code blocks or extra text
       // First, try to find JSON in markdown code blocks
@@ -889,7 +890,7 @@ ${sourceText}`;
       if (codeBlockMatch) {
         try {
           parsed = JSON.parse(codeBlockMatch[1]) as Record<string, unknown>;
-          console.log(`Successfully extracted JSON from markdown code block for financial context "${companyName}"`);
+          log.info(`Successfully extracted JSON from markdown code block for financial context "${companyName}"`);
         } catch {
           // Fall through to next attempt
         }
@@ -905,20 +906,20 @@ ${sourceText}`;
             jsonText = closeOpenJsonStructures(jsonText);
             
             parsed = JSON.parse(jsonText) as Record<string, unknown>;
-            console.log(`Successfully parsed JSON after fixing trailing commas for financial context "${companyName}"`);
+            log.info(`Successfully parsed JSON after fixing trailing commas for financial context "${companyName}"`);
           } catch (fixError) {
-            console.error(`Failed to parse JSON for financial context "${companyName}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
+            log.error(`Failed to parse JSON for financial context "${companyName}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
             // Log the problematic JSON snippet for debugging
             if (jsonMatch[0].length < 500) {
-              console.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
+              log.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
             }
             return null;
           }
         } else {
-          console.error(`No JSON found in response for financial context "${companyName}". Response length: ${text.length}, Preview: ${responsePreview}`);
+          log.error(`No JSON found in response for financial context "${companyName}". Response length: ${text.length}, Preview: ${responsePreview}`);
           // Log full response if it's short enough to be useful
           if (text.length < 500) {
-            console.error(`Full response: ${text}`);
+            log.error(`Full response: ${text}`);
           }
           return null;
         }
@@ -936,7 +937,7 @@ ${sourceText}`;
     }
     return null;
   } catch (error) {
-    console.error("Error extracting financial context:", error);
+    log.error({ err: error }, "Error extracting financial context:");
     return null;
   }
 }

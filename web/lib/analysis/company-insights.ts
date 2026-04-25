@@ -30,6 +30,7 @@ import {
   type VerifiedSource,
   type FinancialContext,
 } from "./company-research";
+import { log } from "@/lib/log";
 
 // ============================================================================
 // Types
@@ -165,7 +166,7 @@ export async function generateCompanyInsight(
       // If lock already exists, another process is generating an insight
       if (lockError) {
         if (isMissingInsightLockInfrastructure(lockError)) {
-          console.warn(
+          log.warn(
             "Insight lock infrastructure is unavailable; continuing without concurrency locks."
           );
         } else {
@@ -232,22 +233,22 @@ export async function generateCompanyInsight(
     }
 
     // Step 3: Build extended historical context (reuses context-builder.ts)
-    console.log(`Building historical context for ${companyName}...`);
+    log.info(`Building historical context for ${companyName}...`);
     const context = await buildExtendedHistoricalContext(companyId, periodDays);
 
     // Step 4: Detect company type (public vs private)
-    console.log(`Detecting company type for ${companyName}...`);
+    log.info(`Detecting company type for ${companyName}...`);
     const companyType = await detectCompanyType(companyName);
 
     // Step 5: Perform deep research
-    console.log(`Performing ${researchDepth} research for ${companyName}...`);
+    log.info(`Performing ${researchDepth} research for ${companyName}...`);
     const research = await performDeepResearch(companyName, {
       isPublic: companyType.isPublic,
       depth: researchDepth,
     });
 
     // Step 6: Generate insight via LLM
-    console.log(`Generating strategic insight for ${companyName}...`);
+    log.info(`Generating strategic insight for ${companyName}...`);
     const generatedInsight = await generateInsightWithLLM(
       companyName,
       context,
@@ -317,11 +318,11 @@ export async function generateCompanyInsight(
       .single();
 
     if (error) {
-      console.error("Error storing company insight:", error);
+      log.error({ err: error }, "Error storing company insight:");
       throw new Error(`Failed to store insight: ${error.message}`);
     }
 
-    console.log(`Company insight generated successfully in ${Date.now() - startTime}ms`);
+    log.info(`Company insight generated successfully in ${Date.now() - startTime}ms`);
 
     // Release lock on successful completion
     if (lockAcquired) {
@@ -586,7 +587,7 @@ async function generateInsightWithLLM(
 
     // Handle empty response
     if (!text || text.length === 0) {
-      console.warn(`Empty response from Gemini for company insight generation: ${companyName}`);
+      log.warn(`Empty response from Gemini for company insight generation: ${companyName}`);
       throw new Error("Empty response from LLM");
     }
 
@@ -598,7 +599,7 @@ async function generateInsightWithLLM(
     } catch (parseError) {
       // Log the actual response for debugging (first 200 chars)
       const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
-      console.warn(`JSON parse failed for company insight "${companyName}". Response preview: ${responsePreview}`);
+      log.warn(`JSON parse failed for company insight "${companyName}". Response preview: ${responsePreview}`);
       
       // Try to extract JSON from text that might have markdown code blocks or extra text
       // First, try to find JSON in markdown code blocks
@@ -606,7 +607,7 @@ async function generateInsightWithLLM(
       if (codeBlockMatch) {
         try {
           parsed = JSON.parse(codeBlockMatch[1]) as Record<string, unknown>;
-          console.log(`Successfully extracted JSON from markdown code block for company insight "${companyName}"`);
+          log.info(`Successfully extracted JSON from markdown code block for company insight "${companyName}"`);
         } catch {
           // Fall through to next attempt
         }
@@ -621,24 +622,24 @@ async function generateInsightWithLLM(
             let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
             
             parsed = JSON.parse(jsonText) as Record<string, unknown>;
-            console.log(`Successfully parsed JSON after fixing trailing commas for company insight "${companyName}"`);
+            log.info(`Successfully parsed JSON after fixing trailing commas for company insight "${companyName}"`);
           } catch (fixError) {
-            console.error(`Failed to parse JSON for company insight "${companyName}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
+            log.error(`Failed to parse JSON for company insight "${companyName}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
             // Log the problematic JSON snippet for debugging
             if (jsonMatch[0].length < 500) {
-              console.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
+              log.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
             }
             // Log full response if it's short enough to be useful
             if (text.length < 1000) {
-              console.error(`Full response: ${text}`);
+              log.error(`Full response: ${text}`);
             }
             throw new Error(`Failed to parse JSON response: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
           }
         } else {
-          console.error(`No JSON found in response for company insight "${companyName}". Response length: ${text.length}, Preview: ${responsePreview}`);
+          log.error(`No JSON found in response for company insight "${companyName}". Response length: ${text.length}, Preview: ${responsePreview}`);
           // Log full response if it's short enough to be useful
           if (text.length < 1000) {
-            console.error(`Full response: ${text}`);
+            log.error(`Full response: ${text}`);
           }
           throw new Error("No JSON found in LLM response");
         }
@@ -670,15 +671,12 @@ async function generateInsightWithLLM(
       executive_summary: out.executiveSummary,
     });
     if (!voice.passed) {
-      console.warn(
-        `[voice] company insight warnings for ${companyName}:`,
-        voice.warnings.join("; ")
-      );
+      log.warn({ err: voice.warnings.join("; ") }, `[voice] company insight warnings for ${companyName}:`);
     }
 
     return out;
   } catch (error) {
-    console.error("LLM generation error:", error);
+    log.error({ err: error }, "LLM generation error:");
     throw new Error(`Failed to generate insight with LLM: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

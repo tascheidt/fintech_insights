@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireAdminApi } from "@/lib/auth/admin";
+
+const querySchema = z.object({
+  job_type: z.string().optional(),
+  operation: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(20),
+});
+
+const deleteSchema = z.object({
+  jobRunId: z.string().uuid(),
+});
 
 // GET /api/admin/job-runs - Fetch recent job execution logs
 export async function GET(req: NextRequest) {
@@ -7,10 +18,18 @@ export async function GET(req: NextRequest) {
   if ("error" in auth) return auth.error;
   const { supabase } = auth;
 
-  const searchParams = req.nextUrl.searchParams;
-  const jobType = searchParams.get("job_type");
-  const operation = searchParams.get("operation");
-  const limit = parseInt(searchParams.get("limit") ?? "20", 10);
+  const queryParsed = querySchema.safeParse({
+    job_type: req.nextUrl.searchParams.get("job_type") ?? undefined,
+    operation: req.nextUrl.searchParams.get("operation") ?? undefined,
+    limit: req.nextUrl.searchParams.get("limit") ?? undefined,
+  });
+  if (!queryParsed.success) {
+    return NextResponse.json(
+      { error: "Invalid query", issues: queryParsed.error.issues },
+      { status: 400 }
+    );
+  }
+  const { job_type: jobType, operation, limit } = queryParsed.data;
 
   let query = supabase
     .from("job_runs")
@@ -69,15 +88,24 @@ export async function DELETE(req: NextRequest) {
   if ("error" in auth) return auth.error;
   const { supabase } = auth;
 
-  const body = await req.json().catch(() => ({})) as { jobRunId?: string };
-  if (!body.jobRunId) {
-    return NextResponse.json({ error: "jobRunId is required" }, { status: 400 });
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const parsed = deleteSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid body", issues: parsed.error.issues },
+      { status: 400 }
+    );
   }
 
   const { error } = await supabase
     .from("job_runs")
     .delete()
-    .eq("id", body.jobRunId);
+    .eq("id", parsed.data.jobRunId);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

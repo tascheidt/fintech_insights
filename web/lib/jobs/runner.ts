@@ -14,6 +14,7 @@ import type {
   JobRunResult,
   TaskStage,
 } from "./types";
+import { log } from "@/lib/log";
 
 /**
  * Create a new job run with tasks for specified companies
@@ -135,7 +136,7 @@ export async function executeCollectionJob(jobRunId: string): Promise<JobRunResu
     if (!tasks || tasks.length === 0) {
       // No resumable tasks — either all completed/running (GH Actions) or nothing to do.
       // Determine final status from existing task states.
-      console.log(`No resumable tasks for job run ${jobRunId}, checking task states...`);
+      log.info(`No resumable tasks for job run ${jobRunId}, checking task states...`);
     } else {
       // Process resumable tasks
       for (const task of tasks) {
@@ -143,7 +144,7 @@ export async function executeCollectionJob(jobRunId: string): Promise<JobRunResu
           await processCollectionTask(task.id);
           completedCount++;
         } catch (error) {
-          console.error(`Task ${task.id} failed:`, error);
+          log.error({ err: error }, `Task ${task.id} failed:`);
           failedCount++;
         }
         await updateJobRunStats(jobRunId);
@@ -163,7 +164,7 @@ export async function executeCollectionJob(jobRunId: string): Promise<JobRunResu
     finalStatus = hasPending ? 'running' : hasFailed ? 'failed' : 'completed';
   } catch (error) {
     // Ensure we always set a terminal status — never leave a job stuck in "running"
-    console.error(`executeCollectionJob error for ${jobRunId}:`, error);
+    log.error({ err: error }, `executeCollectionJob error for ${jobRunId}:`);
     finalStatus = 'failed';
 
     await supabase
@@ -290,7 +291,7 @@ export async function executeAnalysisJob(jobRunId: string): Promise<JobRunResult
       await processAnalysisTask(task.id);
       completedCount++;
     } catch (error) {
-      console.error(`Task ${task.id} failed:`, error);
+      log.error({ err: error }, `Task ${task.id} failed:`);
       failedCount++;
     }
 
@@ -384,7 +385,7 @@ export async function triggerAnalysisJobIfNeeded(
   }
 
   // Execute analysis job asynchronously
-  executeAnalysisJob(analysisJobRunId).catch(console.error);
+  executeAnalysisJob(analysisJobRunId).catch(log.error);
 
   return analysisJobRunId;
 }
@@ -418,7 +419,7 @@ export async function refreshNewsCacheForActiveCompanies(
     .gt('new_jobs', 0);
 
   if (!tasks || tasks.length === 0) {
-    console.log('No companies with new jobs, skipping news cache refresh');
+    log.info('No companies with new jobs, skipping news cache refresh');
     return { refreshed: 0, skipped: 0, failed: 0 };
   }
 
@@ -451,11 +452,11 @@ export async function refreshNewsCacheForActiveCompanies(
   }
 
   if (companiesToRefresh.length === 0) {
-    console.log(`All ${companies.length} companies have valid cache, skipping refresh`);
+    log.info(`All ${companies.length} companies have valid cache, skipping refresh`);
     return { refreshed: 0, skipped: skippedCount, failed: 0 };
   }
 
-  console.log(`Refreshing news cache for ${companiesToRefresh.length} companies (${skippedCount} already cached)...`);
+  log.info(`Refreshing news cache for ${companiesToRefresh.length} companies (${skippedCount} already cached)...`);
 
   let refreshedCount = 0;
   let failedCount = 0;
@@ -466,7 +467,7 @@ export async function refreshNewsCacheForActiveCompanies(
     
     const results = await Promise.allSettled(
       batch.map(async (company) => {
-        console.log(`Fetching news for ${company.name}...`);
+        log.info(`Fetching news for ${company.name}...`);
         await fetchCompanyNewsContext(company.name, company.id, { forceRefresh: true });
         return company.name;
       })
@@ -476,13 +477,13 @@ export async function refreshNewsCacheForActiveCompanies(
       if (result.status === 'fulfilled') {
         refreshedCount++;
       } else {
-        console.error('News cache refresh failed:', result.reason);
+        log.error({ err: result.reason }, 'News cache refresh failed:');
         failedCount++;
       }
     }
   }
 
-  console.log(`News cache refresh complete: ${refreshedCount} refreshed, ${skippedCount} skipped, ${failedCount} failed`);
+  log.info(`News cache refresh complete: ${refreshedCount} refreshed, ${skippedCount} skipped, ${failedCount} failed`);
   return { refreshed: refreshedCount, skipped: skippedCount, failed: failedCount };
 }
 
@@ -506,7 +507,7 @@ export async function refreshTechStacksForCompanies(
     .eq('job_run_id', collectionJobRunId);
 
   if (!tasks || tasks.length === 0) {
-    console.log('No companies in collection run, skipping tech stack refresh');
+    log.info('No companies in collection run, skipping tech stack refresh');
     return { refreshed: 0, skipped: 0, failed: 0 };
   }
 
@@ -535,11 +536,11 @@ export async function refreshTechStacksForCompanies(
   const skippedCount = companies.length - eligible.length;
 
   if (eligible.length === 0) {
-    console.log(`All ${companies.length} companies have fresh tech stacks, skipping refresh`);
+    log.info(`All ${companies.length} companies have fresh tech stacks, skipping refresh`);
     return { refreshed: 0, skipped: skippedCount, failed: 0 };
   }
 
-  console.log(`Refreshing tech stacks for ${eligible.length} companies (${skippedCount} recently generated)...`);
+  log.info(`Refreshing tech stacks for ${eligible.length} companies (${skippedCount} recently generated)...`);
 
   let refreshedCount = 0;
   let failedCount = 0;
@@ -549,11 +550,11 @@ export async function refreshTechStacksForCompanies(
 
     const results = await Promise.allSettled(
       batch.map(async (company) => {
-        console.log(`Aggregating tech stack for ${company.name}...`);
+        log.info(`Aggregating tech stack for ${company.name}...`);
         const rawData = await aggregateTechStackFromJobs(company.id);
 
         if (rawData.technologies.length === 0) {
-          console.log(`No tech data found for ${company.name}, skipping enrichment`);
+          log.info(`No tech data found for ${company.name}, skipping enrichment`);
           return;
         }
 
@@ -577,7 +578,7 @@ export async function refreshTechStacksForCompanies(
           })
           .eq('id', company.id);
 
-        console.log(`Tech stack refreshed for ${company.name}`);
+        log.info(`Tech stack refreshed for ${company.name}`);
       })
     );
 
@@ -585,13 +586,13 @@ export async function refreshTechStacksForCompanies(
       if (result.status === 'fulfilled') {
         refreshedCount++;
       } else {
-        console.error('Tech stack refresh failed:', result.reason);
+        log.error({ err: result.reason }, 'Tech stack refresh failed:');
         failedCount++;
       }
     }
   }
 
-  console.log(`Tech stack refresh complete: ${refreshedCount} refreshed, ${skippedCount} skipped, ${failedCount} failed`);
+  log.info(`Tech stack refresh complete: ${refreshedCount} refreshed, ${skippedCount} skipped, ${failedCount} failed`);
   return { refreshed: refreshedCount, skipped: skippedCount, failed: failedCount };
 }
 
@@ -617,11 +618,11 @@ export async function backfillTechStacksForAllCompanies(): Promise<{ refreshed: 
   const skippedCount = companies.length - eligible.length;
 
   if (eligible.length === 0) {
-    console.log('All companies already have tech stacks, skipping backfill');
+    log.info('All companies already have tech stacks, skipping backfill');
     return { refreshed: 0, skipped: skippedCount, failed: 0 };
   }
 
-  console.log(`Backfilling tech stacks for ${eligible.length} companies...`);
+  log.info(`Backfilling tech stacks for ${eligible.length} companies...`);
 
   let refreshedCount = 0;
   let failedCount = 0;
@@ -631,11 +632,11 @@ export async function backfillTechStacksForAllCompanies(): Promise<{ refreshed: 
 
     const results = await Promise.allSettled(
       batch.map(async (company) => {
-        console.log(`Aggregating tech stack for ${company.name}...`);
+        log.info(`Aggregating tech stack for ${company.name}...`);
         const rawData = await aggregateTechStackFromJobs(company.id);
 
         if (rawData.technologies.length === 0) {
-          console.log(`No tech data found for ${company.name}, skipping enrichment`);
+          log.info(`No tech data found for ${company.name}, skipping enrichment`);
           return;
         }
 
@@ -659,7 +660,7 @@ export async function backfillTechStacksForAllCompanies(): Promise<{ refreshed: 
           })
           .eq('id', company.id);
 
-        console.log(`Tech stack backfilled for ${company.name}`);
+        log.info(`Tech stack backfilled for ${company.name}`);
       })
     );
 
@@ -667,13 +668,13 @@ export async function backfillTechStacksForAllCompanies(): Promise<{ refreshed: 
       if (result.status === 'fulfilled') {
         refreshedCount++;
       } else {
-        console.error('Tech stack backfill failed:', result.reason);
+        log.error({ err: result.reason }, 'Tech stack backfill failed:');
         failedCount++;
       }
     }
   }
 
-  console.log(`Tech stack backfill complete: ${refreshedCount} refreshed, ${skippedCount} skipped, ${failedCount} failed`);
+  log.info(`Tech stack backfill complete: ${refreshedCount} refreshed, ${skippedCount} skipped, ${failedCount} failed`);
   return { refreshed: refreshedCount, skipped: skippedCount, failed: failedCount };
 }
 

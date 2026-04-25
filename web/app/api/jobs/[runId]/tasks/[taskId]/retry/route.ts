@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { requireUser } from "@/lib/auth/guards";
 import { retryTask } from "@/lib/jobs";
+import { log } from "@/lib/log";
+
+const paramsSchema = z.object({
+  runId: z.string().uuid(),
+  taskId: z.string().uuid(),
+});
+
+const bodySchema = z.object({
+  fromStage: z.enum(["scrape", "ingest", "analyze", "done"]).optional(),
+});
 
 /**
  * POST /api/jobs/[runId]/tasks/[taskId]/retry
@@ -11,16 +22,15 @@ export async function POST(
   { params }: { params: Promise<{ runId: string; taskId: string }> }
 ) {
   try {
-    const { taskId } = await params;
-    const supabase = await createClient();
-
-    // Verify user is authenticated and has permission
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const paramsParsed = paramsSchema.safeParse(await params);
+    if (!paramsParsed.success) {
+      return NextResponse.json({ error: "Invalid params" }, { status: 400 });
     }
+    const { taskId } = paramsParsed.data;
+
+    const auth = await requireUser();
+    if (auth instanceof NextResponse) return auth;
+    const { user, supabase } = auth;
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -32,15 +42,28 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { fromStage } = body;
+    let raw: unknown;
+    try {
+      raw = await req.json();
+    } catch {
+      raw = {};
+    }
+    const bodyParsed = bodySchema.safeParse(raw);
+    if (!bodyParsed.success) {
+      return NextResponse.json(
+        { error: "Invalid body", issues: bodyParsed.error.issues },
+        { status: 400 }
+      );
+    }
 
     // Retry task (fire and forget)
-    retryTask(taskId, fromStage).catch(console.error);
+    retryTask(taskId, bodyParsed.data.fromStage).catch((err) =>
+      log.error({ err }, "retryTask failed")
+    );
 
     return NextResponse.json({ success: true, message: "Task retry initiated" });
   } catch (error) {
-    console.error("Retry task error:", error);
+    log.error({ err: error }, "Retry task error");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

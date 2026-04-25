@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded } from "@/lib/jobs";
+import { requireUser } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 
 export const maxDuration = 120;
+
+const paramsSchema = z.object({ id: z.string().uuid() });
 
 /**
  * POST /api/companies/[id]/process
@@ -14,17 +18,16 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-    const adminSupabase = createAdminClient();
-
-    // Verify user is authenticated and has permission
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const paramsParsed = paramsSchema.safeParse(await params);
+    if (!paramsParsed.success) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
+    const { id } = paramsParsed.data;
+
+    const auth = await requireUser();
+    if (auth instanceof NextResponse) return auth;
+    const { user, supabase } = auth;
+    const adminSupabase = createAdminClient();
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -85,8 +88,8 @@ export async function POST(
         await executeCollectionJob(jobRunId);
         await triggerAnalysisJobIfNeeded(jobRunId); // Auto-trigger Phase 2
       } catch (error) {
-        console.error(`Background processing error for job ${jobRunId}:`, error);
-        
+        log.error({ err: error, jobRunId }, "Background processing error");
+
         // Mark job run as failed
         const errorMessage = error instanceof Error ? error.message : String(error);
         await adminSupabase
@@ -113,7 +116,7 @@ export async function POST(
 
     return NextResponse.json({ jobRunId, status: 'started' });
   } catch (error) {
-    console.error("Process company error:", error);
+    log.error({ err: error }, "Process company error");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

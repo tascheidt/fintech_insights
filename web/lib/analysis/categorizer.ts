@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { log } from "@/lib/log";
 
 /**
  * Job Categorizer for Template Library
@@ -183,7 +184,7 @@ export async function categorizePosting(
 ): Promise<JobCategoryResult | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
-    console.error("GEMINI_API_KEY not configured");
+    log.error("GEMINI_API_KEY not configured");
     return null;
   }
 
@@ -225,7 +226,7 @@ export async function categorizePosting(
       quality_score: typeof parsed.quality_score === 'number' ? parsed.quality_score : 3
     };
   } catch (error) {
-    console.error(`Error categorizing posting '${jobTitle}':`, error);
+    log.error({ err: error }, `Error categorizing posting '${jobTitle}':`);
     return null;
   }
 }
