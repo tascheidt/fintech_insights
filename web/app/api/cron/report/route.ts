@@ -12,13 +12,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { format } from "date-fns";
+import * as Sentry from "@sentry/nextjs";
 import {
   generateCompanyInsight,
   getNextCompanyForInsight,
 } from "@/lib/analysis/company-insights";
 import { getWeeklyData, generateWeeklyReport, WeeklyDigest } from "@/lib/analysis/digest";
 import { isOptedInToWeeklyDigest } from "@/lib/email/digest-recipients";
-import { getResendError } from "@/lib/email/resend-result";
+import { retryResendCall } from "@/lib/email/resend-retry";
 import { WeeklyDigestEmail } from "@/lib/email/templates/weekly-digest";
 import { getLatestVersion } from "@/lib/releases";
 import { requireCronSecret } from "@/lib/auth/guards";
@@ -194,6 +195,17 @@ export async function GET(req: NextRequest) {
   const denied = requireCronSecret(req);
   if (denied) return denied;
 
+  // Sentry.withMonitor wraps the cron run in a check-in so the dashboard
+  // shows a missed-run if the route stops firing on schedule. The monitor
+  // slug doubles as the cron identifier for alerting rules.
+  return Sentry.withMonitor(
+    "cron-report",
+    () => runReport(req),
+    { schedule: { type: "crontab", value: "0 8 * * 1" } }
+  );
+}
+
+async function runReport(req: NextRequest) {
   log.info({ path: req.nextUrl.pathname }, "Cron job started: report");
 
   const supabase = createAdminClient();
@@ -283,29 +295,35 @@ export async function GET(req: NextRequest) {
         react: WeeklyDigestEmail({ digest, digestId: savedDigestId, appUrl, version: getLatestVersion() }),
       }));
 
-      try {
-        const sendResult = await resend.batch.send(batchEmails);
-        const batchErr = getResendError(sendResult);
-        if (batchErr) {
-          throw new Error(batchErr);
-        }
+      // Resend's batch.send is wrapped with `retryResendCall` (3 attempts,
+      // exponential backoff 1s/4s/16s). Each retry-and-failure logs a
+      // structured warn line; the final outcome lives in `job_runs.details.email_outcome`.
+      const sendOutcome = await retryResendCall(
+        () => resend.batch.send(batchEmails),
+        { label: "weekly_digest_batch", maxAttempts: 3, baseMs: 1000 }
+      );
 
+      if (sendOutcome.ok) {
         optedInUsers.forEach((user) => {
           deliveryTracking.push({ user_id: user.id, email: user.email, status: "sent" });
           successCount++;
         });
-        log.info({ successCount }, "Batch sent successfully");
-      } catch (sendError) {
-        const errorMessage =
-          sendError instanceof Error ? sendError.message : "Unknown error";
-        log.error({ err: errorMessage }, "Resend batch send failed");
-        lastResendError = errorMessage;
+        log.info(
+          { successCount, attempts: sendOutcome.attempts },
+          "Batch sent successfully"
+        );
+      } else {
+        log.error(
+          { err: sendOutcome.error, attempts: sendOutcome.attempts },
+          "Resend batch send failed after retries"
+        );
+        lastResendError = sendOutcome.error;
         optedInUsers.forEach((user) => {
           deliveryTracking.push({
             user_id: user.id,
             email: user.email,
             status: "failed",
-            error_message: errorMessage,
+            error_message: sendOutcome.error,
           });
           failureCount++;
         });
@@ -356,6 +374,65 @@ export async function GET(req: NextRequest) {
       companyInsightResult = { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 
+    // Per-recipient outcome — stored on `job_runs.details.email_outcome` so
+    // postmortems can answer "did THIS user get the digest?" without paging
+    // through `weekly_digest_deliveries`.
+    const emailOutcome = {
+      total: optedInUsers.length,
+      sent: successCount,
+      failed: failureCount,
+      skipReason: emailSkipReason,
+      lastError: lastResendError,
+      perRecipient: deliveryTracking.map((d) => ({
+        userId: d.user_id,
+        email: d.email,
+        status: d.status,
+        ...(d.error_message ? { error: d.error_message } : {}),
+      })),
+    };
+
+    // If we attempted to send (had recipients + a key) but every send failed,
+    // mark the run as failed and re-throw so Sentry's automatic error capture
+    // picks it up. Partial success is still "completed" — the per-recipient
+    // detail above tells the operator which addresses to retry.
+    const allFailed =
+      resendKey && optedInUsers.length > 0 && successCount === 0 && failureCount > 0;
+
+    if (allFailed) {
+      if (jobRunId) {
+        await supabase
+          .from("job_runs")
+          .update({
+            status: "failed",
+            completed_at: new Date().toISOString(),
+            error_message: `Resend delivery failed for all ${failureCount} recipients: ${lastResendError ?? "unknown"}`,
+            total_companies: digest.total_companies,
+            total_insights: digest.total_companies,
+            details: {
+              totalJobs: digest.total_jobs,
+              totalCompanies: digest.total_companies,
+              digestId: savedDigestId,
+              companySummaries: digest.companies.map(c => ({
+                name: c.company_name,
+                jobCount: c.new_job_count,
+                headline: c.ai_commentary.headline,
+              })),
+              emailSent,
+              recipients: 0,
+              failures: failureCount,
+              emailSkipReason,
+              resendError: lastResendError,
+              companyInsight: companyInsightResult,
+              email_outcome: emailOutcome,
+            },
+          })
+          .eq("id", jobRunId);
+      }
+      throw new Error(
+        `Weekly digest delivery failed: 0/${optedInUsers.length} recipients (${lastResendError ?? "unknown"})`
+      );
+    }
+
     // Update job_runs with success (unified job tracking)
     if (jobRunId) {
       await supabase
@@ -365,7 +442,7 @@ export async function GET(req: NextRequest) {
           completed_at: new Date().toISOString(),
           total_companies: digest.total_companies,
           total_insights: digest.total_companies,
-          details: { 
+          details: {
             totalJobs: digest.total_jobs,
             totalCompanies: digest.total_companies,
             digestId: savedDigestId,
@@ -380,12 +457,13 @@ export async function GET(req: NextRequest) {
             emailSkipReason,
             resendError: lastResendError,
             companyInsight: companyInsightResult,
+            email_outcome: emailOutcome,
           },
         })
         .eq("id", jobRunId);
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true, 
       sent: emailSent,
       emailsSent: successCount,

@@ -1,5 +1,5 @@
 import type { ResolvedFeedbackConfig } from "../types";
-import { getResendError } from "./resend-result";
+import { retryResendCall } from "./resend-retry";
 import { FeedbackNotificationEmail } from "./email-template";
 
 interface FeedbackNotification {
@@ -64,13 +64,23 @@ export async function notifyAdminsOfNewFeedback(
       }),
     }));
 
-    const result = await resend.batch.send(emails);
-    const err = getResendError(result);
-    if (err) {
-      console.error("Resend batch error (admin notification):", err);
+    // Resend batch send is wrapped with retryResendCall (3 attempts,
+    // exponential backoff). Notification is non-fatal: even after retries
+    // fail we just log and return, matching the original semantics.
+    const outcome = await retryResendCall(
+      () => resend.batch.send(emails),
+      { label: "feedback_admin_notification", maxAttempts: 3, baseMs: 1000 }
+    );
+    if (!outcome.ok) {
+      console.error(
+        "Resend batch error (admin notification, after retries):",
+        outcome.error
+      );
       return;
     }
-    console.log(`Admin notification sent to ${adminEmails.length} admin(s)`);
+    console.log(
+      `Admin notification sent to ${adminEmails.length} admin(s) on attempt ${outcome.attempts}`
+    );
   } catch (err) {
     console.error("Failed to send admin feedback notification:", err);
   }

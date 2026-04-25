@@ -1,19 +1,20 @@
 # Cron Topology
 
-Three scheduled jobs run in production. Two live on Vercel (Hobby plan caps at 2),
-one runs from GitHub Actions and calls back into the deployed app over HTTPS.
+Four scheduled jobs run in production. Two live on Vercel (Hobby plan caps at 2),
+two run from GitHub Actions and call back into the deployed app over HTTPS.
 
 ## Jobs
 
-| Job               | Venue          | Schedule (UTC) | Endpoint                          | Auth                                  |
-|-------------------|----------------|----------------|-----------------------------------|---------------------------------------|
-| collect           | Vercel cron    | `0 6 * * *`    | `GET /api/cron/collect`           | Vercel-injected `Bearer CRON_SECRET`  |
-| report            | Vercel cron    | `0 8 * * 1`    | `GET /api/cron/report`            | Vercel-injected `Bearer CRON_SECRET`  |
-| company-insights  | GitHub Actions | `0 9 * * 1`    | `GET /api/cron/company-insights`  | Workflow sends `Bearer CRON_SECRET`   |
+| Job                | Venue          | Schedule (UTC) | Endpoint                          | Auth                                  |
+|--------------------|----------------|----------------|-----------------------------------|---------------------------------------|
+| collect            | Vercel cron    | `0 6 * * *`    | `GET /api/cron/collect`           | Vercel-injected `Bearer CRON_SECRET`  |
+| report             | Vercel cron    | `0 8 * * 1`    | `GET /api/cron/report`            | Vercel-injected `Bearer CRON_SECRET`  |
+| company-insights   | GitHub Actions | `0 9 * * 1`    | `GET /api/cron/company-insights`  | Workflow sends `Bearer CRON_SECRET`   |
+| gemini-cost-alarm  | GitHub Actions | `0 14 * * *`   | `GET /api/admin/cost-alarm`       | Workflow sends `Bearer CRON_SECRET`   |
 
 Source of truth:
 - Vercel: [`web/vercel.json`](../web/vercel.json) `crons` array.
-- GitHub Actions: [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml).
+- GitHub Actions: [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml), [`.github/workflows/gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml).
 
 The `report` job also generates one company insight per run as a side effect,
 so the GH Actions trigger is incremental — it just keeps the rolling backlog
@@ -41,6 +42,16 @@ Rotate both at once. There is no fallback.
 3. Either way: the route must call `requireCronAuth(req)` first and write a
    `job_runs` row (`job_type` from the approved enum, see `CLAUDE.md`).
 4. Update this file.
+
+## Sentry alerts
+
+Every cron route is wrapped in `Sentry.withMonitor(...)` (slug + `crontab`
+schedule pair). Sentry alerts when a scheduled run is missed or fails. Slug
+mapping lives in [`docs/OBSERVABILITY.md`](./OBSERVABILITY.md). The
+`gemini-cost-alarm` workflow does not use `withMonitor` — its job is to fire
+`Sentry.captureMessage(...)` with `tags: { alarm: "gemini-cost" }`, so a
+separate Sentry alert rule routes it on the alarm tag rather than monitor
+state.
 
 ## Out of scope
 

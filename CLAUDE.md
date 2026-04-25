@@ -53,11 +53,12 @@ Two AI calls per job. `analyzeJob` (in `web/lib/analysis/strategic.ts`) and `cat
 
 ## 4. Cron topology
 
-**Two Vercel crons + one GitHub Actions cron.** Hard cap: never more than two Vercel crons. The third scheduled job lives in GitHub Actions because it's long-running / browser-heavy.
+**Two Vercel crons (collect, report) + two GH Actions crons (company-insights, gemini-cost-alarm).** Hard cap: never more than two Vercel crons; everything else lives in GitHub Actions and `curl`s back into the deployed app with `Bearer ${CRON_SECRET}`.
 
 - Vercel daily 6 AM UTC: `/api/cron/collect` — collects jobs and triggers analysis.
 - Vercel weekly Mon 5 AM UTC: `/api/cron/report` — generates the weekly digest.
-- GitHub Actions: `company-insights` — scheduled company-insight regeneration.
+- GitHub Actions weekly Mon 9 AM UTC: `company-insights-cron.yml` — scheduled company-insight regeneration.
+- GitHub Actions daily 14:00 UTC: `gemini-cost-alarm.yml` — sums last 24h `gemini_usage_events.estimated_usd` and fires `Sentry.captureMessage` over threshold.
 
 Heavy browser scraping is offloaded to GitHub Actions on demand via `triggerScrapeWorkflow` in `web/lib/github.ts` (`scrape-heavy.yml`). Full topology, secrets, and decision tree in [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md).
 
@@ -105,6 +106,7 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 - **Auth:** import guards from `web/lib/auth/guards.ts`. Don't reinvent.
 - **Build before push:** `cd web && npm run build` is the contract. Vercel will fail the deploy on a TS error that local dev tolerates.
 - **Changelog discipline:** every user-facing change gets an entry in `web/data/releases.json`. Types: `feature` | `fix` | `improvement`. Bump `web/package.json` version per semver: patch (1.0.x) bug fixes, minor (1.x.0) features, major (x.0.0) breaking changes.
+- **Tests:** Vitest for unit (pure functions only), Playwright for one smoke (`e2e/smoke.spec.ts`); see `docs/AGENTS.md`#Tests.
 
 ## 8. Anti-patterns
 
@@ -130,7 +132,7 @@ The relevant docs include:
 - Root [`CLAUDE.md`](./CLAUDE.md) (this file)
 - [`docs/AGENTS.md`](./docs/AGENTS.md) — operator's manual
 - Per-area sub-CLAUDEs: [`web/lib/analysis/CLAUDE.md`](./web/lib/analysis/CLAUDE.md), [`web/lib/scrapers/CLAUDE.md`](./web/lib/scrapers/CLAUDE.md), [`web/lib/ai/CLAUDE.md`](./web/lib/ai/CLAUDE.md), [`web/lib/auth/CLAUDE.md`](./web/lib/auth/CLAUDE.md)
-- [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md), [`docs/AI_HYGIENE.md`](./docs/AI_HYGIENE.md), [`docs/INGESTION_PIPELINE.md`](./docs/INGESTION_PIPELINE.md)
+- [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md), [`docs/AI_HYGIENE.md`](./docs/AI_HYGIENE.md), [`docs/INGESTION_PIPELINE.md`](./docs/INGESTION_PIPELINE.md), [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md)
 - [`docs/voice.md`](./docs/voice.md), [`docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md`](./docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md)
 - [`web/data/releases.json`](./web/data/releases.json) — user-facing changelog
 - `web/.env.example` when env vars change

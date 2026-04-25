@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies } from "@/lib/jobs";
 import { requireCronSecret } from "@/lib/auth/guards";
@@ -13,6 +14,15 @@ export async function GET(req: NextRequest) {
   const denied = requireCronSecret(req);
   if (denied) return denied;
 
+  // Sentry monitor — alerts when the daily collect cron is missed.
+  return Sentry.withMonitor(
+    "cron-collect",
+    () => runCollect(req),
+    { schedule: { type: "crontab", value: "0 6 * * *" } }
+  );
+}
+
+async function runCollect(req: NextRequest) {
   log.info({ path: req.nextUrl.pathname }, "Cron job started: collect");
 
   try {

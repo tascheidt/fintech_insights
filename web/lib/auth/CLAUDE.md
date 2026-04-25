@@ -44,7 +44,7 @@ if (denied) return denied;
 | ------------------------- | ---------------------- | -------------------------------------------------------------- |
 | `/api/cron/**`            | `requireCronSecret`    | Vercel Cron sends the bearer token automatically.              |
 | `/api/internal/**`        | `requireCronSecret`    | Same secret; used by self-chaining fan-out routes.             |
-| `/api/admin/**`           | `requireAdmin`         | Requires `profiles.role === 'admin'`.                          |
+| `/api/admin/**`           | `requireAdmin`         | Requires `profiles.role === 'admin'`. Exception: `/api/admin/cost-alarm` is `requireCronSecret`-gated (called by GH Actions; no user session). |
 | `/api/feedback/route.ts`  | (handled in package)   | Any signed-in user; admin not required. Auth lives inside `@tascheidt/feedback`. |
 | Everything else           | `requireUser`          | Default: any signed-in user.                                   |
 

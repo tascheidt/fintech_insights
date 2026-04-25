@@ -33,6 +33,22 @@ const envSchema = z.object({
   GEMINI_TELEMETRY_DISABLED: z.string().optional(),
   LOG_CRON_AUTH: z.string().optional(),
 
+  // --- Sentry (server-side only — DSN deliberately not NEXT_PUBLIC_*) ---
+  // Required in production; optional in development. The runtime check below
+  // throws when production deploys ship without a DSN, so we cannot rely on a
+  // Zod `optional()` alone — see `loadEnv()`.
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
+
+  // --- Cost alarm threshold (USD) ---
+  // Daily Gemini spend over this triggers a Sentry message via the
+  // /api/admin/cost-alarm route invoked by the GH Actions workflow. Stored as
+  // a string because env vars are strings; parsed at the call site.
+  GEMINI_DAILY_USD_THRESHOLD: z.string().optional(),
+
+  // --- Vercel-injected ---
+  VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
+
   // --- Build/runtime mode (set automatically by Next.js) ---
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
@@ -48,6 +64,16 @@ function loadEnv(): Env {
       .join("\n");
     throw new Error(
       `Invalid or missing environment variables. Refusing to boot.\n${issues}\n\nSee web/.env.example for the full list of required + optional variables.`
+    );
+  }
+
+  // Production guard: SENTRY_DSN is required when VERCEL_ENV=production. We
+  // do not encode this with Zod's `optional()` because preview/dev deploys
+  // legitimately ship without one, but a missing DSN in production would let
+  // unhandled errors disappear silently — exactly what Sentry exists to prevent.
+  if (parsed.data.VERCEL_ENV === "production" && !parsed.data.SENTRY_DSN) {
+    throw new Error(
+      "SENTRY_DSN is required in production but is unset. Refusing to boot."
     );
   }
 

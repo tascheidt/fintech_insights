@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import * as Sentry from "@sentry/nextjs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   generateCompanyInsight,
@@ -37,9 +38,20 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Sentry monitor — runs from GH Actions per docs/CRON_TOPOLOGY.md.
+  return Sentry.withMonitor(
+    "cron-company-insights",
+    () => runCompanyInsights(req, queryParsed.data.companyId ?? null),
+    { schedule: { type: "crontab", value: "0 9 * * 1" } }
+  );
+}
+
+async function runCompanyInsights(
+  _req: NextRequest,
+  companyId: string | null
+) {
   const supabase = createAdminClient();
   const startTime = Date.now();
-  const companyId = queryParsed.data.companyId ?? null;
 
   // Create job_runs entry for tracking (unified job tracking system)
   const { data: jobRun } = await supabase
