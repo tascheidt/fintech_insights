@@ -1,7 +1,6 @@
-import { Resend } from "resend";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getResendError } from "@/lib/email/resend-result";
-import { FeedbackNotificationEmail } from "./templates/feedback-notification";
+import type { ResolvedFeedbackConfig } from "../types";
+import { getResendError } from "./resend-result";
+import { FeedbackNotificationEmail } from "./email-template";
 
 interface FeedbackNotification {
   title: string;
@@ -15,37 +14,42 @@ interface FeedbackNotification {
  * Send email notification to all admin users when new feedback is submitted.
  * Non-fatal — errors are logged but do not propagate.
  */
-export async function notifyAdminsOfNewFeedback(feedback: FeedbackNotification): Promise<void> {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    console.warn("RESEND_API_KEY not set, skipping admin notification");
+export async function notifyAdminsOfNewFeedback(
+  config: ResolvedFeedbackConfig,
+  feedback: FeedbackNotification
+): Promise<void> {
+  if (!config.email) {
+    console.warn("Email config not provided, skipping admin notification");
     return;
   }
 
+  const { resendApiKey, fromAddress, adminPanelPath } = config.email;
+
   try {
-    const supabase = createAdminClient();
+    // Dynamic import so resend is only loaded when email is configured
+    const { Resend } = await import("resend");
+    const supabase = config.createAdminClient();
 
     const { data: admins } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("role", "admin")
-      .not("email", "is", null);
+      .from(config.userTable)
+      .select(config.userEmailColumn)
+      .eq(config.userRoleColumn, config.adminRoleValue)
+      .not(config.userEmailColumn, "is", null);
 
     const adminEmails = (admins ?? [])
-      .map((a) => a.email)
-      .filter((e): e is string => Boolean(e));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((a) => (a as any)[config.userEmailColumn])
+      .filter((e): e is string => typeof e === "string" && e.length > 0);
 
     if (adminEmails.length === 0) {
       console.warn("No admin users found for feedback notification");
       return;
     }
 
-    const resend = new Resend(resendKey);
-    const from = process.env.RESEND_FROM || "onboarding@resend.dev";
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fintech-talent-brief.vercel.app";
+    const resend = new Resend(resendApiKey);
 
     const emails = adminEmails.map((email) => ({
-      from,
+      from: fromAddress,
       to: email,
       subject: `New feedback: ${feedback.title}`,
       react: FeedbackNotificationEmail({
@@ -54,7 +58,9 @@ export async function notifyAdminsOfNewFeedback(feedback: FeedbackNotification):
         feedbackDescription: feedback.description,
         submittedBy: feedback.submittedByEmail,
         pageUrl: feedback.pageUrl,
-        appUrl,
+        appName: config.appName,
+        appUrl: config.appUrl,
+        adminPanelPath,
       }),
     }));
 

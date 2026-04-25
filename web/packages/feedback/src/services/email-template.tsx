@@ -17,7 +17,9 @@ interface FeedbackNotificationEmailProps {
   feedbackDescription: string;
   submittedBy: string;
   pageUrl?: string;
-  appUrl?: string;
+  appName: string;
+  appUrl: string;
+  adminPanelPath?: string;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -33,10 +35,12 @@ export function FeedbackNotificationEmail({
   feedbackDescription,
   submittedBy,
   pageUrl,
-  appUrl = "https://fintech-talent-brief.vercel.app",
+  appName,
+  appUrl,
+  adminPanelPath = "/admin",
 }: FeedbackNotificationEmailProps) {
   const typeLabel = TYPE_LABELS[feedbackType] || feedbackType;
-  const adminUrl = `${appUrl}/admin`;
+  const adminUrl = `${appUrl}${adminPanelPath}`;
 
   return (
     <Html>
@@ -46,7 +50,7 @@ export function FeedbackNotificationEmail({
         <Container style={container}>
           <Section style={header}>
             <Heading style={title}>New Feedback Submitted</Heading>
-            <Text style={subtitle}>The Fintech Talent Brief</Text>
+            <Text style={subtitle}>{appName}</Text>
           </Section>
 
           <Hr style={divider} />
@@ -68,7 +72,8 @@ export function FeedbackNotificationEmail({
 
           <Section style={ctaSection}>
             <Text style={body}>
-              AI triage is processing this submission. Review it in the admin panel:
+              AI triage is processing this submission. Review it in the admin
+              panel:
             </Text>
             <Link href={adminUrl} style={ctaLink}>
               Open Admin Panel
@@ -77,7 +82,7 @@ export function FeedbackNotificationEmail({
 
           <Section style={footer}>
             <Text style={footerText}>
-              You received this because you are an admin of The Fintech Talent Brief.
+              You received this because you are an admin of {appName}.
             </Text>
           </Section>
         </Container>
