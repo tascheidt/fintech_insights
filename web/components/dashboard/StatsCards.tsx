@@ -1,5 +1,17 @@
+/**
+ * StatsCards — the dashboard's hero stat row.
+ *
+ * Visual contract (design system → StatCard):
+ * - Plain card chrome (NOT shadcn Card — too heavy).
+ *   `bg-card border border-border rounded-[10px] p-4 px-[18px]`
+ * - Label: 12px medium muted-foreground.
+ * - Value: 26px bold tabular-nums, tracking -0.02em.
+ * - Positive net: growth-500 (`text-growth-500`). Never destructive.
+ * - Sparkline: stroke-primary.
+ * - Hover (linked): bg-secondary + shadow-sm.
+ */
+
 import Link from "next/link";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 
@@ -11,7 +23,7 @@ interface StatCardDef {
   sparkline?: number[];
 }
 
-function Sparkline({ data, className }: { data: number[]; className?: string }) {
+function Sparkline({ data }: { data: number[] }) {
   if (data.length < 2) return null;
 
   const max = Math.max(...data);
@@ -26,17 +38,16 @@ function Sparkline({ data, className }: { data: number[]; className?: string }) 
     return `${x},${y}`;
   });
 
-  const pathD = `M ${points.join(" L ")}`;
-
   return (
     <svg
       width={width}
       height={height}
-      className={cn("text-primary", className)}
+      className="text-primary"
       viewBox={`0 0 ${width} ${height}`}
+      aria-hidden
     >
       <path
-        d={pathD}
+        d={`M ${points.join(" L ")}`}
         fill="none"
         stroke="currentColor"
         strokeWidth={1.5}
@@ -72,7 +83,9 @@ export function StatsCards({
     {
       label: "7-Day Net",
       value: (
-        <span className={net >= 0 ? "text-green-600" : "text-red-500"}>
+        // Positive uses growth (Pacific-adjacent green); negative uses sunset
+        // (slowdown, NOT error) per design-system rule.
+        <span className={net >= 0 ? "text-growth-500" : "text-sunset-600"}>
           {net >= 0 ? "+" : ""}{net}
         </span>
       ),
@@ -92,38 +105,40 @@ export function StatsCards({
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-[14px] lg:grid-cols-4">
       {stats.map(({ label, value, subtitle, href, sparkline }) => {
-        const Content = (
-          <Card
-            className={cn("h-full transition-colors", href && "hover:bg-muted/50")}
+        const card = (
+          <div
+            className={cn(
+              "h-full rounded-[10px] border border-border bg-card px-[18px] py-4 transition-colors",
+              href && "hover:bg-secondary hover:shadow-sm"
+            )}
           >
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <span className="text-sm font-medium text-muted-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">
                 {label}
               </span>
               {sparkline && sparkline.length >= 2 && (
                 <Sparkline data={sparkline} />
               )}
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{value}</div>
-              {subtitle && (
-                <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-              )}
-            </CardContent>
-          </Card>
+            </div>
+            <div className="mt-2 text-[26px] font-bold tabular-nums tracking-[-0.02em]">
+              {value}
+            </div>
+            {subtitle && (
+              <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+            )}
+          </div>
         );
 
         if (href) {
           return (
             <Link key={label} href={href} className="block h-full">
-              {Content}
+              {card}
             </Link>
           );
         }
-
-        return <div key={label}>{Content}</div>;
+        return <div key={label}>{card}</div>;
       })}
     </div>
   );

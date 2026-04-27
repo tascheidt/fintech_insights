@@ -91,6 +91,10 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 | `web/lib/dashboard-queries.ts` | Supabase query layer for dashboard. |
 | `web/components/{feature}/` | Feature components. |
 | `web/components/ui/` | shadcn/ui primitives. |
+| `web/components/README.md` | Design system entry point — read before touching UI. |
+| `web/components/DESIGN_SYSTEM.md` | Token + component reference (light + dark, chip system, alignment). |
+| `web/app/globals.css` | Single source of truth for all design tokens (colors, type, gradients). |
+| `web/eslint-rules/no-raw-color.js` | Lints raw hex/rgb/oklch literals outside `globals.css`. |
 | `web/scripts/` | Operational scripts (migrations, gemini-compare, regenerate-insights). |
 | `web/data/releases.json` | Changelog. |
 | `web/supabase/migrations/` | DB migrations. |
@@ -114,6 +118,9 @@ Things that will get a PR rejected:
 
 - Adding a third Vercel cron. The cap is two — route long-running work through GitHub Actions instead.
 - Hardcoding a model string outside `web/lib/ai/prompt-config.ts`.
+- Hardcoding a color outside `web/app/globals.css` (raw hex, rgb, hsl, oklch, or `bg-[#…]`). Add a token instead. Lint rule: `design-system/no-raw-color`.
+- Using Fraunces (`font-display`) outside the four approved editorial surfaces (digest hero, marketing hero, login hero, company stated-strategy callout).
+- Using Tailwind's default green/red/yellow scales for hiring numbers or signal strength. Use `growth-500`, `sunset-*`, `accent`, `highlight` instead.
 - Pinning a versioned/preview Gemini model ID (e.g. `gemini-2.0-flash`). Always `-latest`.
 - Adding a Gemini call site that doesn't write to `gemini_usage_events`.
 - Adding a second grounded Pro call per job (the April 2026 incident).
@@ -134,6 +141,7 @@ The relevant docs include:
 - Per-area sub-CLAUDEs: [`web/lib/analysis/CLAUDE.md`](./web/lib/analysis/CLAUDE.md), [`web/lib/scrapers/CLAUDE.md`](./web/lib/scrapers/CLAUDE.md), [`web/lib/ai/CLAUDE.md`](./web/lib/ai/CLAUDE.md), [`web/lib/auth/CLAUDE.md`](./web/lib/auth/CLAUDE.md)
 - [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md), [`docs/AI_HYGIENE.md`](./docs/AI_HYGIENE.md), [`docs/INGESTION_PIPELINE.md`](./docs/INGESTION_PIPELINE.md), [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md)
 - [`docs/voice.md`](./docs/voice.md), [`docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md`](./docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md)
+- [`web/components/README.md`](./web/components/README.md), [`web/components/DESIGN_SYSTEM.md`](./web/components/DESIGN_SYSTEM.md) — design system docs (update on token / chip / editorial-surface changes)
 - [`web/data/releases.json`](./web/data/releases.json) — user-facing changelog
 - `web/.env.example` when env vars change
 

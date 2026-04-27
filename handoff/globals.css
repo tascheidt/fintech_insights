@@ -1,0 +1,294 @@
+/* ============================================================
+   web/app/globals.css — replacement
+   ============================================================
+   Drop this file in at web/app/globals.css.
+   It preserves the existing Tailwind v4 @theme inline structure
+   and dark-mode @custom-variant — only the OKLCH values change,
+   plus we add named SoCal scales (pacific-*, sand-*, etc.) and
+   the gradient/shadow tokens.
+   ============================================================ */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* ── existing aliases (unchanged keys, new values via :root below) ── */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ── NEW: named scales so devs write `bg-pacific-500` etc. ── */
+  --color-pacific-50:  var(--pacific-50);
+  --color-pacific-100: var(--pacific-100);
+  --color-pacific-200: var(--pacific-200);
+  --color-pacific-300: var(--pacific-300);
+  --color-pacific-400: var(--pacific-400);
+  --color-pacific-500: var(--pacific-500);
+  --color-pacific-600: var(--pacific-600);
+  --color-pacific-700: var(--pacific-700);
+  --color-pacific-800: var(--pacific-800);
+  --color-pacific-900: var(--pacific-900);
+
+  --color-sand-50:  var(--sand-50);
+  --color-sand-100: var(--sand-100);
+  --color-sand-200: var(--sand-200);
+  --color-sand-300: var(--sand-300);
+  --color-sand-400: var(--sand-400);
+  --color-sand-500: var(--sand-500);
+  --color-sand-600: var(--sand-600);
+  --color-sand-700: var(--sand-700);
+  --color-sand-800: var(--sand-800);
+  --color-sand-900: var(--sand-900);
+
+  --color-sun-400: var(--sun-400);
+  --color-sun-500: var(--sun-500);
+  --color-sun-600: var(--sun-600);
+
+  --color-sunset-400: var(--sunset-400);
+  --color-sunset-500: var(--sunset-500);
+  --color-sunset-600: var(--sunset-600);
+
+  /* Soft surfaces */
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent-soft-fg);
+  --color-highlight: var(--highlight);
+  --color-highlight-soft: var(--highlight-soft);
+  --color-highlight-soft-foreground: var(--highlight-soft-fg);
+
+  /* ── Fonts ── */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces);
+
+  /* ── Radii (unchanged from current) ── */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+/* ============================================================
+   :root — light theme tokens
+   These values come straight from this project's
+   ../colors_and_type.css. Keep the two files in sync.
+   ============================================================ */
+:root {
+  --radius: 0.625rem;
+
+  /* Surfaces */
+  --background:        oklch(0.985 0.005 75);   /* warm off-white */
+  --foreground:        oklch(0.18 0.012 250);   /* deep slate */
+  --card:              oklch(1 0 0);
+  --card-foreground:   var(--foreground);
+  --popover:           oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+
+  /* Brand — Pacific (primary) */
+  --pacific-50:  oklch(0.97 0.018 215);
+  --pacific-100: oklch(0.93 0.04 215);
+  --pacific-200: oklch(0.86 0.07 213);
+  --pacific-300: oklch(0.76 0.10 211);
+  --pacific-400: oklch(0.66 0.12 209);
+  --pacific-500: oklch(0.56 0.13 207);   /* core brand */
+  --pacific-600: oklch(0.48 0.13 207);
+  --pacific-700: oklch(0.40 0.11 209);
+  --pacific-800: oklch(0.32 0.08 212);
+  --pacific-900: oklch(0.24 0.05 218);
+
+  /* Sand (neutrals warmed slightly toward yellow) */
+  --sand-50:  oklch(0.985 0.005 75);
+  --sand-100: oklch(0.96 0.008 75);
+  --sand-200: oklch(0.92 0.012 72);
+  --sand-300: oklch(0.86 0.014 70);
+  --sand-400: oklch(0.74 0.016 68);
+  --sand-500: oklch(0.60 0.016 65);
+  --sand-600: oklch(0.48 0.018 65);
+  --sand-700: oklch(0.36 0.018 65);
+  --sand-800: oklch(0.26 0.016 65);
+  --sand-900: oklch(0.18 0.012 250);
+
+  /* Sun (signal accent — used for highlights, never decoratively) */
+  --sun-400: oklch(0.86 0.14 90);
+  --sun-500: oklch(0.78 0.16 85);
+  --sun-600: oklch(0.68 0.16 80);
+
+  /* Sunset (warm signal — used for "moderate" alignment, hot roles) */
+  --sunset-400: oklch(0.78 0.16 50);
+  --sunset-500: oklch(0.70 0.18 45);
+  --sunset-600: oklch(0.60 0.17 42);
+
+  /* Semantic aliases */
+  --primary:               var(--pacific-500);
+  --primary-foreground:    oklch(1 0 0);
+  --primary-hover:         var(--pacific-600);
+  --primary-soft:          oklch(0.95 0.04 213);
+  --primary-soft-fg:       var(--pacific-700);
+
+  --secondary:             var(--sand-100);
+  --secondary-foreground:  var(--sand-800);
+
+  --muted:                 var(--sand-100);
+  --muted-foreground:      var(--sand-600);
+
+  --accent:                var(--sunset-500);
+  --accent-foreground:     oklch(1 0 0);
+  --accent-soft:           oklch(0.96 0.04 50);
+  --accent-soft-fg:        var(--sunset-600);
+
+  --highlight:             var(--sun-500);
+  --highlight-soft:        oklch(0.97 0.06 90);
+  --highlight-soft-fg:     oklch(0.45 0.13 80);
+
+  --destructive:           oklch(0.58 0.22 27);
+
+  --border: var(--sand-200);
+  --input:  var(--sand-200);
+  --ring:   var(--pacific-400);
+
+  /* Charts — match the SoCal palette */
+  --chart-1: var(--pacific-500);
+  --chart-2: var(--pacific-300);
+  --chart-3: var(--sunset-500);
+  --chart-4: var(--sun-500);
+  --chart-5: oklch(0.55 0.13 155);   /* growth green for net-positive only */
+
+  /* Sidebar — keeps the existing sidebar slot but warmed */
+  --sidebar:                       var(--sand-50);
+  --sidebar-foreground:            var(--foreground);
+  --sidebar-primary:               var(--pacific-500);
+  --sidebar-primary-foreground:    oklch(1 0 0);
+  --sidebar-accent:                var(--sand-100);
+  --sidebar-accent-foreground:     var(--sand-800);
+  --sidebar-border:                var(--sand-200);
+  --sidebar-ring:                  var(--pacific-400);
+
+  /* Gradients — only used on Login aside and Marketing hero */
+  --gradient-coast: linear-gradient(115deg,
+    oklch(0.95 0.04 50)  0%,
+    oklch(0.92 0.05 70)  35%,
+    oklch(0.86 0.07 213) 100%);
+  --gradient-dawn: linear-gradient(165deg,
+    oklch(0.97 0.03 75)  0%,
+    oklch(0.94 0.05 60)  50%,
+    oklch(0.92 0.06 30)  100%);
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px oklch(0.18 0.012 250 / 0.05);
+  --shadow-sm: 0 1px 3px oklch(0.18 0.012 250 / 0.08), 0 1px 2px oklch(0.18 0.012 250 / 0.04);
+  --shadow-md: 0 4px 6px oklch(0.18 0.012 250 / 0.07), 0 2px 4px oklch(0.18 0.012 250 / 0.04);
+  --shadow-lg: 0 10px 15px oklch(0.18 0.012 250 / 0.08), 0 4px 6px oklch(0.18 0.012 250 / 0.04);
+}
+
+/* ============================================================
+   .dark — dark theme overrides (Phase 4 polish, not Phase 1)
+   Keep grayscale shape but swap surfaces. Brand stays brand.
+   ============================================================ */
+.dark {
+  --background:        oklch(0.16 0.01 250);
+  --foreground:        oklch(0.96 0.005 75);
+  --card:              oklch(0.21 0.012 250);
+  --card-foreground:   var(--foreground);
+  --popover:           oklch(0.21 0.012 250);
+  --popover-foreground: var(--foreground);
+
+  --primary:               var(--pacific-400);
+  --primary-foreground:    oklch(0.16 0.01 250);
+  --primary-soft:          oklch(0.30 0.07 213);
+  --primary-soft-fg:       var(--pacific-200);
+
+  --secondary:             oklch(0.26 0.01 250);
+  --secondary-foreground:  var(--foreground);
+
+  --muted:                 oklch(0.26 0.01 250);
+  --muted-foreground:      oklch(0.70 0.005 75);
+
+  --accent:                var(--sunset-400);
+  --accent-foreground:     oklch(0.16 0.01 250);
+  --accent-soft:           oklch(0.30 0.10 50);
+  --accent-soft-fg:        var(--sunset-400);
+
+  --highlight:             var(--sun-400);
+  --highlight-soft:        oklch(0.30 0.10 90);
+  --highlight-soft-fg:     var(--sun-400);
+
+  --destructive:           oklch(0.70 0.19 22);
+
+  --border: oklch(1 0 0 / 0.10);
+  --input:  oklch(1 0 0 / 0.15);
+  --ring:   var(--pacific-400);
+
+  --chart-1: var(--pacific-400);
+  --chart-2: var(--pacific-200);
+  --chart-3: var(--sunset-400);
+  --chart-4: var(--sun-400);
+  --chart-5: oklch(0.65 0.15 155);
+
+  --sidebar:                       oklch(0.21 0.012 250);
+  --sidebar-foreground:            var(--foreground);
+  --sidebar-primary:               var(--pacific-400);
+  --sidebar-primary-foreground:    oklch(0.16 0.01 250);
+  --sidebar-accent:                oklch(0.26 0.01 250);
+  --sidebar-accent-foreground:     var(--foreground);
+  --sidebar-border:                oklch(1 0 0 / 0.10);
+  --sidebar-ring:                  var(--pacific-400);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* ============================================================
+   Editorial display utility — for digest hero headlines and
+   marketing only. Never use in product chrome, charts, or tables.
+   ============================================================ */
+@layer utilities {
+  .font-display { font-family: var(--font-display); }
+  .text-display {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+  }
+}

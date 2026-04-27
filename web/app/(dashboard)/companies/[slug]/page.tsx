@@ -1,8 +1,18 @@
 /**
  * Company Detail Page
+ *
+ * v2 (Stream L): the Overview tab is rebuilt as a bets-first editorial
+ * page. The Tabs (Overview / Jobs / Settings) chrome is preserved; the
+ * Jobs tab still renders `JobHistoryView` for company-scoped browsing
+ * and the Settings tab hosts the existing edit form.
+ *
+ * Data is fetched once via `getCompanyDrillDownData` (companies +
+ * normalised bets + every active job assigned to the matching bet) plus
+ * `getAllCompanyJobsWithBets` for the all-jobs drawer view.
  */
 
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -13,7 +23,16 @@ import { JobHistoryView, JobData } from "@/components/companies/JobHistoryView";
 import { FunctionBreakdown } from "@/components/companies/FunctionBreakdown";
 import { ChatPanel } from "@/components/companies/ChatPanel";
 import { GenerateInsightButton } from "@/components/companies/GenerateInsightButton";
-import { ExternalLink } from "lucide-react";
+import { WorkingThesisCard } from "@/components/companies/WorkingThesisCard";
+import { CompanyOverviewBets } from "@/components/companies/CompanyOverviewBets";
+import { CompanyHeaderPill } from "@/components/companies/CompanyHeaderPill";
+import { MonogramAvatar } from "@/components/design";
+import { Button } from "@/components/ui/button";
+import {
+  getCompanyDrillDownData,
+  getAllCompanyJobsWithBets,
+} from "@/lib/dashboard-queries";
+import { Bell, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -25,6 +44,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     : { data: null };
   const canEdit = ["editor", "admin"].includes(profile?.role ?? "");
 
+  const drilldown = await getCompanyDrillDownData(slug);
+  if (!drilldown) notFound();
+
   const { data: company, error } = await supabase
     .from("companies")
     .select("*")
@@ -32,6 +54,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     .eq("is_active", true)
     .single();
   if (error || !company) notFound();
+
+  const allJobsWithBets = await getAllCompanyJobsWithBets(drilldown.company.id);
 
   const [{ data: jobsRaw }, { data: latestInsight }, { data: digestSummary }] = await Promise.all([
     supabase
@@ -65,7 +89,18 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         : digestSummary.weekly_digests) as { week_start: string; week_end: string }
     : null;
 
-  const jobs: JobData[] = (jobsRaw ?? []).map((j: any) => ({
+  type JobRow = {
+    id: string;
+    title: string;
+    standardized_department: string | null;
+    function_category: string | null;
+    location: string | null;
+    is_active: boolean;
+    first_seen_date: string;
+    url: string | null;
+  };
+
+  const jobs: JobData[] = (jobsRaw ?? []).map((j: JobRow) => ({
     id: j.id,
     title: j.title,
     standardized_department: j.standardized_department,
@@ -78,11 +113,35 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
   const activeJobCount = jobs.filter(j => j.isActive).length;
 
+  type CoreFunction = {
+    category: string;
+    label: string;
+    group: string;
+    count: number;
+    percentage: number;
+  };
+  type Discrepancy = {
+    severity?: "high" | "medium" | "low";
+    area?: string;
+    statedStrategy?: string;
+    stated_strategy?: string;
+    actualHiring?: string;
+    actual_hiring?: string;
+    implication?: string;
+  };
+  type ResearchSource = {
+    verificationStatus?: "verified" | "paywall" | string;
+    sourceType?: string;
+    url?: string;
+    title?: string;
+    snippet?: string;
+  };
+
   const insight = latestInsight ?? null;
-  const coreFunctions = (insight?.core_functions as any[]) || [];
-  const discrepancies = (insight?.discrepancies as any[]) || [];
-  const newDirections = (insight?.new_directions as string[]) || [];
-  const researchSources = (insight?.research_sources as any[]) || [];
+  const coreFunctions = (insight?.core_functions as CoreFunction[] | null) ?? [];
+  const discrepancies = (insight?.discrepancies as Discrepancy[] | null) ?? [];
+  const newDirections = (insight?.new_directions as string[] | null) ?? [];
+  const researchSources = (insight?.research_sources as ResearchSource[] | null) ?? [];
 
   return (
     <div className="space-y-6">
@@ -95,39 +154,117 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
+        {/* Overview Tab — bets-first editorial v2 */}
         <TabsContent value="overview" className="space-y-6">
-          {/* Company Header */}
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{company.name}</h1>
-                {company.careers_url && (
-                  <a
-                    href={company.careers_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                    title="Careers page"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {company.country}
-              </p>
-            </div>
-            <GenerateInsightButton companyId={company.id} companyName={company.name} />
+          {/* Breadcrumb */}
+          <div className="font-sans text-[12.5px] text-muted-foreground">
+            <Link href="/companies" className="hover:text-primary">
+              Companies
+            </Link>
+            <span className="mx-1.5">/</span>
+            <span>{drilldown.company.name}</span>
           </div>
 
-          {/* Recent Activity Strip */}
+          {/* Company head — avatar + name + meta with active-postings pill */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <MonogramAvatar size="lg" name={drilldown.company.name} />
+              <div>
+                <h1
+                  className="m-0 font-display font-semibold text-foreground"
+                  style={{
+                    fontSize: 32,
+                    lineHeight: 1.15,
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {drilldown.company.name}
+                </h1>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 font-sans text-[12.5px] text-muted-foreground">
+                  {drilldown.company.country && (
+                    <span>{drilldown.company.country}</span>
+                  )}
+                  {drilldown.company.country && drilldown.company.ats_type && (
+                    <span aria-hidden>·</span>
+                  )}
+                  {drilldown.company.ats_type && (
+                    <span>ATS: {drilldown.company.ats_type}</span>
+                  )}
+                  <span aria-hidden>·</span>
+                  <CompanyHeaderPill
+                    activeJobCount={drilldown.activeJobCount}
+                    companyName={drilldown.company.name}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" disabled title="Coming soon">
+                <Bell className="h-3.5 w-3.5" /> Watch
+              </Button>
+              {drilldown.company.careers_url && (
+                <Button variant="ghost" size="sm" asChild>
+                  <a
+                    href={drilldown.company.careers_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> Careers site
+                  </a>
+                </Button>
+              )}
+              <GenerateInsightButton
+                companyId={company.id}
+                companyName={company.name}
+              />
+            </div>
+          </div>
+
+          {/* Working thesis */}
+          <WorkingThesisCard
+            thesis={drilldown.company.thesis}
+            thesisSub={drilldown.company.thesis_sub}
+            updatedAgo={drilldown.thesisAgo}
+            metrics={[
+              {
+                label: "Active roles",
+                value: String(drilldown.activeJobCount),
+              },
+              {
+                label: "30d net new",
+                value:
+                  drilldown.hiringDelta > 0
+                    ? `+${drilldown.hiringDelta}`
+                    : String(drilldown.hiringDelta),
+              },
+              {
+                label: "New patterns",
+                value: String(drilldown.newPatternsCount),
+              },
+              {
+                label: "Roles per bet",
+                value: drilldown.rolesPerBet.toFixed(1),
+              },
+            ]}
+            editHref={`/companies/${drilldown.company.slug}?edit=1`}
+          />
+
+          {/* Recent activity strip */}
           {digestSummary && digestWeek && (
             <p className="text-sm text-muted-foreground">
               {digestSummary.new_job_count} new jobs · Week of{" "}
               {format(new Date(digestWeek.week_start), "MMM d")}–{format(new Date(digestWeek.week_end), "MMM d")}
             </p>
           )}
+
+          {/* Bets-first section */}
+          <CompanyOverviewBets
+            companyName={drilldown.company.name}
+            companySlug={drilldown.company.slug}
+            bets={drilldown.bets}
+            allJobs={allJobsWithBets}
+            activeJobCount={drilldown.activeJobCount}
+          />
 
           {/* No insight yet */}
           {!insight && (
@@ -153,18 +290,18 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                   {format(new Date(insight.analysis_period_start), "MMM d")}–{format(new Date(insight.analysis_period_end), "MMM d, yyyy")}
                 </span>
                 <span
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium uppercase tracking-wide ${
                     insight.confidence === "high"
-                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                      ? "bg-primary-soft text-primary-soft-foreground"
                       : insight.confidence === "medium"
-                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                        : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                        ? "bg-accent-soft text-accent-soft-foreground"
+                        : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {insight.confidence} confidence
                 </span>
                 {insight.research_quality_score && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium uppercase tracking-wide bg-highlight-soft text-highlight-soft-foreground">
                     Research: {insight.research_quality_score}/5
                   </span>
                 )}
@@ -205,7 +342,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                     <ul className="space-y-2">
                       {newDirections.map((direction, i) => (
                         <li key={i} className="flex items-start gap-2">
-                          <span className="text-green-600 mt-1">●</span>
+                          <span className="text-growth-500 mt-1" aria-hidden>●</span>
                           <span>{direction}</span>
                         </li>
                       ))}
@@ -234,15 +371,15 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {discrepancies.map((d: any, i: number) => (
+                        {discrepancies.map((d, i) => (
                           <div
                             key={i}
                             className={`p-3 rounded-lg border-l-4 ${
                               d.severity === "high"
-                                ? "border-red-500 bg-red-50 dark:bg-red-950"
+                                ? "border-sunset-500 bg-accent-soft/40"
                                 : d.severity === "medium"
-                                  ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950"
-                                  : "border-gray-300 bg-gray-50 dark:bg-gray-900"
+                                  ? "border-sun-500 bg-highlight-soft/40"
+                                  : "border-border bg-muted/40"
                             }`}
                           >
                             <div className="font-medium">{d.area}</div>
@@ -275,15 +412,22 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 </Card>
               )}
 
-              {/* Stated Strategy */}
+              {/* Stated Strategy — editorial display per design system */}
               {insight.stated_strategy && (
                 <Card>
                   <CardHeader>
-                    <h2 className="font-semibold">Company&apos;s Stated Strategy</h2>
-                    <p className="text-sm text-muted-foreground">Extracted from public sources</p>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-primary mb-1">
+                      Stated strategy
+                    </p>
+                    <h2 className="font-display font-semibold text-[22px] tracking-[-0.012em] leading-[1.18] text-foreground">
+                      In their own words
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-1">Extracted from public sources</p>
                   </CardHeader>
                   <CardContent>
-                    <p className="whitespace-pre-wrap">{insight.stated_strategy}</p>
+                    <p className="whitespace-pre-wrap font-display text-[18px] leading-[1.5] text-foreground/90">
+                      {insight.stated_strategy}
+                    </p>
                   </CardContent>
                 </Card>
               )}
@@ -303,15 +447,15 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                   </summary>
                   <div className="px-6 pb-4">
                     <div className="space-y-3">
-                      {researchSources.map((source: any, i: number) => (
+                      {researchSources.map((source, i) => (
                         <div key={i} className="flex items-start gap-3">
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wide ${
                               source.verificationStatus === "verified"
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                ? "bg-primary-soft text-primary-soft-foreground"
                                 : source.verificationStatus === "paywall"
-                                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                  : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                                  ? "bg-highlight-soft text-highlight-soft-foreground"
+                                  : "bg-muted text-muted-foreground"
                             }`}
                           >
                             {source.sourceType}

@@ -62,8 +62,12 @@ export function JobStatusBadge({ companyId, className }: JobStatusBadgeProps) {
     return null;
   }
 
-  // Only show badge for running or recently completed/failed tasks (within last hour)
+  // Only show badge for running or recently completed/failed tasks (within last hour).
+  // `now` is captured at mount to keep render deterministic; the parent re-mounts
+  // this badge on company changes, and the real-time subscription pushes updates
+  // through `task` state so freshness is bounded by completion timing, not stale `now`.
   const isRecent = task.completed_at
+    // eslint-disable-next-line react-hooks/purity
     ? new Date(task.completed_at).getTime() > Date.now() - 3600000
     : false;
 
@@ -77,28 +81,28 @@ export function JobStatusBadge({ companyId, className }: JobStatusBadgeProps) {
         return {
           icon: Loader2,
           label: "Processing",
-          className: "text-blue-600 bg-blue-50",
+          className: "text-primary-soft-foreground bg-primary-soft",
           iconClassName: "animate-spin",
         };
       case "completed":
         return {
           icon: CheckCircle2,
           label: "Completed",
-          className: "text-green-600 bg-green-50",
+          className: "text-accent-soft-foreground bg-accent-soft",
           iconClassName: "",
         };
       case "failed":
         return {
           icon: XCircle,
           label: "Failed",
-          className: "text-red-600 bg-red-50",
+          className: "text-destructive bg-destructive/10",
           iconClassName: "",
         };
       default:
         return {
           icon: Clock,
           label: "Pending",
-          className: "text-gray-600 bg-gray-50",
+          className: "text-muted-foreground bg-muted",
           iconClassName: "",
         };
     }

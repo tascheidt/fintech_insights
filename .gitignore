@@ -22,3 +22,6 @@ web/out/
 .cursor/
 
 /temp
+
+# Playwright stray artifacts if the runner is invoked from the repo root
+/test-results/

@@ -191,11 +191,11 @@ export function ProcessingJobModal({
                   )}
                 </div>
                 <TaskProgressBar
-                  progress={(task.stage_progress as any) || {}}
+                  progress={(task.stage_progress as Record<string, unknown> | null) ?? {}}
                   currentStage={task.current_stage}
                 />
                 {task.error_message && (
-                  <div className="text-sm text-red-600 mt-2">
+                  <div className="text-sm text-destructive mt-2">
                     Error: {task.error_message}
                   </div>
                 )}

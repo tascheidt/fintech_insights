@@ -71,29 +71,29 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
     switch (status) {
       case "success":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-600">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-growth-500/10 text-growth-500">
+            <span className="w-1.5 h-1.5 rounded-full bg-growth-500" />
             Success
           </span>
         );
       case "running":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-soft text-primary-soft-foreground">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
             Running
           </span>
         );
       case "queued":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-soft text-accent-soft-foreground">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent" />
             Queued
           </span>
         );
       case "error":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-600">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
+            <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
             Error
           </span>
         );
@@ -106,31 +106,31 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
     switch (type) {
       case "collect":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-soft text-primary-soft-foreground">
             Collection
           </span>
         );
       case "report":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/10 text-purple-600">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-cat-data/10 text-cat-data">
             Report
           </span>
         );
       case "analyze":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/10 text-orange-600">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-highlight-soft text-highlight-soft-foreground">
             Analyze
           </span>
         );
       case "company-insights":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-growth-500/10 text-growth-500">
             Strategic Insights
           </span>
         );
       case "insight-generation":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-500/10 text-cyan-600">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-cat-operations/10 text-cat-operations">
             Insight
           </span>
         );
@@ -250,26 +250,26 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5">
                     {log.job_type === "collect" ? (
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="w-8 h-8 rounded-lg bg-primary-soft flex items-center justify-center">
+                        <svg className="w-4 h-4 text-primary-soft-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                       </div>
                     ) : log.job_type === "report" ? (
-                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                        <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="w-8 h-8 rounded-lg bg-cat-data/10 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-cat-data" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
                       </div>
                     ) : log.job_type === "company-insights" ? (
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                        <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="w-8 h-8 rounded-lg bg-growth-500/10 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-growth-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                       </div>
                     ) : (
-                      <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                        <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="w-8 h-8 rounded-lg bg-highlight-soft flex items-center justify-center">
+                        <svg className="w-4 h-4 text-highlight-soft-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
                         </svg>
                       </div>
@@ -290,7 +290,7 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
                       <p className="text-xs text-muted-foreground mt-1">{getSummary(log)}</p>
                     )}
                     {log.error_message && (
-                      <p className="text-xs text-red-600 mt-1">{log.error_message}</p>
+                      <p className="text-xs text-destructive mt-1">{log.error_message}</p>
                     )}
                   </div>
                 </div>
@@ -298,7 +298,7 @@ export function CronLogsTable({ refreshSignal }: CronLogsTableProps) {
                   <div>{formatDistanceToNow(new Date(log.started_at), { addSuffix: true })}</div>
                   <button
                     type="button"
-                    className="text-red-600 hover:text-red-700 disabled:opacity-50"
+                    className="text-destructive hover:opacity-80 disabled:opacity-50"
                     disabled={deletingId === log.id}
                     onClick={() => deleteJob(log.id)}
                   >

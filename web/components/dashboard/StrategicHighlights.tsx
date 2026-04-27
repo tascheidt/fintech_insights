@@ -1,3 +1,13 @@
+/**
+ * StrategySignals — strategic alignments + industry trends summary.
+ *
+ * Visual contract (design system):
+ * - Strength dot: 7×7 circle, color depends on alignment.
+ *   strong  → growth-500 / moderate → accent / weak → muted-foreground / contradicting → highlight
+ * - "kind" eyebrow: mono uppercase tracked, muted.
+ * - Chips: bg-accent-soft / bg-primary-soft / bg-muted (token-driven).
+ */
+
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { TrendingUp, ArrowRight } from "lucide-react";
@@ -9,6 +19,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { LatestDigest } from "@/lib/dashboard-queries";
+
+const ALIGNMENT_DOT: Record<string, string> = {
+  strong: "bg-growth-500",
+  moderate: "bg-accent",
+  weak: "bg-muted-foreground",
+  contradicting: "bg-highlight",
+};
+
+const ALIGNMENT_CHIP: Record<string, string> = {
+  strong: "bg-primary-soft text-primary-soft-foreground",
+  moderate: "bg-accent-soft text-accent-soft-foreground",
+  weak: "bg-muted text-muted-foreground",
+  contradicting: "bg-highlight-soft text-highlight-soft-foreground",
+};
 
 export function StrategySignals({
   digest,
@@ -23,7 +47,7 @@ export function StrategySignals({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
+            <TrendingUp className="h-4 w-4 text-primary" />
             Strategy Signals
           </CardTitle>
           <CardDescription>Industry trends and strategic alignments</CardDescription>
@@ -42,7 +66,7 @@ export function StrategySignals({
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="space-y-1">
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
+            <TrendingUp className="h-4 w-4 text-primary" />
             Strategy Signals
           </CardTitle>
           <CardDescription>Industry trends and strategic alignments</CardDescription>
@@ -58,24 +82,23 @@ export function StrategySignals({
       </CardHeader>
       <CardContent>
         <div className="max-h-[400px] overflow-y-auto space-y-5">
-          {/* Hiring Activity */}
           {trends.length > 0 && (
             <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
                 Hiring Activity
               </p>
               {trends.map((trend, i) => (
-                <div key={i} className="space-y-1">
+                <div key={i} className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium text-foreground">
                       {trend.trend.replace(/ hiring surge$/, "").replace(/ adoption$/, "")}
                     </span>
                     <span className="text-xs text-muted-foreground tabular-nums">
                       {trend.jobCount} roles
                     </span>
                     {trend.direction === "new" && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                        tech
+                      <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary-soft text-primary-soft-foreground">
+                        new
                       </span>
                     )}
                   </div>
@@ -96,36 +119,39 @@ export function StrategySignals({
             </div>
           )}
 
-          {/* Strategy Signals */}
           {signals.length > 0 && (
             <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
                 Strategic Alignments
               </p>
-              {signals.map((signal, i) => (
-                <div key={i} className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">
-                      {signal.company}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-xs px-1.5 py-0.5 rounded",
-                        signal.alignment === "strong"
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
-                          : signal.alignment === "moderate"
-                            ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300"
-                            : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {signal.alignment}
-                    </span>
+              {signals.map((signal, i) => {
+                const dotClass = ALIGNMENT_DOT[signal.alignment] ?? ALIGNMENT_DOT.weak;
+                const chipClass = ALIGNMENT_CHIP[signal.alignment] ?? ALIGNMENT_CHIP.weak;
+                return (
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className={cn("h-[7px] w-[7px] rounded-full shrink-0", dotClass)}
+                      />
+                      <span className="text-sm font-medium text-foreground">
+                        {signal.company}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded",
+                          chipClass
+                        )}
+                      >
+                        {signal.alignment}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-[15px]">
+                      {signal.signal}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {signal.signal}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -17,7 +17,7 @@ export interface LabsExperiment {
 }
 
 const PRIMARY_NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard", exact: true },
+  { href: "/dashboard", label: "Dashboard", exact: true },
   { href: "/jobs", label: "Jobs" },
   { href: "/companies", label: "Companies" },
   { href: "/digests", label: "Weekly Digests" },

@@ -1,5 +1,43 @@
 [
   {
+    "version": "1.15.0",
+    "date": "2026-04-25",
+    "changes": [
+      { "type": "feature", "description": "Companies index rebuilt as a signal-rich editorial list. Each row carries a working thesis, hiring sparkline, pivot signals (new pattern / accelerating / going quiet / continuity), and the most recent meaningful change." },
+      { "type": "feature", "description": "Company drill-down rebuilt bets-first. Working thesis at the top, strategic bets ranked by hiring evidence, each bet bundling claim, evidence (internal hiring + external news), confidence, associated jobs, and a forward signal." },
+      { "type": "feature", "description": "Jobs page rebuilt as a list-first browsing surface — sortable table with company / function / location / posted columns, recency filters, plus a contextual right rail showing function heat (30-day net) and cross-company themes." },
+      { "type": "feature", "description": "New scoped Jobs drawer on the company drill-down lets you see jobs filtered to a specific bet without leaving the page, with a one-click 'expand to all companies' cross-link." },
+      { "type": "improvement", "description": "Marketing landing page is now the public root URL; signed-in users land on /dashboard. Old /welcome bookmarks redirect cleanly." },
+      { "type": "improvement", "description": "Admin and labs surfaces fully migrated to design-system tokens — no more raw Tailwind palette utilities. Email templates now share a centralized SoCal color map (web/lib/email/colors.ts)." },
+      { "type": "improvement", "description": "Editor-only fields on the company edit form: working thesis, sub-line, interpretation, last-change, and a strategic-bets repeater (with evidence sub-rows). Companies missing a thesis are surfaced in admin under 'Needs editorial'." }
+    ]
+  },
+  {
+    "version": "1.14.0",
+    "date": "2026-04-25",
+    "changes": [
+      { "type": "improvement", "description": "Design system aligned with the canonical Talent Brief tokens. Pacific brand blue is now the deep ocean hue (oklch 0.575/0.150/236), Sun is the accent family for CTAs, and Sunset is the highlight family for change markers and alerts." },
+      { "type": "improvement", "description": "New brand mark and favicon: gradient sun + coast wave on the warm sand background. Replaces the placeholder check-square mark." },
+      { "type": "improvement", "description": "Net Hiring Flow chart rebuilt as bars (Pacific for new, Sun for closed) with a thin foreground net line — replaces the bright red/green soft area fills." },
+      { "type": "improvement", "description": "Jobs table redesigned: company avatars, function chips with hot/regular variants, location truncated to City + Country, mono first-seen with `2d ago` formatting, accent-soft active status chip. Whole row is the link target — no more blue-underlined titles." },
+      { "type": "improvement", "description": "Audited and replaced ad-hoc Tailwind palette utilities (`text-green-*`, `bg-red-*`, etc.) with design tokens across digests, releases, feedback, settings, jobs, companies, and dashboard surfaces." }
+    ]
+  },
+  {
+    "version": "1.13.0",
+    "date": "2026-04-25",
+    "changes": [
+      { "type": "feature", "description": "New SoCal design system: warm sand surfaces, Pacific brand blue, Sunset/Sun accents, Fraunces editorial display font, and a token-driven color/type pipeline. Every visual value now references a single source of truth in `app/globals.css` so theme tweaks land in one line." },
+      { "type": "feature", "description": "Editorial moments — weekly digest banner, marketing welcome page, login hero, and company stated-strategy callout — now use the coast gradient and Fraunces display type for a clearer reader experience." },
+      { "type": "feature", "description": "New `/digests/archive` route lists every published digest with date, lede, signal density, and year filter." },
+      { "type": "feature", "description": "Settings reorganized into Notifications · Sources · Account · Team tabs, with an ATS source-health table." },
+      { "type": "feature", "description": "New marketing welcome surface at `/welcome` — gradient hero, live stats, sample digest pull-quote, coverage list." },
+      { "type": "improvement", "description": "Job detail page redesigned with a two-column editorial layout: posting body + signals sidebar." },
+      { "type": "improvement", "description": "Reusable `EmptyState` component now powers companies, digests, and settings empty states; new shared `SignalsTimeline` component for vertical/responsive signal lists." },
+      { "type": "improvement", "description": "ESLint rule `design-system/no-raw-color` warns on raw hex/rgb/oklch literals outside `globals.css` to prevent palette drift." }
+    ]
+  },
+  {
     "version": "1.12.0",
     "date": "2026-04-19",
     "changes": [

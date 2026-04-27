@@ -231,7 +231,7 @@ Only say high confidence if you are certain. Most fintech startups are private.`
     // Try to parse JSON, with fallback for malformed JSON
     try {
       parsed = JSON.parse(text) as Record<string, unknown>;
-    } catch (parseError) {
+    } catch {
       // Log the actual response for debugging (first 200 chars)
       const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
       log.warn(`JSON parse failed for company type detection "${companyName}". Response preview: ${responsePreview}`);
@@ -254,7 +254,7 @@ Only say high confidence if you are certain. Most fintech startups are private.`
         if (jsonMatch) {
           try {
             // Try to fix common JSON issues: trailing commas before closing braces/brackets
-            let jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
+            const jsonText = jsonMatch[0].replace(/,(\s*[}\]])/g, '$1');
             
             parsed = JSON.parse(jsonText) as Record<string, unknown>;
             log.info(`Successfully parsed JSON after fixing trailing commas for company type "${companyName}"`);
@@ -879,7 +879,7 @@ ${sourceText}`;
     // Try to parse JSON, with fallback for malformed JSON
     try {
       parsed = JSON.parse(text) as Record<string, unknown>;
-    } catch (parseError) {
+    } catch {
       // Log the actual response for debugging (first 200 chars)
       const responsePreview = text.length > 200 ? text.substring(0, 200) + "..." : text;
       log.warn(`JSON parse failed for financial context "${companyName}". Response preview: ${responsePreview}`);

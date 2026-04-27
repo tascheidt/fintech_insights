@@ -209,9 +209,9 @@ const PLACEHOLDERS: Record<PromptStage, string[]> = {
 };
 
 function toneClass(tone: Metric["tone"]) {
-  if (tone === "good") return "text-emerald-600";
-  if (tone === "warn") return "text-amber-600";
-  return "text-rose-600";
+  if (tone === "good") return "text-growth-500";
+  if (tone === "warn") return "text-accent-soft-foreground";
+  return "text-destructive";
 }
 
 function stageKey(stage: PromptStage) {
@@ -492,7 +492,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Score delta</p>
-                <p className={cn("mt-2 text-3xl font-semibold", scoreDelta >= 0 ? "text-emerald-300" : "text-rose-300")}>
+                <p className={cn("mt-2 text-3xl font-semibold", scoreDelta >= 0 ? "text-growth-500" : "text-destructive")}>
                   {scoreDelta >= 0 ? "+" : ""}
                   {scoreDelta}
                 </p>
@@ -506,7 +506,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Battle meter</p>
                 <p className="mt-1 text-lg font-semibold">{battle ? battle.companyName : selectedCompany?.name ?? "Pick a company"}</p>
               </div>
-              <Trophy className="h-5 w-5 text-amber-300" />
+              <Trophy className="h-5 w-5 text-accent" />
             </div>
             <Progress value={battleProgress} />
             <div className="grid gap-3 sm:grid-cols-2">
@@ -524,9 +524,9 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
       </Card>
 
       {(error || statusMessage) && (
-        <Card className={cn(error ? "border-rose-200 bg-rose-50/60" : "border-emerald-200 bg-emerald-50/60")}>
+        <Card className={cn(error ? "border-transparent bg-destructive/10" : "border-transparent bg-growth-500/10")}>
           <CardContent className="py-4 text-sm">
-            {error ? <p className="text-rose-700">{error}</p> : <p className="text-emerald-700">{statusMessage}</p>}
+            {error ? <p className="text-destructive">{error}</p> : <p className="text-growth-500">{statusMessage}</p>}
           </CardContent>
         </Card>
       )}
@@ -713,8 +713,8 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
                         className={cn(
                           "rounded-full px-2.5 py-1 text-[11px] font-medium",
                           missing
-                            ? "bg-rose-100 text-rose-700"
-                            : "bg-emerald-100 text-emerald-700"
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-growth-500/10 text-growth-500"
                         )}
                       >
                         {missing ? "Missing" : "Ready"} {token}
@@ -906,7 +906,7 @@ export function PromptForgeLab({ initialData }: { initialData: PromptForgeInitia
                         <p className="text-xs text-muted-foreground">{formatRelativeTime(run.createdAt)}</p>
                       </div>
                       {run.savedAsActive && (
-                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                        <span className="rounded-full bg-growth-500/10 px-2.5 py-1 text-xs font-medium text-growth-500">
                           Live
                         </span>
                       )}

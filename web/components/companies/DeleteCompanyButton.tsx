@@ -46,7 +46,7 @@ export function DeleteCompanyButton({ companyId, companyName }: DeleteCompanyBut
       setOpen(false);
       router.push("/companies");
       router.refresh();
-    } catch (err) {
+    } catch {
       setError("Network error. Please try again.");
       setLoading(false);
     }

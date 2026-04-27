@@ -9,17 +9,20 @@ import type { StrategicInitiative, StructuredAssessment } from "@/lib/ai/strateg
 // Constants
 // ============================================================================
 
+// Category chip palette — all colors resolve through design tokens defined in
+// app/globals.css (no raw Tailwind palette). Each category uses a soft surface
+// + matching foreground + a saturated dot.
 const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string; dot: string }> = {
-  "market-expansion": { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", dot: "bg-blue-500" },
-  "new-product": { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", dot: "bg-purple-500" },
-  "technology-investment": { bg: "bg-cyan-50", border: "border-cyan-200", text: "text-cyan-700", dot: "bg-cyan-500" },
-  "regulatory-preparation": { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", dot: "bg-red-500" },
-  "operational-scaling": { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", dot: "bg-amber-500" },
-  "talent-upgrade": { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", dot: "bg-emerald-500" },
-  "cost-optimization": { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-700", dot: "bg-gray-500" },
-  "customer-experience": { bg: "bg-pink-50", border: "border-pink-200", text: "text-pink-700", dot: "bg-pink-500" },
-  "ai-data-capabilities": { bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700", dot: "bg-violet-500" },
-  "other": { bg: "bg-zinc-50", border: "border-zinc-200", text: "text-zinc-700", dot: "bg-zinc-500" },
+  "market-expansion":      { bg: "bg-primary-soft",      border: "border-transparent", text: "text-primary-soft-foreground",   dot: "bg-primary" },
+  "new-product":           { bg: "bg-cat-data/10",       border: "border-transparent", text: "text-cat-data",                  dot: "bg-cat-data" },
+  "technology-investment": { bg: "bg-cat-operations/10", border: "border-transparent", text: "text-cat-operations",            dot: "bg-cat-operations" },
+  "regulatory-preparation":{ bg: "bg-destructive/10",    border: "border-transparent", text: "text-destructive",               dot: "bg-destructive" },
+  "operational-scaling":   { bg: "bg-accent-soft",       border: "border-transparent", text: "text-accent-soft-foreground",    dot: "bg-accent" },
+  "talent-upgrade":        { bg: "bg-growth-500/10",     border: "border-transparent", text: "text-growth-500",                dot: "bg-growth-500" },
+  "cost-optimization":     { bg: "bg-muted",             border: "border-transparent", text: "text-muted-foreground",          dot: "bg-muted-foreground" },
+  "customer-experience":   { bg: "bg-cat-product/10",    border: "border-transparent", text: "text-cat-product",               dot: "bg-cat-product" },
+  "ai-data-capabilities":  { bg: "bg-cat-data/10",       border: "border-transparent", text: "text-cat-data",                  dot: "bg-cat-data" },
+  "other":                 { bg: "bg-muted",             border: "border-transparent", text: "text-muted-foreground",          dot: "bg-muted-foreground" },
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -35,23 +38,25 @@ const CATEGORY_LABELS: Record<string, string> = {
   "other": "Other",
 };
 
+// Strategic initiative palette for the inline width-bar fill — reuses the
+// same design tokens as CATEGORY_COLORS above (defined in app/globals.css).
 const CATEGORY_COLORS_HEX: Record<string, string> = {
-  "market-expansion": "#3b82f6",
-  "new-product": "#a855f7",
-  "technology-investment": "#06b6d4",
-  "regulatory-preparation": "#ef4444",
-  "operational-scaling": "#f59e0b",
-  "talent-upgrade": "#10b981",
-  "cost-optimization": "#6b7280",
-  "customer-experience": "#ec4899",
-  "ai-data-capabilities": "#8b5cf6",
-  other: "#71717a",
+  "market-expansion":         "var(--primary)",
+  "new-product":              "var(--cat-data)",
+  "technology-investment":    "var(--cat-operations)",
+  "regulatory-preparation":   "var(--destructive)",
+  "operational-scaling":      "var(--accent)",
+  "talent-upgrade":           "var(--growth-500)",
+  "cost-optimization":        "var(--muted-foreground)",
+  "customer-experience":      "var(--cat-product)",
+  "ai-data-capabilities":     "var(--cat-data)",
+  other:                      "var(--muted-foreground)",
 };
 
 const CONFIDENCE_STYLES: Record<string, string> = {
-  high: "bg-green-100 text-green-700",
-  medium: "bg-yellow-100 text-yellow-700",
-  low: "bg-gray-100 text-gray-600",
+  high: "bg-primary-soft text-primary-soft-foreground",
+  medium: "bg-accent-soft text-accent-soft-foreground",
+  low: "bg-muted text-muted-foreground",
 };
 
 // ============================================================================
@@ -115,9 +120,9 @@ export function StrategyTimeline({
                   <p className="text-sm font-semibold">{overallAssessment.headline}</p>
                   <p className="text-sm leading-relaxed text-muted-foreground">{overallAssessment.details}</p>
                   {overallAssessment.keyRisk && (
-                    <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
-                      <p className="text-xs font-medium text-amber-800">Key Risk</p>
-                      <p className="text-sm text-amber-700">{overallAssessment.keyRisk}</p>
+                    <div className="mt-2 rounded-md border border-transparent bg-accent-soft px-3 py-2">
+                      <p className="text-xs font-medium text-accent-soft-foreground">Key Risk</p>
+                      <p className="text-sm text-accent-soft-foreground">{overallAssessment.keyRisk}</p>
                     </div>
                   )}
                 </div>
@@ -204,7 +209,7 @@ export function StrategyTimeline({
                       <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
                         <div
                           className="h-full rounded-full"
-                          style={{ width: `${Math.max(roleFraction, 8)}%`, backgroundColor: CATEGORY_COLORS_HEX[initiative.category] ?? "#71717a" }}
+                          style={{ width: `${Math.max(roleFraction, 8)}%`, backgroundColor: CATEGORY_COLORS_HEX[initiative.category] ?? "var(--muted-foreground)" }}
                         />
                       </div>
                       {initiative.timeframe.firstPosting && (
@@ -261,8 +266,8 @@ export function StrategyTimeline({
                       {/* Status */}
                       {initiative.timeframe.isOngoing && (
                         <div className="flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                          <span className="text-xs text-green-600 font-medium">Ongoing — still actively hiring</span>
+                          <span className="h-2 w-2 rounded-full bg-growth-500 animate-pulse" />
+                          <span className="text-xs text-growth-500 font-medium">Ongoing — still actively hiring</span>
                         </div>
                       )}
                     </div>

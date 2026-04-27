@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <defs>
+    <linearGradient id="coast180" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="oklch(0.405 0.115 244)"/>
+      <stop offset="55%" stop-color="oklch(0.575 0.150 236)"/>
+      <stop offset="100%" stop-color="oklch(0.700 0.185 32)"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="40" fill="oklch(0.990 0.006 75)"/>
+  <circle cx="90" cy="73" r="28" fill="oklch(0.830 0.170 84)"/>
+  <path d="M 22 118 Q 56 96, 90 118 T 158 118 V 152 H 22 Z" fill="url(#coast180)"/>
+</svg>

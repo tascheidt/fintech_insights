@@ -1,10 +1,18 @@
+/**
+ * FUNCTION_GROUP_COLORS — chart series colors for the 8 function-category groups.
+ *
+ * Each value resolves to a CSS variable defined in `web/app/globals.css` under
+ * the `--cat-*` family. To change a category color, edit the token in
+ * `globals.css` (and `DESIGN_SYSTEM.md` if the meaning changes) — never
+ * hardcode a hex here.
+ */
 export const FUNCTION_GROUP_COLORS = {
-  "Engineering": "#2563eb", // blue-600
-  "Product & Design": "#db2777", // pink-600
-  "Go-To-Market": "#16a34a", // green-600
-  "Data & Analytics": "#9333ea", // purple-600
-  "Finance & Strategy": "#ea580c", // orange-600
-  "Risk, Legal & Compliance": "#dc2626", // red-600
-  "Operations & People": "#0891b2", // cyan-600
-  "Other": "#71717a", // zinc-500
+  "Engineering":              "var(--cat-engineering)",
+  "Product & Design":         "var(--cat-product)",
+  "Go-To-Market":             "var(--cat-gtm)",
+  "Data & Analytics":         "var(--cat-data)",
+  "Finance & Strategy":       "var(--cat-finance)",
+  "Risk, Legal & Compliance": "var(--cat-risk)",
+  "Operations & People":      "var(--cat-operations)",
+  "Other":                    "var(--cat-other)",
 };

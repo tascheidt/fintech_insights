@@ -2,6 +2,28 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 
+const evidenceSchema = z.object({
+  when: z.string().max(80).optional().default(""),
+  text: z.string().max(400),
+  type: z.enum(["internal", "external"]).default("internal"),
+});
+
+const betSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().max(160),
+  claim: z.string().max(800).optional().default(""),
+  pivot: z.enum(["new", "accel", "cont", "quiet"]),
+  confidence: z.number().int().min(1).max(5),
+  evidence: z.array(evidenceSchema).max(6).optional().default([]),
+  forward_signal: z.string().max(400).optional().default(""),
+  job_filter: z
+    .object({
+      function: z.string().max(120).optional(),
+      theme: z.string().max(120).optional(),
+    })
+    .optional(),
+});
+
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   country: z.string().min(1).optional(),
@@ -22,6 +44,13 @@ const updateSchema = z.object({
   atsIdentifier: z.string().min(1).optional(),
   careersUrl: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
+  // v2 editorial fields (added in 20260425_company_editorial_v2.sql)
+  thesis: z.string().max(200).nullable().optional(),
+  thesisSub: z.string().max(280).nullable().optional(),
+  interpretation: z.string().max(600).nullable().optional(),
+  lastChange: z.string().max(200).nullable().optional(),
+  lastChangeAt: z.string().nullable().optional(), // "YYYY-MM-DD"
+  bets: z.array(betSchema).max(6).optional(),
 });
 
 function slugify(name: string): string {
@@ -122,6 +151,24 @@ export async function PATCH(
   }
   if (parsed.data.isActive !== undefined) {
     updates.is_active = parsed.data.isActive;
+  }
+  if (parsed.data.thesis !== undefined) {
+    updates.thesis = parsed.data.thesis;
+  }
+  if (parsed.data.thesisSub !== undefined) {
+    updates.thesis_sub = parsed.data.thesisSub;
+  }
+  if (parsed.data.interpretation !== undefined) {
+    updates.interpretation = parsed.data.interpretation;
+  }
+  if (parsed.data.lastChange !== undefined) {
+    updates.last_change = parsed.data.lastChange;
+  }
+  if (parsed.data.lastChangeAt !== undefined) {
+    updates.last_change_at = parsed.data.lastChangeAt;
+  }
+  if (parsed.data.bets !== undefined) {
+    updates.bets = parsed.data.bets;
   }
 
   if (Object.keys(updates).length === 0) {

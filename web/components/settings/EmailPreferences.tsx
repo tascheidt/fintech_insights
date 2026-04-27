@@ -73,8 +73,8 @@ export function EmailPreferences({ initialWeeklyDigest }: EmailPreferencesProps)
           <div
             className={`p-3 rounded-lg text-sm ${
               message.type === "success"
-                ? "bg-green-500/10 text-green-600 border border-green-500/20"
-                : "bg-red-500/10 text-red-600 border border-red-500/20"
+                ? "bg-primary-soft text-primary-soft-foreground border border-primary-soft"
+                : "bg-destructive/10 text-destructive border border-destructive/20"
             }`}
           >
             {message.text}

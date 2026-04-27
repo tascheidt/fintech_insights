@@ -32,17 +32,17 @@ interface FeedbackSubmission {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  submitted: "bg-gray-500/10 text-gray-600",
-  reviewing: "bg-yellow-500/10 text-yellow-600",
-  accepted: "bg-green-500/10 text-green-600",
-  maybe: "bg-blue-500/10 text-blue-600",
-  declined: "bg-red-500/10 text-red-600",
+  submitted: "bg-muted text-muted-foreground",
+  reviewing: "bg-accent-soft text-accent-soft-foreground",
+  accepted: "bg-growth-500/10 text-growth-500",
+  maybe: "bg-primary-soft text-primary-soft-foreground",
+  declined: "bg-destructive/10 text-destructive",
 };
 
 const DECISION_STYLES: Record<string, string> = {
-  yes: "bg-green-500/10 text-green-600",
-  maybe: "bg-blue-500/10 text-blue-600",
-  no: "bg-red-500/10 text-red-600",
+  yes: "bg-growth-500/10 text-growth-500",
+  maybe: "bg-primary-soft text-primary-soft-foreground",
+  no: "bg-destructive/10 text-destructive",
 };
 
 const STATUS_FILTERS = ["all", "submitted", "reviewing", "maybe", "accepted", "declined"];
@@ -202,7 +202,7 @@ export function FeedbackReviewTable() {
                           {item.triage_confidence ? ` (${item.triage_confidence}/10)` : ""}
                         </span>
                       )}
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 shrink-0">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
                         {item.type}
                       </span>
                       <p className="text-sm font-medium truncate">{item.title}</p>
@@ -244,7 +244,7 @@ export function FeedbackReviewTable() {
                             </p>
                           )}
                           {item.triage_duplicate_of && (
-                            <p className="text-xs text-yellow-600">
+                            <p className="text-xs text-accent-soft-foreground">
                               Possible duplicate: {item.triage_duplicate_of}
                             </p>
                           )}
@@ -263,7 +263,7 @@ export function FeedbackReviewTable() {
                                   href={item.github_issue_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 h-7 px-2 text-xs rounded-md font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                  className="inline-flex items-center gap-1 h-7 px-2 text-xs rounded-md font-medium text-primary hover:bg-primary-soft transition-colors"
                                 >
                                   <ExternalLink className="h-3 w-3" />
                                   Issue #{item.github_issue_number}
@@ -323,7 +323,7 @@ export function FeedbackReviewTable() {
                                 )}
                               </Button>
                               {issueError[item.id] && (
-                                <p className="text-xs text-red-600">{issueError[item.id]}</p>
+                                <p className="text-xs text-destructive">{issueError[item.id]}</p>
                               )}
                             </div>
                           )}

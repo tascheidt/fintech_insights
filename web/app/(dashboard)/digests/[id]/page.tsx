@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
+import type { RoleThemeSummary } from "@/lib/analysis/role-themes";
+import type {
+  IndustryTrend,
+  StrategySignal,
+  NotableMovement,
+} from "@/lib/analysis/digest";
 import { Calendar, Clock } from "lucide-react";
 import { DigestViewer } from "@/components/digests/DigestViewer";
 
@@ -47,10 +53,12 @@ export default async function DigestDetailPage({
 
   // Transform data for DigestViewer
   // Handle JSONB fields that might be stored as objects
-  const globalSummary = digest.global_summary as any;
-  const industryTrends = (digest.industry_trends as any) || [];
-  const strategySignals = (digest.strategy_signals as any) || [];
-  const notableMovements = (digest.notable_movements as any) || [];
+  type GlobalSummary = { headline?: string; body?: string; key_insight?: string };
+
+  const globalSummary = digest.global_summary as GlobalSummary | null;
+  const industryTrends = (digest.industry_trends as IndustryTrend[] | null) ?? [];
+  const strategySignals = (digest.strategy_signals as StrategySignal[] | null) ?? [];
+  const notableMovements = (digest.notable_movements as NotableMovement[] | null) ?? [];
 
   const digestData = {
     week_start: digest.week_start,
@@ -66,21 +74,37 @@ export default async function DigestDetailPage({
     industry_trends: industryTrends,
     strategy_signals: strategySignals,
     notable_movements: notableMovements,
-    companies: (companies || []).map((c: any) => {
+    companies: (companies || []).map((c: {
+      companies: { id?: string; name?: string; slug?: string } | { id?: string; name?: string; slug?: string }[];
+      new_job_count?: number;
+      current_open_job_count?: number;
+      year_to_date_job_count?: number;
+      departments?: Record<string, number>;
+      dominant_tech?: string[];
+      seniority_breakdown?: Record<string, number>;
+      headline?: string | null;
+      body?: string | null;
+      weekly_role_themes?: RoleThemeSummary[];
+      open_role_themes?: RoleThemeSummary[];
+      year_to_date_role_themes?: RoleThemeSummary[];
+      continuing_themes?: string[];
+      new_themes?: string[];
+      continuity?: "continuing" | "mixed" | "new_focus";
+    }) => {
       const company = Array.isArray(c.companies) ? c.companies[0] : c.companies;
       return {
         company_id: company?.id || "",
         company_name: company?.name || "Unknown",
         company_slug: company?.slug || "",
-        new_job_count: c.new_job_count,
+        new_job_count: c.new_job_count ?? 0,
         current_open_job_count: c.current_open_job_count || 0,
         year_to_date_job_count: c.year_to_date_job_count || 0,
         departments: c.departments || {},
         dominant_tech: c.dominant_tech || [],
         seniority_breakdown: c.seniority_breakdown || {},
         ai_commentary: {
-          headline: c.headline,
-          body: c.body,
+          headline: c.headline ?? "",
+          body: c.body ?? "",
         },
         jobs: [], // Jobs not stored in digest_companies table
         hiring_pattern: {

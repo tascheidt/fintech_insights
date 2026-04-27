@@ -10,6 +10,7 @@ import {
   Link,
   Hr,
 } from "@react-email/components";
+import { EMAIL_COLORS } from "../../../../lib/email/colors";
 
 interface FeedbackNotificationEmailProps {
   feedbackTitle: string;
@@ -92,13 +93,13 @@ export function FeedbackNotificationEmail({
 }
 
 const main: React.CSSProperties = {
-  backgroundColor: "#f6f9fc",
+  backgroundColor: EMAIL_COLORS.bg,
   fontFamily:
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif',
 };
 
 const container: React.CSSProperties = {
-  backgroundColor: "#ffffff",
+  backgroundColor: EMAIL_COLORS.surface,
   margin: "0 auto",
   padding: "20px 0 48px",
   maxWidth: "600px",
@@ -110,7 +111,7 @@ const header: React.CSSProperties = {
 };
 
 const title: React.CSSProperties = {
-  color: "#1a1a2e",
+  color: EMAIL_COLORS.fg,
   fontSize: "22px",
   fontWeight: "700",
   lineHeight: "1.2",
@@ -118,13 +119,13 @@ const title: React.CSSProperties = {
 };
 
 const subtitle: React.CSSProperties = {
-  color: "#6b7280",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "13px",
   margin: "0",
 };
 
 const divider: React.CSSProperties = {
-  borderColor: "#e5e7eb",
+  borderColor: EMAIL_COLORS.border,
   margin: "16px 40px",
 };
 
@@ -133,7 +134,7 @@ const content: React.CSSProperties = {
 };
 
 const typeTag: React.CSSProperties = {
-  color: "#4a69bd",
+  color: EMAIL_COLORS.primary,
   fontSize: "11px",
   fontWeight: "600",
   textTransform: "uppercase" as const,
@@ -142,7 +143,7 @@ const typeTag: React.CSSProperties = {
 };
 
 const feedbackTitleStyle: React.CSSProperties = {
-  color: "#1a1a2e",
+  color: EMAIL_COLORS.fg,
   fontSize: "18px",
   fontWeight: "600",
   lineHeight: "1.4",
@@ -150,14 +151,14 @@ const feedbackTitleStyle: React.CSSProperties = {
 };
 
 const body: React.CSSProperties = {
-  color: "#374151",
+  color: EMAIL_COLORS.fg2,
   fontSize: "14px",
   lineHeight: "1.6",
   margin: "0 0 8px",
 };
 
 const meta: React.CSSProperties = {
-  color: "#9ca3af",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "12px",
   margin: "16px 0 0",
 };
@@ -168,8 +169,8 @@ const ctaSection: React.CSSProperties = {
 
 const ctaLink: React.CSSProperties = {
   display: "inline-block",
-  backgroundColor: "#1a1a2e",
-  color: "#ffffff",
+  backgroundColor: EMAIL_COLORS.fg,
+  color: EMAIL_COLORS.surface,
   fontSize: "13px",
   fontWeight: "600",
   padding: "10px 20px",
@@ -183,7 +184,7 @@ const footer: React.CSSProperties = {
 };
 
 const footerText: React.CSSProperties = {
-  color: "#9ca3af",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "11px",
   textAlign: "center" as const,
   margin: "0",

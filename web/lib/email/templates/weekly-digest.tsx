@@ -21,6 +21,7 @@ import {
   type CompanySectionView,
   type SurfaceContext,
 } from "@/components/digests/digest-render-helpers";
+import { EMAIL_COLORS } from "@/lib/email/colors";
 
 interface WeeklyDigestEmailProps {
   digest: WeeklyDigest;
@@ -44,7 +45,7 @@ function GlobalSummarySection({ summary }: { summary: GlobalSummary }) {
           ...globalBody,
           fontSize: "16px",
           fontWeight: "600",
-          color: "#1a1a2e",
+          color: EMAIL_COLORS.fg,
           marginBottom: "14px",
           lineHeight: "1.5",
         }}>
@@ -75,7 +76,7 @@ function CompanySection({
   return (
     <Section style={companySection}>
       {/* Company Name - Clickable */}
-      <Link href={links.company} style={{ ...companyName, color: "#000", textDecoration: "none" }}>
+      <Link href={links.company} style={{ ...companyName, color: EMAIL_COLORS.fg, textDecoration: "none" }}>
         {company.company_name}
       </Link>
 
@@ -89,7 +90,7 @@ function CompanySection({
         {company.ai_commentary.body}
       </Text>
 
-      <Text style={{ ...statsLine, marginBottom: "12px", color: "#4b5563" }}>
+      <Text style={{ ...statsLine, marginBottom: "12px", color: EMAIL_COLORS.fg2 }}>
         {isContinuing ? (
           `This continues an existing hiring pattern for ${company.company_name}.`
         ) : hasNewThemes ? (
@@ -187,7 +188,7 @@ export function WeeklyDigestEmail({
             </Text>
             <Text style={{ textAlign: "center" as const, marginTop: "12px", marginBottom: "0" }}>
               <Link href={topLinks.digest} style={{
-                color: "#6b7280",
+                color: EMAIL_COLORS.fgMuted,
                 fontSize: "13px",
                 textDecoration: "underline",
               }}>
@@ -232,7 +233,7 @@ export function WeeklyDigestEmail({
                   New This Week
                 </Heading>
                 {signalRows.slice(0, 3).map((row, idx) => (
-                  <div key={idx} style={{ marginBottom: "16px", paddingBottom: "16px", borderBottom: idx < Math.min(signalRows.length - 1, 2) ? "1px solid #e5e7eb" : "none" }}>
+                  <div key={idx} style={{ marginBottom: "16px", paddingBottom: "16px", borderBottom: idx < Math.min(signalRows.length - 1, 2) ? `1px solid ${EMAIL_COLORS.border}` : "none" }}>
                     <Text style={{ fontWeight: "600", marginBottom: "4px" }}>
                       {row.companyHref ? (
                         <Link href={row.companyHref} style={inlineLink}>
@@ -242,7 +243,7 @@ export function WeeklyDigestEmail({
                         row.signal.company
                       )}
                     </Text>
-                    <Text style={{ fontSize: "14px", color: "#6b7280", marginBottom: "8px" }}>
+                    <Text style={{ fontSize: "14px", color: EMAIL_COLORS.fgMuted, marginBottom: "8px" }}>
                       {row.signalHref ? (
                         <Link href={row.signalHref} style={inlineLink}>
                           {row.signal.signal}
@@ -251,16 +252,16 @@ export function WeeklyDigestEmail({
                         row.signal.signal
                       )}
                     </Text>
-                    <Text style={{ fontSize: "13px", color: "#374151", lineHeight: "1.5", marginBottom: "6px" }}>
+                    <Text style={{ fontSize: "13px", color: EMAIL_COLORS.fg2, lineHeight: "1.5", marginBottom: "6px" }}>
                       {row.signal.detail}
                     </Text>
-                    <Text style={{ fontSize: "12px", color: "#6b7280" }}>
+                    <Text style={{ fontSize: "12px", color: EMAIL_COLORS.fgMuted }}>
                       {row.signal.interpretation}
                     </Text>
                   </div>
                 ))}
                 {signalRows.length > 3 && (
-                  <Text style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px" }}>
+                  <Text style={{ fontSize: "12px", color: EMAIL_COLORS.fgMuted, marginTop: "8px" }}>
                     <Link href={topLinks.digest} style={inlineLink}>
                       +{signalRows.length - 3} more signals in full digest
                     </Link>
@@ -278,20 +279,20 @@ export function WeeklyDigestEmail({
                 <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "4px" }}>
                   Role Focus This Week
                 </Heading>
-                <Text style={{ fontSize: "13px", color: "#6b7280", marginBottom: "12px" }}>
+                <Text style={{ fontSize: "13px", color: EMAIL_COLORS.fgMuted, marginBottom: "12px" }}>
                   The role areas that showed up across multiple companies this week
                 </Text>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                   <thead>
-                    <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
-                      <th style={{ textAlign: "left", padding: "6px 8px 6px 0", fontWeight: "600", color: "#6b7280" }}>Theme</th>
-                      <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: "600", color: "#6b7280" }}>Roles</th>
-                      <th style={{ textAlign: "left", padding: "6px 0 6px 8px", fontWeight: "600", color: "#6b7280" }}>Companies</th>
+                    <tr style={{ borderBottom: `1px solid ${EMAIL_COLORS.border}` }}>
+                      <th style={{ textAlign: "left", padding: "6px 8px 6px 0", fontWeight: "600", color: EMAIL_COLORS.fgMuted }}>Theme</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: "600", color: EMAIL_COLORS.fgMuted }}>Roles</th>
+                      <th style={{ textAlign: "left", padding: "6px 0 6px 8px", fontWeight: "600", color: EMAIL_COLORS.fgMuted }}>Companies</th>
                     </tr>
                   </thead>
                   <tbody>
                     {trendRows.slice(0, 5).map((row, idx) => (
-                      <tr key={idx} style={{ borderBottom: idx < Math.min(trendRows.length - 1, 4) ? "1px solid #f3f4f6" : "none" }}>
+                      <tr key={idx} style={{ borderBottom: idx < Math.min(trendRows.length - 1, 4) ? `1px solid ${EMAIL_COLORS.borderSubtle}` : "none" }}>
                         <td style={{ padding: "8px 8px 8px 0", fontWeight: "500" }}>
                           {row.href ? (
                             <Link href={row.href} style={inlineLink}>
@@ -304,7 +305,7 @@ export function WeeklyDigestEmail({
                         <td style={{ padding: "8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                           {String(row.trend.jobCount)}
                         </td>
-                        <td style={{ padding: "8px 0 8px 8px", color: "#6b7280" }}>
+                        <td style={{ padding: "8px 0 8px 8px", color: EMAIL_COLORS.fgMuted }}>
                           {row.companies.map((badge, companyIdx) => {
                             const separator = companyIdx < row.companies.length - 1 ? ", " : "";
                             if (!badge.href) {
@@ -386,12 +387,12 @@ export function WeeklyDigestEmail({
 // ============================================================================
 
 const main: React.CSSProperties = {
-  backgroundColor: "#f6f9fc",
+  backgroundColor: EMAIL_COLORS.bg,
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif',
 };
 
 const container: React.CSSProperties = {
-  backgroundColor: "#ffffff",
+  backgroundColor: EMAIL_COLORS.surface,
   margin: "0 auto",
   padding: "20px 0 48px",
   maxWidth: "600px",
@@ -403,7 +404,7 @@ const header: React.CSSProperties = {
 };
 
 const title: React.CSSProperties = {
-  color: "#1a1a2e",
+  color: EMAIL_COLORS.fg,
   fontSize: "28px",
   fontWeight: "700",
   lineHeight: "1.2",
@@ -411,19 +412,19 @@ const title: React.CSSProperties = {
 };
 
 const subtitle: React.CSSProperties = {
-  color: "#6b7280",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "14px",
   margin: "0",
 };
 
 const globalSummarySection: React.CSSProperties = {
   padding: "24px 40px 28px",
-  borderTop: "3px solid #1a1a2e",
+  borderTop: `3px solid ${EMAIL_COLORS.fg}`,
   margin: "0 20px 8px",
 };
 
 const globalHeadline: React.CSSProperties = {
-  color: "#1a1a2e",
+  color: EMAIL_COLORS.fg,
   fontSize: "22px",
   fontWeight: "700",
   lineHeight: "1.3",
@@ -432,7 +433,7 @@ const globalHeadline: React.CSSProperties = {
 };
 
 const globalBody: React.CSSProperties = {
-  color: "#374151",
+  color: EMAIL_COLORS.fg2,
   fontSize: "15px",
   lineHeight: "1.7",
   margin: "0 0 8px",
@@ -450,7 +451,7 @@ const statsTable: React.CSSProperties = {
 
 const statCell: React.CSSProperties = {
   padding: "16px",
-  backgroundColor: "#f9fafb",
+  backgroundColor: EMAIL_COLORS.surfaceMuted,
   borderRadius: "8px",
   width: "50%",
 };
@@ -460,7 +461,7 @@ const statCell: React.CSSProperties = {
  * wrapper — react-email's <Text> renders a <p>, which is invalid inside <a>.
  */
 const statNumberSpan: React.CSSProperties = {
-  color: "#4a69bd",
+  color: EMAIL_COLORS.primary,
   fontSize: "32px",
   fontWeight: "700",
   lineHeight: "1",
@@ -468,7 +469,7 @@ const statNumberSpan: React.CSSProperties = {
 };
 
 const statDescriptionSpan: React.CSSProperties = {
-  color: "#6b7280",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "12px",
   marginTop: "8px",
   textTransform: "uppercase" as const,
@@ -477,17 +478,17 @@ const statDescriptionSpan: React.CSSProperties = {
 };
 
 const divider: React.CSSProperties = {
-  borderColor: "#e5e7eb",
+  borderColor: EMAIL_COLORS.border,
   margin: "24px 40px",
 };
 
 const companySection: React.CSSProperties = {
   padding: "24px 40px",
-  borderBottom: "1px solid #f3f4f6",
+  borderBottom: `1px solid ${EMAIL_COLORS.borderSubtle}`,
 };
 
 const companyName: React.CSSProperties = {
-  color: "#9ca3af",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "12px",
   fontWeight: "600",
   margin: "0 0 8px",
@@ -496,7 +497,7 @@ const companyName: React.CSSProperties = {
 };
 
 const headline: React.CSSProperties = {
-  color: "#1a1a2e",
+  color: EMAIL_COLORS.fg,
   fontSize: "20px",
   fontWeight: "700",
   lineHeight: "1.3",
@@ -504,14 +505,14 @@ const headline: React.CSSProperties = {
 };
 
 const bodyText: React.CSSProperties = {
-  color: "#4b5563",
+  color: EMAIL_COLORS.fg2,
   fontSize: "15px",
   lineHeight: "1.6",
   margin: "0 0 16px",
 };
 
 const statsLine: React.CSSProperties = {
-  color: "#9ca3af",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "12px",
   margin: "0",
   lineHeight: "1.5",
@@ -527,7 +528,7 @@ const emptySection: React.CSSProperties = {
 };
 
 const emptyText: React.CSSProperties = {
-  color: "#6b7280",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "15px",
 };
 
@@ -541,27 +542,27 @@ const footerText: React.CSSProperties = {
 };
 
 const footerLink: React.CSSProperties = {
-  color: "#4a69bd",
+  color: EMAIL_COLORS.primary,
   fontSize: "14px",
   fontWeight: "600",
   textDecoration: "none",
 };
 
 const footerMuted: React.CSSProperties = {
-  color: "#9ca3af",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "12px",
   margin: "0",
 };
 
 const footerVersion: React.CSSProperties = {
-  color: "#c0c0c0",
+  color: EMAIL_COLORS.fgFaint,
   fontSize: "11px",
   margin: "8px 0 0",
   textAlign: "center" as const,
 };
 
 const footerVersionLink: React.CSSProperties = {
-  color: "#9ca3af",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "11px",
   textDecoration: "underline",
 };
@@ -574,7 +575,7 @@ const footerVersionLink: React.CSSProperties = {
 const inlineLink: React.CSSProperties = {
   color: "inherit",
   textDecoration: "underline",
-  textDecorationColor: "#c0c0c0",
+  textDecorationColor: EMAIL_COLORS.fgFaint,
   textUnderlineOffset: "2px",
 };
 

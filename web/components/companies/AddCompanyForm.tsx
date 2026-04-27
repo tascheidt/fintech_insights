@@ -221,20 +221,16 @@ export function AddCompanyForm() {
             <div
               className={`p-4 rounded-lg border ${
                 detection.detected && detection.verified
-                  ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"
+                  ? "bg-primary-soft border-primary/20"
                   : detection.detected
-                  ? "bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800"
-                  : "bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800"
+                  ? "bg-accent-soft border-accent/20"
+                  : "bg-destructive/10 border-destructive/20"
               }`}
             >
               {detection.detected ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    {detection.verified ? (
-                      <span className="text-green-600 dark:text-green-400">✓</span>
-                    ) : (
-                      <span className="text-blue-600 dark:text-blue-400">✓</span>
-                    )}
+                    <span className={detection.verified ? "text-primary-soft-foreground" : "text-accent-soft-foreground"}>✓</span>
                     <span className="font-medium">
                       Detected: {detection.atsLabel ?? detection.atsType}
                     </span>
@@ -242,7 +238,7 @@ export function AddCompanyForm() {
                   <div className="text-sm text-muted-foreground">
                     <p>Identifier: <code className="bg-muted px-1 rounded">{detection.atsIdentifier}</code></p>
                     {detection.verified && (
-                      <p className="text-green-600 dark:text-green-400 mt-1">
+                      <p className="text-primary-soft-foreground mt-1">
                         Verified! Found {detection.jobCount} jobs
                       </p>
                     )}
@@ -252,7 +248,7 @@ export function AddCompanyForm() {
                       </p>
                     )}
                     {detection.implemented === false && (
-                      <p className="text-yellow-600 dark:text-yellow-400 mt-1">
+                      <p className="text-highlight-soft-foreground mt-1">
                         {detection.message}
                       </p>
                     )}
@@ -260,7 +256,7 @@ export function AddCompanyForm() {
                   <button
                     type="button"
                     onClick={() => setShowManual(true)}
-                    className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+                    className="text-sm text-primary hover:underline"
                   >
                     Override detection
                   </button>
@@ -268,7 +264,7 @@ export function AddCompanyForm() {
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-red-600 dark:text-red-400">✗</span>
+                    <span className="text-destructive">✗</span>
                     <span className="font-medium">Could not detect ATS platform</span>
                   </div>
                   <p className="text-sm text-muted-foreground">{detection.message}</p>
@@ -312,7 +308,7 @@ export function AddCompanyForm() {
                 <button
                   type="button"
                   onClick={() => setShowManual(false)}
-                  className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+                  className="text-sm text-primary hover:underline"
                 >
                   Use detected values
                 </button>

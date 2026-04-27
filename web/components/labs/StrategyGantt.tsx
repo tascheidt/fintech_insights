@@ -2,17 +2,18 @@
 
 import type { StrategicInitiative } from "@/lib/ai/strategy-analysis";
 
+// Strategic initiative palette — tokens defined in app/globals.css.
 const CATEGORY_COLORS_HEX: Record<string, string> = {
-  "market-expansion": "#3b82f6",
-  "new-product": "#a855f7",
-  "technology-investment": "#06b6d4",
-  "regulatory-preparation": "#ef4444",
-  "operational-scaling": "#f59e0b",
-  "talent-upgrade": "#10b981",
-  "cost-optimization": "#6b7280",
-  "customer-experience": "#ec4899",
-  "ai-data-capabilities": "#8b5cf6",
-  other: "#71717a",
+  "market-expansion":         "var(--strat-market-expansion)",
+  "new-product":              "var(--strat-new-product)",
+  "technology-investment":    "var(--strat-technology-investment)",
+  "regulatory-preparation":   "var(--strat-regulatory-preparation)",
+  "operational-scaling":      "var(--strat-operational-scaling)",
+  "talent-upgrade":           "var(--strat-talent-upgrade)",
+  "cost-optimization":        "var(--strat-cost-optimization)",
+  "customer-experience":      "var(--strat-customer-experience)",
+  "ai-data-capabilities":     "var(--strat-ai-data-capabilities)",
+  other:                      "var(--strat-other)",
 };
 
 function monthsBetween(start: Date, end: Date): string[] {

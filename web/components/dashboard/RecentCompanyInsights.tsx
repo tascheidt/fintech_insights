@@ -48,12 +48,12 @@ export function RecentCompanyInsights({ insights }: RecentCompanyInsightsProps) 
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium">{insight.company.name}</span>
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide ${
                         insight.confidence === "high"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          ? "bg-primary-soft text-primary-soft-foreground"
                           : insight.confidence === "medium"
-                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                            : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                            ? "bg-accent-soft text-accent-soft-foreground"
+                            : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {insight.confidence}

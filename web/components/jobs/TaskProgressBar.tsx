@@ -84,10 +84,10 @@ export function TaskProgressBar({ progress, currentStage, className }: TaskProgr
                   <div
                     className={cn(
                       "flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium",
-                      isCompleted && "bg-green-500 text-white",
-                      isFailed && "bg-red-500 text-white",
-                      isRunning && "bg-blue-500 text-white animate-pulse",
-                      !isCompleted && !isFailed && !isRunning && "bg-gray-300 text-gray-600"
+                      isCompleted && "bg-primary text-primary-foreground",
+                      isFailed && "bg-destructive text-white",
+                      isRunning && "bg-accent text-accent-foreground animate-pulse",
+                      !isCompleted && !isFailed && !isRunning && "bg-muted text-muted-foreground"
                     )}
                   >
                     {isCompleted ? (
@@ -116,7 +116,7 @@ export function TaskProgressBar({ progress, currentStage, className }: TaskProgr
                 <div
                   className={cn(
                     "h-0.5 flex-1",
-                    isCompleted ? "bg-green-500" : "bg-gray-300"
+                    isCompleted ? "bg-primary" : "bg-muted"
                   )}
                 />
               )}

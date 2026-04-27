@@ -59,7 +59,7 @@ export async function requireAdminPage() {
   }
 
   if (context.profile?.role !== "admin") {
-    redirect("/");
+    redirect("/dashboard");
   }
 
   return {
