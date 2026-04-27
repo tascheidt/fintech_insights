@@ -1,17 +1,56 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import noRawColor from "./eslint-rules/no-raw-color.js";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    plugins: {
+      "design-system": {
+        rules: { "no-raw-color": noRawColor },
+      },
+    },
+    rules: {
+      // Phase 1: ship as warn so the migration can land without CI noise.
+      // Promote to "error" once all Tailwind chart files and email templates
+      // have been migrated to tokens.
+      "design-system/no-raw-color": "warn",
+    },
+  },
+  // Operational scripts, email templates, and the canonical email color map
+  // have legitimate reasons to use loose typing, unused imports, and raw hex.
+  // Email clients can't consume CSS variables; lib/email/colors.ts is the
+  // single source of truth for those hex values and is intentionally exempt.
+  {
+    files: [
+      "scripts/**/*.{ts,tsx,js,mjs}",
+      "lib/email/colors.ts",
+      "lib/email/templates/**/*.{ts,tsx}",
+      "packages/feedback/src/services/email-template.{ts,tsx}",
+      "packages/feedback/templates/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "design-system/no-raw-color": "off",
+    },
+  },
+  // proxy.ts at the repo root needs `let` for some shadcn-style helpers.
+  {
+    files: ["proxy.ts"],
+    rules: {
+      "prefer-const": "warn",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "eslint-rules/**",
   ]),
 ]);
 

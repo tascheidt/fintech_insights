@@ -9,10 +9,19 @@
 
 import type { JobData } from "./types";
 import type { Browser } from "puppeteer-core";
-import { htmlToText, detectLocationType, normalizeCommitment } from "./utils";
+import { detectLocationType, normalizeCommitment } from "./utils";
 
 let puppeteer: typeof import("puppeteer-core") | null = null;
-let chromium: any = null;
+// Dynamic import target. The original code accessed `defaultViewport` and
+// `headless` on the chromium module — neither is exported by recent
+// @sparticuz/chromium versions, but undefined access flows through to
+// puppeteer.launch() which falls back to its defaults. Typing as the static
+// class shape ∪ the legacy fields preserves the actual behavior without `any`.
+type ChromiumModule = typeof import("@sparticuz/chromium").default & {
+  defaultViewport?: { width: number; height: number } | null;
+  headless?: boolean;
+};
+let chromium: ChromiumModule | null = null;
 
 async function loadBrowserDependencies() {
   if (!puppeteer) {
@@ -356,7 +365,7 @@ export async function scrapeDayforceWithBrowser(
                 try {
                   const nextData = JSON.parse(nextDataScript.textContent || '{}');
                   const jobData = nextData?.props?.pageProps?.jobData || 
-                                 nextData?.props?.pageProps?.dehydratedState?.queries?.find((q: any) => 
+                                 nextData?.props?.pageProps?.dehydratedState?.queries?.find((q: { queryKey?: unknown[]; state?: { data?: { jobData?: unknown } } }) =>
                                    q?.queryKey?.[0] === 'jobs' || 
                                    q?.state?.data?.jobData
                                  )?.state?.data?.jobData;
@@ -366,7 +375,7 @@ export async function scrapeDayforceWithBrowser(
                       return true;
                     }
                   }
-                } catch (e) {
+                } catch {
                   // JSON parsing failed, check DOM instead
                 }
               }
@@ -461,14 +470,14 @@ export async function scrapeDayforceWithBrowser(
                       // Extract location from postingLocations
                       const locations = jobData.postingLocations || [];
                       const location = locations.length > 0 
-                        ? locations.map((loc: any) => 
+                        ? locations.map((loc: { formattedAddress?: string; cityName?: string; stateCode?: string; isoCountryCode?: string }) =>
                             loc.formattedAddress || 
                             [loc.cityName, loc.stateCode, loc.isoCountryCode].filter(Boolean).join(', ')
                           ).join('; ')
                         : '';
                       
                       // Extract department from jobPostingAttributes
-                      const jobFunction = jobData.jobPostingAttributes?.find((attr: any) => 
+                      const jobFunction = jobData.jobPostingAttributes?.find((attr: { name?: string; value?: string }) =>
                         attr.name === 'JobFunction' || attr.name === 'JobFamily'
                       );
                       const department = jobFunction?.value || jobData.jobFamily || '';
@@ -479,7 +488,7 @@ export async function scrapeDayforceWithBrowser(
                                        '';
                       
                       // Extract employment type
-                      const payType = jobData.jobPostingAttributes?.find((attr: any) => 
+                      const payType = jobData.jobPostingAttributes?.find((attr: { name?: string; value?: string }) =>
                         attr.name === 'PayType'
                       );
                       const employmentType = payType?.value || '';
@@ -498,7 +507,7 @@ export async function scrapeDayforceWithBrowser(
                     }
                   }
                 }
-              } catch (e) {
+              } catch {
                 // JSON parsing failed, fall through to DOM extraction
                 // Note: console.error in page.evaluate won't show in Node.js logs
               }

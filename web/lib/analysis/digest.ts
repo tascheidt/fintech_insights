@@ -85,7 +85,7 @@ export interface WeeklyDigestCompanyInput {
   continuity: "continuing" | "mixed" | "new_focus";
 }
 
-export interface CompanyHiringPattern extends WeeklyDigestCompanyInput {}
+export type CompanyHiringPattern = WeeklyDigestCompanyInput;
 
 export interface CompanyWeeklySummary {
   company_id: string;
@@ -455,7 +455,6 @@ export function buildWeeklyDigestCompanyInput(
   historicalContext: HistoricalPatternContext
 ): WeeklyDigestCompanyInput {
   const weeklyRoleThemes = aggregateRoleThemes(companyData.jobs);
-  const weeklyThemeIds = new Set(weeklyRoleThemes.map((theme) => theme.id));
   const historicalThemeIds = new Set(historicalContext.yearToDateRoleThemes.map((theme) => theme.id));
 
   const continuingThemes = weeklyRoleThemes

@@ -25,7 +25,7 @@ const ATS_PATTERNS: ATSPattern[] = [
       /^jobs\.lever\.co$/i,
       /^([a-z0-9-]+)\.lever\.co$/i,
     ],
-    extractIdentifier: (url: URL, match: RegExpMatchArray | null) => {
+    extractIdentifier: (url: URL) => {
       const host = url.hostname.toLowerCase();
       if (host === "jobs.lever.co") {
         // Path format: /identifier/...

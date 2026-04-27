@@ -1,17 +1,39 @@
 /**
- * Job Detail Page
- * 
- * Shows individual job posting details.
- * Note: This page is kept for deep links. Jobs are now primarily accessed
- * through company pages at /companies/[slug].
+ * Job Detail Page — redesigned per design system.
+ *
+ * Visual contract:
+ * - Two-column layout: posting body (1fr) + 320px sidebar at ≥980px.
+ * - Stacks vertically on narrow viewports.
+ * - Sidebar consolidates extracted strategic insights into a "Why this matters"
+ *   editorial block.
  */
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { format } from "date-fns";
+import { ArrowLeft, ExternalLink } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type JobRecord = {
+  id: string;
+  title: string;
+  description_text?: string | null;
+  url?: string | null;
+  location?: string | null;
+  standardized_department?: string | null;
+  first_seen_date?: string | null;
+};
+
+type CompanyRef = { id: string; name: string; slug: string };
+
+type StrategicInsight = {
+  id: string;
+  category?: string | null;
+  insight_summary?: string | null;
+  run_date?: string | null;
+};
 
 export default async function JobDetailPage({
   params,
@@ -38,65 +60,158 @@ export default async function JobDetailPage({
     .eq("job_posting_id", id)
     .order("run_date", { ascending: false });
 
-  const company = (job as { companies?: { name: string; slug: string } }).companies;
+  const j = job as JobRecord & { companies?: CompanyRef };
+  const company = j.companies;
+  const insightList: StrategicInsight[] = insights ?? [];
+
+  const paragraphs = (j.description_text ?? "")
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-center gap-4">
+    <div className="space-y-6">
+      <div>
         <Button variant="ghost" size="sm" asChild>
-          <Link href={source === "jobs" ? "/jobs" : company?.slug ? `/companies/${company.slug}` : "/companies"}>
-            ← Back to {source === "jobs" ? "Jobs" : company?.name ?? "Companies"}
+          <Link
+            href={
+              source === "jobs"
+                ? "/jobs"
+                : company?.slug
+                  ? `/companies/${company.slug}`
+                  : "/companies"
+            }
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to {source === "jobs" ? "Jobs" : company?.name ?? "Companies"}
           </Link>
         </Button>
       </div>
-      <Card>
-        <CardHeader>
-          <h1 className="text-2xl font-bold">{(job as { title: string }).title}</h1>
-          <p className="text-muted-foreground">
-            <Link href={`/companies/${company?.slug ?? ""}`} className="hover:underline">{company?.name ?? "Unknown"}</Link>
-            {" · "}
-            {(job as { standardized_department?: string }).standardized_department ?? "—"}
-            {" · "}
-            {(job as { location?: string }).location ?? "—"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            First seen: {(job as { first_seen_date?: string }).first_seen_date ? format(new Date((job as { first_seen_date: string }).first_seen_date), "MMM d, yyyy") : "—"}
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {(job as { description_text?: string }).description_text && (
-            <div className="prose prose-sm max-w-none">
-              <pre className="whitespace-pre-wrap font-sans text-sm">{(job as { description_text: string }).description_text}</pre>
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        {/* Posting body */}
+        <article className="min-w-0 space-y-6">
+          <header className="space-y-3 border-b border-border pb-6">
+            <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-primary">
+              {company?.name ?? "Unknown company"}
+            </p>
+            <h1 className="font-display font-semibold text-[32px] tracking-[-0.018em] leading-[1.12] text-foreground">
+              {j.title}
+            </h1>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11.5px] tracking-[0.02em] text-muted-foreground">
+              {j.standardized_department && <span>{j.standardized_department}</span>}
+              {j.location && <span>· {j.location}</span>}
+              {j.first_seen_date && (
+                <span>· First seen {format(new Date(j.first_seen_date), "MMM d, yyyy")}</span>
+              )}
             </div>
+          </header>
+
+          {paragraphs.length > 0 ? (
+            <div className="space-y-4 max-w-[68ch] text-[15px] leading-[1.65] text-foreground">
+              {paragraphs.map((p, i) => (
+                <p key={i} className="whitespace-pre-wrap">{p}</p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No description text captured for this posting.
+            </p>
           )}
-          {(job as { url?: string }).url && (
-            <a href={(job as { url: string }).url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+
+          {j.url && (
+            <a
+              href={j.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
               View original posting
+              <ExternalLink className="h-3.5 w-3.5" />
             </a>
           )}
-        </CardContent>
-      </Card>
-      {(insights ?? []).length > 0 && (
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold">Strategic Insights</h2>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {(insights as { id: string; category?: string; insight_summary?: string; run_date?: string }[]).map((i) => (
-                <li key={i.id}>
-                  <Link href={`/insights/${i.id}`} className="hover:underline">
-                    {i.category ?? "—"}: {i.insight_summary?.slice(0, 100) ?? ""}…
+        </article>
+
+        {/* Sidebar */}
+        <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+          <SidebarBlock title="Why this matters">
+            {company ? (
+              <>
+                <p className="text-sm text-foreground/80 leading-relaxed">
+                  Posting from{" "}
+                  <Link
+                    href={`/companies/${company.slug}`}
+                    className="font-medium text-foreground hover:underline"
+                  >
+                    {company.name}
                   </Link>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    {i.run_date ? format(new Date(i.run_date), "MMM d") : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+                  . Read the full company picture for surrounding hiring context.
+                </p>
+                <Link
+                  href={`/companies/${company.slug}`}
+                  className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  Open company drill-down
+                </Link>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Company context unavailable.
+              </p>
+            )}
+          </SidebarBlock>
+
+          {insightList.length > 0 && (
+            <SidebarBlock title="Strategic signals">
+              <ul className="space-y-3">
+                {insightList.map((i) => (
+                  <li key={i.id} className="space-y-0.5">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                      {i.category ?? "signal"}
+                    </p>
+                    <Link
+                      href={`/insights/${i.id}`}
+                      className="text-sm text-foreground hover:underline"
+                    >
+                      {(i.insight_summary ?? "").slice(0, 120)}
+                      {(i.insight_summary ?? "").length > 120 && "…"}
+                    </Link>
+                    {i.run_date && (
+                      <p className="font-mono text-[10px] text-muted-foreground tabular-nums">
+                        {format(new Date(i.run_date), "MMM d")}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </SidebarBlock>
+          )}
+        </aside>
+      </div>
     </div>
+  );
+}
+
+function SidebarBlock({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-[10px] border border-border bg-card px-5 py-4",
+        className
+      )}
+    >
+      <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-primary mb-3">
+        {title}
+      </p>
+      {children}
+    </section>
   );
 }

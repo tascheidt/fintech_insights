@@ -1,9 +1,9 @@
 import type { Change } from "@/lib/releases";
 
 const badgeStyles: Record<Change["type"], string> = {
-  feature: "bg-emerald-50 text-emerald-700",
-  fix: "bg-amber-50 text-amber-700",
-  improvement: "bg-blue-50 text-blue-700",
+  feature: "bg-accent-soft text-accent-soft-foreground",
+  fix: "bg-highlight-soft text-highlight-soft-foreground",
+  improvement: "bg-primary-soft text-primary-soft-foreground",
 };
 
 const badgeLabels: Record<Change["type"], string> = {

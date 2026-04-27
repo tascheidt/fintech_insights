@@ -27,7 +27,7 @@ function toIso(val: unknown): string | null {
 async function main() {
   const db = new Database(dbPath, { readonly: true });
 
-  let { data: orgs } = await supabase.from("organizations").select("id").eq("slug", "default").limit(1);
+  const { data: orgs } = await supabase.from("organizations").select("id").eq("slug", "default").limit(1);
   let orgId: string;
   if (orgs?.length) {
     orgId = orgs[0].id;

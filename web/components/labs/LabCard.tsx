@@ -64,7 +64,7 @@ export function LabCard({
                 {status}
               </NotionCardTag>
               {adminOnly && (
-                <NotionCardTag className="rounded-full px-2.5 py-1 text-[11px] bg-amber-100 text-amber-700">
+                <NotionCardTag className="rounded-full px-2.5 py-1 text-[11px] bg-accent-soft text-accent-soft-foreground">
                   Admin only
                 </NotionCardTag>
               )}

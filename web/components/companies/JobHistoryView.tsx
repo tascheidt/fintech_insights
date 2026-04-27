@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils";
 import { format, subDays, subMonths } from "date-fns";
 import {
   Search,
-  Briefcase,
   MapPin,
   Calendar,
   ChevronLeft,
@@ -52,6 +51,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { getCategoryLabel, getCategoryGroup, ROLE_CATEGORIES, type RoleCategory } from "@/lib/analysis/function-categories";
 import { classifyJob, getThemeLabel } from "@/lib/analysis/role-themes";
+import { CompanyAvatar } from "@/components/companies/CompanyAvatar";
 
 /** Job posting data structure */
 export interface JobData {
@@ -425,15 +425,12 @@ export function JobHistoryView({
 
   return (
     <div className={cn("space-y-4", className)}>
-      {/* Header */}
+      {/* Header — eyebrow + count, no redundant title (the page already titled this section) */}
       {showHeader && (
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Job Postings</h2>
-            <p className="text-sm text-muted-foreground">
-              {filteredJobs.length} of {jobs.length} jobs
-            </p>
-          </div>
+        <div className="flex items-end justify-between border-b border-border pb-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
+            {filteredJobs.length} of {jobs.length} {jobs.length === 1 ? "job" : "jobs"}
+          </p>
           <ViewToggle view={view} onViewChange={setView} />
         </div>
       )}
@@ -604,173 +601,240 @@ export function JobHistoryView({
 }
 
 /**
- * Card view for jobs
+ * Hot functions — these get the highlight chip (sunset-soft) instead of
+ * the neutral muted chip. Compliance & Payments are the canonical "hot"
+ * categories per CORRECTIONS.md § 3.
+ */
+const HOT_FUNCTION_GROUPS = new Set([
+  "Risk, Legal & Compliance",
+  "Engineering", // Payments often nests under Eng
+]);
+
+/** Compact "2d ago" / "Mar 14" first-seen formatter. */
+function formatFirstSeen(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const days = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 1) return "today";
+  if (days < 7) return `${days}d ago`;
+  return format(d, "MMM d");
+}
+
+/** "5700 Yonge St, North York, ON M2N 5M9, Canada" → "North York, Canada". */
+function shortLocation(loc: string | null): string {
+  if (!loc) return "—";
+  const parts = loc.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length <= 2) return parts.join(", ");
+  // Heuristic: drop street address (usually the first segment), keep last city + country.
+  const country = parts[parts.length - 1];
+  // Find the first segment that looks like a city name (no digits).
+  const city = parts.find((p) => !/\d/.test(p)) ?? parts[0];
+  if (city === country) return city;
+  return `${city}, ${country}`;
+}
+
+/**
+ * Card view for jobs.
+ *
+ * Visual contract: company avatar + plain title (foreground, no link styling),
+ * function chip, truncated location, mono first-seen, status chip.
  */
 function JobsCardView({ jobs, source }: { jobs: JobData[]; source: string }) {
   const hasCompanyInfo = jobs.some((j) => j.companyName);
-  const router = useRouter();
-  
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {jobs.map((job) => (
-        <Link key={job.id} href={`/jobs/${job.id}?source=${source}`}>
-          <NotionCard className="h-full">
-            <NotionCardContent>
-              {/* Title and status */}
-              <div className="flex items-start justify-between gap-2">
-                <NotionCardTitle className="flex-1">{job.title}</NotionCardTitle>
-                <span
-                  className={cn(
-                    "shrink-0 w-2 h-2 rounded-full mt-1.5",
-                    job.isActive ? "bg-green-500" : "bg-gray-400"
-                  )}
-                  title={job.isActive ? "Active" : "Inactive"}
-                />
-              </div>
-
-              {/* Company (if available) */}
-              {hasCompanyInfo && job.companyName && (
-                <div className="mt-2">
-                  {job.companySlug ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        router.push(`/companies/${job.companySlug}`);
-                      }}
-                      className="text-xs text-primary hover:underline font-medium text-left"
-                    >
-                      {job.companyName}
-                    </button>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">{job.companyName}</span>
-                  )}
+      {jobs.map((job) => {
+        const isHot =
+          isRoleCategory(job.function_category) &&
+          HOT_FUNCTION_GROUPS.has(getCategoryGroup(job.function_category as RoleCategory));
+        return (
+          <Link key={job.id} href={`/jobs/${job.id}?source=${source}`}>
+            <NotionCard className="h-full">
+              <NotionCardContent>
+                <div className="flex items-start justify-between gap-2">
+                  <NotionCardTitle className="flex-1 text-foreground">
+                    {job.title}
+                  </NotionCardTitle>
+                  <span
+                    className={cn(
+                      "mt-1.5 h-2 w-2 shrink-0 rounded-full",
+                      job.isActive ? "bg-pacific-500" : "bg-sand-400"
+                    )}
+                    title={job.isActive ? "Active" : "Inactive"}
+                  />
                 </div>
-              )}
 
-              {/* Details */}
-              <div className="space-y-1 mt-3">
-                {job.standardized_department && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Briefcase className="h-3 w-3" />
-                    <span>{job.standardized_department}</span>
+                {hasCompanyInfo && job.companyName && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <CompanyAvatar name={job.companyName} size={20} />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {job.companyName}
+                    </span>
                   </div>
                 )}
-                {job.function_category && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Briefcase className="h-3 w-3" />
-                    <span>
+
+                <div className="mt-3 space-y-1.5">
+                  {job.function_category && (
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                        isHot
+                          ? "bg-highlight-soft text-highlight-soft-foreground"
+                          : "bg-muted text-foreground"
+                      )}
+                    >
                       {isRoleCategory(job.function_category)
                         ? getCategoryLabel(job.function_category)
                         : job.function_category}
                     </span>
-                  </div>
-                )}
-                {job.location && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    <span>{job.location}</span>
-                  </div>
-                )}
-                {job.firstSeenDate && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    <span>{format(new Date(job.firstSeenDate), "MMM d, yyyy")}</span>
-                  </div>
-                )}
-              </div>
+                  )}
+                  {job.location && (
+                    <div
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                      title={job.location}
+                    >
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{shortLocation(job.location)}</span>
+                    </div>
+                  )}
+                  {job.firstSeenDate && (
+                    <div className="flex items-center gap-1.5 font-mono text-[11.5px] tabular-nums text-muted-foreground">
+                      <Calendar className="h-3 w-3 shrink-0" />
+                      {formatFirstSeen(job.firstSeenDate)}
+                    </div>
+                  )}
+                </div>
 
-              {/* Footer */}
-              <NotionCardFooter className="mt-auto pt-3">
-                <NotionCardTag className={job.isActive 
-                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                  : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                }>
-                  {job.isActive ? "Active" : "Closed"}
-                </NotionCardTag>
-              </NotionCardFooter>
-            </NotionCardContent>
-          </NotionCard>
-        </Link>
-      ))}
+                <NotionCardFooter className="mt-auto pt-3">
+                  <NotionCardTag
+                    className={
+                      job.isActive
+                        ? "bg-accent-soft text-accent-soft-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }
+                  >
+                    {job.isActive ? "Active" : "Closed"}
+                  </NotionCardTag>
+                </NotionCardFooter>
+              </NotionCardContent>
+            </NotionCard>
+          </Link>
+        );
+      })}
     </div>
   );
 }
 
 /**
- * Table view for jobs
+ * Table view for jobs (canonical Talent Brief table layout).
+ *
+ * Visual contract per CORRECTIONS.md § 3:
+ * - Title in `--foreground`, medium weight, NO underline (underline on row hover).
+ * - The whole ROW is the link target — not the title text.
+ * - Company column: 22×22 avatar + name in muted-foreground (no blue links).
+ * - Function: chip (bg-muted for default, bg-highlight-soft for hot).
+ * - Location: truncated City, Country (full in title attribute).
+ * - First seen: mono tabular-nums, "2d ago" then date.
+ * - Status: accent-soft for active, muted for closed.
  */
 function JobsTableView({ jobs, source }: { jobs: JobData[]; source: string }) {
+  const router = useRouter();
   const hasCompanyInfo = jobs.some((j) => j.companyName);
-  
+
   return (
-    <div className="rounded-lg border">
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Title</TableHead>
+          <TableRow className="border-b border-border bg-muted/40 hover:bg-muted/40">
+            <TableHead className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+              Title
+            </TableHead>
             {hasCompanyInfo && (
-              <TableHead className="hidden sm:table-cell">Company</TableHead>
+              <TableHead className="hidden font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground sm:table-cell">
+                Company
+              </TableHead>
             )}
-            <TableHead className="hidden sm:table-cell">Department</TableHead>
-            <TableHead className="hidden sm:table-cell">Function</TableHead>
-            <TableHead className="hidden md:table-cell">Location</TableHead>
-            <TableHead className="hidden md:table-cell">First Seen</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead className="hidden font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground sm:table-cell">
+              Function
+            </TableHead>
+            <TableHead className="hidden font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground md:table-cell">
+              Location
+            </TableHead>
+            <TableHead className="hidden font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground md:table-cell">
+              First seen
+            </TableHead>
+            <TableHead className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+              Status
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {jobs.map((job) => (
-            <TableRow key={job.id}>
-              <TableCell className="font-medium">
-                <Link
-                  href={`/jobs/${job.id}?source=${source}`}
-                  className="text-primary hover:underline"
-                >
+          {jobs.map((job) => {
+            const isHot =
+              isRoleCategory(job.function_category) &&
+              HOT_FUNCTION_GROUPS.has(getCategoryGroup(job.function_category as RoleCategory));
+            return (
+              <TableRow
+                key={job.id}
+                className="cursor-pointer border-b border-border transition-colors hover:bg-secondary"
+                onClick={() => router.push(`/jobs/${job.id}?source=${source}`)}
+              >
+                <TableCell className="text-[13px] font-medium text-foreground">
                   {job.title}
-                </Link>
-              </TableCell>
-              {hasCompanyInfo && (
+                </TableCell>
+                {hasCompanyInfo && (
+                  <TableCell className="hidden text-[13px] sm:table-cell">
+                    <span className="inline-flex items-center gap-2">
+                      <CompanyAvatar name={job.companyName} size={22} />
+                      <span className="text-muted-foreground">
+                        {job.companyName ?? "—"}
+                      </span>
+                    </span>
+                  </TableCell>
+                )}
                 <TableCell className="hidden sm:table-cell">
-                  {job.companySlug ? (
-                    <Link
-                      href={`/companies/${job.companySlug}`}
-                      className="text-primary hover:underline"
+                  {job.function_category ? (
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                        isHot
+                          ? "bg-highlight-soft text-highlight-soft-foreground"
+                          : "bg-muted text-foreground"
+                      )}
                     >
-                      {job.companyName ?? "—"}
-                    </Link>
+                      {isRoleCategory(job.function_category)
+                        ? getCategoryLabel(job.function_category)
+                        : job.function_category}
+                    </span>
                   ) : (
-                    job.companyName ?? "—"
+                    <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
-              )}
-              <TableCell className="hidden sm:table-cell">{job.standardized_department ?? "—"}</TableCell>
-              <TableCell className="hidden sm:table-cell">
-                {isRoleCategory(job.function_category)
-                  ? getCategoryLabel(job.function_category)
-                  : job.function_category ?? "—"}
-              </TableCell>
-              <TableCell className="hidden md:table-cell">{job.location ?? "—"}</TableCell>
-              <TableCell className="hidden md:table-cell">
-                {job.firstSeenDate
-                  ? format(new Date(job.firstSeenDate), "MMM d, yyyy")
-                  : "—"}
-              </TableCell>
-              <TableCell>
-                <span
-                  className={cn(
-                    "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
-                    job.isActive
-                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                      : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                  )}
+                <TableCell
+                  className="hidden max-w-[200px] truncate text-[13px] text-muted-foreground md:table-cell"
+                  title={job.location ?? undefined}
                 >
-                  {job.isActive ? "Active" : "Closed"}
-                </span>
-              </TableCell>
-            </TableRow>
-          ))}
+                  {shortLocation(job.location)}
+                </TableCell>
+                <TableCell className="hidden font-mono text-[12px] tabular-nums text-muted-foreground md:table-cell">
+                  {formatFirstSeen(job.firstSeenDate)}
+                </TableCell>
+                <TableCell>
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                      job.isActive
+                        ? "bg-accent-soft text-accent-soft-foreground"
+                        : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {job.isActive ? "Active" : "Closed"}
+                  </span>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

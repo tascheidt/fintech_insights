@@ -14,11 +14,11 @@ interface FeedbackItem {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  submitted: "bg-gray-500/10 text-gray-600",
-  reviewing: "bg-yellow-500/10 text-yellow-600",
-  accepted: "bg-green-500/10 text-green-600",
-  maybe: "bg-blue-500/10 text-blue-600",
-  declined: "bg-red-500/10 text-red-600",
+  submitted: "bg-muted text-muted-foreground",
+  reviewing: "bg-accent-soft text-accent-soft-foreground",
+  accepted: "bg-primary-soft text-primary-soft-foreground",
+  maybe: "bg-highlight-soft text-highlight-soft-foreground",
+  declined: "bg-destructive/10 text-destructive",
 };
 
 const STATUS_LABELS: Record<string, string> = {

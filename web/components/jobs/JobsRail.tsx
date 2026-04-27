@@ -1,0 +1,131 @@
+/**
+ * JobsRail — right-hand contextual rail on the v2 Jobs page.
+ *
+ * Two cards stacked with a 14px gap:
+ *   1. Function heat · 30d net   (6 rows: name | bar | +N)
+ *   2. Cross-company themes      (up to 5 rows: name + meta + chevron)
+ *
+ * Reference: /tmp/design-package-v2/.../JobsList_v2.jsx (rail block).
+ */
+
+import { BarChart3, GitBranch, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type HeatKind = "new" | "accel" | "default";
+
+export interface FunctionHeatRow {
+  name: string;
+  val: number;
+  max: number;
+  kind: HeatKind;
+}
+
+export interface CrossCompanyTheme {
+  name: string;
+  cos: number;
+  roles: number;
+}
+
+export interface JobsRailProps {
+  heat: FunctionHeatRow[];
+  themes: CrossCompanyTheme[];
+}
+
+function heatFillClass(kind: HeatKind): string {
+  switch (kind) {
+    case "new":
+      return "bg-sunset-500";
+    case "accel":
+      return "bg-sun-700";
+    default:
+      return "bg-pacific-500";
+  }
+}
+
+export function JobsRail({ heat, themes }: JobsRailProps) {
+  return (
+    <aside className="flex flex-col gap-[14px]">
+      {/* Function heat card */}
+      <section className="rounded-xl border border-sand-200 bg-card px-4 py-[14px]">
+        <header className="mb-2.5 flex items-center gap-1.5 font-mono uppercase text-sand-500"
+          style={{ fontSize: 10.5, letterSpacing: "0.08em", lineHeight: 1 }}>
+          <BarChart3 className="h-2.5 w-2.5" aria-hidden style={{ width: 11, height: 11 }} />
+          <span>Function heat · 30d net</span>
+        </header>
+        {heat.length === 0 ? (
+          <p className="text-[12px] text-sand-500">No activity in window.</p>
+        ) : (
+          heat.map((row) => {
+            const pct = Math.max(
+              0,
+              Math.min(100, (row.val / Math.max(1, row.max)) * 100)
+            );
+            return (
+              <div
+                key={row.name}
+                className="grid grid-cols-[86px_1fr_28px] items-center gap-2 py-[5px]"
+              >
+                <span className="truncate text-[11.5px] font-medium text-sand-800">
+                  {row.name}
+                </span>
+                <span
+                  className="relative block h-2 overflow-hidden rounded bg-sand-100"
+                  aria-hidden
+                >
+                  <span
+                    className={cn("block h-full rounded", heatFillClass(row.kind))}
+                    style={{ width: `${pct}%` }}
+                  />
+                </span>
+                <span className="text-right font-mono text-[11px] tabular-nums text-sand-500">
+                  +{row.val}
+                </span>
+              </div>
+            );
+          })
+        )}
+      </section>
+
+      {/* Cross-company themes card */}
+      <section className="rounded-xl border border-sand-200 bg-card px-4 py-[14px]">
+        <header className="mb-2.5 flex items-center gap-1.5 font-mono uppercase text-sand-500"
+          style={{ fontSize: 10.5, letterSpacing: "0.08em", lineHeight: 1 }}>
+          <GitBranch className="h-2.5 w-2.5" aria-hidden style={{ width: 11, height: 11 }} />
+          <span>Cross-company themes</span>
+        </header>
+        {themes.length === 0 ? (
+          <p className="text-[12px] text-sand-500">
+            No themes spanning multiple companies right now.
+          </p>
+        ) : (
+          themes.map((theme, idx) => {
+            const last = idx === themes.length - 1;
+            return (
+              <div
+                key={theme.name}
+                className={cn(
+                  "flex items-center gap-2.5",
+                  last ? "pt-2.5" : "border-b border-sand-100 py-2.5"
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[12.5px] font-medium leading-tight text-sand-950">
+                    {theme.name}
+                  </div>
+                  <div className="mt-0.5 text-[11px] leading-tight text-sand-500">
+                    {theme.cos} {theme.cos === 1 ? "company" : "companies"} ·{" "}
+                    {theme.roles} {theme.roles === 1 ? "role" : "roles"}
+                  </div>
+                </div>
+                <ChevronRight
+                  className="h-3 w-3 shrink-0 text-sand-400"
+                  aria-hidden
+                />
+              </div>
+            );
+          })
+        )}
+      </section>
+    </aside>
+  );
+}

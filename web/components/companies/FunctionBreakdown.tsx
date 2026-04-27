@@ -14,15 +14,17 @@ interface FunctionBreakdownProps {
   functions: FunctionStat[];
 }
 
+// Function-category palette — token-driven (see globals.css `--cat-*` family)
+// and FUNCTION_GROUP_COLORS in lib/constants.ts.
 const GROUP_COLORS: Record<string, string> = {
-  Engineering: "bg-blue-500",
-  "Product & Design": "bg-purple-500",
-  "Data & Analytics": "bg-indigo-500",
-  "Risk, Legal & Compliance": "bg-red-500",
-  "Go-To-Market": "bg-green-500",
-  "Finance & Strategy": "bg-yellow-500",
-  "Operations & People": "bg-orange-500",
-  Other: "bg-gray-500",
+  Engineering: "bg-cat-engineering",
+  "Product & Design": "bg-cat-product",
+  "Data & Analytics": "bg-cat-data",
+  "Risk, Legal & Compliance": "bg-cat-risk",
+  "Go-To-Market": "bg-cat-gtm",
+  "Finance & Strategy": "bg-cat-finance",
+  "Operations & People": "bg-cat-operations",
+  Other: "bg-cat-other",
 };
 
 export function FunctionBreakdown({ functions }: FunctionBreakdownProps) {

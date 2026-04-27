@@ -11,30 +11,33 @@ interface CompanyTechStackProps {
   initialGeneratedAt: string | null;
 }
 
-// 3 color families + gray fallback (Notion-style, muted)
+// Tech-stack categories use the design-system soft-chip variants. The mapping
+// follows the same logic as before (banking → growth/primary; dev → primary;
+// data → highlight via sun; ops → accent) but reaches for tokens, not raw
+// Tailwind palette utilities.
 const CATEGORY_COLORS: Record<string, string> = {
-  // Green: banking/financial systems
-  banking_platforms: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
-  financial_systems: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
-  // Blue: software development and platform
-  dev_stack: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
-  application_stack: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
-  platform_infrastructure: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
-  // Purple: data/analytics
-  data_analytics: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800",
-  data_ai: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800",
-  // Amber: operations and business tooling
-  business_operations: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
+  // Banking / financial systems → primary-soft (Pacific)
+  banking_platforms:        "bg-primary-soft text-primary-soft-foreground border-primary/20",
+  financial_systems:        "bg-primary-soft text-primary-soft-foreground border-primary/20",
+  // Software dev / platform → primary-soft
+  dev_stack:                "bg-primary-soft text-primary-soft-foreground border-primary/20",
+  application_stack:        "bg-primary-soft text-primary-soft-foreground border-primary/20",
+  platform_infrastructure:  "bg-primary-soft text-primary-soft-foreground border-primary/20",
+  // Data / analytics → highlight-soft (Sunset)
+  data_analytics:           "bg-highlight-soft text-highlight-soft-foreground border-highlight/20",
+  data_ai:                  "bg-highlight-soft text-highlight-soft-foreground border-highlight/20",
+  // Operations / business tooling → accent-soft (Sun)
+  business_operations:      "bg-accent-soft text-accent-soft-foreground border-accent/20",
   // Legacy categories (backward compat)
-  languages: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
-  frameworks: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
-  cloud: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
-  devops: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
-  databases: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
-  data_tools: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800",
-  ai_ml: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800",
-  // Gray: everything else
-  other: "bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700",
+  languages:                "bg-primary-soft text-primary-soft-foreground border-primary/20",
+  frameworks:               "bg-primary-soft text-primary-soft-foreground border-primary/20",
+  cloud:                    "bg-primary-soft text-primary-soft-foreground border-primary/20",
+  devops:                   "bg-primary-soft text-primary-soft-foreground border-primary/20",
+  databases:                "bg-primary-soft text-primary-soft-foreground border-primary/20",
+  data_tools:               "bg-highlight-soft text-highlight-soft-foreground border-highlight/20",
+  ai_ml:                    "bg-highlight-soft text-highlight-soft-foreground border-highlight/20",
+  // Default fallback
+  other:                    "bg-muted text-muted-foreground border-border",
 };
 
 function formatDate(dateStr: string): string {
@@ -99,7 +102,7 @@ export function CompanyTechStack({
         <CardContent>
           {error ? (
             <div className="space-y-2">
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <p className="text-sm text-destructive">{error}</p>
               <button
                 onClick={handleRefresh}
                 disabled={loading}
@@ -123,7 +126,7 @@ export function CompanyTechStack({
     if (!error) return null;
     return (
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-red-600 dark:text-red-400">{error}</span>
+        <span className="text-destructive">{error}</span>
         {errorStatus !== 429 && (
           <button
             onClick={handleRefresh}

@@ -1,47 +1,48 @@
 /**
- * Jobs Page
+ * Jobs Page (v2 — list-first browsing surface).
  *
- * Shows all job postings across all companies with search and filters.
- * Uses the same JobHistoryView component as company pages.
+ * Editorial header + filter bar + two-column grid (sortable list | right
+ * rail with function heat and cross-company themes).
  *
- * Accepts query parameters so that deep links from the weekly digest email
- * can land users in a pre-filtered view with a context banner for
- * orientation. Supported params:
- *   - status, time, date (legacy)
- *   - theme (role theme id)
- *   - company (company slug)
- *   - inDigest (weekly_digests UUID — scopes to the digest's captured jobs)
- *   - from, to (ISO date strings)
+ * Accepts query parameters so deep links from the weekly digest email
+ * land users in a pre-filtered view with a context banner. Supported
+ * params:
+ *   - status, time, date (legacy — deprecated; recency overrides them now)
+ *   - q, company, function, recency (new v2 params owned by JobsHeader)
+ *   - theme       (role theme id; filters via classifyJob)
+ *   - inDigest    (weekly_digests UUID — scopes to that digest's job_ids)
+ *   - from, to    (ISO date strings; bound first_seen_date)
+ *
+ * Note: the company-scoped Jobs tab inside companies/[slug] still uses
+ * `JobHistoryView` — do NOT remove that component.
  */
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { JobHistoryView, JobData } from "@/components/companies/JobHistoryView";
+import {
+  getJobsListData,
+  getFunctionHeatData,
+  getCrossCompanyThemes,
+  type JobsListRow,
+} from "@/lib/dashboard-queries";
+import { CATEGORY_GROUPS } from "@/lib/analysis/function-categories";
+import { JobsPageClient } from "@/components/jobs/JobsPageClient";
 
 type JobsPageSearchParams = {
+  // Legacy
   status?: string;
   time?: string;
   date?: string;
+  // Digest deep-link
   theme?: string;
-  company?: string;
   inDigest?: string;
   from?: string;
   to?: string;
-};
-
-type JobRow = {
-  id: string;
-  title: string;
-  standardized_department: string | null;
-  function_category: string | null;
-  location: string | null;
-  is_active: boolean;
-  first_seen_date: string | null;
-  url: string | null;
-  companies:
-    | { id: string; name: string; slug: string }
-    | { id: string; name: string; slug: string }[]
-    | null;
+  // v2 owned by JobsHeader
+  q?: string;
+  company?: string;
+  function?: string;
+  recency?: string;
 };
 
 type DigestCompanyRow = {
@@ -49,35 +50,25 @@ type DigestCompanyRow = {
   job_ids: unknown;
 };
 
-function getInitialStatus(status?: string): "all" | "active" | "inactive" {
-  if (status === "active" || status === "inactive") return status;
-  return "all";
-}
-
-function getInitialTimeFilter(
-  time?: string,
-  date?: string
-): "all" | "7days" | "30days" | "90days" | "6months" | "1year" {
-  const requestedFilter = time ?? (date === "week" ? "7days" : undefined);
-  if (
-    requestedFilter === "7days" ||
-    requestedFilter === "30days" ||
-    requestedFilter === "90days" ||
-    requestedFilter === "6months" ||
-    requestedFilter === "1year"
-  ) {
-    return requestedFilter;
-  }
-
-  return "all";
-}
-
-/** Parse an ISO date param and return the normalized string, or null if invalid. */
 function parseIsoDateParam(value?: string): string | null {
   if (!value) return null;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return value;
+}
+
+/** Coerce the inbound `recency` param to a known value. */
+function parseRecency(
+  value: string | undefined,
+  legacyTime?: string,
+  legacyDate?: string
+): "any" | "7" | "30" {
+  if (value === "7" || value === "30") return value;
+  if (value === "any") return "any";
+  // Legacy fallback: time=7days / date=week → recency=7.
+  if (legacyTime === "7days" || legacyDate === "week") return "7";
+  if (legacyTime === "30days") return "30";
+  return "any";
 }
 
 export default async function JobsPage({
@@ -87,7 +78,9 @@ export default async function JobsPage({
 }) {
   const params = await searchParams;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const themeParam = params.theme?.trim() || null;
@@ -96,21 +89,9 @@ export default async function JobsPage({
   const fromParam = parseIsoDateParam(params.from);
   const toParam = parseIsoDateParam(params.to);
 
-  // When viewing a digest snapshot, the job_ids list is already the scope —
-  // we must show closed jobs as well because the digest is a historical
-  // frame, so force status to "all" regardless of the incoming status param.
-  const initialStatus = inDigestParam
-    ? "all"
-    : getInitialStatus(params.status);
-
-  // Explicit from/to overrides the preset time filter (mutually exclusive).
-  const initialTimeFilter =
-    fromParam || toParam
-      ? "all"
-      : getInitialTimeFilter(params.time, params.date);
-
-  // If inDigest is present, look up the job_ids captured by that digest (or
-  // the single matching company's job_ids if company is also set).
+  // Resolve digest snapshot scope — when inDigest is set, the relevant
+  // job IDs are pulled from weekly_digest_companies.job_ids and act as
+  // an exclusive filter regardless of recency / status.
   let digestJobIds: string[] | null = null;
   if (inDigestParam) {
     let companyId: string | null = null;
@@ -123,107 +104,115 @@ export default async function JobsPage({
       companyId = companyRow?.id ?? null;
     }
 
-    let digestCompaniesQuery = supabase
+    let digestQuery = supabase
       .from("weekly_digest_companies")
       .select("company_id, job_ids")
       .eq("digest_id", inDigestParam);
 
     if (companyParam && companyId) {
-      digestCompaniesQuery = digestCompaniesQuery.eq("company_id", companyId);
+      digestQuery = digestQuery.eq("company_id", companyId);
     }
 
-    const { data: digestCompanyRows } = await digestCompaniesQuery;
-
-    const jobIdSet = new Set<string>();
+    const { data: digestCompanyRows } = await digestQuery;
+    const ids = new Set<string>();
     for (const row of (digestCompanyRows ?? []) as DigestCompanyRow[]) {
-      const rawIds = Array.isArray(row.job_ids) ? row.job_ids : [];
-      for (const id of rawIds) {
-        if (typeof id === "string" && id) jobIdSet.add(id);
+      const raw = Array.isArray(row.job_ids) ? row.job_ids : [];
+      for (const id of raw) {
+        if (typeof id === "string" && id) ids.add(id);
       }
     }
-    digestJobIds = Array.from(jobIdSet);
+    digestJobIds = Array.from(ids);
   }
 
-  // Fetch all jobs with company information
-  let jobsQuery = supabase
-    .from("job_postings")
-    .select(
-      "id, title, standardized_department, function_category, location, is_active, first_seen_date, url, companies(id, name, slug)"
-    )
-    .order("first_seen_date", { ascending: false });
+  const [rows, heat, themes] = await Promise.all([
+    getJobsListData({ jobIds: digestJobIds }),
+    getFunctionHeatData(30),
+    getCrossCompanyThemes(),
+  ]);
 
-  if (digestJobIds !== null) {
-    if (digestJobIds.length === 0) {
-      // Digest exists but captured nothing (or doesn't exist). Short-circuit
-      // to an empty list — the banner will still render and show 0 of 0.
-      const emptyJobs: JobData[] = [];
-      return (
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">All Jobs</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Browse job postings across all companies
-            </p>
-          </div>
-          <JobHistoryView
-            jobs={emptyJobs}
-            companySlug="all"
-            initialStatus={initialStatus}
-            initialTimeFilter={initialTimeFilter}
-            initialThemeFilter={themeParam}
-            initialCompanyFilter={companyParam}
-            initialInDigest={inDigestParam}
-            initialFromDate={fromParam}
-            initialToDate={toParam}
-            showHeader={true}
-            pageSize={24}
-          />
-        </div>
-      );
+  // Apply server-side date bounds (digest deep-link only). The interactive
+  // "recency" filter lives on the client and overlays this baseline.
+  const fromCutoff = fromParam ? new Date(fromParam) : null;
+  const toCutoff = toParam ? new Date(toParam) : null;
+  const baseRows: JobsListRow[] =
+    fromCutoff || toCutoff
+      ? rows.filter((r) => {
+          if (!r.firstSeenDate) return false;
+          const seen = new Date(r.firstSeenDate);
+          if (fromCutoff && seen < fromCutoff) return false;
+          if (toCutoff && seen > toCutoff) return false;
+          return true;
+        })
+      : rows;
+
+  // Eyebrow stats are derived from the visible (post-digest-scope) baseline
+  // so they stay accurate when the user enters from a digest deep link.
+  const activeCount = baseRows.filter((r) => r.isActive).length;
+  const newCount = baseRows.filter(
+    (r) => r.ageDays !== null && r.ageDays <= 7
+  ).length;
+
+  // Available companies for dropdown — distinct slugs from active visible rows.
+  const companyMap = new Map<string, { slug: string; name: string }>();
+  for (const r of baseRows) {
+    if (r.companySlug && r.companyName) {
+      companyMap.set(r.companySlug, {
+        slug: r.companySlug,
+        name: r.companyName,
+      });
     }
-    jobsQuery = jobsQuery.in("id", digestJobIds);
   }
+  const companies = Array.from(companyMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 
-  const { data: jobsRaw } = await jobsQuery;
+  // Function groups for dropdown — full taxonomy keeps the option set
+  // stable across filter swings.
+  const functionGroups = Object.keys(CATEGORY_GROUPS).sort();
 
-  // Transform jobs data for JobHistoryView
-  const jobs: JobData[] = ((jobsRaw ?? []) as JobRow[]).map((j) => {
-    const company = Array.isArray(j.companies) ? j.companies[0] : j.companies;
-    return {
-      id: j.id,
-      title: j.title,
-      standardized_department: j.standardized_department,
-      function_category: j.function_category,
-      location: j.location,
-      isActive: j.is_active,
-      firstSeenDate: j.first_seen_date,
-      url: j.url,
-      companyName: company?.name,
-      companySlug: company?.slug,
-    };
-  });
+  // Resolve display name of the company filter (for the digest banner).
+  const digestCompanyName = companyParam
+    ? companyMap.get(companyParam)?.name ?? null
+    : null;
+
+  // Initial filter state seeded from URL.
+  const initialCompany = companyParam && companyMap.has(companyParam) ? companyParam : "all";
+  const initialFn =
+    params.function && Object.keys(CATEGORY_GROUPS).includes(params.function)
+      ? params.function
+      : "all";
+  const initialQ = (params.q ?? "").trim();
+  const initialRecency = parseRecency(params.recency, params.time, params.date);
+
+  // Total companies covered (for the sub-headline copy).
+  const { count: companyCount } = await supabase
+    .from("companies")
+    .select("*", { count: "exact", head: true })
+    .eq("is_active", true);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">All Jobs</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Browse job postings across all companies
-        </p>
-      </div>
-      <JobHistoryView
-        jobs={jobs}
-        companySlug="all"
-        initialStatus={initialStatus}
-        initialTimeFilter={initialTimeFilter}
-        initialThemeFilter={themeParam}
-        initialCompanyFilter={companyParam}
-        initialInDigest={inDigestParam}
-        initialFromDate={fromParam}
-        initialToDate={toParam}
-        showHeader={true}
-        pageSize={24}
-      />
-    </div>
+    <JobsPageClient
+      rows={baseRows}
+      heat={heat}
+      themes={themes}
+      companies={companies}
+      functionGroups={functionGroups}
+      initial={{
+        q: initialQ,
+        company: initialCompany,
+        fn: initialFn,
+        recency: initialRecency,
+      }}
+      digestContext={{
+        themeId: themeParam,
+        inDigest: inDigestParam,
+        fromDate: fromParam,
+        toDate: toParam,
+        companyName: digestCompanyName,
+      }}
+      activeCount={activeCount}
+      newCount={newCount}
+      companyCount={companyCount ?? companies.length}
+    />
   );
 }

@@ -156,9 +156,9 @@ function DigestDateGroup({
  */
 function DigestInsightCard({ insight }: { insight: DigestInsight }) {
   const confidenceStyles = {
-    high: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
-    medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
-    low: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+    high: "bg-primary-soft text-primary-soft-foreground",
+    medium: "bg-accent-soft text-accent-soft-foreground",
+    low: "bg-muted text-muted-foreground",
   };
 
   // Use headline if available, fallback to company name

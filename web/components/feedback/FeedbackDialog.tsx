@@ -99,8 +99,8 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
       <DialogContent className="sm:max-w-md">
         {status === "success" ? (
           <div className="flex flex-col items-center gap-4 py-8">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-50">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
+              <CheckCircle2 className="h-6 w-6 text-accent-soft-foreground" />
             </div>
             <div className="text-center">
               <p className="font-semibold">Your feedback is on its way</p>
@@ -120,7 +120,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
 
             <div className="space-y-4 py-4">
               {errorMsg && (
-                <div className="p-3 rounded-lg text-sm bg-red-500/10 text-red-600 border border-red-500/20">
+                <div className="p-3 rounded-lg text-sm bg-destructive/10 text-destructive border border-destructive/20">
                   {errorMsg}
                 </div>
               )}

@@ -49,7 +49,7 @@ export async function fetchWorkableJobs(atsIdentifier: string): Promise<JobData[
       if (Array.isArray(dept)) dept = dept[0];
       const department = (dept as string) ?? "";
 
-      let descriptionHtml = (j.description as string) ?? "";
+      const descriptionHtml = (j.description as string) ?? "";
       const shortcode = (j.shortcode as string) ?? "";
 
       let postedDate: Date | null = null;

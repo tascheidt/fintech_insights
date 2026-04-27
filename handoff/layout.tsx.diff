@@ -1,0 +1,65 @@
+# handoff/layout.tsx.diff — Add Fraunces to web/app/layout.tsx
+
+The existing layout loads Geist + Geist_Mono. We need to add Fraunces (the
+display serif) and expose it as `--font-fraunces`, which `globals.css` then
+maps to `--font-display`.
+
+## Replace `web/app/layout.tsx` with:
+
+```tsx
+import type { Metadata } from "next";
+import { Geist, Geist_Mono, Fraunces } from "next/font/google";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  // Optical sizing — we use Fraunces almost exclusively at large display sizes.
+  // The "soft" preset gives the slightly humanist feel we approved in the
+  // Type — display & headings preview card.
+  axes: ["opsz", "SOFT"],
+  weight: ["400", "500", "600", "700"],
+});
+
+export const metadata: Metadata = {
+  title: "The Fintech Talent Brief",
+  description:
+    "Fintech hiring intelligence — track competitor moves and decode strategy through talent signals.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased`}
+      >
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+## What changes
+- Adds `Fraunces` import from `next/font/google`.
+- Loads Fraunces with `opsz` + `SOFT` axes and weights 400–700.
+- Exposes it as `--font-fraunces` on `<body>`.
+- `globals.css` already maps `--font-display: var(--font-fraunces)`.
+
+## Where to use it
+- Tailwind: `font-display` or `text-display` (utility added in globals.css)
+- Direct: `font-family: var(--font-display)`
+- **Only on**: digest hero headlines, marketing hero, login hero, the company
+  stated-strategy callout. Never on UI chrome, charts, tables, or labels.

@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { JobsTabContent } from "@/components/admin/JobsTabContent";
 import { FeedbackReviewTable } from "@/components/admin/FeedbackReviewTable";
 import { parseCronExpression } from "@/lib/utils/cron";
@@ -18,7 +20,7 @@ export default async function AdminPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "admin") redirect("/");
+  if (profile?.role !== "admin") redirect("/dashboard");
 
   // Fetch users for user management section
   const { data: users } = await supabase
@@ -61,6 +63,16 @@ export default async function AdminPage() {
     .limit(1)
     .maybeSingle();
 
+  // Companies missing an editorial thesis. Driven by the v2 editorial
+  // fields added in 20260425_company_editorial_v2.sql.
+  const { data: needsEditorial } = await supabase
+    .from("companies")
+    .select("id, name, slug")
+    .eq("is_active", true)
+    .is("thesis", null)
+    .order("name", { ascending: true })
+    .limit(50);
+
   return (
     <div className="space-y-6">
       <div>
@@ -79,13 +91,54 @@ export default async function AdminPage() {
         </TabsList>
 
         {/* Jobs Tab */}
-        <TabsContent value="jobs">
+        <TabsContent value="jobs" className="space-y-4">
           <JobsTabContent
             collectionSchedule={collectionSchedule}
             reportSchedule={reportSchedule}
             lastCollect={lastCollect}
             lastReport={lastReport}
           />
+
+          {/* Needs editorial — companies missing a thesis */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold">Needs editorial</h3>
+                  <CardDescription>
+                    Companies without a working thesis. v2 surfaces fall back to
+                    a neutral empty state until one is added.
+                  </CardDescription>
+                </div>
+                <span className="rounded-full bg-highlight-soft px-2.5 py-0.5 text-xs font-medium text-highlight-soft-foreground">
+                  {needsEditorial?.length ?? 0}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(needsEditorial ?? []).length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  All tracked companies have a thesis.
+                </p>
+              ) : (
+                <div className="divide-y">
+                  {(needsEditorial ?? []).map((c) => (
+                    <div
+                      key={c.id}
+                      className="py-3 flex items-center justify-between gap-3"
+                    >
+                      <p className="font-medium">{c.name}</p>
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/companies/${c.slug}?edit=1`}>
+                          Add thesis
+                        </Link>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* User Management Tab */}
@@ -139,3 +192,4 @@ export default async function AdminPage() {
     </div>
   );
 }
+

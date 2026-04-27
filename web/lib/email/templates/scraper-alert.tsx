@@ -10,6 +10,7 @@ import {
   Link,
   Hr,
 } from "@react-email/components";
+import { EMAIL_COLORS } from "@/lib/email/colors";
 
 export interface ScraperIssue {
   companyName: string;
@@ -116,13 +117,13 @@ export function ScraperAlertEmail({
 }
 
 const main: React.CSSProperties = {
-  backgroundColor: "#f6f9fc",
+  backgroundColor: EMAIL_COLORS.bg,
   fontFamily:
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif',
 };
 
 const container: React.CSSProperties = {
-  backgroundColor: "#ffffff",
+  backgroundColor: EMAIL_COLORS.surface,
   margin: "0 auto",
   padding: "20px 0 48px",
   maxWidth: "600px",
@@ -134,7 +135,7 @@ const header: React.CSSProperties = {
 };
 
 const title: React.CSSProperties = {
-  color: "#1a1a2e",
+  color: EMAIL_COLORS.fg,
   fontSize: "22px",
   fontWeight: "700",
   lineHeight: "1.2",
@@ -142,13 +143,13 @@ const title: React.CSSProperties = {
 };
 
 const subtitle: React.CSSProperties = {
-  color: "#6b7280",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "13px",
   margin: "0",
 };
 
 const divider: React.CSSProperties = {
-  borderColor: "#e5e7eb",
+  borderColor: EMAIL_COLORS.border,
   margin: "16px 40px",
 };
 
@@ -157,22 +158,22 @@ const content: React.CSSProperties = {
 };
 
 const body: React.CSSProperties = {
-  color: "#374151",
+  color: EMAIL_COLORS.fg2,
   fontSize: "14px",
   lineHeight: "1.6",
   margin: "0 0 16px",
 };
 
 const issueCard: React.CSSProperties = {
-  backgroundColor: "#fafafa",
-  borderLeft: "3px solid #ef4444",
+  backgroundColor: EMAIL_COLORS.surfaceMuted,
+  borderLeft: `3px solid ${EMAIL_COLORS.danger}`,
   padding: "12px 16px",
   marginBottom: "12px",
   borderRadius: "0 6px 6px 0",
 };
 
 const companyName: React.CSSProperties = {
-  color: "#1a1a2e",
+  color: EMAIL_COLORS.fg,
   fontSize: "15px",
   fontWeight: "600",
   margin: "0 0 4px",
@@ -180,8 +181,8 @@ const companyName: React.CSSProperties = {
 
 const tagError: React.CSSProperties = {
   display: "inline-block",
-  backgroundColor: "#fee2e2",
-  color: "#b91c1c",
+  backgroundColor: EMAIL_COLORS.dangerSoft,
+  color: EMAIL_COLORS.dangerSoftFg,
   fontSize: "11px",
   fontWeight: "600",
   textTransform: "uppercase" as const,
@@ -193,28 +194,28 @@ const tagError: React.CSSProperties = {
 
 const tagWarning: React.CSSProperties = {
   ...tagError,
-  backgroundColor: "#fef3c7",
-  color: "#b45309",
+  backgroundColor: EMAIL_COLORS.accentSoft,
+  color: EMAIL_COLORS.accentSoftFg,
 };
 
 const detail: React.CSSProperties = {
-  color: "#4b5563",
+  color: EMAIL_COLORS.fg2,
   fontSize: "13px",
   margin: "4px 0 0",
 };
 
 const errorText: React.CSSProperties = {
-  color: "#6b7280",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "12px",
   fontFamily: "monospace",
-  backgroundColor: "#f3f4f6",
+  backgroundColor: EMAIL_COLORS.borderSubtle,
   padding: "6px 8px",
   borderRadius: "4px",
   margin: "4px 0 0",
 };
 
 const metaText: React.CSSProperties = {
-  color: "#9ca3af",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "11px",
   margin: "16px 0 0",
 };
@@ -225,8 +226,8 @@ const ctaSection: React.CSSProperties = {
 
 const ctaLink: React.CSSProperties = {
   display: "inline-block",
-  backgroundColor: "#1a1a2e",
-  color: "#ffffff",
+  backgroundColor: EMAIL_COLORS.fg,
+  color: EMAIL_COLORS.surface,
   fontSize: "13px",
   fontWeight: "600",
   padding: "10px 20px",
@@ -240,7 +241,7 @@ const footer: React.CSSProperties = {
 };
 
 const footerText: React.CSSProperties = {
-  color: "#9ca3af",
+  color: EMAIL_COLORS.fgMuted,
   fontSize: "11px",
   textAlign: "center" as const,
   margin: "0",

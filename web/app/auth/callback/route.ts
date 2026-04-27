@@ -25,8 +25,12 @@ export async function GET(request: Request) {
     })();
 
   // Only honor same-origin relative paths — never follow external URLs.
+  // Default destination after sign-in is the dashboard; the marketing landing
+  // at `/` would just bounce authenticated users back to `/dashboard`.
   const next =
-    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
+      ? rawNext
+      : "/dashboard";
   const origin = new URL(request.url).origin;
 
   // Handle OAuth errors from Supabase

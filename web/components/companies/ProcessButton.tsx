@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TaskProgressBar } from "@/components/jobs/TaskProgressBar";
-import type { JobRunTask, TaskStage } from "@/lib/jobs/types";
+import type { JobRunTask } from "@/lib/jobs/types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface ProcessButtonProps {
@@ -17,7 +17,7 @@ const CLIENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [jobRunId, setJobRunId] = useState<string | null>(null);
+  const [, setJobRunId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [taskStatus, setTaskStatus] = useState<JobRunTask | null>(null);
   const [result, setResult] = useState<{
@@ -241,7 +241,7 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
         setIsProcessing(false);
         startTimeRef.current = null;
       }
-    } catch (error) {
+    } catch {
       setResult({
         success: false,
         message: "Network error",
@@ -251,7 +251,7 @@ export function ProcessButton({ companyId, companyName }: ProcessButtonProps) {
     }
   }
 
-  const progress = taskStatus?.stage_progress as any || {};
+  const progress = (taskStatus?.stage_progress as Record<string, unknown> | null) ?? {};
   const currentStage = taskStatus?.current_stage;
 
   return (

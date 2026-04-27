@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  EditCompanyEditorialForm,
+  type EditorialState,
+  type Bet,
+} from "@/components/companies/EditCompanyEditorialForm";
 
 interface DetectionResult {
   detected: boolean;
@@ -28,6 +33,12 @@ interface Company {
   ats_identifier: string;
   careers_url?: string | null;
   is_active: boolean;
+  thesis?: string | null;
+  thesis_sub?: string | null;
+  interpretation?: string | null;
+  last_change?: string | null;
+  last_change_at?: string | null;
+  bets?: Bet[] | null;
 }
 
 const SUPPORTED_ATS = [
@@ -60,6 +71,16 @@ export function EditCompanyForm({ company }: { company: Company }) {
   // ATS settings
   const [atsType, setAtsType] = useState(company.ats_type);
   const [atsIdentifier, setAtsIdentifier] = useState(company.ats_identifier);
+
+  // Editorial fields (v2)
+  const [editorial, setEditorial] = useState<EditorialState>({
+    thesis: company.thesis ?? "",
+    thesisSub: company.thesis_sub ?? "",
+    interpretation: company.interpretation ?? "",
+    lastChange: company.last_change ?? "",
+    lastChangeAt: company.last_change_at ?? "",
+    bets: Array.isArray(company.bets) ? company.bets : [],
+  });
 
   // Detection state
   const [detection, setDetection] = useState<DetectionResult | null>(null);
@@ -151,6 +172,12 @@ export function EditCompanyForm({ company }: { company: Company }) {
           atsIdentifier,
           careersUrl: (detection?.normalizedUrl ?? careersUrl) || null,
           isActive,
+          thesis: editorial.thesis.trim() || null,
+          thesisSub: editorial.thesisSub.trim() || null,
+          interpretation: editorial.interpretation.trim() || null,
+          lastChange: editorial.lastChange.trim() || null,
+          lastChangeAt: editorial.lastChangeAt || null,
+          bets: editorial.bets,
         }),
       });
       if (!res.ok) {
@@ -166,13 +193,23 @@ export function EditCompanyForm({ company }: { company: Company }) {
     }
   }
 
+  const editorialChanged =
+    editorial.thesis !== (company.thesis ?? "") ||
+    editorial.thesisSub !== (company.thesis_sub ?? "") ||
+    editorial.interpretation !== (company.interpretation ?? "") ||
+    editorial.lastChange !== (company.last_change ?? "") ||
+    editorial.lastChangeAt !== (company.last_change_at ?? "") ||
+    JSON.stringify(editorial.bets) !==
+      JSON.stringify(Array.isArray(company.bets) ? company.bets : []);
+
   const hasChanges =
     name !== company.name ||
     country !== company.country ||
     atsType !== company.ats_type ||
     atsIdentifier !== company.ats_identifier ||
     careersUrl !== (company.careers_url ?? "") ||
-    isActive !== company.is_active;
+    isActive !== company.is_active ||
+    editorialChanged;
 
   return (
     <Card>
@@ -223,20 +260,16 @@ export function EditCompanyForm({ company }: { company: Company }) {
             <div
               className={`p-4 rounded-lg border ${
                 detection.detected && detection.verified
-                  ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"
+                  ? "bg-primary-soft border-primary/20"
                   : detection.detected
-                  ? "bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800"
-                  : "bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800"
+                  ? "bg-accent-soft border-accent/20"
+                  : "bg-destructive/10 border-destructive/20"
               }`}
             >
               {detection.detected ? (
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    {detection.verified ? (
-                      <span className="text-green-600 dark:text-green-400">✓</span>
-                    ) : (
-                      <span className="text-blue-600 dark:text-blue-400">✓</span>
-                    )}
+                    <span className={detection.verified ? "text-primary-soft-foreground" : "text-accent-soft-foreground"}>✓</span>
                     <span className="font-medium">
                       Detected: {detection.atsLabel ?? detection.atsType}
                     </span>
@@ -251,7 +284,7 @@ export function EditCompanyForm({ company }: { company: Company }) {
                     </p>
                   )}
                   {detection.atsType !== atsType && (
-                    <p className="text-sm text-blue-600 dark:text-blue-400">
+                    <p className="text-sm text-primary">
                       Fields updated to detected values
                     </p>
                   )}
@@ -330,6 +363,12 @@ export function EditCompanyForm({ company }: { company: Company }) {
               </div>
             </div>
           </div>
+
+          {/* Editorial fields (v2) */}
+          <EditCompanyEditorialForm
+            value={editorial}
+            onChange={setEditorial}
+          />
 
           {/* Actions */}
           <div className="flex gap-2 pt-2">

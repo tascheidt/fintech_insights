@@ -1,8 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  normalizeTechName,
-  type CompanyTechStack,
-} from "./tech-stack-extraction";
+import { normalizeTechName } from "./tech-stack-extraction";
 
 // ============================================================================
 // Exclusion list — generic productivity/office tools that add no signal

@@ -1,42 +1,149 @@
+/* ============================================================
+   web/app/globals.css — Fintech Talent Brief tokens
+   ============================================================
+   Single source of truth for design tokens. Mirrors the
+   canonical `colors_and_type.css` from the design system project.
+
+   ⚑ Core principle: every visual value in the app must reference
+   a token defined in this file. No raw hex / rgb / oklch literals
+   live anywhere outside `globals.css`.
+
+   Palette intent:
+   - PACIFIC (deep ocean blue) — primary brand, links, focus
+   - SUN (warm yellow) — ACCENT (CTAs, weekly digest banner stop)
+   - SUNSET (orange/coral) — HIGHLIGHT (new-this-week markers, alerts)
+   - SAND (warm neutrals) — surfaces, text, borders
+
+   Sun is the accent (warmer CTA energy); Sunset is the highlight
+   (visual call-out for change). This pairing is intentional —
+   do not swap. See chat history of the design system project.
+   ============================================================ */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* ── Semantic surface aliases ── */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ── Pacific (primary blue) ── */
+  --color-pacific-50:  var(--pacific-50);
+  --color-pacific-100: var(--pacific-100);
+  --color-pacific-200: var(--pacific-200);
+  --color-pacific-300: var(--pacific-300);
+  --color-pacific-400: var(--pacific-400);
+  --color-pacific-500: var(--pacific-500);
+  --color-pacific-600: var(--pacific-600);
+  --color-pacific-700: var(--pacific-700);
+  --color-pacific-800: var(--pacific-800);
+  --color-pacific-900: var(--pacific-900);
+  --color-pacific-950: var(--pacific-950);
+
+  /* ── Sand (warm neutrals) ── */
+  --color-sand-0:   var(--sand-0);
+  --color-sand-25:  var(--sand-25);
+  --color-sand-50:  var(--sand-50);
+  --color-sand-100: var(--sand-100);
+  --color-sand-200: var(--sand-200);
+  --color-sand-300: var(--sand-300);
+  --color-sand-400: var(--sand-400);
+  --color-sand-500: var(--sand-500);
+  --color-sand-600: var(--sand-600);
+  --color-sand-700: var(--sand-700);
+  --color-sand-800: var(--sand-800);
+  --color-sand-900: var(--sand-900);
+  --color-sand-950: var(--sand-950);
+
+  /* ── Sun (yellow) — the ACCENT family ── */
+  --color-sun-50:  var(--sun-50);
+  --color-sun-100: var(--sun-100);
+  --color-sun-200: var(--sun-200);
+  --color-sun-300: var(--sun-300);
+  --color-sun-400: var(--sun-400);
+  --color-sun-500: var(--sun-500);
+  --color-sun-600: var(--sun-600);
+  --color-sun-700: var(--sun-700);
+  --color-sun-800: var(--sun-800);
+  --color-sun-900: var(--sun-900);
+
+  /* ── Sunset (orange/coral) — the HIGHLIGHT family ── */
+  --color-sunset-50:  var(--sunset-50);
+  --color-sunset-100: var(--sunset-100);
+  --color-sunset-200: var(--sunset-200);
+  --color-sunset-300: var(--sunset-300);
+  --color-sunset-400: var(--sunset-400);
+  --color-sunset-500: var(--sunset-500);
+  --color-sunset-600: var(--sunset-600);
+  --color-sunset-700: var(--sunset-700);
+  --color-sunset-800: var(--sunset-800);
+  --color-sunset-900: var(--sunset-900);
+
+  /* Soft surfaces (chip / callout backgrounds) */
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent-soft-fg);
+  --color-highlight: var(--highlight);
+  --color-highlight-soft: var(--highlight-soft);
+  --color-highlight-soft-foreground: var(--highlight-soft-fg);
+
+  /* Growth utility (text-growth-500, bg-growth-500) */
+  --color-growth-500: var(--growth-500);
+
+  /* Function-category Tailwind utilities (bg-cat-engineering, etc.) */
+  --color-cat-engineering: var(--cat-engineering);
+  --color-cat-product:     var(--cat-product);
+  --color-cat-gtm:         var(--cat-gtm);
+  --color-cat-data:        var(--cat-data);
+  --color-cat-finance:     var(--cat-finance);
+  --color-cat-risk:        var(--cat-risk);
+  --color-cat-operations:  var(--cat-operations);
+  --color-cat-other:       var(--cat-other);
+
+  /* Semantic info colors */
+  --color-success: var(--color-success-token);
+  --color-warning: var(--color-warning-token);
+  --color-danger:  var(--color-danger-token);
+  --color-info:    var(--color-info-token);
+
+  /* ── Fonts ── */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
+  --font-display: var(--font-fraunces);
+
+  /* ── Radii ── */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -46,73 +153,234 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
+/* ============================================================
+   :root — light theme tokens (canonical SoCal palette)
+   Mirrors design-system colors_and_type.css.
+   ============================================================ */
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  /* ── Pacific (primary blue) ── */
+  --pacific-50:  oklch(0.975 0.018 230);
+  --pacific-100: oklch(0.945 0.038 230);
+  --pacific-200: oklch(0.885 0.072 230);
+  --pacific-300: oklch(0.795 0.110 230);
+  --pacific-400: oklch(0.680 0.140 232);
+  --pacific-500: oklch(0.575 0.150 236);  /* brand primary */
+  --pacific-600: oklch(0.490 0.140 240);
+  --pacific-700: oklch(0.405 0.115 244);
+  --pacific-800: oklch(0.320 0.085 248);
+  --pacific-900: oklch(0.230 0.060 252);
+  --pacific-950: oklch(0.160 0.045 255);
+
+  /* ── Sunset (true orange / coral, hues 38–55) ── */
+  --sunset-50:  oklch(0.980 0.018 65);
+  --sunset-100: oklch(0.955 0.040 60);
+  --sunset-200: oklch(0.905 0.085 55);
+  --sunset-300: oklch(0.835 0.130 50);
+  --sunset-400: oklch(0.770 0.160 47);
+  --sunset-500: oklch(0.715 0.175 44);    /* coral / sunset highlight */
+  --sunset-600: oklch(0.640 0.180 42);
+  --sunset-700: oklch(0.555 0.165 40);
+  --sunset-800: oklch(0.460 0.135 38);
+  --sunset-900: oklch(0.370 0.100 38);
+
+  /* ── Sun (warm yellow) ── */
+  --sun-50:  oklch(0.990 0.020 95);
+  --sun-100: oklch(0.975 0.045 92);
+  --sun-200: oklch(0.945 0.090 90);
+  --sun-300: oklch(0.905 0.130 88);
+  --sun-400: oklch(0.870 0.155 86);
+  --sun-500: oklch(0.830 0.170 84);       /* warm sun accent */
+  --sun-600: oklch(0.755 0.165 80);
+  --sun-700: oklch(0.660 0.140 75);
+  --sun-800: oklch(0.540 0.110 70);
+  --sun-900: oklch(0.420 0.085 68);
+
+  /* ── Growth (mossy green for net-positive hiring numbers) ──
+     Per canonical styles.css `.tb-stat__value.is-pos` + `.tb-net.is-pos`. */
+  --growth-500: oklch(0.500 0.130 155);
+
+  /* ── Sand (warm neutrals — replaces grayscale) ── */
+  --sand-0:   oklch(1.000 0 0);
+  --sand-25:  oklch(0.990 0.006 75);      /* page bg, subtle warmth */
+  --sand-50:  oklch(0.975 0.010 75);
+  --sand-100: oklch(0.955 0.014 75);      /* card hover, subtle fills */
+  --sand-200: oklch(0.910 0.014 75);      /* default border */
+  --sand-300: oklch(0.860 0.014 75);      /* strong border */
+  --sand-400: oklch(0.730 0.014 75);
+  --sand-500: oklch(0.585 0.012 75);      /* muted-foreground */
+  --sand-600: oklch(0.480 0.012 75);
+  --sand-700: oklch(0.380 0.012 70);
+  --sand-800: oklch(0.275 0.012 65);
+  --sand-900: oklch(0.195 0.012 60);
+  --sand-950: oklch(0.135 0.012 60);      /* foreground (warm near-black) */
+
+  /* ── Surfaces ── */
+  --background:        var(--sand-25);
+  --foreground:        var(--sand-950);
+  --card:              var(--sand-0);
+  --card-foreground:   var(--foreground);
+  --popover:           var(--sand-0);
+  --popover-foreground: var(--foreground);
+
+  /* ── Primary (Pacific) ── */
+  --primary:               var(--pacific-500);
+  --primary-foreground:    var(--sand-0);
+  --primary-hover:         var(--pacific-600);
+  --primary-press:         var(--pacific-700);
+  --primary-soft:          var(--pacific-50);
+  --primary-soft-fg:       var(--pacific-700);
+
+  /* ── Secondary / muted (Sand) ── */
+  --secondary:             var(--sand-100);
+  --secondary-foreground:  var(--sand-800);
+  --muted:                 var(--sand-100);
+  --muted-foreground:      var(--sand-500);
+
+  /* ── Accent = Sun (warm CTA energy) ── */
+  --accent:                var(--sun-500);
+  --accent-foreground:     var(--sand-950);
+  --accent-hover:          var(--sun-600);
+  --accent-soft:           var(--sun-100);
+  --accent-soft-fg:        var(--sun-800);
+
+  /* ── Highlight = Sunset (new-this-week markers, alerts) ── */
+  --highlight:             var(--sunset-500);
+  --highlight-soft:        var(--sunset-50);
+  --highlight-soft-fg:     var(--sunset-700);
+
+  /* ── Destructive (true error states only) ── */
+  --destructive:           oklch(0.575 0.220 27);
+
+  /* ── Borders + inputs ── */
+  --border:        var(--sand-200);
+  --border-strong: var(--sand-300);
+  --input:         var(--sand-200);
+  --ring:          var(--pacific-400);
+
+  /* ── Semantic info colors ── */
+  --color-success-token: oklch(0.625 0.150 155);
+  --color-warning-token: var(--sun-600);
+  --color-danger-token:  oklch(0.575 0.220 27);
+  --color-info-token:    var(--pacific-500);
+
+  /* ── Charts (canonical 5-series ramp) ── */
+  --chart-1: var(--pacific-500);                    /* primary series */
+  --chart-2: var(--sunset-500);                     /* sunset highlight */
+  --chart-3: var(--sun-500);                        /* sun accent */
+  --chart-4: oklch(0.575 0.130 195);                /* sea-foam teal */
+  --chart-5: oklch(0.620 0.180 340);                /* magenta dusk */
+
+  /* ── Function-category palette ──
+     Distinct hues for the 8 role-function groups, used by FunctionBreakdown
+     and the dashboard category legend. Borrows from chart-* and adds 3 to
+     guarantee 8 visually distinct bars. */
+  --cat-engineering:  var(--pacific-500);
+  --cat-product:      oklch(0.620 0.180 340);  /* magenta dusk */
+  --cat-gtm:          oklch(0.625 0.150 155);  /* growth green */
+  --cat-data:         oklch(0.560 0.160 295);  /* purple */
+  --cat-finance:      var(--sunset-500);
+  --cat-risk:         oklch(0.575 0.220 27);   /* warm red */
+  --cat-operations:   oklch(0.575 0.130 195);  /* sea-foam teal */
+  --cat-other:        var(--sand-500);
+
+  /* ── Sidebar (warmed) ── */
+  --sidebar:                       var(--sand-25);
+  --sidebar-foreground:            var(--foreground);
+  --sidebar-primary:               var(--pacific-500);
+  --sidebar-primary-foreground:    var(--sand-0);
+  --sidebar-accent:                var(--sand-100);
+  --sidebar-accent-foreground:     var(--sand-800);
+  --sidebar-border:                var(--sand-200);
+  --sidebar-ring:                  var(--pacific-400);
+
+  /* Soft top-right glow overlay used on top of `--gradient-coast` to
+     match the canonical DigestBanner highlight (styles.css `.tb-digest::after`). */
+  --digest-banner-glow: radial-gradient(
+    120% 70% at 80% 10%,
+    oklch(1 0 0 / 0.25),
+    transparent 60%
+  );
+
+  /* ── Gradients (used in two places only: digest hero, marketing) ──
+     Stays in deep blue longer, then warms through coral-orange into
+     amber yellow. No red-brick transit. */
+  --gradient-coast: linear-gradient(
+    115deg,
+    var(--pacific-800) 0%,
+    var(--pacific-600) 30%,
+    var(--pacific-400) 55%,
+    var(--sunset-400) 82%,
+    var(--sun-400) 100%
+  );
+  --gradient-dawn: linear-gradient(
+    180deg,
+    var(--pacific-50) 0%,
+    var(--sunset-50) 60%,
+    var(--sun-50) 100%
+  );
+
+  /* ── Shadows (warm-blue tinted, never pure black) ── */
+  --shadow-xs: 0 1px 2px oklch(0.16 0.04 255 / 0.06);
+  --shadow-sm: 0 1px 3px oklch(0.16 0.04 255 / 0.08), 0 1px 2px oklch(0.16 0.04 255 / 0.04);
+  --shadow-md: 0 4px 12px oklch(0.16 0.04 255 / 0.08), 0 2px 4px oklch(0.16 0.04 255 / 0.04);
+  --shadow-lg: 0 12px 28px oklch(0.16 0.04 255 / 0.10), 0 4px 8px oklch(0.16 0.04 255 / 0.05);
 }
 
+/* ============================================================
+   .dark — cool dusk dark mode
+   ============================================================ */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background:        var(--sand-950);
+  --foreground:        var(--sand-50);
+  --card:              var(--sand-900);
+  --card-foreground:   var(--foreground);
+  --popover:           var(--sand-900);
+  --popover-foreground: var(--foreground);
+
+  --primary:               var(--pacific-400);
+  --primary-foreground:    var(--sand-950);
+  --primary-hover:         var(--pacific-300);
+  --primary-soft:          oklch(0.32 0.085 248 / 0.30);
+  --primary-soft-fg:       var(--pacific-200);
+
+  --secondary:             var(--sand-800);
+  --secondary-foreground:  var(--foreground);
+
+  --muted:                 var(--sand-800);
+  --muted-foreground:      var(--sand-400);
+
+  --accent:                var(--sun-400);
+  --accent-foreground:     var(--sand-950);
+  --accent-soft:           oklch(0.54 0.11 70 / 0.30);
+  --accent-soft-fg:        var(--sun-200);
+
+  --highlight:             var(--sunset-400);
+  --highlight-soft:        oklch(0.46 0.13 40 / 0.30);
+  --highlight-soft-fg:     var(--sunset-200);
+
+  --destructive:           oklch(0.700 0.190 22);
+
+  --border:        oklch(1 0 0 / 0.08);
+  --border-strong: oklch(1 0 0 / 0.14);
+  --input:         oklch(1 0 0 / 0.14);
+  --ring:          var(--pacific-400);
+
+  --chart-1: var(--pacific-400);
+  --chart-2: var(--sunset-400);
+  --chart-3: var(--sun-400);
+  --chart-4: oklch(0.660 0.130 195);
+  --chart-5: oklch(0.700 0.180 340);
+
+  --sidebar:                       var(--sand-900);
+  --sidebar-foreground:            var(--foreground);
+  --sidebar-primary:               var(--pacific-400);
+  --sidebar-primary-foreground:    var(--sand-950);
+  --sidebar-accent:                var(--sand-800);
+  --sidebar-accent-foreground:     var(--foreground);
+  --sidebar-border:                oklch(1 0 0 / 0.08);
+  --sidebar-ring:                  var(--pacific-400);
 }
 
 @layer base {
@@ -121,5 +389,41 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* ============================================================
+   Editorial display utility — Fraunces. Reserved for:
+   - Digest hero headline (WeeklyIntelBanner)
+   - Marketing hero
+   - Login hero
+   - Company stated-strategy callout
+   Never in UI chrome, charts, tables, or labels.
+   ============================================================ */
+@layer utilities {
+  .font-display { font-family: var(--font-display); }
+  .text-display {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+  }
+  .eyebrow {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .stat-number {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 }

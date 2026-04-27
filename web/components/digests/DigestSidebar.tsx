@@ -30,10 +30,46 @@ interface MonthGroup {
   digests: DigestSummary[];
 }
 
+function computeInitialExpanded(
+  digests: DigestSummary[],
+  activeId: string | undefined
+): Set<string> {
+  if (digests.length === 0) return new Set();
+
+  const monthMap = new Map<string, DigestSummary[]>();
+  for (const d of digests) {
+    const date = new Date(d.week_start);
+    const monthLabel = format(date, "MMMM yyyy");
+    const existing = monthMap.get(monthLabel) ?? [];
+    existing.push(d);
+    monthMap.set(monthLabel, existing);
+  }
+
+  const sortedMonths = Array.from(monthMap.keys()).sort((a, b) => {
+    const da = new Date(monthMap.get(a)![0].week_start).getTime();
+    const db = new Date(monthMap.get(b)![0].week_start).getTime();
+    return db - da;
+  });
+
+  const initial = new Set<string>();
+  if (sortedMonths.length > 0) initial.add(sortedMonths[0]);
+  if (activeId) {
+    for (const [monthLabel, monthDigests] of monthMap) {
+      if (monthDigests.some((d) => d.id === activeId)) initial.add(monthLabel);
+    }
+  }
+  return initial;
+}
+
 export function DigestSidebar({ digests }: DigestSidebarProps) {
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  // Initial expansion is derived once at mount: first month + month containing
+  // the active digest. After mount, user toggles in `toggleMonth` are the only
+  // source of truth (no effect-driven state writes).
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(() =>
+    computeInitialExpanded(digests, pathname.split("/").pop())
+  );
 
   // Group digests by month
   const monthGroups = useMemo(() => {
@@ -69,28 +105,6 @@ export function DigestSidebar({ digests }: DigestSidebarProps) {
       return dateB.getTime() - dateA.getTime();
     });
   }, [digests]);
-
-  // Auto-expand months with active digest or first month
-  useMemo(() => {
-    const newExpanded = new Set<string>();
-    
-    // Always expand the first month
-    if (monthGroups.length > 0) {
-      newExpanded.add(monthGroups[0].month);
-    }
-    
-    // Expand month containing active digest
-    const activeId = pathname.split("/").pop();
-    for (const group of monthGroups) {
-      if (group.digests.some(d => d.id === activeId)) {
-        newExpanded.add(group.month);
-      }
-    }
-    
-    if (newExpanded.size > 0 && expandedMonths.size === 0) {
-      setExpandedMonths(newExpanded);
-    }
-  }, [monthGroups, pathname, expandedMonths.size]);
 
   // Filter digests based on search
   const filteredGroups = useMemo(() => {

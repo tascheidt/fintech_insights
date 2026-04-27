@@ -3,6 +3,7 @@ import {
   getCategoryGroup,
   RoleCategory,
   CATEGORY_GROUPS,
+  ROLE_CATEGORIES,
 } from "@/lib/analysis/function-categories";
 import { startOfWeek, format, subDays, parseISO, addHours } from "date-fns";
 
@@ -548,4 +549,916 @@ export async function getNetThisWeek(
     newCount: filteredNew.length,
     closedCount: closedCount ?? 0,
   };
+}
+
+// ============================================================================
+// v2 helpers — Companies index, company drill-down, Jobs page right rail
+// ============================================================================
+
+export type PivotKind = "new" | "accel" | "quiet" | "cont";
+export type PivotSignal = { kind: PivotKind; label: string };
+
+const ACCEL_RATIO = 2; // 4w count must exceed (avg(4w over 12w window)) * 2
+const COLD_START_DAYS = 180; // 6 months of silence before "cold start"
+const QUIET_DAYS = 30; // sustained-baseline group going to zero for this long
+
+/**
+ * Per-week posting counts for the last `weeks` weeks (oldest → newest)
+ * for one company. Used to power the small inline Sparkline on the
+ * Companies index row.
+ */
+export async function getCompanyHiringSparkline(
+  companyId: string,
+  weeks: number = 8
+): Promise<number[]> {
+  const supabase = await createClient();
+  const startDate = subDays(new Date(), weeks * 7).toISOString();
+
+  const { data: jobs } = await supabase
+    .from("job_postings")
+    .select("first_seen_date")
+    .eq("company_id", companyId)
+    .gte("first_seen_date", startDate)
+    .not("first_seen_date", "is", null);
+
+  // Bucket by week-start (Monday).
+  const buckets = new Map<string, number>();
+  for (let i = weeks - 1; i >= 0; i--) {
+    const ws = startOfWeek(subDays(new Date(), i * 7), { weekStartsOn: 1 });
+    buckets.set(ws.toISOString(), 0);
+  }
+
+  for (const job of jobs ?? []) {
+    if (!job.first_seen_date) continue;
+    const ws = startOfWeek(parseISO(job.first_seen_date), { weekStartsOn: 1 });
+    const key = ws.toISOString();
+    if (buckets.has(key)) {
+      buckets.set(key, (buckets.get(key) || 0) + 1);
+    }
+  }
+
+  return Array.from(buckets.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([, n]) => n);
+}
+
+/**
+ * Net new postings in the last `days` days for one company.
+ * If `closed_date` is populated, subtracts closures in the same window.
+ */
+export async function getCompanyHiringDelta(
+  companyId: string,
+  days: number = 30
+): Promise<number> {
+  const supabase = await createClient();
+  const startDate = subDays(new Date(), days).toISOString();
+
+  const [{ count: newCount }, { count: closedCount }] = await Promise.all([
+    supabase
+      .from("job_postings")
+      .select("*", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .gte("first_seen_date", startDate),
+    supabase
+      .from("job_postings")
+      .select("*", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .gte("closed_date", startDate),
+  ]);
+
+  return (newCount ?? 0) - (closedCount ?? 0);
+}
+
+/**
+ * Classify a company's overall hiring pivot using three rules over the
+ * function-group breakdown of their last ~12 weeks of postings:
+ *
+ *   1. accel — any group's 4w count > 2× its 12w baseline (per-week avg × 4)
+ *   2. new   — first posting in a group in 6+ months (cold start)
+ *   3. quiet — group with sustained baseline drops to 0 for 30+ days
+ *   4. cont  — none of the above
+ *
+ * Row-level kind precedence: new > accel > quiet > cont.
+ */
+export async function classifyCompanyPivot(
+  companyId: string
+): Promise<{ kind: PivotKind; signals: PivotSignal[] }> {
+  const supabase = await createClient();
+  const longWindowStart = subDays(new Date(), COLD_START_DAYS).toISOString();
+  const recent4wStart = subDays(new Date(), 28);
+  const recent12wStart = subDays(new Date(), 84);
+
+  const { data: jobs } = await supabase
+    .from("job_postings")
+    .select("function_category, first_seen_date")
+    .eq("company_id", companyId)
+    .gte("first_seen_date", longWindowStart)
+    .not("function_category", "is", null)
+    .not("first_seen_date", "is", null);
+
+  const allByGroup = new Map<string, Date[]>();
+  for (const job of jobs ?? []) {
+    if (!job.function_category || !job.first_seen_date) continue;
+    const group = getCategoryGroup(job.function_category as RoleCategory);
+    if (!allByGroup.has(group)) allByGroup.set(group, []);
+    allByGroup.get(group)!.push(parseISO(job.first_seen_date));
+  }
+
+  const signals: PivotSignal[] = [];
+
+  for (const [group, dates] of allByGroup.entries()) {
+    const last4w = dates.filter((d) => d >= recent4wStart).length;
+    const last12w = dates.filter((d) => d >= recent12wStart).length;
+    const baseline4w = (last12w / 12) * 4; // avg per 4w over 12w window
+
+    // Accelerating
+    if (baseline4w >= 1 && last4w > baseline4w * ACCEL_RATIO) {
+      signals.push({ kind: "accel", label: `${group} accelerating` });
+    }
+
+    // Cold start: first posting in 6+ months means the only postings in the
+    // window are concentrated near "now". A simple proxy: nothing older than
+    // 5 months but at least one in the last 4 weeks.
+    const oldest = dates.reduce(
+      (acc, d) => (d < acc ? d : acc),
+      new Date()
+    );
+    const fiveMonthsAgo = subDays(new Date(), 150);
+    if (last4w > 0 && oldest > fiveMonthsAgo && dates.length === last4w) {
+      signals.push({ kind: "new", label: `${group} cold start` });
+    }
+
+    // Going quiet: had a sustained baseline (≥4 in the prior 12w) but
+    // nothing in the last 30 days.
+    const last30dStart = subDays(new Date(), QUIET_DAYS);
+    const last30d = dates.filter((d) => d >= last30dStart).length;
+    if (last12w >= 4 && last30d === 0) {
+      signals.push({ kind: "quiet", label: `${group} going quiet` });
+    }
+  }
+
+  // Row-level kind precedence
+  let kind: PivotKind = "cont";
+  if (signals.some((s) => s.kind === "new")) kind = "new";
+  else if (signals.some((s) => s.kind === "accel")) kind = "accel";
+  else if (signals.some((s) => s.kind === "quiet")) kind = "quiet";
+
+  return { kind, signals };
+}
+
+/**
+ * Most recent meaningful event for a company. Priority:
+ *   1. companies.last_change + last_change_at (editor-curated)
+ *   2. Most recent posting_events row (if populated)
+ *   3. Most recent job_postings.first_seen_date — labeled "New posting"
+ */
+export async function getCompanyLastChange(
+  companyId: string
+): Promise<{ text: string; when: string } | null> {
+  const supabase = await createClient();
+
+  // Editor-curated
+  const { data: company } = await supabase
+    .from("companies")
+    .select("last_change, last_change_at")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (company?.last_change) {
+    return {
+      text: company.last_change,
+      when: company.last_change_at
+        ? relativeWhen(parseISO(company.last_change_at as string))
+        : "—",
+    };
+  }
+
+  // posting_events feed (best-effort; table may not be populated)
+  try {
+    const { data: events } = await supabase
+      .from("posting_events")
+      .select("event_type, occurred_at, summary")
+      .eq("company_id", companyId)
+      .order("occurred_at", { ascending: false })
+      .limit(1);
+    const ev = events?.[0] as
+      | { event_type?: string; occurred_at?: string; summary?: string }
+      | undefined;
+    if (ev?.occurred_at) {
+      return {
+        text: ev.summary ?? ev.event_type ?? "Posting event",
+        when: relativeWhen(parseISO(ev.occurred_at)),
+      };
+    }
+  } catch {
+    // table may not exist in all envs; fall through
+  }
+
+  // Fallback: most recent job_postings.first_seen_date
+  const { data: latestJob } = await supabase
+    .from("job_postings")
+    .select("first_seen_date")
+    .eq("company_id", companyId)
+    .not("first_seen_date", "is", null)
+    .order("first_seen_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestJob?.first_seen_date) {
+    return {
+      text: "New posting",
+      when: relativeWhen(parseISO(latestJob.first_seen_date)),
+    };
+  }
+
+  return null;
+}
+
+function relativeWhen(date: Date): string {
+  const ms = Date.now() - date.getTime();
+  const days = Math.floor(ms / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "1d";
+  if (days < 14) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 8) return `${weeks}w`;
+  const months = Math.floor(days / 30);
+  return `${months}mo`;
+}
+
+/**
+ * Function-heat strip data for the Jobs page right rail.
+ * Returns 6 rows (top 6 groups by raw new-posting count in window).
+ */
+export async function getFunctionHeatData(
+  days: number = 30
+): Promise<
+  Array<{
+    name: string;
+    val: number;
+    max: number;
+    kind: "new" | "accel" | "default";
+  }>
+> {
+  const supabase = await createClient();
+  const recent = subDays(new Date(), days).toISOString();
+  const recent4wStart = subDays(new Date(), 28);
+  const recent12wStart = subDays(new Date(), 84);
+  const longWindowStart = subDays(new Date(), COLD_START_DAYS).toISOString();
+
+  const [{ data: recentJobs }, { data: longRangeJobs }] = await Promise.all([
+    supabase
+      .from("job_postings")
+      .select("function_category, first_seen_date")
+      .gte("first_seen_date", recent)
+      .not("function_category", "is", null),
+    supabase
+      .from("job_postings")
+      .select("function_category, first_seen_date")
+      .gte("first_seen_date", longWindowStart)
+      .not("function_category", "is", null)
+      .not("first_seen_date", "is", null),
+  ]);
+
+  // Recent counts by group
+  const recentByGroup = new Map<string, number>();
+  for (const job of recentJobs ?? []) {
+    if (!job.function_category) continue;
+    const group = getCategoryGroup(job.function_category as RoleCategory);
+    recentByGroup.set(group, (recentByGroup.get(group) || 0) + 1);
+  }
+
+  // Per-group windows for accel / cold-start classification
+  const longByGroup = new Map<string, Date[]>();
+  for (const job of longRangeJobs ?? []) {
+    if (!job.function_category || !job.first_seen_date) continue;
+    const group = getCategoryGroup(job.function_category as RoleCategory);
+    if (!longByGroup.has(group)) longByGroup.set(group, []);
+    longByGroup.get(group)!.push(parseISO(job.first_seen_date));
+  }
+
+  const max = Math.max(1, ...Array.from(recentByGroup.values()));
+
+  const rows = Array.from(recentByGroup.entries())
+    .map(([name, val]) => {
+      const dates = longByGroup.get(name) ?? [];
+      const last4w = dates.filter((d) => d >= recent4wStart).length;
+      const last12w = dates.filter((d) => d >= recent12wStart).length;
+      const baseline4w = (last12w / 12) * 4;
+
+      const fiveMonthsAgo = subDays(new Date(), 150);
+      const oldest = dates.reduce(
+        (acc, d) => (d < acc ? d : acc),
+        new Date()
+      );
+      const isColdStart =
+        last4w > 0 && oldest > fiveMonthsAgo && dates.length === last4w;
+      const isAccel = baseline4w >= 1 && last4w > baseline4w * ACCEL_RATIO;
+
+      const kind: "new" | "accel" | "default" = isColdStart
+        ? "new"
+        : isAccel
+        ? "accel"
+        : "default";
+
+      return { name, val, max, kind };
+    })
+    .sort((a, b) => b.val - a.val)
+    .slice(0, 6);
+
+  return rows;
+}
+
+/**
+ * Cross-company themes for the Jobs page right rail. Phase-1 derivation:
+ * the function-category labels appearing in ≥2 companies' active jobs.
+ * Sort by company count desc, then role count desc. Up to 5 rows.
+ */
+export async function getCrossCompanyThemes(): Promise<
+  Array<{ name: string; cos: number; roles: number }>
+> {
+  const supabase = await createClient();
+
+  const { data: jobs } = await supabase
+    .from("job_postings")
+    .select(
+      "company_id, function_category, is_active, companies!inner(is_active)"
+    )
+    .eq("is_active", true)
+    .eq("companies.is_active", true)
+    .not("function_category", "is", null);
+
+  const themeStats = new Map<string, { cos: Set<string>; roles: number }>();
+  for (const job of jobs ?? []) {
+    if (!job.function_category) continue;
+    const group = getCategoryGroup(job.function_category as RoleCategory);
+    if (!themeStats.has(group)) {
+      themeStats.set(group, { cos: new Set(), roles: 0 });
+    }
+    const entry = themeStats.get(group)!;
+    entry.cos.add(job.company_id);
+    entry.roles += 1;
+  }
+
+  return Array.from(themeStats.entries())
+    .map(([name, { cos, roles }]) => ({ name, cos: cos.size, roles }))
+    .filter((row) => row.cos >= 2)
+    .sort((a, b) => b.cos - a.cos || b.roles - a.roles)
+    .slice(0, 5);
+}
+
+/**
+ * Row shape returned by `getJobsListData` — what the v2 Jobs page table
+ * needs for one row. `functionGroup` is the high-level group label (e.g.
+ * "Engineering"), `keywords` is the structure-extracted keyword array used
+ * to render up to 3 SignalTag chips, and `ageDays` is precomputed from
+ * `firstSeenDate` so the client can sort and chip-filter without
+ * recomputing.
+ */
+export interface JobsListRow {
+  id: string;
+  title: string;
+  companyName: string;
+  companySlug: string;
+  companyId: string;
+  functionCategory: string | null;
+  functionGroup: string | null;
+  location: string | null;
+  locationStructured: {
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    formatted: string | null;
+  } | null;
+  firstSeenDate: string | null;
+  isActive: boolean;
+  keywords: string[];
+  ageDays: number | null;
+  standardizedDepartment: string | null;
+}
+
+interface JobsListRawRow {
+  id: string;
+  title: string;
+  standardized_department: string | null;
+  function_category: string | null;
+  location: string | null;
+  location_structured: unknown;
+  is_active: boolean;
+  first_seen_date: string | null;
+  keywords: unknown;
+  company_id: string;
+  companies:
+    | { id: string; name: string; slug: string }
+    | { id: string; name: string; slug: string }[]
+    | null;
+}
+
+function coerceLocationStructured(
+  raw: unknown
+): JobsListRow["locationStructured"] {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  return {
+    city: typeof r.city === "string" ? r.city : null,
+    state: typeof r.state === "string" ? r.state : null,
+    country: typeof r.country === "string" ? r.country : null,
+    formatted: typeof r.formatted === "string" ? r.formatted : null,
+  };
+}
+
+function coerceKeywords(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === "string" && v.length > 0);
+}
+
+/**
+ * Fetch all job rows for the standalone Jobs page (`/jobs`). Optionally
+ * scope to an explicit set of job IDs — used when entering from a digest
+ * deep link that captured a specific snapshot of jobs (the
+ * `weekly_digest_companies.job_ids` payload).
+ */
+export async function getJobsListData(
+  options: { jobIds?: string[] | null } = {}
+): Promise<JobsListRow[]> {
+  const supabase = await createClient();
+
+  // Digest snapshot with no captured jobs — short-circuit.
+  if (options.jobIds !== undefined && options.jobIds !== null && options.jobIds.length === 0) {
+    return [];
+  }
+
+  let query = supabase
+    .from("job_postings")
+    .select(
+      "id, title, standardized_department, function_category, location, location_structured, is_active, first_seen_date, keywords, company_id, companies(id, name, slug)"
+    )
+    .order("first_seen_date", { ascending: false });
+
+  if (options.jobIds && options.jobIds.length > 0) {
+    query = query.in("id", options.jobIds);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) return [];
+
+  const now = Date.now();
+  return (data as JobsListRawRow[]).map((j) => {
+    const company = Array.isArray(j.companies) ? j.companies[0] : j.companies;
+    const ageDays = j.first_seen_date
+      ? Math.max(
+          0,
+          Math.floor((now - new Date(j.first_seen_date).getTime()) / 86_400_000)
+        )
+      : null;
+    const functionGroup =
+      j.function_category &&
+      (ROLE_CATEGORIES as readonly string[]).includes(j.function_category)
+        ? getCategoryGroup(j.function_category as RoleCategory)
+        : null;
+    return {
+      id: j.id,
+      title: j.title,
+      companyName: company?.name ?? "—",
+      companySlug: company?.slug ?? "",
+      companyId: j.company_id,
+      functionCategory: j.function_category,
+      functionGroup,
+      location: j.location,
+      locationStructured: coerceLocationStructured(j.location_structured),
+      firstSeenDate: j.first_seen_date,
+      isActive: j.is_active,
+      keywords: coerceKeywords(j.keywords),
+      ageDays,
+      standardizedDepartment: j.standardized_department,
+    };
+  });
+}
+
+// ============================================================================
+// v2 — Company drill-down (Stream L)
+// ============================================================================
+
+export type BetEvidenceType = "internal" | "external";
+
+export interface CompanyBetEvidence {
+  when: string;
+  text: string;
+  type: BetEvidenceType;
+}
+
+export interface CompanyBet {
+  id: string;
+  title: string;
+  claim: string;
+  pivot: PivotKind;
+  pivot_label?: string;
+  confidence: 1 | 2 | 3 | 4 | 5;
+  evidence: CompanyBetEvidence[];
+  forward_signal: string;
+  job_filter?: { function?: string; theme?: string };
+}
+
+export interface CompanyBetJob {
+  id: string;
+  title: string;
+  functionCategory: string | null;
+  functionGroup: string | null;
+  location: string | null;
+  firstSeenDate: string | null;
+  isActive: boolean;
+  ageDays: number | null;
+  ageLabel: string;
+  keywords: string[];
+  url: string | null;
+  isNew: boolean;
+}
+
+export interface CompanyBetWithJobs extends CompanyBet {
+  jobs: CompanyBetJob[];
+  jobsCount: number;
+}
+
+interface CompanyDrillDownRow {
+  id: string;
+  name: string;
+  slug: string;
+  country: string | null;
+  ats_type: string | null;
+  ats_identifier: string | null;
+  careers_url: string | null;
+  thesis: string | null;
+  thesis_sub: string | null;
+  interpretation: string | null;
+  bets: unknown;
+  last_change: string | null;
+  last_change_at: string | null;
+  is_active: boolean;
+  created_at: string | null;
+  tech_stack: unknown;
+  tech_stack_generated_at: string | null;
+}
+
+export interface CompanyDrillDownData {
+  company: CompanyDrillDownRow;
+  bets: CompanyBetWithJobs[];
+  activeJobCount: number;
+  hiringDelta: number;
+  newPatternsCount: number;
+  rolesPerBet: number;
+  thesisAgo: string | null;
+}
+
+function coerceBetEvidence(raw: unknown): CompanyBetEvidence[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((e) => {
+      if (!e || typeof e !== "object") return null;
+      const r = e as Record<string, unknown>;
+      const type = r.type === "external" ? "external" : "internal";
+      return {
+        when: typeof r.when === "string" ? r.when : "",
+        text: typeof r.text === "string" ? r.text : "",
+        type,
+      } as CompanyBetEvidence;
+    })
+    .filter((e): e is CompanyBetEvidence => e !== null);
+}
+
+function coerceBets(raw: unknown): CompanyBet[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((b, idx) => {
+      if (!b || typeof b !== "object") return null;
+      const r = b as Record<string, unknown>;
+      const pivotRaw = typeof r.pivot === "string" ? r.pivot : "cont";
+      const pivot: PivotKind =
+        pivotRaw === "new" ||
+        pivotRaw === "accel" ||
+        pivotRaw === "quiet" ||
+        pivotRaw === "cont"
+          ? pivotRaw
+          : "cont";
+      const confRaw = typeof r.confidence === "number" ? r.confidence : 3;
+      const confidence = (Math.min(5, Math.max(1, Math.round(confRaw))) as
+        | 1
+        | 2
+        | 3
+        | 4
+        | 5);
+      const filterRaw =
+        r.job_filter && typeof r.job_filter === "object"
+          ? (r.job_filter as Record<string, unknown>)
+          : undefined;
+      const job_filter = filterRaw
+        ? {
+            function:
+              typeof filterRaw.function === "string"
+                ? filterRaw.function
+                : undefined,
+            theme:
+              typeof filterRaw.theme === "string"
+                ? filterRaw.theme
+                : undefined,
+          }
+        : undefined;
+      return {
+        id: typeof r.id === "string" && r.id ? r.id : `bet-${idx}`,
+        title: typeof r.title === "string" ? r.title : "",
+        claim: typeof r.claim === "string" ? r.claim : "",
+        pivot,
+        pivot_label:
+          typeof r.pivot_label === "string" ? r.pivot_label : undefined,
+        confidence,
+        evidence: coerceBetEvidence(r.evidence),
+        forward_signal:
+          typeof r.forward_signal === "string" ? r.forward_signal : "",
+        job_filter,
+      } as CompanyBet;
+    })
+    .filter((b): b is CompanyBet => b !== null);
+}
+
+function ageLabelFromDate(date: string | null, now: number): string {
+  if (!date) return "—";
+  const ms = now - new Date(date).getTime();
+  const days = Math.max(0, Math.floor(ms / 86_400_000));
+  if (days <= 0) return "today";
+  if (days === 1) return "1d";
+  if (days < 14) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 8) return `${weeks}w`;
+  const months = Math.floor(days / 30);
+  return `${months}mo`;
+}
+
+function matchesJobFilter(
+  job: {
+    function_category: string | null;
+    standardized_department: string | null;
+    keywords: string[];
+    title: string;
+    functionGroup: string | null;
+  },
+  filter: { function?: string; theme?: string } | undefined
+): boolean {
+  if (!filter || (!filter.function && !filter.theme)) return false;
+
+  let fnPass = true;
+  if (filter.function) {
+    const want = filter.function.toLowerCase().trim();
+    const candidates = [
+      job.functionGroup ?? "",
+      job.function_category ?? "",
+      job.standardized_department ?? "",
+    ]
+      .map((s) => s.toLowerCase())
+      .filter((s) => s.length > 0);
+    fnPass = candidates.some(
+      (c) => c === want || c.includes(want) || want.includes(c)
+    );
+  }
+
+  let themePass = true;
+  if (filter.theme) {
+    const want = filter.theme.toLowerCase().trim();
+    const haystack = [
+      job.title.toLowerCase(),
+      ...job.keywords.map((k) => k.toLowerCase()),
+    ];
+    themePass = haystack.some((h) => h.includes(want));
+  }
+
+  return fnPass && themePass;
+}
+
+interface RawCompanyJob {
+  id: string;
+  title: string;
+  function_category: string | null;
+  standardized_department: string | null;
+  location: string | null;
+  is_active: boolean;
+  first_seen_date: string | null;
+  keywords: unknown;
+  url: string | null;
+}
+
+function shapeCompanyJob(raw: RawCompanyJob, now: number): CompanyBetJob & {
+  function_category: string | null;
+  standardized_department: string | null;
+} {
+  const keywords = coerceKeywords(raw.keywords);
+  const ageDays = raw.first_seen_date
+    ? Math.max(
+        0,
+        Math.floor((now - new Date(raw.first_seen_date).getTime()) / 86_400_000)
+      )
+    : null;
+  const functionGroup =
+    raw.function_category &&
+    (ROLE_CATEGORIES as readonly string[]).includes(raw.function_category)
+      ? getCategoryGroup(raw.function_category as RoleCategory)
+      : null;
+  const isNew = ageDays !== null && ageDays <= 7;
+  return {
+    id: raw.id,
+    title: raw.title,
+    functionCategory: raw.function_category,
+    functionGroup,
+    location: raw.location,
+    firstSeenDate: raw.first_seen_date,
+    isActive: raw.is_active,
+    ageDays,
+    ageLabel: ageLabelFromDate(raw.first_seen_date, now),
+    keywords,
+    url: raw.url,
+    isNew,
+    function_category: raw.function_category,
+    standardized_department: raw.standardized_department,
+  };
+}
+
+/**
+ * Return all active jobs at a company that match a bet's `job_filter`.
+ * If both `function` and `theme` are set, both must match (AND).
+ * If neither is set, returns an empty array (which the UI interprets as
+ * "this bet has no associated hiring yet — that's the signal").
+ */
+export async function getJobsForBet(
+  companyId: string,
+  jobFilter: { function?: string; theme?: string }
+): Promise<CompanyBetJob[]> {
+  if (!jobFilter || (!jobFilter.function && !jobFilter.theme)) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("job_postings")
+    .select(
+      "id, title, function_category, standardized_department, location, is_active, first_seen_date, keywords, url"
+    )
+    .eq("company_id", companyId)
+    .eq("is_active", true)
+    .order("first_seen_date", { ascending: false });
+
+  const now = Date.now();
+  const shaped = (data as RawCompanyJob[] | null)?.map((r) =>
+    shapeCompanyJob(r, now)
+  ) ?? [];
+
+  return shaped
+    .filter((j) =>
+      matchesJobFilter(
+        {
+          function_category: j.function_category,
+          standardized_department: j.standardized_department,
+          keywords: j.keywords,
+          title: j.title,
+          functionGroup: j.functionGroup,
+        },
+        jobFilter
+      )
+    )
+    .map(({ function_category: _fc, standardized_department: _sd, ...rest }) => {
+      void _fc;
+      void _sd;
+      return rest as CompanyBetJob;
+    });
+}
+
+/**
+ * Single helper for the company drill-down page: fetches the company row,
+ * normalises the bets payload, fetches every active job once, and assigns
+ * each job to the matching bets. Also computes the metric strip values
+ * (active count, 30d net new, new-pattern count, roles/bet ratio) and the
+ * "updated Xd ago" label for the thesis.
+ */
+export async function getCompanyDrillDownData(
+  slug: string
+): Promise<CompanyDrillDownData | null> {
+  const supabase = await createClient();
+  const { data: company } = await supabase
+    .from("companies")
+    .select(
+      "id, name, slug, country, ats_type, ats_identifier, careers_url, thesis, thesis_sub, interpretation, bets, last_change, last_change_at, is_active, created_at, tech_stack, tech_stack_generated_at"
+    )
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!company) return null;
+
+  const co = company as CompanyDrillDownRow;
+  const bets = coerceBets(co.bets);
+
+  const { data: jobsRaw } = await supabase
+    .from("job_postings")
+    .select(
+      "id, title, function_category, standardized_department, location, is_active, first_seen_date, keywords, url"
+    )
+    .eq("company_id", co.id)
+    .eq("is_active", true)
+    .order("first_seen_date", { ascending: false });
+
+  const now = Date.now();
+  const shapedJobs = (jobsRaw as RawCompanyJob[] | null)?.map((r) =>
+    shapeCompanyJob(r, now)
+  ) ?? [];
+
+  const betsWithJobs: CompanyBetWithJobs[] = bets.map((bet) => {
+    const matched = shapedJobs
+      .filter((j) =>
+        matchesJobFilter(
+          {
+            function_category: j.function_category,
+            standardized_department: j.standardized_department,
+            keywords: j.keywords,
+            title: j.title,
+            functionGroup: j.functionGroup,
+          },
+          bet.job_filter
+        )
+      )
+      .map(({ function_category: _fc, standardized_department: _sd, ...rest }) => {
+        void _fc;
+        void _sd;
+        return rest as CompanyBetJob;
+      });
+    return { ...bet, jobs: matched, jobsCount: matched.length };
+  });
+
+  const activeJobCount = shapedJobs.length;
+  const hiringDelta = await getCompanyHiringDelta(co.id, 30);
+  const newPatternsCount = bets.filter((b) => b.pivot === "new").length;
+  const rolesPerBet =
+    bets.length > 0 ? activeJobCount / bets.length : 0;
+
+  const thesisAgo =
+    co.last_change_at != null
+      ? relativeWhen(parseISO(co.last_change_at))
+      : null;
+
+  return {
+    company: co,
+    bets: betsWithJobs,
+    activeJobCount,
+    hiringDelta,
+    newPatternsCount,
+    rolesPerBet,
+    thesisAgo,
+  };
+}
+
+/**
+ * Fetches every active job at a company, plus their bet assignment.
+ * Used by the JobsScopeDrawer in `kind: "all"` mode so we can show a
+ * little "filed under {bet}" hint per row.
+ */
+export async function getAllCompanyJobsWithBets(companyId: string): Promise<
+  Array<CompanyBetJob & { betId: string | null; betTitle: string | null }>
+> {
+  const supabase = await createClient();
+  const { data: company } = await supabase
+    .from("companies")
+    .select("bets")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  const bets = coerceBets((company as { bets?: unknown } | null)?.bets);
+
+  const { data: jobsRaw } = await supabase
+    .from("job_postings")
+    .select(
+      "id, title, function_category, standardized_department, location, is_active, first_seen_date, keywords, url"
+    )
+    .eq("company_id", companyId)
+    .eq("is_active", true)
+    .order("first_seen_date", { ascending: false });
+
+  const now = Date.now();
+  const shaped = (jobsRaw as RawCompanyJob[] | null)?.map((r) =>
+    shapeCompanyJob(r, now)
+  ) ?? [];
+
+  return shaped.map((j) => {
+    const owner = bets.find((b) =>
+      matchesJobFilter(
+        {
+          function_category: j.function_category,
+          standardized_department: j.standardized_department,
+          keywords: j.keywords,
+          title: j.title,
+          functionGroup: j.functionGroup,
+        },
+        b.job_filter
+      )
+    );
+    const { function_category: _fc, standardized_department: _sd, ...rest } = j;
+    void _fc;
+    void _sd;
+    return {
+      ...(rest as CompanyBetJob),
+      betId: owner?.id ?? null,
+      betTitle: owner?.title ?? null,
+    };
+  });
 }

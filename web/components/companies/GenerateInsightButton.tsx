@@ -60,7 +60,7 @@ export function GenerateInsightButton({
       setTimeout(() => {
         window.location.reload();
       }, 1500);
-    } catch (err) {
+    } catch {
       setError("An error occurred. Please try again.");
     } finally {
       setLoading(false);

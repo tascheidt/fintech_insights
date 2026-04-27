@@ -13,7 +13,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { StrategyTimeline } from "./StrategyTimeline";
 import { StrategyGantt } from "./StrategyGantt";
-import type { StrategyAnalysisResult, StructuredAssessment } from "@/lib/ai/strategy-analysis";
+import type { StrategyAnalysisResult } from "@/lib/ai/strategy-analysis";
 
 interface Company {
   id: string;
@@ -33,13 +33,14 @@ function useLoadingPhase(loading: boolean) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    if (!loading) {
-      setElapsed(0);
-      return;
-    }
+    if (!loading) return;
     const start = Date.now();
     const interval = setInterval(() => setElapsed(Date.now() - start), 200);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      // Reset on cleanup so the next loading run starts fresh.
+      setElapsed(0);
+    };
   }, [loading]);
 
   const phase = LOADING_PHASES.find((p) => elapsed < p.until) ?? LOADING_PHASES[LOADING_PHASES.length - 1];

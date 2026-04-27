@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CATEGORY_GROUPS } from "@/lib/analysis/function-categories";
+import { CompanyAvatar } from "@/components/companies/CompanyAvatar";
 import type { CompetitiveMatrixRow } from "@/lib/dashboard-queries";
 
 const DISPLAY_GROUPS = Object.keys(CATEGORY_GROUPS).filter(
@@ -203,8 +204,9 @@ export function CompetitiveMatrix({
                       <TableCell className="sticky left-0 bg-card z-10">
                         <Link
                           href={`/companies/${row.companySlug}`}
-                          className="font-medium text-sm hover:text-primary hover:underline"
+                          className="inline-flex items-center gap-2.5 font-medium text-sm text-foreground"
                         >
+                          <CompanyAvatar name={row.companyName} size={22} />
                           {row.companyName}
                         </Link>
                       </TableCell>
@@ -217,12 +219,10 @@ export function CompetitiveMatrix({
                             key={group}
                             className={cn(
                               "text-center text-xs tabular-nums px-2",
-                              show7dNet &&
-                                change > 0 &&
-                                "bg-green-50 dark:bg-green-950/30",
-                              show7dNet &&
-                                change < 0 &&
-                                "bg-red-50 dark:bg-red-950/30"
+                              // Token-driven cell tint: growth for new postings,
+                              // sunset for slowdown — never destructive.
+                              show7dNet && change > 0 && "bg-primary-soft/40",
+                              show7dNet && change < 0 && "bg-accent-soft/40"
                             )}
                           >
                             {count > 0 ? (
@@ -246,9 +246,9 @@ export function CompetitiveMatrix({
                         <TableCell className="text-center text-xs">
                           <span
                             className={cn(
-                              "font-medium",
-                              row.weekChange > 0 && "text-green-600",
-                              row.weekChange < 0 && "text-red-600",
+                              "font-medium tabular-nums",
+                              row.weekChange > 0 && "text-growth-500",
+                              row.weekChange < 0 && "text-sunset-600",
                               row.weekChange === 0 && "text-muted-foreground"
                             )}
                           >
