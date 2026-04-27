@@ -17,7 +17,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { Search, Bell, Download } from "lucide-react";
+import { Search, Bell, Check, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,9 @@ export interface JobsHeaderProps {
 
   /** Notify parent of filter changes (debounced search inside). */
   onChange: (next: JobsFilterState) => void;
+
+  /** Optional handler for the Export CSV button. When omitted the button hides. */
+  onExportCsv?: () => void;
 }
 
 /** Debounce a value so we don't spam URL replaces on every keystroke. */
@@ -92,9 +95,36 @@ export function JobsHeader({
   initial,
   digestContext,
   onChange,
+  onExportCsv,
 }: JobsHeaderProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [savedHint, setSavedHint] = React.useState(false);
+
+  const handleSaveView = React.useCallback(async () => {
+    if (typeof window === "undefined") return;
+    const href = window.location.href;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(href);
+      } else {
+        // Fallback for browsers without the clipboard API (rare in 2026 but
+        // still possible on older mobile webviews).
+        const textarea = document.createElement("textarea");
+        textarea.value = href;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setSavedHint(true);
+      window.setTimeout(() => setSavedHint(false), 2000);
+    } catch {
+      // Non-fatal — user can copy URL manually.
+    }
+  }, []);
 
   const [q, setQ] = React.useState(initial.q);
   const [company, setCompany] = React.useState(initial.company);
@@ -195,24 +225,39 @@ export function JobsHeader({
             variant="outline"
             size="sm"
             type="button"
-            onClick={() => {
-              /* placeholder — wired in a later pass */
-            }}
+            onClick={handleSaveView}
+            aria-live="polite"
+            title="Copy this filter URL to your clipboard"
           >
-            <Bell className="h-3.5 w-3.5" aria-hidden />
-            Save view
+            {savedHint ? (
+              <>
+                <Check className="h-3.5 w-3.5" aria-hidden />
+                Link copied
+              </>
+            ) : (
+              <>
+                <Bell className="h-3.5 w-3.5" aria-hidden />
+                Save view
+              </>
+            )}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            type="button"
-            onClick={() => {
-              /* placeholder — wired in a later pass */
-            }}
-          >
-            <Download className="h-3.5 w-3.5" aria-hidden />
-            Export CSV
-          </Button>
+          {onExportCsv && (
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={onExportCsv}
+              disabled={filteredCount === 0}
+              title={
+                filteredCount === 0
+                  ? "Nothing to export"
+                  : `Download ${filteredCount.toLocaleString()} ${filteredCount === 1 ? "row" : "rows"} as CSV`
+              }
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden />
+              Export CSV ({filteredCount.toLocaleString()})
+            </Button>
+          )}
         </div>
       </div>
 

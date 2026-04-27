@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 export type DrawerView =
   | { kind: "scope"; betId: string }
   | { kind: "all" }
+  | { kind: "function"; functionName: string }
   | { kind: "job"; jobId: string; betId?: string }
   | null;
 
@@ -103,6 +104,10 @@ export function JobsScopeDrawer({
     eyebrow = "JOBS · all open";
     title = `All open roles at ${companyName}`;
     sub = `${allJobs.length} active postings across mapped bets and unmapped roles.`;
+  } else if (view.kind === "function") {
+    eyebrow = `JOBS · ${view.functionName}`;
+    title = `${view.functionName} hiring at ${companyName}`;
+    sub = `Active postings in this function group. Cross-reference against the bets ranked under "By function".`;
   } else {
     eyebrow = "JOB · evidence detail";
     title = "";
@@ -178,6 +183,18 @@ export function JobsScopeDrawer({
               onJobClick={(jobId, betId) =>
                 onSetView({ kind: "job", jobId, betId })
               }
+            />
+          )}
+
+          {view.kind === "function" && (
+            <FunctionBody
+              companyName={companyName}
+              functionName={view.functionName}
+              allJobs={allJobs}
+              onJobClick={(jobId, betId) =>
+                onSetView({ kind: "job", jobId, betId })
+              }
+              onSeeAll={() => onSetView({ kind: "all" })}
             />
           )}
 
@@ -309,6 +326,72 @@ function AllBody({
           </div>
         ) : (
           allJobs.map((j) => (
+            <JobRow
+              key={j.id}
+              job={j}
+              betLabel={j.betTitle ?? "Not mapped to a bet"}
+              betUnmapped={!j.betId}
+              onClick={() => onJobClick(j.id, j.betId ?? undefined)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Function body — allJobs filtered to one function group
+// ---------------------------------------------------------------------------
+
+function FunctionBody({
+  companyName,
+  functionName,
+  allJobs,
+  onJobClick,
+  onSeeAll,
+}: {
+  companyName: string;
+  functionName: string;
+  allJobs: AllJob[];
+  onJobClick: (jobId: string, betId: string | undefined) => void;
+  onSeeAll: () => void;
+}) {
+  const lower = functionName.toLowerCase();
+  const filtered = allJobs.filter(
+    (j) =>
+      (j.functionGroup ?? j.functionCategory ?? "").toLowerCase() === lower
+  );
+
+  return (
+    <div className="flex h-full flex-col">
+      <FilterStrip>
+        <FilterChip label={`Company · ${companyName}`} />
+        <FilterChip label={`Function · ${functionName}`} onRemove={onSeeAll} />
+        <span className="ml-auto font-mono text-[11px] text-muted-foreground">
+          {filtered.length} active
+        </span>
+      </FilterStrip>
+
+      <div className="flex-1 overflow-y-auto pb-6 pt-1">
+        {filtered.length === 0 ? (
+          <div className="px-[22px] py-10 text-center text-[13px] text-muted-foreground">
+            <SearchX
+              className="mx-auto mb-2 h-6 w-6 text-muted-foreground"
+              aria-hidden
+            />
+            <div className="text-foreground">
+              <strong>
+                No active {functionName} postings at {companyName}.
+              </strong>
+            </div>
+            <p className="mx-auto mt-1 max-w-[36ch]">
+              That gap is itself a signal — the bets ranked under this group
+              don&rsquo;t have hiring evidence yet.
+            </p>
+          </div>
+        ) : (
+          filtered.map((j) => (
             <JobRow
               key={j.id}
               job={j}

@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.16.0",
+    "date": "2026-04-27",
+    "changes": [
+      { "type": "feature", "description": "LLM editorial engine: generates each company's working thesis, interpretation paragraph, last meaningful change, and 3–6 strategic bets (with evidence + forward signal) from hiring data + the existing grounded research. Refreshable via /api/admin/companies/[id]/regenerate-editorial, the regenerate-editorial.ts script, or a weekly GitHub Actions cron." },
+      { "type": "feature", "description": "Cross-company theme labels on the Jobs right rail are now author-quality (\"Real-time payments rails\", \"In-house card issuing\") rather than mechanical group keys. Cached in cross_company_themes; auto-refreshes when the keyword bag changes." },
+      { "type": "feature", "description": "Company drill-down has working \"By bet\" / \"By function\" tabs. The function tab re-shards bets under their function group, with \"see all roles in {group}\" links opening a function-scoped Jobs drawer." },
+      { "type": "feature", "description": "Bet auto-suggestions on the editorial form: a \"Suggest from hiring data\" button proposes 1–4 candidate bets derived from the rule-based pivot classifier (acceleration, cold start, going quiet, keyword burst). Editors review, edit, and accept; the candidates are starting points, not finished editorial." },
+      { "type": "feature", "description": "Save view + Export CSV on the Jobs page. Save view copies the current filter URL to the clipboard; Export CSV downloads the visible rows as a dated file (count is shown on the button)." },
+      { "type": "improvement", "description": "Playwright e2e on every PR: the public visual smoke runs without secrets, and an authed visual smoke runs against real Supabase when the secrets are configured (skipped cleanly on forks). Reports upload as artifacts on every run." },
+      { "type": "improvement", "description": "Editorial pipeline is fully telemetered: every Gemini call writes to gemini_usage_events with a stable callSite + prompt version, and the Pro grounded research from company-insights is reused as context to avoid double-grounding." }
+    ]
+  },
+  {
     "version": "1.15.0",
     "date": "2026-04-25",
     "changes": [

@@ -368,6 +368,7 @@ export function EditCompanyForm({ company }: { company: Company }) {
           <EditCompanyEditorialForm
             value={editorial}
             onChange={setEditorial}
+            companyId={company.id}
           />
 
           {/* Actions */}

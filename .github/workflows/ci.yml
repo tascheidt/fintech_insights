@@ -92,9 +92,8 @@ jobs:
           exit 0
 
   e2e-smoke:
-    name: Playwright smoke (login page)
+    name: Playwright e2e (public routes)
     needs: lint-typecheck-test-build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -146,8 +145,13 @@ jobs:
           RESEND_API_KEY: ci-resend-key
           PORT: "3000"
 
-      - name: Run smoke test
-        run: npm run e2e
+      - name: Run public smoke + visual specs
+        # The chromium-public project covers both `e2e/smoke.spec.ts` and the
+        # public assertions inside `e2e/visual-smoke.spec.ts` (login,
+        # marketing). Authenticated routes are skipped by the spec when the
+        # `chromium-authed` project is not selected — see
+        # `web/e2e/visual-smoke.spec.ts`.
+        run: npx playwright test --project=chromium-public
 
       - name: Stop app
         if: always()
@@ -155,3 +159,115 @@ jobs:
           if [ -f /tmp/app.pid ]; then
             kill "$(cat /tmp/app.pid)" || true
           fi
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e-authed:
+    # Authenticated visual smoke. Requires real Supabase + service-role
+    # credentials to mint a Playwright session via the `setup` project. We
+    # only run on the canonical refs (PR target main, push to main) and
+    # skip cleanly if the secrets are absent so forks don't break.
+    name: Playwright e2e (authed routes)
+    needs: lint-typecheck-test-build
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    steps:
+      - name: Skip when Supabase secrets are absent
+        id: gate
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
+            echo "::warning::Skipping authed e2e — Supabase secrets not configured for this runner"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        if: steps.gate.outputs.skip != 'true'
+        run: npm ci
+
+      - name: Install Playwright browsers
+        if: steps.gate.outputs.skip != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the app
+        if: steps.gate.outputs.skip != 'true'
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'ci-gemini-key' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET || 'ci-cron-secret' }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || 'ci-resend-key' }}
+
+      - name: Start app
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          npm start &
+          echo $! > /tmp/app.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 >/dev/null 2>&1; then
+              echo "App is up."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App failed to start within 60s." >&2
+          exit 1
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'ci-gemini-key' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET || 'ci-cron-secret' }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || 'ci-resend-key' }}
+          PORT: "3000"
+
+      - name: Run authed visual smoke
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx playwright test --project=setup --project=chromium-authed
+
+      - name: Stop app
+        if: always() && steps.gate.outputs.skip != 'true'
+        run: |
+          if [ -f /tmp/app.pid ]; then
+            kill "$(cat /tmp/app.pid)" || true
+          fi
+
+      - name: Upload Playwright artifacts
+        if: always() && steps.gate.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-authed
+          path: web/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
