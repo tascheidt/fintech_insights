@@ -8,6 +8,7 @@
  * Reference: /tmp/design-package-v2/.../JobsList_v2.jsx (rail block).
  */
 
+import Link from "next/link";
 import { BarChart3, GitBranch, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -114,17 +115,21 @@ export function JobsRail({ heat, themes }: JobsRailProps) {
           themes.map((theme, idx) => {
             const last = idx === themes.length - 1;
             const display = theme.label ?? humanizeGroupKey(theme.name);
+            // Cross-link the row into /jobs?function=<group>. The function
+            // filter dropdown picks this up via initialFn in the page.
+            const href = `/jobs?function=${encodeURIComponent(theme.name)}`;
             return (
-              <div
+              <Link
                 key={theme.name}
+                href={href}
                 className={cn(
-                  "flex items-center gap-2.5",
+                  "group flex items-center gap-2.5 -mx-2 px-2 transition-colors hover:bg-sand-50 rounded",
                   last ? "pt-2.5" : "border-b border-sand-100 py-2.5"
                 )}
                 title={theme.description ?? undefined}
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[12.5px] font-medium leading-tight text-sand-950">
+                  <div className="truncate text-[12.5px] font-medium leading-tight text-sand-950 group-hover:text-primary transition-colors">
                     {display}
                   </div>
                   <div className="mt-0.5 text-[11px] leading-tight text-sand-500">
@@ -133,10 +138,10 @@ export function JobsRail({ heat, themes }: JobsRailProps) {
                   </div>
                 </div>
                 <ChevronRight
-                  className="h-3 w-3 shrink-0 text-sand-400"
+                  className="h-3 w-3 shrink-0 text-sand-400 transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
                   aria-hidden
                 />
-              </div>
+              </Link>
             );
           })
         )}
