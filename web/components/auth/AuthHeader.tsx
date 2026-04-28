@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useGoogleAuth } from "@/hooks/use-google-auth";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { BrandMark } from "@/components/layout/BrandMark";
 
 export function AuthHeader() {
   const { signInWithGoogle, isLoading } = useGoogleAuth();
@@ -12,10 +12,11 @@ export function AuthHeader() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8 bg-background/80 backdrop-blur-sm border-b border-border/40">
       <div className="flex items-center gap-2">
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-lg">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Sparkles className="h-4 w-4" />
-          </div>
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-[9px] font-semibold text-lg"
+        >
+          <BrandMark size={28} />
           <span>The Fintech Talent Brief</span>
         </Link>
       </div>

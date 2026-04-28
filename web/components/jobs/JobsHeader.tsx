@@ -15,7 +15,7 @@
  */
 
 import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { Search, Bell, Check, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -98,7 +98,11 @@ export function JobsHeader({
   onExportCsv,
 }: JobsHeaderProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  // We deliberately do NOT pull the live `useSearchParams()` value into the
+  // syncUrl callback's dep array — `router.replace` below mutates the URL,
+  // which makes useSearchParams return a new reference, which would re-fire
+  // the URL-sync effect and call router.replace again → infinite loop. We
+  // read window.location.search inside syncUrl at call time instead.
   const [savedHint, setSavedHint] = React.useState(false);
 
   const handleSaveView = React.useCallback(async () => {
@@ -140,10 +144,13 @@ export function JobsHeader({
 
   // Sync filter state into the URL so deep-links + back/forward keep state.
   // We avoid clobbering digest deep-link params (theme, inDigest, from, to)
-  // here — the explicit "Clear digest context" button handles those.
+  // here — the explicit "Clear digest context" button handles those. Read
+  // current params from window.location at call time (not via React state)
+  // to keep this callback's identity stable across URL mutations.
   const syncUrl = React.useCallback(
     (next: JobsFilterState) => {
-      const params = new URLSearchParams(searchParams.toString());
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
       const setOrDel = (key: string, value: string | null | undefined) => {
         if (!value || value === "all" || value === "any") params.delete(key);
         else params.set(key, value);
@@ -153,11 +160,17 @@ export function JobsHeader({
       setOrDel("function", next.fn);
       setOrDel("recency", next.recency);
       const qs = params.toString();
-      router.replace(qs ? `?${qs}` : window.location.pathname, {
-        scroll: false,
-      });
+      const target = qs
+        ? `${window.location.pathname}?${qs}`
+        : window.location.pathname;
+      // Skip the replace when nothing actually changed — avoids a second
+      // round-trip through router state on initial mount.
+      if (target === window.location.pathname + window.location.search) {
+        return;
+      }
+      router.replace(target, { scroll: false });
     },
-    [router, searchParams]
+    [router]
   );
 
   // Push URL on state changes (debounced for q via debouncedQ above).
