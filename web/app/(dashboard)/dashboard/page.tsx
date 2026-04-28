@@ -151,7 +151,10 @@ export default async function DashboardPage({
       <NetHiringFlowChart data={netHiringFlow} />
 
       {/* ROW 4: Competitive Matrix (2/3) + Function Mix donut (1/3) */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* `[&>*]:min-w-0` so each card's inner `overflow-x-auto` can actually
+          clip — without it the matrix's min-w-[600px] table makes the card
+          push past the viewport on mobile. */}
+      <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
         <CompetitiveMatrix
           data={competitiveMatrix}
           matrixWindow={matrixWindow}
@@ -165,7 +168,7 @@ export default async function DashboardPage({
       </div>
 
       {/* ROW 5: Hot Roles Feed (1/2) + Strategy Signals (1/2) */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <HotRolesFeed roles={hotRoles} />
         <StrategySignals digest={latestDigest} />
       </div>

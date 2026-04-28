@@ -79,18 +79,26 @@ export function CompaniesIndexRow({ row }: CompaniesIndexRowProps) {
     <Link
       href={`/companies/${row.slug}`}
       className={cn(
-        "group grid cursor-pointer items-center gap-[18px] border-b border-border/60 py-3.5 pr-[22px] transition-colors last:border-b-0 hover:bg-sand-100",
+        "group grid cursor-pointer border-b border-border/60 transition-colors last:border-b-0 hover:bg-sand-100",
+        // Mobile: 4px strip + content column, items align top, comfortable
+        // padding. Desktop: the original 5-col table grid.
+        "grid-cols-[4px_1fr] items-stretch gap-x-3 gap-y-2 py-3.5 pl-0 pr-4",
+        "sm:[grid-template-columns:4px_320px_1fr_220px_240px] sm:items-center sm:gap-x-[18px] sm:gap-y-0 sm:pr-[22px]",
         isCont && "bg-sand-100/50"
       )}
-      style={{ gridTemplateColumns: "4px 320px 1fr 220px 240px" }}
     >
-      <CoverageStrip kind={row.status} />
+      {/* Coverage strip — spans the whole card on mobile, single row on desktop. */}
+      <CoverageStrip
+        kind={row.status}
+        className="row-span-3 self-stretch sm:row-span-1"
+      />
+
 
       {/* Company · thesis */}
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-start gap-3 sm:items-center">
         <MonogramAvatar size="lg" name={row.name} />
         <div className="min-w-0">
-          <h3 className="m-0 mb-[3px] truncate text-[14.5px] font-semibold leading-[1.2] tracking-[-0.005em] text-foreground">
+          <h3 className="m-0 mb-[3px] text-[14.5px] font-semibold leading-[1.2] tracking-[-0.005em] text-foreground sm:truncate">
             <span>{row.name}</span>
             <span className="ml-2 inline-block translate-y-[2px] font-mono text-[9.5px] uppercase tracking-[0.06em] text-muted-foreground">
               {row.hq}
@@ -148,7 +156,7 @@ export function CompaniesIndexRow({ row }: CompaniesIndexRowProps) {
               ))
           )}
         </div>
-        <div className="mt-0.5 flex items-baseline gap-1.5 text-[11px] leading-[1.4]">
+        <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[11px] leading-[1.4]">
           <span className="shrink-0 font-mono text-[9.5px] font-medium uppercase tracking-[0.07em] text-muted-foreground">
             Last
           </span>

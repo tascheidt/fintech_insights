@@ -165,22 +165,19 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             <span>{drilldown.company.name}</span>
           </div>
 
-          {/* Company head — avatar + name + meta with active-postings pill */}
-          <div className="flex items-start justify-between gap-4">
+          {/* Company head — avatar + name + meta with active-postings pill.
+              Mobile stacks the action buttons under the name; desktop keeps
+              them on the right. */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-3.5">
               <MonogramAvatar size="lg" name={drilldown.company.name} />
-              <div>
+              <div className="min-w-0">
                 <h1
-                  className="m-0 font-display font-semibold text-foreground"
-                  style={{
-                    fontSize: 32,
-                    lineHeight: 1.15,
-                    letterSpacing: "-0.02em",
-                  }}
+                  className="m-0 font-display font-semibold text-foreground text-[26px] leading-[1.15] tracking-[-0.02em] sm:text-[32px]"
                 >
                   {drilldown.company.name}
                 </h1>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2 font-sans text-[12.5px] text-muted-foreground">
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-[12.5px] text-muted-foreground">
                   {drilldown.company.country && (
                     <span>{drilldown.company.country}</span>
                   )}
@@ -198,7 +195,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="ghost" size="sm" disabled title="Coming soon">
                 <Bell className="h-3.5 w-3.5" /> Watch
               </Button>
