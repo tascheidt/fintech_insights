@@ -42,10 +42,10 @@ import { log } from "@/lib/log";
 // Versioning + model selection
 // ---------------------------------------------------------------------------
 
-export const EDITORIAL_PROMPT_VERSION = "company-editorial-v1";
+export const EDITORIAL_PROMPT_VERSION = "company-editorial-v2";
 export const EDITORIAL_MODEL = "gemini-pro-latest" as const;
 
-const EDITORIAL_TIMEOUT_MS = 60_000;
+const EDITORIAL_TIMEOUT_MS = 120_000;
 
 // ---------------------------------------------------------------------------
 // Output schema (Zod) — matches `bets` column shape + editorial fields.
@@ -96,6 +96,11 @@ interface EditorialContext {
   companyName: string;
   country: string | null;
   ats: string | null;
+
+  /** ISO date (YYYY-MM-DD) — Pro doesn't know today's date, so we tell it. */
+  todayIso: string;
+  /** ISO date of the most recent posting in window, or null if no postings. */
+  mostRecentPostingDate: string | null;
 
   activeJobs: number;
   totalJobs90d: number;
@@ -207,11 +212,23 @@ async function buildEditorialContext(
     };
   }
 
+  // Anchor the LLM to real dates: today + the most recent posting (the latter
+  // doubles as a sane upper bound for last_change_at).
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const mostRecentPostingDate = allJobs.reduce<string | null>((acc, j) => {
+    const d = j.first_seen_date as string | null;
+    if (!d) return acc;
+    const iso = d.slice(0, 10);
+    return acc === null || iso > acc ? iso : acc;
+  }, null);
+
   return {
     companyId,
     companyName,
     country: (company?.country as string | null) ?? null,
     ats: (company?.ats_type as string | null) ?? null,
+    todayIso,
+    mostRecentPostingDate,
     activeJobs: allJobs.filter((j) => j.is_active).length,
     totalJobs90d: allJobs.length,
     sparkline,
@@ -241,7 +258,13 @@ function dedupe(arr: string[]): string[] {
 function formatContextBlock(ctx: EditorialContext): string {
   const lines: string[] = [];
 
-  lines.push(`## Company`);
+  lines.push(`## Today`);
+  lines.push(`Today's date is ${ctx.todayIso}. Use this as the upper bound for any date you emit.`);
+  if (ctx.mostRecentPostingDate) {
+    lines.push(`Most recent posting in window: ${ctx.mostRecentPostingDate}`);
+  }
+
+  lines.push(`\n## Company`);
   lines.push(`Name: ${ctx.companyName}`);
   if (ctx.country) lines.push(`Country: ${ctx.country}`);
   if (ctx.ats) lines.push(`ATS: ${ctx.ats}`);
@@ -373,7 +396,7 @@ For each bet, set \`job_filter.function\` to a function-group name from the inpu
 - \`thesis_sub\` (≤280 chars, optional): One-line provenance ("Inferred from 6 months of hiring data, observed product launches, and stated strategy"). Empty string is acceptable.
 - \`interpretation\` (≤600 chars): 2–4 sentences interpreting the recent hiring pattern. This is your editorial paragraph — confident on what's evidenced, explicit about what's uncertain.
 - \`last_change\` (≤200 chars): Short factual sentence describing the most recent meaningful event. Examples: "USD spending account launched", "First SMB credit-risk hire in 18 months", "Spun up Mexico City build-out". If \`last_change_fallback\` is the strongest signal, use a clean editorial restatement of it (e.g. "New senior backend posting" rather than "New posting").
-- \`last_change_at\` (YYYY-MM-DD): The date of \`last_change\`. Today is acceptable when nothing else is dated.
+- \`last_change_at\` (YYYY-MM-DD): The date of \`last_change\`. Must be **today's date or earlier**, and never more than 90 days before today (the inputs only carry the last 90 days). When in doubt, use the "Most recent posting in window" date from the inputs above. Never invent a date from outside that window.
 - \`bets\` (3–6 entries): The strategic bets, each with title / claim / pivot / confidence / evidence / forward_signal / optional job_filter.
 
 ## Output
@@ -543,7 +566,31 @@ export async function generateCompanyEditorial(
     id: b.id ?? `bet-${i + 1}`,
   }));
 
-  return { ...result.data, bets: stampedBets };
+  // Server-side guard against the LLM hallucinating dates outside the 90-day
+  // window. We clamp `last_change_at` to [today - 90d, today]; if the model
+  // emitted something outside that band, replace it with the most recent
+  // posting date (or today as a last resort).
+  const todayIso = ctx.todayIso;
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const minIso = ninetyDaysAgo.toISOString().slice(0, 10);
+  let lastChangeAt = result.data.last_change_at;
+  if (lastChangeAt > todayIso || lastChangeAt < minIso) {
+    log.warn(
+      {
+        emitted: lastChangeAt,
+        clampedTo: ctx.mostRecentPostingDate ?? todayIso,
+      },
+      `[editorial] last_change_at out of range for ${companyName}; clamping`
+    );
+    lastChangeAt = ctx.mostRecentPostingDate ?? todayIso;
+  }
+
+  return {
+    ...result.data,
+    last_change_at: lastChangeAt,
+    bets: stampedBets,
+  };
 }
 
 // ---------------------------------------------------------------------------
