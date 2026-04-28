@@ -1,15 +1,18 @@
 [
   {
-    "version": "1.16.0",
-    "date": "2026-04-27",
+    "version": "2.0.0",
+    "date": "2026-04-28",
     "changes": [
-      { "type": "feature", "description": "LLM editorial engine: generates each company's working thesis, interpretation paragraph, last meaningful change, and 3–6 strategic bets (with evidence + forward signal) from hiring data + the existing grounded research. Refreshable via /api/admin/companies/[id]/regenerate-editorial, the regenerate-editorial.ts script, or a weekly GitHub Actions cron." },
-      { "type": "feature", "description": "Cross-company theme labels on the Jobs right rail are now author-quality (\"Real-time payments rails\", \"In-house card issuing\") rather than mechanical group keys. Cached in cross_company_themes; auto-refreshes when the keyword bag changes." },
+      { "type": "feature", "description": "Talent Brief v2 — substantial upgrade pairing the SoCal v1.15 visual rebuild with a working editorial pipeline. Every active company now has a working thesis, interpretation, last-change, and 3–6 strategic bets seeded against live hiring data, refreshable on demand or weekly." },
+      { "type": "feature", "description": "LLM editorial engine: Pro (ungrounded) call that generates each company's working thesis, interpretation paragraph, last meaningful change, and 3–6 strategic bets with evidence + forward signal. Reuses the most recent company_insights row as background context to avoid stacking a second grounded call. Refreshable via /api/admin/companies/[id]/regenerate-editorial, the regenerate-editorial.ts script, or a weekly GitHub Actions cron." },
+      { "type": "feature", "description": "Cross-company theme labels on the Jobs right rail are now author-quality (\"Retail credit card acquisition\", \"Credit and AML compliance\", \"Treasury and regulatory reporting\") rather than mechanical group keys. Cached in cross_company_themes; auto-refreshed when the keyword bag changes; rows link to /jobs?function=… for one-click drill-in." },
       { "type": "feature", "description": "Company drill-down has working \"By bet\" / \"By function\" tabs. The function tab re-shards bets under their function group, with \"see all roles in {group}\" links opening a function-scoped Jobs drawer." },
       { "type": "feature", "description": "Bet auto-suggestions on the editorial form: a \"Suggest from hiring data\" button proposes 1–4 candidate bets derived from the rule-based pivot classifier (acceleration, cold start, going quiet, keyword burst). Editors review, edit, and accept; the candidates are starting points, not finished editorial." },
       { "type": "feature", "description": "Save view + Export CSV on the Jobs page. Save view copies the current filter URL to the clipboard; Export CSV downloads the visible rows as a dated file (count is shown on the button)." },
-      { "type": "improvement", "description": "Playwright e2e on every PR: the public visual smoke runs without secrets, and an authed visual smoke runs against real Supabase when the secrets are configured (skipped cleanly on forks). Reports upload as artifacts on every run." },
-      { "type": "improvement", "description": "Editorial pipeline is fully telemetered: every Gemini call writes to gemini_usage_events with a stable callSite + prompt version, and the Pro grounded research from company-insights is reused as context to avoid double-grounding." }
+      { "type": "improvement", "description": "Playwright e2e on every PR: the public visual smoke runs without secrets, and an authed visual smoke runs against real Supabase when the secrets are configured (skipped cleanly on forks). Reports upload as artifacts on every run. New regression spec guards the cross-company themes block." },
+      { "type": "improvement", "description": "Editorial pipeline is fully telemetered: every Gemini call writes to gemini_usage_events with a stable callSite + prompt version, and the Pro grounded research from company-insights is reused as context to avoid double-grounding." },
+      { "type": "fix", "description": "Jobs page no longer gets stuck in an infinite render loop when filters change. The URL-sync effect now reads window.location.search at call time instead of depending on the live useSearchParams() reference, breaking the router.replace → searchParams → effect → router.replace cycle." },
+      { "type": "fix", "description": "Login / marketing chrome shows the canonical 28px BrandMark instead of a generic Sparkles placeholder." }
     ]
   },
   {
