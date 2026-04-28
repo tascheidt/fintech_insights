@@ -13,11 +13,19 @@
 
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Sparkles, TrendingUp, Minus, TrendingDown, Plus, X } from "lucide-react";
+import {
+  Sparkles,
+  TrendingUp,
+  Minus,
+  TrendingDown,
+  Plus,
+  Lightbulb,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type Pivot = "new" | "accel" | "cont" | "quiet";
@@ -51,6 +59,23 @@ export interface EditorialState {
 export interface EditCompanyEditorialFormProps {
   value: EditorialState;
   onChange: (next: EditorialState) => void;
+  /**
+   * When provided, enables the "Suggest from hiring data" panel. The form
+   * fetches `/api/companies/${companyId}/bet-suggestions` for rule-based
+   * candidate bets the editor can append.
+   */
+  companyId?: string;
+}
+
+interface SuggestedBetPayload {
+  source: "accel" | "cold-start" | "quiet" | "keyword-burst";
+  title: string;
+  claim: string;
+  pivot: Pivot;
+  confidence: 1 | 2 | 3 | 4 | 5;
+  evidence: BetEvidence[];
+  forward_signal: string;
+  job_filter?: { function?: string; theme?: string };
 }
 
 const PIVOT_OPTIONS: Array<{ value: Pivot; label: string; Icon: typeof Sparkles }> = [
@@ -79,8 +104,46 @@ const BLANK_EVIDENCE: BetEvidence = {
 export function EditCompanyEditorialForm({
   value,
   onChange,
+  companyId,
 }: EditCompanyEditorialFormProps) {
   const idBase = useId();
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestedBetPayload[]>([]);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+
+  async function fetchSuggestions() {
+    if (!companyId) return;
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/bet-suggestions`);
+      const data = await res.json();
+      if (!res.ok) {
+        setSuggestError(data.error ?? "Failed to load suggestions");
+      } else {
+        setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+      }
+    } catch (err) {
+      setSuggestError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  function acceptSuggestion(s: SuggestedBetPayload) {
+    if (value.bets.length >= 6) return;
+    const next: Bet = {
+      title: s.title,
+      claim: s.claim,
+      pivot: s.pivot,
+      confidence: s.confidence,
+      evidence: s.evidence.map((e) => ({ ...e })),
+      forward_signal: s.forward_signal,
+      job_filter: s.job_filter ? { ...s.job_filter } : {},
+    };
+    onChange({ ...value, bets: [...value.bets, next] });
+    setSuggestions((prev) => prev.filter((p) => p.title !== s.title));
+  }
 
   function setField<K extends keyof EditorialState>(
     key: K,
@@ -217,23 +280,90 @@ export function EditCompanyEditorialForm({
 
       {/* Bets */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div>
             <h4 className="text-sm font-medium">Strategic bets</h4>
             <p className="text-xs text-muted-foreground">
               Up to 6 bets. {value.bets.length}/6
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={addBet}
-            disabled={value.bets.length >= 6}
-          >
-            <Plus className="h-3.5 w-3.5" /> Add bet
-          </Button>
+          <div className="flex items-center gap-2">
+            {companyId && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={fetchSuggestions}
+                disabled={suggesting}
+              >
+                <Lightbulb className="h-3.5 w-3.5" />
+                {suggesting ? "Reading hiring…" : "Suggest from hiring data"}
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addBet}
+              disabled={value.bets.length >= 6}
+            >
+              <Plus className="h-3.5 w-3.5" /> Add bet
+            </Button>
+          </div>
         </div>
+
+        {suggestError && (
+          <p className="text-xs text-destructive">{suggestError}</p>
+        )}
+
+        {suggestions.length > 0 && (
+          <div className="rounded-md border border-dashed bg-muted/20 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium">
+                {suggestions.length} candidate{" "}
+                {suggestions.length === 1 ? "bet" : "bets"} from hiring rules.
+                Edit before saving — these are starting points, not finished
+                editorial.
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setSuggestions([])}
+                aria-label="Dismiss suggestions"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <ul className="space-y-2">
+              {suggestions.map((s) => (
+                <li
+                  key={s.title}
+                  className="flex items-start gap-3 rounded border bg-background p-2.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{s.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {s.claim}
+                    </p>
+                    <p className="mt-1 font-mono text-[10.5px] uppercase tracking-wide text-muted-foreground">
+                      Source · {s.source.replace("-", " ")}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => acceptSuggestion(s)}
+                    disabled={value.bets.length >= 6}
+                  >
+                    <Plus className="h-3 w-3" /> Add
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {value.bets.length === 0 ? (
           <p className="text-sm text-muted-foreground rounded-md border border-dashed p-4 text-center">

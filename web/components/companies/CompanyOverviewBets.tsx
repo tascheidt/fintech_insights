@@ -16,11 +16,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Briefcase } from "lucide-react";
 import { StrategicBetCard } from "./StrategicBetCard";
+import { BetsByFunction } from "./BetsByFunction";
 import { JobsScopeDrawer, type DrawerView } from "./JobsScopeDrawer";
 import { COMPANY_DRAWER_OPEN_EVENT } from "./CompanyHeaderPill";
+import { cn } from "@/lib/utils";
 import type { CompanyBetWithJobs, CompanyBetJob } from "@/lib/dashboard-queries";
 
 type AllJob = CompanyBetJob & { betId: string | null; betTitle: string | null };
+type Tab = "bet" | "function";
 
 export interface CompanyOverviewBetsProps {
   companyName: string;
@@ -38,6 +41,7 @@ export function CompanyOverviewBets({
   activeJobCount,
 }: CompanyOverviewBetsProps) {
   const [view, setView] = useState<DrawerView>(null);
+  const [tab, setTab] = useState<Tab>("bet");
 
   const open = view !== null;
   const close = () => setView(null);
@@ -54,6 +58,8 @@ export function CompanyOverviewBets({
   return (
     <>
       <SectionHeader
+        tab={tab}
+        onTabChange={setTab}
         activeJobCount={activeJobCount}
         onAllJobsClick={() => setView({ kind: "all" })}
       />
@@ -75,7 +81,7 @@ export function CompanyOverviewBets({
             <ArrowUpRight className="h-3 w-3" aria-hidden />
           </Link>
         </div>
-      ) : (
+      ) : tab === "bet" ? (
         <div className="flex flex-col gap-3.5">
           {bets.map((bet) => (
             <StrategicBetCard
@@ -88,6 +94,15 @@ export function CompanyOverviewBets({
             />
           ))}
         </div>
+      ) : (
+        <BetsByFunction
+          bets={bets}
+          allJobs={allJobs}
+          onOpenScope={(betId) => setView({ kind: "scope", betId })}
+          onOpenFunction={(functionName) =>
+            setView({ kind: "function", functionName })
+          }
+        />
       )}
 
       <JobsScopeDrawer
@@ -105,9 +120,13 @@ export function CompanyOverviewBets({
 }
 
 function SectionHeader({
+  tab,
+  onTabChange,
   activeJobCount,
   onAllJobsClick,
 }: {
+  tab: Tab;
+  onTabChange: (next: Tab) => void;
   activeJobCount: number;
   onAllJobsClick: () => void;
 }) {
@@ -121,20 +140,44 @@ function SectionHeader({
           Strategic bets, ranked by hiring evidence
         </div>
         <div className="mt-1 font-sans text-[12px] text-muted-foreground">
-          Click any bet title to see the jobs staffing it. Each card opens in
-          a side panel so you don&rsquo;t lose the thesis.
+          {tab === "bet"
+            ? "Click any bet title to see the jobs staffing it. Each card opens in a side panel so you don’t lose the thesis."
+            : "Bets re-grouped by the function their hiring evidence falls under. Useful for seeing where you have evidence — and where you don’t."}
         </div>
       </div>
-      <div className="hidden items-center gap-1 sm:flex">
-        <span className="rounded-md bg-muted px-2 py-1 font-sans text-[11px] font-medium text-foreground">
+      <div
+        className="hidden items-center gap-1 sm:flex"
+        role="tablist"
+        aria-label="Bets view"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "bet"}
+          onClick={() => onTabChange("bet")}
+          className={cn(
+            "rounded-md px-2 py-1 font-sans text-[11px] font-medium transition-colors",
+            tab === "bet"
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:bg-muted/60"
+          )}
+        >
           By bet
-        </span>
-        <span
-          className="rounded-md px-2 py-1 font-sans text-[11px] font-medium text-muted-foreground"
-          title="Coming soon"
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "function"}
+          onClick={() => onTabChange("function")}
+          className={cn(
+            "rounded-md px-2 py-1 font-sans text-[11px] font-medium transition-colors",
+            tab === "function"
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:bg-muted/60"
+          )}
         >
           By function
-        </span>
+        </button>
         <button
           type="button"
           onClick={onAllJobsClick}

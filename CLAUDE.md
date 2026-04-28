@@ -53,11 +53,12 @@ Two AI calls per job. `analyzeJob` (in `web/lib/analysis/strategic.ts`) and `cat
 
 ## 4. Cron topology
 
-**Two Vercel crons (collect, report) + two GH Actions crons (company-insights, gemini-cost-alarm).** Hard cap: never more than two Vercel crons; everything else lives in GitHub Actions and `curl`s back into the deployed app with `Bearer ${CRON_SECRET}`.
+**Two Vercel crons (collect, report) + three GH Actions crons (company-insights, editorial, gemini-cost-alarm).** Hard cap: never more than two Vercel crons. Most GH Actions crons `curl` back into the deployed app with `Bearer ${CRON_SECRET}`; the editorial cron runs the regenerate script directly in the runner.
 
 - Vercel daily 6 AM UTC: `/api/cron/collect` — collects jobs and triggers analysis.
 - Vercel weekly Mon 5 AM UTC: `/api/cron/report` — generates the weekly digest.
 - GitHub Actions weekly Mon 9 AM UTC: `company-insights-cron.yml` — scheduled company-insight regeneration.
+- GitHub Actions weekly Mon 11 AM UTC: `editorial-cron.yml` — runs `web/scripts/regenerate-editorial.ts` against stale companies (`companies.thesis / interpretation / bets`) and refreshes cross-company theme labels.
 - GitHub Actions daily 14:00 UTC: `gemini-cost-alarm.yml` — sums last 24h `gemini_usage_events.estimated_usd` and fires `Sentry.captureMessage` over threshold.
 
 Heavy browser scraping is offloaded to GitHub Actions on demand via `triggerScrapeWorkflow` in `web/lib/github.ts` (`scrape-heavy.yml`). Full topology, secrets, and decision tree in [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md).
@@ -75,7 +76,8 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 - **PRs touching `web/lib/ai/**` or `web/lib/analysis/**` MUST run `gemini-compare.ts`** and attach the markdown report; commit JSON artifacts under `web/scripts/artifacts/`.
 - **Don't stack grounded calls.** Before adding a new `googleSearch` call, check whether an upstream call already grounds.
 - **Cache keys must include `prompt_config_version`** or prompt tweaks silently serve stale outputs.
-- **Editorial voice** (`web/lib/ai/voice.ts`, rules in [`docs/voice.md`](./docs/voice.md)) is mandatory on user-facing surfaces (digest, company insight, chat, narrative) and forbidden on internal extraction/classification.
+- **Editorial voice** (`web/lib/ai/voice.ts`, rules in [`docs/voice.md`](./docs/voice.md)) is mandatory on user-facing surfaces (digest, company insight, **company editorial**, **cross-company theme labels**, chat, narrative) and forbidden on internal extraction/classification.
+- **Reuse upstream research before adding grounded calls.** The company editorial engine (`web/lib/analysis/company-editorial.ts`) is ungrounded; it loads the most recent `company_insights` row and feeds it as background context. Don't add a third grounded call just because a new surface needs background.
 
 ## 6. Directory map
 

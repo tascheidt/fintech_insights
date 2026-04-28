@@ -1,0 +1,109 @@
+name: Company Editorial Cron
+
+# Weekly refresh of company editorial fields (thesis + bets) and cross-company
+# theme labels. Runs the regenerate-editorial.ts script directly in the
+# Action runner — easier to debug than a long-running serverless function and
+# keeps the editorial pipeline off the Vercel cron quota (cap is 2).
+#
+# Required repository secrets:
+#   - GEMINI_API_KEY
+#   - NEXT_PUBLIC_SUPABASE_URL
+#   - NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   - SUPABASE_SERVICE_ROLE_KEY
+#
+# Schedule: Monday 11:00 UTC — fires after company-insights (09:00) so the
+# editorial run can reuse the freshly grounded research as additional context.
+
+on:
+  schedule:
+    - cron: "0 11 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Selection mode"
+        required: false
+        type: choice
+        default: stale
+        options:
+          - stale
+          - all
+          - slug
+      slug:
+        description: "Company slug (only used when mode=slug)"
+        required: false
+        type: string
+      themes:
+        description: "Refresh cross-company theme labels"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Validate required secrets
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          for secret in GEMINI_API_KEY SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            value=$(eval echo \$$secret)
+            if [ -z "$value" ]; then
+              echo "::error::Missing required secret $secret"
+              exit 1
+            fi
+          done
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Run regenerate-editorial
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MODE: ${{ inputs.mode || 'stale' }}
+          SLUG_INPUT: ${{ inputs.slug }}
+          REFRESH_THEMES: ${{ inputs.themes != 'false' }}
+        run: |
+          set -e
+          ARGS=""
+          case "$MODE" in
+            all)
+              ARGS="--all"
+              ;;
+            slug)
+              if [ -z "$SLUG_INPUT" ]; then
+                echo "::error::mode=slug requires the slug input"
+                exit 1
+              fi
+              ARGS="--slug $SLUG_INPUT"
+              ;;
+            stale|"")
+              ARGS=""
+              ;;
+            *)
+              echo "::error::Unknown mode: $MODE"
+              exit 1
+              ;;
+          esac
+          if [ "$REFRESH_THEMES" = "true" ]; then
+            ARGS="$ARGS --themes"
+          fi
+          echo "Running: npx tsx scripts/regenerate-editorial.ts $ARGS"
+          npx tsx scripts/regenerate-editorial.ts $ARGS

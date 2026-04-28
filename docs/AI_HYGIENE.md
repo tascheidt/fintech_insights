@@ -54,12 +54,18 @@ The voice directive from `web/lib/ai/voice.ts` is mandatory on user-facing surfa
 
 - Weekly digest copy
 - Company insight narratives
+- **Company editorial** (thesis, interpretation, bets — `web/lib/analysis/company-editorial.ts`)
+- **Cross-company theme labels** (Jobs page right rail — `web/lib/analysis/cross-company-themes.ts`)
 - Chat
 - Strategy narrative
 
 It is **forbidden** on internal extraction/classification prompts. Extraction output is never shown to users; the voice rules only eat tokens there. Adding the voice directive to `extractJobStructure` is a code-review reject.
 
 See `docs/voice.md` for the editorial rules themselves.
+
+### 6. Reuse upstream research before stacking calls
+
+The company editorial engine was tempted to fire its own grounded research call. Instead it loads the most recent `company_insights` row (which already paid the grounded-Pro cost) and feeds it as background context. New surfaces that need company context should follow the same pattern: read the most recent insight, not start a new grounded call.
 
 ## Approved models (recap)
 
@@ -68,6 +74,17 @@ Single source of truth lives in `web/lib/ai/prompt-config.ts` (`AI_MODEL_OPTIONS
 - `gemini-pro-latest` — advanced analysis with web search/grounding; deeper reasoning and narrative quality.
 - `gemini-flash-latest` — fast, cost-effective; default for extraction, classification, digest, chat.
 - `gemini-flash-lite-latest` — cheapest tier for high-volume, low-stakes calls. Use only where the comparison report confirms ≥95% L1 field agreement.
+
+## Editorial pipeline call sites
+
+The v2 editorial fields (working thesis, interpretation, strategic bets, last meaningful change) are populated by these call sites — both telemetered, both narrative-voice:
+
+| Call site                  | Module                                       | Model                  | Grounded | Prompt version              |
+|----------------------------|----------------------------------------------|------------------------|----------|-----------------------------|
+| `generateCompanyEditorial` | `web/lib/analysis/company-editorial.ts`      | `gemini-pro-latest`    | no       | `company-editorial-v1`      |
+| `generateThemeLabels`      | `web/lib/analysis/cross-company-themes.ts`   | `gemini-flash-latest`  | no       | `cross-company-themes-v1`   |
+
+Both are refreshable via `web/scripts/regenerate-editorial.ts` (per company or `--all`) and the `editorial-cron.yml` GH Actions workflow (Mondays 11:00 UTC). The bet auto-suggestions surfaced in the editorial form are rule-based (`web/lib/analysis/bet-suggester.ts`) — no AI calls.
 
 **Never pin a versioned or preview model ID** (e.g. `gemini-3-flash-preview`, `gemini-2.0-flash`, `gemini-1.5-pro`). Always the `-latest` alias. The comparison harness and production telemetry are how we catch a bad alias rotation; pinning bypasses that signal.
 

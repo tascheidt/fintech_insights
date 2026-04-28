@@ -20,6 +20,7 @@ import {
 } from "@/components/jobs/JobsRail";
 import type { JobsListRow } from "@/lib/dashboard-queries";
 import { classifyJob } from "@/lib/analysis/role-themes";
+import { downloadJobsCsv } from "@/lib/jobs/export-csv";
 
 export interface JobsPageClientProps {
   rows: JobsListRow[];
@@ -101,11 +102,19 @@ export function JobsPageClient({
         companyCount={companyCount}
         newCount={newCount}
         filteredCount={filtered.length}
-        totalCount=
-{rows.length}
+        totalCount={rows.length}
         initial={initial}
         digestContext={digestContext}
         onChange={onChange}
+        onExportCsv={() => {
+          const stem =
+            filters.company !== "all"
+              ? `jobs-${filters.company}`
+              : filters.fn !== "all"
+                ? `jobs-${filters.fn.toLowerCase().replace(/\s+/g, "-")}`
+                : "jobs";
+          downloadJobsCsv(filtered, stem);
+        }}
       />
 
       <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[1fr_280px]">

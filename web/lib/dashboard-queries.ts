@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
   getCategoryGroup,
@@ -6,6 +7,16 @@ import {
   ROLE_CATEGORIES,
 } from "@/lib/analysis/function-categories";
 import { startOfWeek, format, subDays, parseISO, addHours } from "date-fns";
+
+/**
+ * Many of the company-scoped helpers below accept an optional Supabase
+ * client so they can be invoked from request scope (default: the
+ * cookie-bound `createClient`) or from a script / cron (admin client).
+ *
+ * We accept `SupabaseClient` directly — the helpers don't need a typed
+ * Database generic to function.
+ */
+type SupabaseLike = SupabaseClient;
 
 const ROLLING_WEEK_DAYS = 7;
 
@@ -569,9 +580,10 @@ const QUIET_DAYS = 30; // sustained-baseline group going to zero for this long
  */
 export async function getCompanyHiringSparkline(
   companyId: string,
-  weeks: number = 8
+  weeks: number = 8,
+  client?: SupabaseLike
 ): Promise<number[]> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   const startDate = subDays(new Date(), weeks * 7).toISOString();
 
   const { data: jobs } = await supabase
@@ -608,9 +620,10 @@ export async function getCompanyHiringSparkline(
  */
 export async function getCompanyHiringDelta(
   companyId: string,
-  days: number = 30
+  days: number = 30,
+  client?: SupabaseLike
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   const startDate = subDays(new Date(), days).toISOString();
 
   const [{ count: newCount }, { count: closedCount }] = await Promise.all([
@@ -641,9 +654,10 @@ export async function getCompanyHiringDelta(
  * Row-level kind precedence: new > accel > quiet > cont.
  */
 export async function classifyCompanyPivot(
-  companyId: string
+  companyId: string,
+  client?: SupabaseLike
 ): Promise<{ kind: PivotKind; signals: PivotSignal[] }> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   const longWindowStart = subDays(new Date(), COLD_START_DAYS).toISOString();
   const recent4wStart = subDays(new Date(), 28);
   const recent12wStart = subDays(new Date(), 84);
@@ -713,9 +727,10 @@ export async function classifyCompanyPivot(
  *   3. Most recent job_postings.first_seen_date — labeled "New posting"
  */
 export async function getCompanyLastChange(
-  companyId: string
+  companyId: string,
+  client?: SupabaseLike
 ): Promise<{ text: string; when: string } | null> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
 
   // Editor-curated
   const { data: company } = await supabase
@@ -870,13 +885,26 @@ export async function getFunctionHeatData(
 }
 
 /**
- * Cross-company themes for the Jobs page right rail. Phase-1 derivation:
- * the function-category labels appearing in ≥2 companies' active jobs.
- * Sort by company count desc, then role count desc. Up to 5 rows.
+ * Cross-company themes for the Jobs page right rail.
+ *
+ * Counts come from job_postings (function-group rollup, ≥2 companies). The
+ * editorial `label` and `description` are author-quality strings cached in
+ * the `cross_company_themes` table by `web/lib/analysis/cross-company-themes.ts`.
+ * When the cache is empty we fall back to the raw group key — the UI handles
+ * either shape.
  */
-export async function getCrossCompanyThemes(): Promise<
-  Array<{ name: string; cos: number; roles: number }>
-> {
+export interface CrossCompanyThemeRow {
+  /** Function-group key — stable identifier ("engineering", "operations-strategy"). */
+  name: string;
+  /** Editorial label when one has been generated; otherwise the group key title-cased. */
+  label: string | null;
+  /** One-sentence editorial description; null until the labeler runs. */
+  description: string | null;
+  cos: number;
+  roles: number;
+}
+
+export async function getCrossCompanyThemes(): Promise<CrossCompanyThemeRow[]> {
   const supabase = await createClient();
 
   const { data: jobs } = await supabase
@@ -900,11 +928,40 @@ export async function getCrossCompanyThemes(): Promise<
     entry.roles += 1;
   }
 
-  return Array.from(themeStats.entries())
+  const counts = Array.from(themeStats.entries())
     .map(([name, { cos, roles }]) => ({ name, cos: cos.size, roles }))
     .filter((row) => row.cos >= 2)
     .sort((a, b) => b.cos - a.cos || b.roles - a.roles)
     .slice(0, 5);
+
+  if (counts.length === 0) return [];
+
+  const { data: cachedLabels } = await supabase
+    .from("cross_company_themes")
+    .select("category_group, label, description")
+    .in(
+      "category_group",
+      counts.map((c) => c.name)
+    );
+
+  const byGroup = new Map<string, { label: string; description: string | null }>();
+  for (const row of cachedLabels ?? []) {
+    byGroup.set(row.category_group as string, {
+      label: row.label as string,
+      description: (row.description as string | null) ?? null,
+    });
+  }
+
+  return counts.map((row) => {
+    const cached = byGroup.get(row.name);
+    return {
+      name: row.name,
+      label: cached?.label ?? null,
+      description: cached?.description ?? null,
+      cos: row.cos,
+      roles: row.roles,
+    };
+  });
 }
 
 /**

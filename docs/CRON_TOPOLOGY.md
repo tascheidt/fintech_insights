@@ -1,20 +1,24 @@
 # Cron Topology
 
-Four scheduled jobs run in production. Two live on Vercel (Hobby plan caps at 2),
-two run from GitHub Actions and call back into the deployed app over HTTPS.
+Five scheduled jobs run in production. Two live on Vercel (Hobby plan caps at 2),
+three run from GitHub Actions. Most GH Actions cron jobs `curl` back into the
+deployed Next.js app; the editorial cron is the exception — it runs the
+regenerate script directly inside the runner because GH Actions has the
+runtime budget for the Pro calls.
 
 ## Jobs
 
-| Job                | Venue          | Schedule (UTC) | Endpoint                          | Auth                                  |
-|--------------------|----------------|----------------|-----------------------------------|---------------------------------------|
-| collect            | Vercel cron    | `0 6 * * *`    | `GET /api/cron/collect`           | Vercel-injected `Bearer CRON_SECRET`  |
-| report             | Vercel cron    | `0 8 * * 1`    | `GET /api/cron/report`            | Vercel-injected `Bearer CRON_SECRET`  |
-| company-insights   | GitHub Actions | `0 9 * * 1`    | `GET /api/cron/company-insights`  | Workflow sends `Bearer CRON_SECRET`   |
-| gemini-cost-alarm  | GitHub Actions | `0 14 * * *`   | `GET /api/admin/cost-alarm`       | Workflow sends `Bearer CRON_SECRET`   |
+| Job                | Venue          | Schedule (UTC) | Endpoint / runtime                                    | Auth                                  |
+|--------------------|----------------|----------------|-------------------------------------------------------|---------------------------------------|
+| collect            | Vercel cron    | `0 6 * * *`    | `GET /api/cron/collect`                               | Vercel-injected `Bearer CRON_SECRET`  |
+| report             | Vercel cron    | `0 8 * * 1`    | `GET /api/cron/report`                                | Vercel-injected `Bearer CRON_SECRET`  |
+| company-insights   | GitHub Actions | `0 9 * * 1`    | `GET /api/cron/company-insights`                      | Workflow sends `Bearer CRON_SECRET`   |
+| editorial          | GitHub Actions | `0 11 * * 1`   | `npx tsx web/scripts/regenerate-editorial.ts`         | Service-role + Gemini secrets in repo |
+| gemini-cost-alarm  | GitHub Actions | `0 14 * * *`   | `GET /api/admin/cost-alarm`                           | Workflow sends `Bearer CRON_SECRET`   |
 
 Source of truth:
 - Vercel: [`web/vercel.json`](../web/vercel.json) `crons` array.
-- GitHub Actions: [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml), [`.github/workflows/gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml).
+- GitHub Actions: [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml), [`.github/workflows/editorial-cron.yml`](../.github/workflows/editorial-cron.yml), [`.github/workflows/gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml).
 
 The `report` job also generates one company insight per run as a side effect,
 so the GH Actions trigger is incremental — it just keeps the rolling backlog
@@ -22,7 +26,7 @@ covered between weekly digest runs.
 
 ## Required secrets
 
-Both venues use the same `CRON_SECRET` value. The route validates it via
+`CRON_SECRET` is shared between Vercel and GH Actions. The route validates it via
 `requireCronAuth` in [`web/lib/cron/auth.ts`](../web/lib/cron/auth.ts).
 
 - **Vercel project env**: `CRON_SECRET` (Production + Preview).
@@ -30,6 +34,14 @@ Both venues use the same `CRON_SECRET` value. The route validates it via
   e.g. `fintech-talent-brief.vercel.app`, no scheme, no trailing slash).
 
 Rotate both at once. There is no fallback.
+
+The editorial cron runs the regenerate script directly inside the runner, so
+it needs Supabase + Gemini credentials in addition to `CRON_SECRET`:
+
+- `GEMINI_API_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
 ## Adding a new scheduled job — decision tree
 
