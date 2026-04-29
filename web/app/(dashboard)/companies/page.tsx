@@ -181,14 +181,15 @@ export default async function CompaniesPage({
     <div className="space-y-5">
       <CompaniesHeader count={list.length} canEdit={canEdit} />
 
-      {/* Toolbar — wraps to two rows on mobile, side-by-side at sm+. Each
-          control is in its own scroll container so a long lens (or future
-          extra tabs) doesn't push the page wider than the viewport. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3.5">
-        <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* Toolbar — wraps to two rows on mobile, side-by-side at sm+. The
+          lens slot is `flex-1 min-w-0` so it absorbs any leftover width
+          and scrolls horizontally inside; the view toggle stays
+          `shrink-0` so its label never clips. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3.5">
+        <div className="-mx-1 min-w-0 flex-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <CompaniesLens active={lens} counts={counts} />
         </div>
-        <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="-mx-1 shrink-0 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <CompaniesViewToggle active={view} />
         </div>
       </div>

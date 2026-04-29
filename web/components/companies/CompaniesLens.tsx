@@ -63,14 +63,19 @@ export function CompaniesLens({ active, counts }: CompaniesLensProps) {
             key={key}
             type="button"
             onClick={() => onSelect(key)}
+            // `shrink-0` + `whitespace-nowrap` keep each chip on a single
+            // line; the parent toolbar wraps in `overflow-x-auto` so the
+            // user gets a horizontal scroll affordance instead of "Going
+            // quiet" wrapping mid-label.
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-[7px] px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+              "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[7px] px-3 py-1.5 text-[12.5px] font-medium transition-colors",
               isActive
                 ? "bg-primary text-white"
                 : "bg-transparent text-muted-foreground hover:text-foreground"
             )}
+            aria-label={`${label} (${counts[key] ?? 0})`}
           >
-            <Icon className="h-3.5 w-3.5" aria-hidden />
+            <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <span>{label}</span>
             <span className="ml-0.5 font-mono text-[10.5px] opacity-85 tabular-nums">
               {counts[key] ?? 0}
