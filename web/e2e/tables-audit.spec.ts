@@ -17,6 +17,12 @@ const ENABLED = process.env.TABLES_AUDIT === "1";
 const OUT = path.resolve(process.cwd(), "test-results/tables-audit");
 fs.mkdirSync(OUT, { recursive: true });
 
+// Module-level skip so Playwright doesn't even spawn the browser fixture
+// for these tests when the audit isn't requested. Inline `test.skip(...)`
+// runs after the fixture chain, which means a missing browser still
+// crashes the test. CI doesn't set TABLES_AUDIT, so this short-circuits.
+test.skip(!ENABLED, "TABLES_AUDIT=1 not set — audit disabled");
+
 const ROUTES = [
   "/jobs",
   "/companies",
@@ -31,7 +37,6 @@ for (const route of ROUTES) {
   for (const w of WIDTHS) {
     const slug = route.replace(/^\//, "").replace(/\//g, "_") || "home";
     test(`${slug} @ ${w}px`, async ({ browser }, testInfo) => {
-      test.skip(!ENABLED, "audit disabled");
       test.skip(testInfo.project.name !== "chromium-authed", "needs auth");
       const ctx = await browser.newContext({
         ...devices["Desktop Chrome"],

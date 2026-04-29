@@ -20,7 +20,12 @@ const ENABLE_AUDIT = process.env.MOBILE_AUDIT === "1";
 const OUT_DIR = path.resolve(process.cwd(), "test-results/mobile-audit");
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
-test.use({ ...devices["iPhone 13"] });
+// `devices["iPhone 13"]` sets `defaultBrowserType: "webkit"`, which would
+// override the project's chromium and force CI to launch a browser it
+// hasn't installed. Pin `browserName: "chromium"` so we keep the iPhone-13
+// viewport / UA / isMobile / hasTouch but render in Chromium (which fully
+// supports mobile emulation).
+test.use({ ...devices["iPhone 13"], browserName: "chromium" });
 
 const ROUTES: Array<{ name: string; path: string }> = [
   { name: "marketing", path: "/" },
@@ -36,9 +41,14 @@ const ROUTES: Array<{ name: string; path: string }> = [
   { name: "releases", path: "/releases" },
 ];
 
+// Skip-everything-when-disabled at the module level so Playwright doesn't
+// even attempt to spawn the browser fixture for these tests on CI runs
+// that don't set `MOBILE_AUDIT=1`. (`test.skip(...)` inside a test body
+// runs *after* the page fixture resolves.)
+test.skip(!ENABLE_AUDIT, "MOBILE_AUDIT=1 not set — audit disabled");
+
 for (const route of ROUTES) {
   test(`mobile audit · ${route.name}`, async ({ page }, testInfo) => {
-    test.skip(!ENABLE_AUDIT, "audit disabled");
     test.skip(
       testInfo.project.name !== "chromium-authed",
       "audit needs auth"

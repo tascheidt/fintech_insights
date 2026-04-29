@@ -7,7 +7,10 @@ import { test, expect, devices } from "@playwright/test";
  *   - Tapping a link closes the sheet and routes to it.
  */
 
-test.use({ ...devices["iPhone 13"] });
+// Pin chromium — `devices["iPhone 13"]` sets defaultBrowserType to
+// webkit, but CI only installs chromium. Chromium emulates the iPhone 13
+// viewport / UA / isMobile / hasTouch fine.
+test.use({ ...devices["iPhone 13"], browserName: "chromium" });
 
 test("mobile nav hamburger opens the menu and routes to /jobs", async ({
   page,

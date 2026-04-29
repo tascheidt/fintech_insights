@@ -14,9 +14,12 @@ const WIDTHS = [390, 640, 768, 1024, 1200, 1440];
 
 test.use({ ...devices["Desktop Chrome"] });
 
+// Module-level skip so the page fixture isn't even resolved when the
+// probe isn't requested. CI doesn't set WIDTHS_PROBE.
+test.skip(!ENABLED, "WIDTHS_PROBE=1 not set — probe disabled");
+
 for (const w of WIDTHS) {
   test(`jobs at ${w}px`, async ({ browser }, testInfo) => {
-    test.skip(!ENABLED, "widths probe disabled");
     test.skip(testInfo.project.name !== "chromium-authed", "needs auth");
     const ctx = await browser.newContext({
       ...devices["Desktop Chrome"],
