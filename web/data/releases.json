@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.0.1",
+    "date": "2026-04-28",
+    "changes": [
+      { "type": "fix", "description": "Mobile rendering: every surface now fits the iPhone-13 viewport with zero horizontal overflow. Companies index toolbar (lens + view toggle) wraps to two rows on mobile and each control scroll-clips inside its own container; rows reflow as stacked cards instead of an unreadable 5-column grid." },
+      { "type": "fix", "description": "Dashboard Competitive Matrix and other multi-column rows no longer push the page wider than the viewport — the grid containers now apply min-w-0 so each card's overflow-x-auto can actually clip." },
+      { "type": "fix", "description": "Company drill-down header stacks its action buttons (Watch / Careers site / Generate Insight) under the company name on mobile instead of fighting the headline for horizontal space; the headline itself drops from 32px to 26px on small screens." },
+      { "type": "improvement", "description": "Mobile-audit Playwright spec ships under MOBILE_AUDIT=1 — captures full-page screenshots and overflow stats per route so future regressions on small screens get caught quickly. Mobile-nav regression spec asserts the hamburger menu opens and routes." }
+    ]
+  },
+  {
     "version": "2.0.0",
     "date": "2026-04-28",
     "changes": [

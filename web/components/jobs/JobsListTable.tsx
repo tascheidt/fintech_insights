@@ -108,8 +108,23 @@ function SortHeader({ label, sortKey, current, onClick, align = "left" }: SortHe
   );
 }
 
+// Responsive column template:
+//   <lg (≤1023px):  Title (flex) | Posted | chevron — Company/Function/Location
+//                    collapse into a metadata row below the title. Even at
+//                    768/1024 the title needs ~250px+ to read, which breaks
+//                    once we re-introduce the four side columns.
+//   lg+:            Title (flex) | Company | Function | Location | Posted | chevron
+//                    — slim fixed widths so the title column keeps room.
+//   xl+:            Same as lg but with the rail siphoning 298px from the
+//                    page width; no further changes inside the table needed.
+//
+// Keep these classes synced with `HIDE_BELOW_LG` below.
 const GRID_COLS =
-  "grid grid-cols-[minmax(0,2fr)_200px_140px_180px_80px_24px] items-center gap-3.5 px-[18px]";
+  "grid grid-cols-[minmax(0,1fr)_56px_24px] items-center gap-3 px-3 " +
+  "lg:grid-cols-[minmax(0,1fr)_minmax(0,160px)_minmax(0,140px)_minmax(0,140px)_64px_20px] lg:gap-3.5 lg:px-[18px]";
+
+const HIDE_BELOW_LG = "hidden lg:flex";
+const HIDE_BELOW_LG_INLINE = "hidden lg:inline-flex";
 
 export function JobsListTable({ rows }: JobsListTableProps) {
   const router = useRouter();
@@ -180,9 +195,15 @@ export function JobsListTable({ rows }: JobsListTableProps) {
         )}
       >
         <SortHeader label="Title" sortKey="title" current={sort} onClick={onSortClick} />
-        <SortHeader label="Company" sortKey="company" current={sort} onClick={onSortClick} />
-        <SortHeader label="Function" sortKey="function" current={sort} onClick={onSortClick} />
-        <SortHeader label="Location" sortKey="location" current={sort} onClick={onSortClick} />
+        <div className={HIDE_BELOW_LG_INLINE}>
+          <SortHeader label="Company" sortKey="company" current={sort} onClick={onSortClick} />
+        </div>
+        <div className={HIDE_BELOW_LG_INLINE}>
+          <SortHeader label="Function" sortKey="function" current={sort} onClick={onSortClick} />
+        </div>
+        <div className={HIDE_BELOW_LG_INLINE}>
+          <SortHeader label="Location" sortKey="location" current={sort} onClick={onSortClick} />
+        </div>
         <SortHeader label="Posted" sortKey="posted" current={sort} onClick={onSortClick} align="right" />
         <span aria-hidden />
       </div>
@@ -207,15 +228,21 @@ export function JobsListTable({ rows }: JobsListTableProps) {
               idx !== sorted.length - 1 && "border-b border-sand-100"
             )}
           >
-            {/* Title cell */}
-            <div className="flex min-w-0 flex-col gap-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[13.5px] font-medium text-sand-950 leading-tight tracking-[-0.005em]">
+            {/* Title cell — title is single-line truncated so the row
+                height stays predictable. NEW pill sits inline. Signal
+                tags + the mobile metadata strip live in their own rows
+                below, only wrapping if they really need to. */}
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <span
+                  className="min-w-0 flex-1 truncate text-[13.5px] font-medium leading-tight tracking-[-0.005em] text-sand-950"
+                  title={row.title}
+                >
                   {row.title}
                 </span>
                 {isNew && (
                   <span
-                    className="inline-flex items-center rounded-[4px] bg-sunset-100 text-sunset-800 font-display uppercase"
+                    className="inline-flex shrink-0 items-center rounded-[4px] bg-sunset-100 font-display uppercase text-sunset-800"
                     style={{
                       fontSize: 10,
                       padding: "3px 6px",
@@ -226,14 +253,59 @@ export function JobsListTable({ rows }: JobsListTableProps) {
                     new
                   </span>
                 )}
-                {sigs.map((s, i) => (
-                  <SignalTag key={i}>{s}</SignalTag>
-                ))}
               </div>
+
+              {/* Mobile metadata strip — only renders below md, and gives
+                  the reader the four pieces of info they'd otherwise see
+                  in dedicated columns. Renders as a single wrapping row. */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-sand-500 lg:hidden">
+                <span className="inline-flex items-center gap-1">
+                  <MonogramAvatar size="sm" name={row.companyName} />
+                  <span className="font-medium text-sand-700">{row.companyName}</span>
+                </span>
+                {row.functionGroup && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <FunctionDot fn={row.functionGroup} />
+                      <span className="text-sand-700">{row.functionGroup}</span>
+                    </span>
+                  </>
+                )}
+                {shortLocation(row) !== "—" && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span className="text-sand-700">{shortLocation(row)}</span>
+                  </>
+                )}
+                {remote && (
+                  <span
+                    className="font-mono uppercase text-sand-400"
+                    style={{
+                      fontSize: 9.5,
+                      letterSpacing: "0.04em",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {remote}
+                  </span>
+                )}
+              </div>
+
+              {/* Signal tags — second line, wraps cleanly without forcing
+                  the title to wrap. Hidden below sm to keep mobile rows
+                  compact. */}
+              {sigs.length > 0 && (
+                <div className="hidden flex-wrap items-center gap-1.5 sm:flex">
+                  {sigs.map((s, i) => (
+                    <SignalTag key={i}>{s}</SignalTag>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Company cell */}
-            <div className="flex min-w-0 items-center gap-2">
+            <div className={cn(HIDE_BELOW_LG, "min-w-0 items-center gap-2")}>
               <MonogramAvatar size="sm" name={row.companyName} />
               <span
                 className="truncate text-[12.5px] font-medium text-sand-700"
@@ -244,7 +316,12 @@ export function JobsListTable({ rows }: JobsListTableProps) {
             </div>
 
             {/* Function cell */}
-            <div className="inline-flex items-center gap-1.5 text-[12px] font-medium text-sand-700">
+            <div
+              className={cn(
+                HIDE_BELOW_LG_INLINE,
+                "min-w-0 items-center gap-1.5 text-[12px] font-medium text-sand-700"
+              )}
+            >
               {row.functionGroup ? (
                 <>
                   <FunctionDot fn={row.functionGroup} />
@@ -256,7 +333,12 @@ export function JobsListTable({ rows }: JobsListTableProps) {
             </div>
 
             {/* Location cell */}
-            <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-sand-700">
+            <div
+              className={cn(
+                HIDE_BELOW_LG,
+                "min-w-0 items-center gap-1.5 text-[12px] text-sand-700"
+              )}
+            >
               <span className="truncate" title={row.location ?? undefined}>
                 {shortLocation(row)}
               </span>

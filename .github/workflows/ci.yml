@@ -181,6 +181,15 @@ jobs:
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
     steps:
+      # Check out FIRST so the job's `defaults.run.working-directory: web`
+      # has a `web/` directory to enter. The previous ordering (gate
+      # first) failed because every step inherits the working-directory
+      # default — including the gate step before checkout had created
+      # `web/`. Cost of always checking out is ~1s; gate still skips
+      # everything else when secrets are absent.
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Skip when Supabase secrets are absent
         id: gate
         env:
@@ -193,10 +202,6 @@ jobs:
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Checkout
-        if: steps.gate.outputs.skip != 'true'
-        uses: actions/checkout@v4
 
       - name: Setup Node.js
         if: steps.gate.outputs.skip != 'true'

@@ -181,17 +181,26 @@ export default async function CompaniesPage({
     <div className="space-y-5">
       <CompaniesHeader count={list.length} canEdit={canEdit} />
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3.5">
-        <CompaniesLens active={lens} counts={counts} />
-        <CompaniesViewToggle active={view} />
+      {/* Toolbar — wraps to two rows on mobile, side-by-side at sm+. The
+          lens slot is `flex-1 min-w-0` so it absorbs any leftover width
+          and scrolls horizontally inside; the view toggle stays
+          `shrink-0` so its label never clips. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3.5">
+        <div className="-mx-1 min-w-0 flex-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <CompaniesLens active={lens} counts={counts} />
+        </div>
+        <div className="-mx-1 shrink-0 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <CompaniesViewToggle active={view} />
+        </div>
       </div>
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
-        {/* Header row */}
+        {/* Header row — only renders at lg+, matching the row grid. Below
+            1024px the rows are vertical cards with their own labels, so
+            column headers would clutter. */}
         <div
-          className="grid items-center gap-[18px] border-b border-border bg-secondary/70 py-2.5 pr-[22px] font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground"
+          className="hidden items-center gap-[18px] border-b border-border bg-secondary/70 py-2.5 pr-[22px] font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground lg:grid"
           style={{ gridTemplateColumns: "4px 320px 1fr 220px 240px" }}
         >
           <div />
@@ -220,7 +229,7 @@ export default async function CompaniesPage({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-[11.5px] leading-[1.5] text-muted-foreground">
+      <div className="flex flex-col gap-1.5 text-[11.5px] leading-[1.5] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>{syncedLabel}</span>
         <span>
           Strip ·{" "}
@@ -235,7 +244,7 @@ export default async function CompaniesPage({
 
 function CompaniesHeader({ count, canEdit }: { count: number; canEdit: boolean }) {
   return (
-    <div className="flex items-end justify-between gap-6">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
       <div>
         <div className="mb-2 inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase leading-none tracking-[0.09em] text-muted-foreground">
           <span

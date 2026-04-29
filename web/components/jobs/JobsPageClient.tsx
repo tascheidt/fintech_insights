@@ -117,7 +117,11 @@ export function JobsPageClient({
         }}
       />
 
-      <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[1fr_280px]">
+      {/* Rail only shows from xl (1280px+). Below that, the table has the
+          whole row width — anything narrower forced the title column to
+          single-digit pixels because the fixed cols (Company/Function/
+          Location/Posted) plus a 280px rail starved everything else. */}
+      <div className="grid grid-cols-1 gap-[18px] xl:grid-cols-[1fr_280px] [&>*]:min-w-0">
         <JobsListTable rows={filtered} />
         <JobsRail heat={heat} themes={themes} />
       </div>
