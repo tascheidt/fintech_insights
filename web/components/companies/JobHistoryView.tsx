@@ -781,7 +781,43 @@ function JobsTableView({ jobs, source }: { jobs: JobData[]; source: string }) {
                 onClick={() => router.push(`/jobs/${job.id}?source=${source}`)}
               >
                 <TableCell className="text-[13px] font-medium text-foreground">
-                  {job.title}
+                  <div className="flex flex-col gap-1">
+                    <span className="leading-tight">{job.title}</span>
+                    {/* Mobile-only metadata strip — surfaces the columns
+                        we hide via `hidden sm:table-cell` so users on
+                        narrow screens still see company / function /
+                        location / first seen. */}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-normal text-muted-foreground sm:hidden">
+                      {hasCompanyInfo && job.companyName && (
+                        <span className="inline-flex items-center gap-1">
+                          <CompanyAvatar name={job.companyName} size={16} />
+                          <span>{job.companyName}</span>
+                        </span>
+                      )}
+                      {job.function_category && (
+                        <>
+                          {hasCompanyInfo && job.companyName && <span aria-hidden>·</span>}
+                          <span>
+                            {isRoleCategory(job.function_category)
+                              ? getCategoryLabel(job.function_category)
+                              : job.function_category}
+                          </span>
+                        </>
+                      )}
+                      {job.location && shortLocation(job.location) !== "—" && (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span>{shortLocation(job.location)}</span>
+                        </>
+                      )}
+                      {job.firstSeenDate && (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span className="font-mono">{formatFirstSeen(job.firstSeenDate)}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </TableCell>
                 {hasCompanyInfo && (
                   <TableCell className="hidden text-[13px] sm:table-cell">

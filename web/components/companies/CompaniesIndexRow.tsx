@@ -80,25 +80,27 @@ export function CompaniesIndexRow({ row }: CompaniesIndexRowProps) {
       href={`/companies/${row.slug}`}
       className={cn(
         "group grid cursor-pointer border-b border-border/60 transition-colors last:border-b-0 hover:bg-sand-100",
-        // Mobile: 4px strip + content column, items align top, comfortable
-        // padding. Desktop: the original 5-col table grid.
+        // Mobile + tablet: 4px strip + content column, items align top.
+        // Desktop (lg+): the original 5-col table grid. Below 1024px the
+        // Active-signals column (240px) collides with the thesis column
+        // and gets clipped by the wrapping `overflow-hidden` table.
         "grid-cols-[4px_1fr] items-stretch gap-x-3 gap-y-2 py-3.5 pl-0 pr-4",
-        "sm:[grid-template-columns:4px_320px_1fr_220px_240px] sm:items-center sm:gap-x-[18px] sm:gap-y-0 sm:pr-[22px]",
+        "lg:[grid-template-columns:4px_320px_1fr_220px_240px] lg:items-center lg:gap-x-[18px] lg:gap-y-0 lg:pr-[22px]",
         isCont && "bg-sand-100/50"
       )}
     >
       {/* Coverage strip — spans the whole card on mobile, single row on desktop. */}
       <CoverageStrip
         kind={row.status}
-        className="row-span-3 self-stretch sm:row-span-1"
+        className="row-span-3 self-stretch lg:row-span-1"
       />
 
 
       {/* Company · thesis */}
-      <div className="flex min-w-0 items-start gap-3 sm:items-center">
+      <div className="flex min-w-0 items-start gap-3 lg:items-center">
         <MonogramAvatar size="lg" name={row.name} />
         <div className="min-w-0">
-          <h3 className="m-0 mb-[3px] text-[14.5px] font-semibold leading-[1.2] tracking-[-0.005em] text-foreground sm:truncate">
+          <h3 className="m-0 mb-[3px] text-[14.5px] font-semibold leading-[1.2] tracking-[-0.005em] text-foreground lg:truncate">
             <span>{row.name}</span>
             <span className="ml-2 inline-block translate-y-[2px] font-mono text-[9.5px] uppercase tracking-[0.06em] text-muted-foreground">
               {row.hq}

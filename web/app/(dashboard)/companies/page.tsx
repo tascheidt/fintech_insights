@@ -195,10 +195,11 @@ export default async function CompaniesPage({
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
-        {/* Header row — desktop grid only. Mobile rows are vertical cards
-            with their own labels, so column headers would just clutter. */}
+        {/* Header row — only renders at lg+, matching the row grid. Below
+            1024px the rows are vertical cards with their own labels, so
+            column headers would clutter. */}
         <div
-          className="hidden items-center gap-[18px] border-b border-border bg-secondary/70 py-2.5 pr-[22px] font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground sm:grid"
+          className="hidden items-center gap-[18px] border-b border-border bg-secondary/70 py-2.5 pr-[22px] font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground lg:grid"
           style={{ gridTemplateColumns: "4px 320px 1fr 220px 240px" }}
         >
           <div />
