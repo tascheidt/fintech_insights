@@ -22,6 +22,7 @@ import {
   SignalTag,
 } from "@/components/design";
 import type { JobsListRow } from "@/lib/dashboard-queries";
+import { useJobSelection } from "@/components/jobs/JobSelectionContext";
 
 type SortKey = "title" | "company" | "function" | "location" | "posted";
 type SortDir = "asc" | "desc";
@@ -120,14 +121,15 @@ function SortHeader({ label, sortKey, current, onClick, align = "left" }: SortHe
 //
 // Keep these classes synced with `HIDE_BELOW_LG` below.
 const GRID_COLS =
-  "grid grid-cols-[minmax(0,1fr)_56px_24px] items-center gap-3 px-3 " +
-  "lg:grid-cols-[minmax(0,1fr)_minmax(0,160px)_minmax(0,140px)_minmax(0,140px)_64px_20px] lg:gap-3.5 lg:px-[18px]";
+  "grid grid-cols-[28px_minmax(0,1fr)_56px_24px] items-center gap-3 px-3 " +
+  "lg:grid-cols-[28px_minmax(0,1fr)_minmax(0,160px)_minmax(0,140px)_minmax(0,140px)_64px_20px] lg:gap-3.5 lg:px-[18px]";
 
 const HIDE_BELOW_LG = "hidden lg:flex";
 const HIDE_BELOW_LG_INLINE = "hidden lg:inline-flex";
 
 export function JobsListTable({ rows }: JobsListTableProps) {
   const router = useRouter();
+  const { toggle, isSelected } = useJobSelection();
   const [sort, setSort] = React.useState<{ key: SortKey; dir: SortDir }>({
     key: "posted",
     dir: "asc",
@@ -194,6 +196,7 @@ export function JobsListTable({ rows }: JobsListTableProps) {
           "border-b border-sand-200 bg-sand-100 py-[11px]"
         )}
       >
+        <span aria-hidden />
         <SortHeader label="Title" sortKey="title" current={sort} onClick={onSortClick} />
         <div className={HIDE_BELOW_LG_INLINE}>
           <SortHeader label="Company" sortKey="company" current={sort} onClick={onSortClick} />
@@ -213,6 +216,7 @@ export function JobsListTable({ rows }: JobsListTableProps) {
         const isNew = row.ageDays !== null && row.ageDays <= 7;
         const remote = deriveRemote(row);
         const sigs = row.keywords.slice(0, 3);
+        const checked = isSelected(row.id);
         return (
           <div
             key={row.id}
@@ -225,9 +229,44 @@ export function JobsListTable({ rows }: JobsListTableProps) {
             className={cn(
               GRID_COLS,
               "cursor-pointer py-[11px] transition-colors hover:bg-sand-100",
+              checked && "bg-pacific-50",
               idx !== sorted.length - 1 && "border-b border-sand-100"
             )}
           >
+            {/* Selection checkbox */}
+            <div
+              className="flex items-center justify-center"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggle(row.id);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  toggle(row.id);
+                }
+              }}
+            >
+              <div
+                role="checkbox"
+                aria-checked={checked}
+                tabIndex={0}
+                className={cn(
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                  checked
+                    ? "border-pacific-500 bg-pacific-500 text-white"
+                    : "border-sand-300 bg-white hover:border-sand-400"
+                )}
+              >
+                {checked && (
+                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden>
+                    <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
+            </div>
+
             {/* Title cell — title is single-line truncated so the row
                 height stays predictable. NEW pill sits inline. Signal
                 tags + the mobile metadata strip live in their own rows
