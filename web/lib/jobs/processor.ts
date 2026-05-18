@@ -348,7 +348,7 @@ export async function runIngestStage(
     // Mark jobs as closed if no longer in feed
     // Only update jobs that are currently active to avoid overwriting
     // closed_date on already-closed jobs every collection run
-    for (const [extId, jobId] of existingMap) {
+    for (const [extId, entry] of existingMap) {
       if (!fetchedIds.has(extId)) {
         const { count } = await supabase
           .from('job_postings')
@@ -356,7 +356,7 @@ export async function runIngestStage(
             is_active: false,
             closed_date: new Date().toISOString(),
           })
-          .eq('id', jobId)
+          .eq('id', entry.id)
           .eq('is_active', true);
         if (count && count > 0) {
           closedJobs++;
