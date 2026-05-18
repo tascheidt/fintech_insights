@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.0.2",
+    "date": "2026-05-18",
+    "changes": [
+      { "type": "fix", "description": "Closed-job detection: jobs that drop out of an ATS feed are once again marked closed. A regression in the Phase 2 description-hash gate left the closure loop passing an object where a job id was expected, so no posting had been marked closed since 2026-04-19 — the \"Closed\" series on the Net hiring flow chart and the \"closed\" half of 7-Day Net both flatlined at zero. Backfilled the 147 missed closures with closed_date set to each job's last_seen_date, so they land on the timeline when they actually happened rather than spiking on the fix date." }
+    ]
+  },
+  {
     "version": "2.0.1",
     "date": "2026-04-28",
     "changes": [
