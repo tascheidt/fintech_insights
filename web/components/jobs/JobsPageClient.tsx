@@ -18,6 +18,8 @@ import {
   type FunctionHeatRow,
   type CrossCompanyTheme,
 } from "@/components/jobs/JobsRail";
+import { JobSelectionProvider, useJobSelection } from "@/components/jobs/JobSelectionContext";
+import { JobGeneratorModal } from "@/components/jobs/JobGeneratorModal";
 import type { JobsListRow } from "@/lib/dashboard-queries";
 import { classifyJob } from "@/lib/analysis/role-themes";
 import { downloadJobsCsv } from "@/lib/jobs/export-csv";
@@ -42,7 +44,15 @@ export interface JobsPageClientProps {
   companyCount: number;
 }
 
-export function JobsPageClient({
+export function JobsPageClient(props: JobsPageClientProps) {
+  return (
+    <JobSelectionProvider>
+      <JobsPageClientInner {...props} />
+    </JobSelectionProvider>
+  );
+}
+
+function JobsPageClientInner({
   rows,
   heat,
   themes,
@@ -55,6 +65,8 @@ export function JobsPageClient({
   companyCount,
 }: JobsPageClientProps) {
   const [filters, setFilters] = React.useState<JobsFilterState>(initial);
+  const { selected, clear } = useJobSelection();
+  const [generatorOpen, setGeneratorOpen] = React.useState(false);
 
   const onChange = React.useCallback((next: JobsFilterState) => {
     setFilters(next);
@@ -93,6 +105,11 @@ export function JobsPageClient({
     });
   }, [rows, filters, digestContext.themeId]);
 
+  const selectedJobs = React.useMemo(
+    () => rows.filter((r) => selected.has(r.id)),
+    [rows, selected]
+  );
+
   return (
     <div className="space-y-[14px]">
       <JobsHeader
@@ -125,6 +142,38 @@ export function JobsPageClient({
         <JobsListTable rows={filtered} />
         <JobsRail heat={heat} themes={themes} />
       </div>
+
+      {/* Floating selection bar */}
+      {selected.size > 0 && (
+        <div className="fixed inset-x-0 bottom-6 z-40 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-xl border border-sand-200 bg-white px-4 py-2.5 shadow-lg">
+            <span className="text-[12.5px] font-medium text-sand-700">
+              {selected.size} {selected.size === 1 ? "job" : "jobs"} selected
+            </span>
+            <div className="h-4 w-px bg-sand-200" />
+            <button
+              type="button"
+              onClick={() => setGeneratorOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-pacific-500 px-3 py-1.5 text-[12.5px] font-medium text-white transition-colors hover:bg-pacific-600"
+            >
+              Generate posting
+            </button>
+            <button
+              type="button"
+              onClick={clear}
+              className="text-[12px] text-sand-500 hover:text-sand-700 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      <JobGeneratorModal
+        open={generatorOpen}
+        onOpenChange={setGeneratorOpen}
+        selectedJobs={selectedJobs}
+      />
     </div>
   );
 }
