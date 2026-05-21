@@ -19,8 +19,9 @@
  *     point).
  *
  * Cap: forces PHENOM_RBC_MAX_JOBS=5 so a local smoke costs ~30s, not the
- * ~30 minutes a full RBC scrape would. Adjust the constant below if you
- * want more data.
+ * ~30 minutes a full RBC scrape would. The env var is an optional cap —
+ * unset (the production default) the scraper processes the whole corpus.
+ * Adjust the constant below if you want more data.
  */
 
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -65,7 +66,7 @@ async function main(): Promise<void> {
     jobCount: jobs.length,
     notes: [
       "Driven through the real fetchJobs(\"phenom\", \"rbc\", …) factory and the production phenom-rbc.ts scraper.",
-      "PHENOM_RBC_MAX_JOBS env var caps the scrape; default is 50, this smoke forces 5.",
+      "PHENOM_RBC_MAX_JOBS is an optional cap; unset = full corpus, this smoke forces 5.",
       "description_text on each job is the FULL extracted text from the per-detail-page JSON-LD JobPosting block.",
     ],
     jobs,

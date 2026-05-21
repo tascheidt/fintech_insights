@@ -15,6 +15,7 @@ import {
   decodeHtmlEntities,
   extractEagerLoadPayload,
   mapPhenomJob,
+  resolveJobCap,
   type PhenomRawJob,
   type PhenomSearchPayload,
 } from "./phenom-rbc";
@@ -151,6 +152,30 @@ describe("mapPhenomJob", () => {
     const sales = FIXTURE.data!.jobs!.find((j) => j.reqId === "R-0000170325");
     const job = mapPhenomJob(sales as PhenomRawJob);
     expect(job.location).toBe("WINNIPEG, Manitoba, Canada");
+  });
+});
+
+describe("resolveJobCap", () => {
+  it("returns null when unset — production default is the FULL corpus", () => {
+    expect(resolveJobCap(undefined)).toBeNull();
+  });
+
+  it("returns null for an empty string", () => {
+    expect(resolveJobCap("")).toBeNull();
+  });
+
+  it("returns null for a non-numeric value rather than throwing", () => {
+    expect(resolveJobCap("all")).toBeNull();
+    expect(resolveJobCap("50x")).toBeNull();
+  });
+
+  it("parses a positive integer cap (smoke tests / cost ceilings)", () => {
+    expect(resolveJobCap("5")).toBe(5);
+    expect(resolveJobCap("1500")).toBe(1500);
+  });
+
+  it("clamps a zero cap up to 1 — a cap of 0 would be a useless run", () => {
+    expect(resolveJobCap("0")).toBe(1);
   });
 });
 

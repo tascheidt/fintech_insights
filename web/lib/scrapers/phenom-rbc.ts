@@ -20,17 +20,22 @@
  *      `phApp.ddo.jobDetail.data.job.description` is a structurally
  *      equivalent fallback.
  *
- * The scraper visits the listing pages first (cheap — one page-load per
- * 10 jobs), then enriches each posting's description with a per-job
- * detail-page fetch. Description enrichment runs at concurrency=4 with
- * a dedicated puppeteer page per worker.
+ * The scraper paginates the FULL listing first (cheap — one page-load
+ * per 10 jobs), then enriches every posting's description with a per-job
+ * detail-page fetch. Description enrichment runs in batches of
+ * `ENRICH_BATCH_SIZE` (50): each batch uses concurrency=4 with fresh
+ * puppeteer pages that are closed when the batch finishes, so page
+ * memory doesn't accumulate across a multi-thousand-job run. Progress is
+ * logged per batch.
  *
- * Cost knob: `PHENOM_RBC_MAX_JOBS` env var caps the corpus to fetch per
- * run (default 50). Tune up after smoke confirms the pipeline. Full RBC
- * is ~1,500 jobs; at 4-concurrent description fetches × ~5s each that's
- * ~30min on cold-start. The processor's `description_hash` gate makes
- * subsequent runs cheap (no Gemini re-extraction on unchanged jobs), but
- * the per-page Puppeteer load is still incurred — that's the next
+ * Cost knob: `PHENOM_RBC_MAX_JOBS` env var is an OPTIONAL cap. Unset (the
+ * production default) means "process the entire RBC corpus" — pagination
+ * runs until totalHits is exhausted. Set it for smoke tests or to impose
+ * a cost ceiling. Full RBC is ~1,500 jobs; at 4-concurrent description
+ * fetches × ~5s each that's ~30min on cold-start (fine for GitHub
+ * Actions). The processor's `description_hash` gate makes subsequent
+ * runs cheap (no Gemini re-extraction on unchanged jobs), but the
+ * per-page Puppeteer load is still incurred — that's the next
  * optimization frontier if cost becomes real.
  */
 
@@ -40,8 +45,11 @@ import { detectLocationType, htmlToText } from "./utils";
 import { log } from "@/lib/log";
 
 const RBC_LISTING_URL = "https://jobs.rbc.com/ca/en/search-results";
-const DEFAULT_MAX_JOBS = 50;
 const DESCRIPTION_CONCURRENCY = 4;
+// Description enrichment is processed in batches of this size: fresh
+// puppeteer pages per batch, closed at batch end. Bounds page-memory
+// growth over a full ~1,500-job corpus and gives per-batch progress logs.
+const ENRICH_BATCH_SIZE = 50;
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -334,16 +342,22 @@ async function enrichOne(page: Page, job: JobData): Promise<void> {
   job.description_text = htmlToText(decoded);
 }
 
-async function enrichDescriptions(
+/**
+ * Enrich one batch of jobs. Spins up `concurrency` fresh pages, drains a
+ * shared queue, and closes the pages when done — so page memory is
+ * released at the end of every batch rather than accumulating across the
+ * whole corpus.
+ */
+async function enrichBatch(
   browser: Browser,
-  jobs: JobData[],
+  batch: JobData[],
   concurrency: number
-): Promise<void> {
-  const queue = [...jobs];
+): Promise<{ enriched: number; failed: number }> {
+  const queue = [...batch];
   let enriched = 0;
   let failed = 0;
   await Promise.all(
-    Array.from({ length: Math.min(concurrency, jobs.length) }, async () => {
+    Array.from({ length: Math.min(concurrency, batch.length) }, async () => {
       const page = await browser.newPage();
       try {
         await page.setUserAgent(USER_AGENT);
@@ -369,8 +383,44 @@ async function enrichDescriptions(
       }
     })
   );
+  return { enriched, failed };
+}
+
+/**
+ * Enrich every job's description, walking the corpus in chunks of
+ * `batchSize`. Each chunk is a self-contained `enrichBatch` call; progress
+ * is logged after each so a long (~1,500-job) run is observable and a
+ * crash leaves a clear high-water mark in the logs.
+ */
+async function enrichDescriptions(
+  browser: Browser,
+  jobs: JobData[],
+  concurrency: number,
+  batchSize: number
+): Promise<void> {
+  const batchCount = Math.ceil(jobs.length / batchSize);
+  let totalEnriched = 0;
+  let totalFailed = 0;
+  for (let i = 0; i < jobs.length; i += batchSize) {
+    const batchNum = Math.floor(i / batchSize) + 1;
+    const batch = jobs.slice(i, i + batchSize);
+    const { enriched, failed } = await enrichBatch(browser, batch, concurrency);
+    totalEnriched += enriched;
+    totalFailed += failed;
+    log.info(
+      {
+        batch: batchNum,
+        batchCount,
+        processed: Math.min(i + batchSize, jobs.length),
+        total: jobs.length,
+        enrichedSoFar: totalEnriched,
+        failedSoFar: totalFailed,
+      },
+      "[phenom-rbc] enrichment batch complete"
+    );
+  }
   log.info(
-    { enriched, failed, total: jobs.length },
+    { enriched: totalEnriched, failed: totalFailed, total: jobs.length },
     "[phenom-rbc] description enrichment complete"
   );
 }
@@ -378,6 +428,22 @@ async function enrichDescriptions(
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
+
+/**
+ * Resolve the optional per-run cap. `PHENOM_RBC_MAX_JOBS`:
+ *   - unset (production default) → null → process the entire corpus
+ *   - a positive integer → cap the run to that many jobs (smoke tests,
+ *     cost ceilings)
+ * Exported for unit testing.
+ */
+export function resolveJobCap(
+  rawEnv: string | undefined = process.env.PHENOM_RBC_MAX_JOBS
+): number | null {
+  if (rawEnv && /^\d+$/.test(rawEnv)) {
+    return Math.max(1, parseInt(rawEnv, 10));
+  }
+  return null;
+}
 
 export async function fetchPhenomRbcJobs(
   atsIdentifier: string,
@@ -387,11 +453,7 @@ export async function fetchPhenomRbcJobs(
   // factory can dispatch by tenant once more Phenom tenants land.
   void atsIdentifier;
 
-  const maxJobsEnv = process.env.PHENOM_RBC_MAX_JOBS;
-  const maxJobs =
-    maxJobsEnv && /^\d+$/.test(maxJobsEnv)
-      ? Math.max(1, parseInt(maxJobsEnv, 10))
-      : DEFAULT_MAX_JOBS;
+  const cap = resolveJobCap();
 
   const { browser: browserInstance, owned } = await acquireBrowser(browser);
 
@@ -403,28 +465,39 @@ export async function fetchPhenomRbcJobs(
     let totalHits: number | null = null;
     let from = 0;
 
-    // Paginate listings. Stop when: corpus exhausted, page is empty, or
-    // we hit the per-run cap.
-    while (jobs.length < maxJobs) {
+    // Paginate the FULL listing. Phenom serves 10 per page. Stop when the
+    // corpus is exhausted, a page comes back empty, or the optional cap
+    // is reached.
+    while (true) {
       const payload = await fetchListingPage(listingPage, from);
       if (!payload?.data?.jobs?.length) break;
       totalHits = payload.totalHits ?? totalHits;
-      const pageJobs = payload.data.jobs.map(mapPhenomJob);
-      jobs.push(...pageJobs);
-      from += pageJobs.length;
+      jobs.push(...payload.data.jobs.map(mapPhenomJob));
+      from += payload.data.jobs.length;
+      if (cap != null && jobs.length >= cap) break;
       if (totalHits != null && from >= totalHits) break;
     }
 
-    if (jobs.length > maxJobs) jobs.length = maxJobs;
+    if (cap != null && jobs.length > cap) jobs.length = cap;
     await listingPage.close();
 
     log.info(
-      { fetched: jobs.length, totalHits, maxJobs },
-      "[phenom-rbc] listings complete; enriching descriptions"
+      {
+        fetched: jobs.length,
+        totalHits,
+        cap: cap ?? "uncapped",
+        batchSize: ENRICH_BATCH_SIZE,
+      },
+      "[phenom-rbc] listings complete; enriching descriptions in batches"
     );
 
     if (jobs.length > 0) {
-      await enrichDescriptions(browserInstance, jobs, DESCRIPTION_CONCURRENCY);
+      await enrichDescriptions(
+        browserInstance,
+        jobs,
+        DESCRIPTION_CONCURRENCY,
+        ENRICH_BATCH_SIZE
+      );
     }
 
     return jobs;
