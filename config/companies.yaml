@@ -60,3 +60,19 @@ companies:
     ats_type: workable
     ats_identifier: starling-bank
     careers_url: https://www.starlingbank.com/careers/
+
+  # Canadian Incumbents (big-6 banks)
+  #
+  # These are tier=incumbent and surface only through dedicated views; the
+  # analyzer cost gate skips Pro analysis on bank jobs outside the staff+
+  # AI/ML/Data/Risk whitelist (see web/lib/jobs/incumbent-cost-gate.ts).
+  # is_active defaults to false until Phase 1.5 validates the scraper end-
+  # to-end against the live site.
+  - name: RBC
+    slug: rbc
+    country: CA
+    ats_type: phenom
+    ats_identifier: rbc
+    careers_url: https://jobs.rbc.com/ca/en/search-results
+    tier: incumbent
+    is_active: false

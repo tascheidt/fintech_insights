@@ -67,6 +67,14 @@ export interface Company {
   ats_identifier: string | null;
   careers_url: string | null;
   is_active: boolean;
+  /**
+   * 'fintech' (the platform's primary subject) or 'incumbent' (big-bank
+   * comparators like RBC/TD/BMO). The analyzer cost gate uses this to skip
+   * Pro+grounded analysis for incumbent jobs outside the senior-AI/ML
+   * whitelist. Added by migration 20260521000000_company_tier; older rows
+   * default to 'fintech'.
+   */
+  tier: "fintech" | "incumbent";
 }
 
 export interface IngestResult {
