@@ -20,6 +20,24 @@ type SupabaseLike = SupabaseClient;
 
 const ROLLING_WEEK_DAYS = 7;
 
+/**
+ * Company tier classification.
+ *
+ * `fintech` is the platform's primary subject. `incumbent` covers big-bank /
+ * non-fintech companies whose hiring is useful as benchmark signal but would
+ * dominate volume aggregates if surfaced alongside fintechs. Every cross-
+ * company aggregator in this file accepts a `tiers` parameter that defaults
+ * to `DEFAULT_TIERS` (fintech-only). Surfaces that want bank signal — like
+ * the planned Incumbent Bets rail — opt in explicitly with `['incumbent']`
+ * or `['fintech','incumbent']`.
+ *
+ * Self-scoped helpers (company drill-down, sparkline, hiring delta) do not
+ * take a `tiers` argument: they're invoked with an explicit company id and
+ * the caller already knows the tier.
+ */
+export type CompanyTier = "fintech" | "incumbent";
+export const DEFAULT_TIERS: readonly CompanyTier[] = ["fintech"];
+
 function getRollingWeekStartIso(now: Date = new Date()): string {
   return subDays(now, ROLLING_WEEK_DAYS).toISOString();
 }
@@ -151,17 +169,22 @@ function isBackfill(
 
 /**
  * Get job posting volume trends grouped by week, excluding backfill.
+ *
+ * Filters to `tiers` (default fintech-only) via an inner join on companies so
+ * incumbent (big-bank) postings do not skew the headline trend.
  */
 export async function getPostingTrends(
   days: number,
-  cutoffs: Map<string, Date>
+  cutoffs: Map<string, Date>,
+  tiers: readonly CompanyTier[] = DEFAULT_TIERS
 ): Promise<WeeklyTrend[]> {
   const supabase = await createClient();
   const startDate = subDays(new Date(), days).toISOString();
 
   const { data: jobs, error } = await supabase
     .from("job_postings")
-    .select("company_id, first_seen_date")
+    .select("company_id, first_seen_date, companies!inner(tier)")
+    .in("companies.tier", [...tiers])
     .gte("first_seen_date", startDate)
     .order("first_seen_date", { ascending: true });
 
@@ -190,17 +213,22 @@ export async function getPostingTrends(
 
 /**
  * Get raw function category data for client-side filtering, excluding backfill.
+ *
+ * Filters to `tiers` (default fintech-only) so the dashboard function-mix
+ * view stays fintech-focused.
  */
 export async function getRawFunctionData(
   days: number,
-  cutoffs: Map<string, Date>
+  cutoffs: Map<string, Date>,
+  tiers: readonly CompanyTier[] = DEFAULT_TIERS
 ): Promise<RawFunctionData[]> {
   const supabase = await createClient();
   const startDate = subDays(new Date(), days).toISOString();
 
   const { data: jobs, error } = await supabase
     .from("job_postings")
-    .select("company_id, function_category, first_seen_date")
+    .select("company_id, function_category, first_seen_date, companies!inner(tier)")
+    .in("companies.tier", [...tiers])
     .gte("first_seen_date", startDate)
     .not("function_category", "is", null)
     .not("first_seen_date", "is", null);
@@ -214,23 +242,30 @@ export async function getRawFunctionData(
 
 /**
  * Get net hiring flow data: new vs closed jobs per week.
+ *
+ * Filters to `tiers` (default fintech-only) on both the new- and closed-job
+ * pulls so flow numbers remain peer-comparable.
  */
 export async function getNetHiringFlow(
   days: number,
-  cutoffs: Map<string, Date>
+  cutoffs: Map<string, Date>,
+  tiers: readonly CompanyTier[] = DEFAULT_TIERS
 ): Promise<NetHiringFlowPoint[]> {
   const supabase = await createClient();
   const startDate = subDays(new Date(), days).toISOString();
+  const tierList = [...tiers];
 
   const [{ data: newJobs }, { data: closedJobs }] = await Promise.all([
     supabase
       .from("job_postings")
-      .select("company_id, first_seen_date")
+      .select("company_id, first_seen_date, companies!inner(tier)")
+      .in("companies.tier", tierList)
       .gte("first_seen_date", startDate)
       .not("first_seen_date", "is", null),
     supabase
       .from("job_postings")
-      .select("company_id, first_seen_date, closed_date")
+      .select("company_id, first_seen_date, closed_date, companies!inner(tier)")
+      .in("companies.tier", tierList)
       .gte("closed_date", startDate)
       .not("closed_date", "is", null),
   ]);
@@ -287,26 +322,33 @@ export async function getCompetitiveMatrixData(
   options?: {
     windowDays?: number | null; // null = current active snapshot
     includeClosed?: boolean;
+    tiers?: readonly CompanyTier[];
   }
 ): Promise<CompetitiveMatrixRow[]> {
   const supabase = await createClient();
   const isHistorical = options?.windowDays != null;
   const includeClosed = isHistorical && (options?.includeClosed ?? false);
   const rollingWeekStart = getRollingWeekStartIso();
+  const tierList = [...(options?.tiers ?? DEFAULT_TIERS)];
 
-  // Always seed from active companies
+  // Always seed from active companies in the selected tier(s) so the matrix
+  // shows every fintech (or every incumbent in a tier-incumbent view), not
+  // just those with jobs in the window.
   const { data: allCompanies } = await supabase
     .from("companies")
     .select("id, name, slug")
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .in("tier", tierList);
 
-  // Build jobs query based on mode
+  // Build jobs query based on mode. Inner-join companies and filter on tier
+  // so a future incumbent row cannot leak into the fintech matrix.
   let jobsQuery = supabase
     .from("job_postings")
     .select(
-      "company_id, function_category, first_seen_date, is_active, companies!inner(id, name, slug, is_active)"
+      "company_id, function_category, first_seen_date, is_active, companies!inner(id, name, slug, is_active, tier)"
     )
-    .eq("companies.is_active", true);
+    .eq("companies.is_active", true)
+    .in("companies.tier", tierList);
 
   if (includeClosed) {
     // Jobs that overlapped the window: active OR closed within the window
@@ -390,7 +432,8 @@ export async function getCompetitiveMatrixData(
   if (!isHistorical) {
     const { data: closedThisWeek } = await supabase
       .from("job_postings")
-      .select("company_id, function_category")
+      .select("company_id, function_category, companies!inner(tier)")
+      .in("companies.tier", tierList)
       .gte("closed_date", rollingWeekStart);
 
     for (const job of closedThisWeek ?? []) {
@@ -493,20 +536,26 @@ export async function getLatestDigest(): Promise<LatestDigest | null> {
 
 /**
  * Get most recent active job postings for the hot roles feed, excluding backfill.
+ *
+ * Filters to `tiers` (default fintech-only). Phase 2 will add an "Incumbent
+ * Bets" rail that queries with `tiers: ['incumbent']` and an additional
+ * seniority/function gate.
  */
 export async function getHotRoles(
   cutoffs: Map<string, Date>,
-  limit: number = 15
+  limit: number = 15,
+  tiers: readonly CompanyTier[] = DEFAULT_TIERS
 ): Promise<HotRole[]> {
   const supabase = await createClient();
 
   const { data: jobs } = await supabase
     .from("job_postings")
     .select(
-      "id, title, company_id, first_seen_date, function_category, companies!inner(name, slug, is_active)"
+      "id, title, company_id, first_seen_date, function_category, companies!inner(name, slug, is_active, tier)"
     )
     .eq("is_active", true)
     .eq("companies.is_active", true)
+    .in("companies.tier", [...tiers])
     .order("first_seen_date", { ascending: false })
     .limit(50); // Fetch extra to account for backfill filtering
 
@@ -534,21 +583,28 @@ export async function getHotRoles(
 
 /**
  * Get net new/closed jobs in the last 7 days, excluding backfill from new count.
+ *
+ * Filters to `tiers` (default fintech-only) on both pulls so the headline
+ * KPI cards stay peer-comparable.
  */
 export async function getNetThisWeek(
-  cutoffs: Map<string, Date>
+  cutoffs: Map<string, Date>,
+  tiers: readonly CompanyTier[] = DEFAULT_TIERS
 ): Promise<{ newCount: number; closedCount: number }> {
   const supabase = await createClient();
   const rollingWeekStart = getRollingWeekStartIso();
+  const tierList = [...tiers];
 
   const [{ data: newJobs }, { count: closedCount }] = await Promise.all([
     supabase
       .from("job_postings")
-      .select("company_id, first_seen_date")
+      .select("company_id, first_seen_date, companies!inner(tier)")
+      .in("companies.tier", tierList)
       .gte("first_seen_date", rollingWeekStart),
     supabase
       .from("job_postings")
-      .select("*", { count: "exact", head: true })
+      .select("*, companies!inner(tier)", { count: "exact", head: true })
+      .in("companies.tier", tierList)
       .gte("closed_date", rollingWeekStart),
   ]);
 
@@ -806,7 +862,8 @@ function relativeWhen(date: Date): string {
  * Returns 6 rows (top 6 groups by raw new-posting count in window).
  */
 export async function getFunctionHeatData(
-  days: number = 30
+  days: number = 30,
+  tiers: readonly CompanyTier[] = DEFAULT_TIERS
 ): Promise<
   Array<{
     name: string;
@@ -820,16 +877,19 @@ export async function getFunctionHeatData(
   const recent4wStart = subDays(new Date(), 28);
   const recent12wStart = subDays(new Date(), 84);
   const longWindowStart = subDays(new Date(), COLD_START_DAYS).toISOString();
+  const tierList = [...tiers];
 
   const [{ data: recentJobs }, { data: longRangeJobs }] = await Promise.all([
     supabase
       .from("job_postings")
-      .select("function_category, first_seen_date")
+      .select("function_category, first_seen_date, companies!inner(tier)")
+      .in("companies.tier", tierList)
       .gte("first_seen_date", recent)
       .not("function_category", "is", null),
     supabase
       .from("job_postings")
-      .select("function_category, first_seen_date")
+      .select("function_category, first_seen_date, companies!inner(tier)")
+      .in("companies.tier", tierList)
       .gte("first_seen_date", longWindowStart)
       .not("function_category", "is", null)
       .not("first_seen_date", "is", null),
@@ -904,16 +964,19 @@ export interface CrossCompanyThemeRow {
   roles: number;
 }
 
-export async function getCrossCompanyThemes(): Promise<CrossCompanyThemeRow[]> {
+export async function getCrossCompanyThemes(
+  tiers: readonly CompanyTier[] = DEFAULT_TIERS
+): Promise<CrossCompanyThemeRow[]> {
   const supabase = await createClient();
 
   const { data: jobs } = await supabase
     .from("job_postings")
     .select(
-      "company_id, function_category, is_active, companies!inner(is_active)"
+      "company_id, function_category, is_active, companies!inner(is_active, tier)"
     )
     .eq("is_active", true)
     .eq("companies.is_active", true)
+    .in("companies.tier", [...tiers])
     .not("function_category", "is", null);
 
   const themeStats = new Map<string, { cos: Set<string>; roles: number }>();
