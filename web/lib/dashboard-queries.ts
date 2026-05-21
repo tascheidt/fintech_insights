@@ -1097,9 +1097,14 @@ function coerceKeywords(raw: unknown): string[] {
  * scope to an explicit set of job IDs — used when entering from a digest
  * deep link that captured a specific snapshot of jobs (the
  * `weekly_digest_companies.job_ids` payload).
+ *
+ * Tier-filtered (default fintech-only) via an inner join on companies, so
+ * incumbent (big-bank) postings do not flood the Jobs list, its company
+ * dropdown, or the eyebrow stats. The Jobs-page Tier toggle opts in by
+ * passing `tiers` explicitly.
  */
 export async function getJobsListData(
-  options: { jobIds?: string[] | null } = {}
+  options: { jobIds?: string[] | null; tiers?: readonly CompanyTier[] } = {}
 ): Promise<JobsListRow[]> {
   const supabase = await createClient();
 
@@ -1108,11 +1113,14 @@ export async function getJobsListData(
     return [];
   }
 
+  const tierList = [...(options.tiers ?? DEFAULT_TIERS)];
+
   let query = supabase
     .from("job_postings")
     .select(
-      "id, title, standardized_department, function_category, location, location_structured, is_active, first_seen_date, keywords, company_id, companies(id, name, slug)"
+      "id, title, standardized_department, function_category, location, location_structured, is_active, first_seen_date, keywords, company_id, companies!inner(id, name, slug, tier)"
     )
+    .in("companies.tier", tierList)
     .order("first_seen_date", { ascending: false });
 
   if (options.jobIds && options.jobIds.length > 0) {

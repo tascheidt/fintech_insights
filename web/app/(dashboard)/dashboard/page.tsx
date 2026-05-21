@@ -75,12 +75,14 @@ export default async function DashboardPage({
     hotRoles,
     { data: companiesRaw },
   ] = await Promise.all([
-    // Active jobs count (current snapshot, no backfill filter needed)
+    // Active jobs count (current snapshot, no backfill filter needed).
+    // Fintech-only — incumbent (big-bank) postings must not inflate the KPI.
     supabase
       .from("job_postings")
-      .select("*, companies!inner(is_active)", { count: "exact", head: true })
+      .select("*, companies!inner(is_active, tier)", { count: "exact", head: true })
       .eq("is_active", true)
-      .eq("companies.is_active", true),
+      .eq("companies.is_active", true)
+      .eq("companies.tier", "fintech"),
     // Net new/closed this week
     getNetThisWeek(cutoffs),
     // Posting trends for sparkline
@@ -98,11 +100,13 @@ export default async function DashboardPage({
     getLatestDigest(),
     // Hot roles feed
     getHotRoles(cutoffs),
-    // Companies for filter dropdown
+    // Companies for filter dropdown (fintech-only — the dashboard is the
+    // fintech surface; incumbents are excluded from the count + dropdown).
     supabase
       .from("companies")
       .select("id, name")
       .eq("is_active", true)
+      .eq("tier", "fintech")
       .order("name"),
   ]);
 

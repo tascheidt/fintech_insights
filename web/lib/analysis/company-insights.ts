@@ -804,12 +804,16 @@ export async function getNextCompanyForInsight(): Promise<{
     throw new Error(`Failed to clean up insight locks: ${cleanupError.message}`);
   }
 
-  // Get active companies that don't have a recent insight
-  // Exclude companies that are currently being processed (have active locks)
+  // Get active companies that don't have a recent insight.
+  // Fintech-only: the scheduled insight generator must skip incumbents —
+  // each insight is an expensive Pro+grounded call, and we don't auto-
+  // generate company insights for big banks. (Admins can still trigger an
+  // incumbent insight by explicit company id.)
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .eq("tier", "fintech");
 
   if (!companies || companies.length === 0) {
     return null;

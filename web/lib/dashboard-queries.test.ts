@@ -56,6 +56,7 @@ import {
   getCrossCompanyThemes,
   getFunctionHeatData,
   getHotRoles,
+  getJobsListData,
   getNetHiringFlow,
   getNetThisWeek,
   getPostingTrends,
@@ -154,6 +155,26 @@ describe("volume aggregators apply the default fintech-only tier filter", () => 
   it("getCrossCompanyThemes filters on tier=fintech", async () => {
     await getCrossCompanyThemes();
     expect(tierFilterArgs("job_postings")).toEqual([["companies.tier", ["fintech"]]]);
+  });
+});
+
+describe("getJobsListData tier filter (Phase 2 Step 1 — leak G4)", () => {
+  it("defaults to fintech-only so RBC's ~1,500 jobs don't flood the /jobs list", async () => {
+    await getJobsListData();
+    expect(tierFilterArgs("job_postings")).toEqual([["companies.tier", ["fintech"]]]);
+  });
+
+  it("accepts an explicit tiers override (the Jobs-page Tier toggle opting into incumbents)", async () => {
+    await getJobsListData({ tiers: ["fintech", "incumbent"] });
+    expect(tierFilterArgs("job_postings")).toEqual([
+      ["companies.tier", ["fintech", "incumbent"]],
+    ]);
+  });
+
+  it("short-circuits an empty jobIds snapshot without issuing a query", async () => {
+    const result = await getJobsListData({ jobIds: [] });
+    expect(result).toEqual([]);
+    expect(tierFilterArgs("job_postings")).toEqual([]);
   });
 });
 

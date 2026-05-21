@@ -74,10 +74,15 @@ export default async function CompaniesPage({
     .single();
   const canEdit = ["editor", "admin"].includes(profile?.role ?? "");
 
+  // Fintech-only. Incumbent (big-bank) companies are surfaced through a
+  // dedicated "Incumbents" lens (Phase 2), never mixed into the default
+  // companies list — they'd otherwise carry meaningless fintech pivot
+  // classifications and ~1,500-job counts.
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name, slug, country, thesis, last_change, last_change_at, last_collected_at")
     .eq("is_active", true)
+    .eq("tier", "fintech")
     .order("name");
 
   const list = companies ?? [];
