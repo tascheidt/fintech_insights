@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { analyzeJobAdvanced } from "@/lib/analysis";
 import type { Company, AnalyzeResult } from "./types";
 import { updateTaskProgress } from "./progress";
+import { decideIncumbentGate } from "./incumbent-cost-gate";
 import { log } from "@/lib/log";
 
 /**
@@ -29,14 +30,37 @@ export async function runAnalyzeStage(
 
     // Process each job that needs analysis
     for (const jobId of jobIds) {
-      // Get job posting details
+      // Get job posting details. We pull `seniority_level` and
+      // `function_category` (populated by extractJobStructure / Flash) so the
+      // incumbent cost gate can decide whether to run the expensive
+      // Pro+grounded analyzer for big-bank rows.
       const { data: jobPosting } = await supabase
         .from('job_postings')
-        .select('id, title, standardized_department, location, description_text')
+        .select('id, title, standardized_department, location, description_text, seniority_level, function_category')
         .eq('id', jobId)
         .single();
 
       if (!jobPosting) {
+        analyzed++;
+        if (onProgress) {
+          onProgress(analyzed, total);
+        }
+        continue;
+      }
+
+      // Incumbent cost gate: skip Pro analysis for big-bank jobs unless
+      // they're high-signal hires (staff+ in AI/ML / Data / Risk-AI). For
+      // tier='fintech' the gate always passes — see incumbent-cost-gate.ts.
+      const gate = decideIncumbentGate({
+        tier: company.tier,
+        seniority_level: jobPosting.seniority_level,
+        function_category: jobPosting.function_category,
+      });
+      if (!gate.shouldAnalyze) {
+        log.info(
+          { jobId, companyId: company.id, tier: company.tier, reason: gate.reason },
+          "[analyzer] skipping analyzeJobAdvanced (incumbent cost gate)"
+        );
         analyzed++;
         if (onProgress) {
           onProgress(analyzed, total);

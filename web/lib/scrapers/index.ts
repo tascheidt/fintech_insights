@@ -47,8 +47,16 @@ export async function fetchJobs(
       return scrapeSuccessFactors(careersUrl, browser);
     }
     
-    // Browser-based scraping for platforms without APIs
+    // Browser-based scraping for platforms without APIs.
+    //
+    // `phenom` covers Phenom CareerConnect — used by RBC (jobs.rbc.com),
+    // BMO (jobs.bmo.com), and others. The page is client-rendered with
+    // generic `a[href*="/job/"]` markup that the existing generic scraper
+    // catches; tenant-specific scrapers (e.g. phenom-rbc.ts) can land
+    // ahead of this fallback in Phase 1.5 if listing extraction needs
+    // tightening.
     case "workday":
+    case "phenom":
     case "smartrecruiters":
     case "bamboohr":
     case "jazzhr":

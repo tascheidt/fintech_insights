@@ -152,6 +152,23 @@ const ATS_PATTERNS: ATSPattern[] = [
       return null;
     },
   },
+  // Phenom CareerConnect: vendor-hosted but white-labelled to each tenant's
+  // own domain (jobs.rbc.com, jobs.bmo.com, etc.), so detection works off a
+  // known-tenant allowlist rather than a vendor subdomain. The identifier
+  // is just the hostname's leading bank slug — used for telemetry/display,
+  // not for URL construction (the scraper uses `careersUrl` directly).
+  {
+    type: "phenom",
+    patterns: [
+      /^jobs\.rbc\.com$/i,
+      /^jobs\.bmo\.com$/i,
+    ],
+    extractIdentifier: (url: URL) => {
+      const host = url.hostname.toLowerCase();
+      const match = host.match(/^jobs\.([a-z0-9-]+)\.com$/i);
+      return match ? match[1] : null;
+    },
+  },
 ];
 
 /**
@@ -209,6 +226,7 @@ export const SUPPORTED_ATS = [
   { value: "workable", label: "Workable", implemented: true },
   { value: "ashby", label: "Ashby", implemented: true },
   { value: "dayforce", label: "Dayforce", implemented: true },
+  { value: "phenom", label: "Phenom CareerConnect", implemented: true },
   { value: "workday", label: "Workday", implemented: false },
   { value: "smartrecruiters", label: "SmartRecruiters", implemented: false },
   { value: "bamboohr", label: "BambooHR", implemented: false },
