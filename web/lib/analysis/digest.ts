@@ -19,6 +19,10 @@ import {
   aggregateRoleThemes,
   type RoleThemeSummary,
 } from "@/lib/analysis/role-themes";
+import {
+  DEFAULT_TIERS,
+  type CompanyTier,
+} from "@/lib/dashboard-queries";
 
 export type { RoleThemeSummary } from "@/lib/analysis/role-themes";
 export { aggregateRoleThemes } from "@/lib/analysis/role-themes";
@@ -486,12 +490,17 @@ export function buildWeeklyDigestCompanyInput(
   };
 }
 
-export async function getWeeklyData(daysBack: number = 7): Promise<Map<string, CompanyJobData>> {
+export async function getWeeklyData(
+  daysBack: number = 7,
+  tiers: readonly CompanyTier[] = DEFAULT_TIERS,
+): Promise<Map<string, CompanyJobData>> {
   const supabase = createAdminClient();
   const { weekStart, weekEnd } = getWeekBoundaries();
   const cutoffDate = new Date();
   cutoffDate.setUTCDate(cutoffDate.getUTCDate() - daysBack);
 
+  // Tier filter (default fintech-only) keeps the digest's cross-company
+  // themes from being skewed by big-bank volume.
   const query = supabase
     .from("job_postings")
     .select(`
@@ -511,10 +520,12 @@ export async function getWeeklyData(daysBack: number = 7): Promise<Map<string, C
         id,
         name,
         slug,
-        is_active
+        is_active,
+        tier
       )
     `)
     .eq("companies.is_active", true)
+    .in("companies.tier", [...tiers])
     .order("first_seen_date", { ascending: false });
 
   const { data: jobs, error } = daysBack === 7
@@ -673,9 +684,12 @@ export async function generateWeeklyReport(
   };
 }
 
-export async function createWeeklyDigest(daysBack: number = 7): Promise<WeeklyDigest> {
+export async function createWeeklyDigest(
+  daysBack: number = 7,
+  tiers: readonly CompanyTier[] = DEFAULT_TIERS,
+): Promise<WeeklyDigest> {
   console.log(`Generating weekly digest for the last ${daysBack} days...`);
-  const weeklyData = await getWeeklyData(daysBack);
+  const weeklyData = await getWeeklyData(daysBack, tiers);
   console.log(`Found ${weeklyData.size} companies with new job postings`);
   const digest = await generateWeeklyReport(weeklyData);
   console.log(`Generated digest with ${digest.total_jobs} total jobs`);

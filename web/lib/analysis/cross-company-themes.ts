@@ -23,6 +23,7 @@ import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCategoryGroup, type RoleCategory } from "./function-categories";
+import { DEFAULT_TIERS, type CompanyTier } from "@/lib/dashboard-queries";
 import { log } from "@/lib/log";
 
 export const THEME_LABELER_PROMPT_VERSION = "cross-company-themes-v1";
@@ -323,13 +324,20 @@ export async function persistThemeLabels(
  * call the labeler for any that are missing or stale, and persist results.
  * Returns the cached + fresh labels for downstream UI use.
  */
-export async function refreshAllThemeLabels(): Promise<ThemeLabelOutput[]> {
+export async function refreshAllThemeLabels(
+  tiers: readonly CompanyTier[] = DEFAULT_TIERS,
+): Promise<ThemeLabelOutput[]> {
   const supabase = createAdminClient();
 
+  // Tier filter (default fintech-only) keeps incumbent keyword bags out of
+  // the cross-company labeler — otherwise bank hiring dwarfs every theme.
   const { data: jobs } = await supabase
     .from("job_postings")
-    .select("function_category, keywords, title, company_id, is_active")
+    .select(
+      "function_category, keywords, title, company_id, is_active, companies!inner(tier)"
+    )
     .eq("is_active", true)
+    .in("companies.tier", [...tiers])
     .not("function_category", "is", null);
 
   if (!jobs?.length) return [];
