@@ -1,0 +1,120 @@
+{
+  "totalHits": 1482,
+  "hits": 3,
+  "data": {
+    "jobs": [
+      {
+        "subCategory": "Research",
+        "ml_skills": [
+          "machine learning",
+          "python",
+          "deep learning",
+          "natural language processing",
+          "information retrieval",
+          "pytorch",
+          "jax",
+          "tensorflow",
+          "software development life cycle",
+          "software engineering best practices",
+          "stakeholder management",
+          "testing methods",
+          "code reviews",
+          "source control management",
+          "product development design",
+          "decision making",
+          "quantitative research",
+          "research and development operations",
+          "long term planning"
+        ],
+        "type": "Full time",
+        "descriptionTeaser": "Embrace the role of a Research Engineer and drive innovation in machine learning at RBC Borealis. Collaborate with top researchers, develop cutting-edge AI solutions, and work with massive datasets and computational resources. If you have a passion for applied machine learning and a strong Python skills, this is your opportunity to make an impact.",
+        "state": "Quebec",
+        "multi_category": [
+          "Technology | Analytics | Research"
+        ],
+        "reqId": "R-0000153556",
+        "city": "MONTR\u00c9AL",
+        "multi_location": [
+          "MONTR\u00c9AL, Quebec, Canada"
+        ],
+        "applyUrl": "https://rbc.wd3.myworkdayjobs.com/RBCGLOBAL1/job/MONTRAL-Quebec-Canada/Research-Engineer-II_R-0000153556/apply",
+        "country": "Canada",
+        "jobId": "R-0000153556",
+        "title": "Research Engineer",
+        "postedDate": "2026-02-12T00:00:00.000+0000",
+        "category": "Technology | Analytics | Research"
+      },
+      {
+        "subCategory": "Enterprise and Financial Risk",
+        "ml_skills": [
+          "asset liability management",
+          "interest rate risk management",
+          "liquidity risk management",
+          "risk analytics",
+          "data analysis",
+          "regulatory compliance",
+          "financial reporting",
+          "ms office",
+          "analytical skills",
+          "communication skills",
+          "problem solving",
+          "interpersonal skills"
+        ],
+        "type": "Full time",
+        "descriptionTeaser": "Join our team as a US ALM Risk Manager and play a crucial role in overseeing banking book market risk. Leverage your expertise in asset liability management and risk analytics to drive effective risk management strategies. If you thrive in a dynamic environment and have a passion for financial services, we want to hear from you!",
+        "state": "California",
+        "multi_category": [
+          "Audit | Compliance | Legal | Risk"
+        ],
+        "reqId": "R-0000040439",
+        "city": "Los Angeles",
+        "multi_location": [
+          "Los Angeles, California, United States of America"
+        ],
+        "applyUrl": "https://rbc.wd3.myworkdayjobs.com/RBCGLOBAL1/job/Los-Angeles-California-United-States-of-America/US-ALM-Risk-Manager_R-0000040439/apply",
+        "country": "United States of America",
+        "jobId": "R-0000040439",
+        "title": "US ALM Risk Manager",
+        "postedDate": "2022-12-05T00:00:00.000+0000",
+        "category": "Audit | Compliance | Legal | Risk"
+      },
+      {
+        "subCategory": "Sales and Advisory",
+        "ml_skills": [
+          "mergers and acquisitions",
+          "private company transactions",
+          "canadian accounting",
+          "valuation analysis",
+          "legal compliance",
+          "tax planning",
+          "client relationship management",
+          "pitch development",
+          "stakeholder management",
+          "mentoring",
+          "networking",
+          "presentation skills",
+          "private equity advisory",
+          "wealth management advisory",
+          "capital markets advisory"
+        ],
+        "type": "Full time",
+        "descriptionTeaser": "Join our team as Senior Director, Mid-Market Mergers & Acquisitions and lead high-impact transactions across Manitoba and Saskatchewan. Drive growth through strategic origination, negotiation, and stakeholder management. Mentor junior staff and shape RBC\u2019s M&A presence in a dynamic, collaborative environment. Make a lasting impact with your expertise in commercial banking and M&A.",
+        "state": "Manitoba",
+        "multi_category": [
+          "Customer Service | Client Advice | Sales"
+        ],
+        "reqId": "R-0000170325",
+        "city": "WINNIPEG",
+        "multi_location": [
+          "WINNIPEG, Manitoba, Canada"
+        ],
+        "applyUrl": "https://rbc.wd3.myworkdayjobs.com/RBCGLOBAL1/job/WINNIPEG-Manitoba-Canada/Senior-Director--Mid-Market-Mergers---Acquisitions_R-0000170325-1/apply",
+        "country": "Canada",
+        "jobId": "R-0000170325",
+        "title": "Senior Director, Mid-Market Mergers & Acquisitions",
+        "postedDate": "2026-04-29T00:00:00.000+0000",
+        "category": "Customer Service | Client Advice | Sales"
+      }
+    ]
+  }
+}
