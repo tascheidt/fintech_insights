@@ -45,3 +45,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# Smoke-script debug artifacts (transient; rebuilt on each smoke run).
+# Baseline JSON files committed under scripts/artifacts/baseline-*.json
+# are kept; the transient *-page.html and *-smoke.json outputs aren't.
+scripts/artifacts/*-smoke.json
+scripts/artifacts/*-page.html

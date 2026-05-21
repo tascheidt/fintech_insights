@@ -6,6 +6,7 @@ import { fetchWorkableJobs } from "./workable";
 import { fetchAshbyJobs } from "./ashby";
 import { fetchDayforceJobs } from "./dayforce";
 import { fetchScotiabankJobs } from "./scotiabank";
+import { fetchPhenomRbcJobs } from "./phenom-rbc";
 
 export type { JobData } from "./types";
 export { jobToRow } from "./types";
@@ -38,7 +39,23 @@ export async function fetchJobs(
       return fetchDayforceJobs(atsIdentifier, browser);
     case "scotiabank":
       return fetchScotiabankJobs(atsIdentifier);
-    
+
+    case "phenom": {
+      // Phenom CareerConnect is white-labelled to each bank's own domain
+      // (jobs.rbc.com, jobs.bmo.com, etc.). Dispatch by tenant since the
+      // listing-page URL and per-tenant quirks differ. The pure-logic
+      // pieces (eagerLoadRefineSearch parsing, JSON-LD enrichment) are
+      // exported from phenom-rbc.ts and can be reused by future
+      // phenom-bmo.ts etc. — extract a shared helper once 2+ tenants ship.
+      const tenant = atsIdentifier.toLowerCase();
+      if (tenant === "rbc") {
+        return fetchPhenomRbcJobs(atsIdentifier, browser);
+      }
+      throw new Error(
+        `No Phenom scraper for tenant '${atsIdentifier}'. Add a tenant-specific scraper modeled on phenom-rbc.ts.`
+      );
+    }
+
     case "successfactors": {
       if (!careersUrl) {
         throw new Error(`${atsType} requires a careers URL for browser-based scraping`);
@@ -46,17 +63,12 @@ export async function fetchJobs(
       const { scrapeSuccessFactors } = await import("./browser");
       return scrapeSuccessFactors(careersUrl, browser);
     }
-    
-    // Browser-based scraping for platforms without APIs.
-    //
-    // `phenom` covers Phenom CareerConnect — used by RBC (jobs.rbc.com),
-    // BMO (jobs.bmo.com), and others. The page is client-rendered with
-    // generic `a[href*="/job/"]` markup that the existing generic scraper
-    // catches; tenant-specific scrapers (e.g. phenom-rbc.ts) can land
-    // ahead of this fallback in Phase 1.5 if listing extraction needs
-    // tightening.
+
+    // Browser-based scraping for platforms without APIs / without a
+    // tenant-specific scraper. Falls back to the generic Puppeteer
+    // extractor — works on enough sites to be useful but trades reliability
+    // for breadth.
     case "workday":
-    case "phenom":
     case "smartrecruiters":
     case "bamboohr":
     case "jazzhr":
@@ -106,6 +118,7 @@ export function isBrowserScraper(atsType: string): boolean {
     'smartrecruiters',
     'dayforce',
     'successfactors',
+    'phenom',
     'taleo',
     'icims',
   ];
