@@ -391,6 +391,57 @@ export async function triggerAnalysisJobIfNeeded(
 }
 
 /**
+ * Create and RUN an analysis job for a specific set of newly-ingested job
+ * IDs at one company, awaiting it to completion.
+ *
+ * This is the offload-path counterpart to `triggerAnalysisJobIfNeeded`.
+ * That function is invoked by the Vercel collect route the instant
+ * `executeCollectionJob` returns — which is too early for browser-scraper
+ * companies (RBC etc.), whose scrape + ingest is still running on GitHub
+ * Actions at that point. The GH Actions entrypoint (`scrape-heavy.ts`)
+ * calls THIS right after `runIngestStage`, so the analysis stage — and
+ * the incumbent cost gate inside `runAnalyzeStage` — actually executes
+ * for offloaded companies instead of being silently skipped.
+ *
+ * Scoped to a single company on purpose: re-running the collection run's
+ * `triggerAnalysisJobIfNeeded` would re-analyze sibling fintech tasks
+ * whose `pending_analysis_job_ids` are never cleared, double-billing Pro
+ * calls and duplicating `strategic_insights`.
+ *
+ * Unlike `triggerAnalysisJobIfNeeded` (fire-and-forget, suited to the
+ * serverless route), this AWAITS `executeAnalysisJob` — a GH Actions
+ * process must not exit before analysis finishes.
+ *
+ * @returns the analysis job run id, or null if there was nothing to analyze.
+ */
+export async function triggerAnalysisForJobs(
+  companyId: string,
+  jobIds: string[],
+  parentJobRunId?: string
+): Promise<string | null> {
+  if (jobIds.length === 0) return null;
+  const supabase = createAdminClient();
+
+  const analysisJobRunId = await createJobRun({
+    jobType: 'analyze',
+    triggerType: 'cron',
+    companyIds: [companyId],
+    parentJobRunId,
+  });
+
+  // createJobRun has already inserted the single task for this company;
+  // populate the job IDs it should analyze.
+  await supabase
+    .from('job_run_tasks')
+    .update({ pending_analysis_job_ids: jobIds })
+    .eq('job_run_id', analysisJobRunId)
+    .eq('company_id', companyId);
+
+  await executeAnalysisJob(analysisJobRunId);
+  return analysisJobRunId;
+}
+
+/**
  * Refresh news cache for companies that had new jobs in the collection run.
  * This pre-computes the expensive Gemini + web search calls so they're ready
  * for weekly digest generation.

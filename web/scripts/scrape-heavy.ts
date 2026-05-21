@@ -19,6 +19,7 @@ import type { Browser } from "puppeteer-core";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchJobs } from "@/lib/scrapers";
 import { runIngestStage } from "@/lib/jobs/processor";
+import { triggerAnalysisForJobs } from "@/lib/jobs/runner";
 import type { Company } from "@/lib/jobs/types";
 
 async function main() {
@@ -257,6 +258,39 @@ async function main() {
       .eq("id", jobRun.id);
 
     console.log("✅ Scraping completed successfully!");
+
+    // Step 9: Analysis. The Vercel collect route fires analysis the moment
+    // executeCollectionJob returns — far too early for an offloaded scraper
+    // whose scrape + ingest only just finished here. Without this call the
+    // analysis stage (and the incumbent cost gate inside runAnalyzeStage)
+    // never runs for browser-scraped companies. Scoped to this company's
+    // newly-ingested jobs so sibling fintech tasks aren't re-analyzed.
+    if (ingestResult.newJobIds.length > 0) {
+      console.log(
+        `🧠 Triggering analysis for ${ingestResult.newJobIds.length} new job(s)...`
+      );
+      try {
+        const analysisRunId = await triggerAnalysisForJobs(
+          companyId,
+          ingestResult.newJobIds,
+          jobRun.id
+        );
+        console.log(`✅ Analysis stage complete (run ${analysisRunId})`);
+      } catch (analysisError) {
+        // Collection data is already saved and the task is marked
+        // completed — an analysis failure is recoverable (re-runnable), so
+        // log loudly but don't fail the whole script.
+        console.error(
+          `⚠️  Analysis stage failed (collection data is safe): ${
+            analysisError instanceof Error
+              ? analysisError.message
+              : String(analysisError)
+          }`
+        );
+      }
+    } else {
+      console.log("ℹ️  No new jobs — skipping analysis stage.");
+    }
   } catch (error) {
     console.error(`❌ Error during scraping: ${error instanceof Error ? error.message : String(error)}`);
     
