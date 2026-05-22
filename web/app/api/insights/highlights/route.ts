@@ -91,9 +91,10 @@ export async function GET(req: NextRequest) {
         significance_score,
         confidence,
         executive_summary,
-        companies!inner(id, name, slug, is_active)
+        companies!inner(id, name, slug, is_active, tier)
       `)
       .eq("companies.is_active", true)
+      .eq("companies.tier", "fintech")
       .gte("generated_at", cutoffDate.toISOString())
       .order("significance_score", { ascending: false, nullsFirst: false })
       .order("generated_at", { ascending: false })
@@ -127,11 +128,13 @@ export async function GET(req: NextRequest) {
       };
     });
     
-    // Get tracked company count
+    // Get tracked company count (fintech-only — incumbents aren't "tracked
+    // companies" in the dashboard's sense).
     const { count: trackedCompanyCount } = await supabase
       .from("companies")
       .select("*", { count: "exact", head: true })
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("tier", "fintech");
     
     return NextResponse.json({
       highlights,
