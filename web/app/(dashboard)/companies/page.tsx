@@ -33,7 +33,7 @@ import { CompaniesIndexRow, type CompanyRow } from "@/components/companies/Compa
 import { CompaniesLens, type LensKey } from "@/components/companies/CompaniesLens";
 import { CompaniesViewToggle, type ViewKey } from "@/components/companies/CompaniesViewToggle";
 
-const LENS_KEYS: LensKey[] = ["all", "new", "accel", "quiet", "cont"];
+const LENS_KEYS: LensKey[] = ["all", "new", "accel", "quiet", "cont", "incumbent"];
 const VIEW_KEYS: ViewKey[] = ["signal", "alpha"];
 const STATUS_PRIORITY: Record<PivotKind, number> = {
   new: 0,
@@ -74,20 +74,30 @@ export default async function CompaniesPage({
     .single();
   const canEdit = ["editor", "admin"].includes(profile?.role ?? "");
 
-  // Fintech-only. Incumbent (big-bank) companies are surfaced through a
-  // dedicated "Incumbents" lens (Phase 2), never mixed into the default
-  // companies list — they'd otherwise carry meaningless fintech pivot
-  // classifications and ~1,500-job counts.
+  const isIncumbentLens = lens === "incumbent";
+
+  // The Incumbents tab badge always reflects the live count of tracked
+  // incumbent banks, regardless of which lens is active.
+  const { count: incumbentCount } = await supabase
+    .from("companies")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", true)
+    .eq("tier", "incumbent");
+
+  // Fintech-only by default. Incumbent (big-bank) companies are surfaced
+  // through a dedicated "Incumbents" lens (Phase 2), never mixed into the
+  // default companies list — they'd otherwise carry meaningless fintech
+  // pivot classifications and ~1,500-job counts.
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name, slug, country, thesis, last_change, last_change_at, last_collected_at")
     .eq("is_active", true)
-    .eq("tier", "fintech")
+    .eq("tier", isIncumbentLens ? "incumbent" : "fintech")
     .order("name");
 
   const list = companies ?? [];
 
-  if (list.length === 0) {
+  if (list.length === 0 && !isIncumbentLens) {
     return (
       <div className="space-y-6">
         <CompaniesHeader count={0} canEdit={canEdit} />
@@ -114,8 +124,30 @@ export default async function CompaniesPage({
   }
 
   // Per-company editorial signals (small N — ≤30 companies per CLAUDE.md).
+  //
+  // Incumbent rows deliberately skip `classifyCompanyPivot` (and the
+  // sparkline/delta queries): banks are tracked for senior-role signal, not
+  // scored for fintech pivots, so the classification would be meaningless
+  // noise and the queries pure waste (spec §Surface 4).
   const rows: CompanyRow[] = await Promise.all(
-    list.map(async (c) => {
+    list.map(async (c): Promise<CompanyRow> => {
+      if (isIncumbentLens) {
+        return {
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          hq: (c.country ?? "—") as string,
+          thesis: (c.thesis as string | null) ?? null,
+          jobs: jobsByCompany.get(c.id) ?? 0,
+          spark: [],
+          delta: 0,
+          signals: [],
+          lastChange: null,
+          status: "cont",
+          tier: "incumbent",
+        };
+      }
+
       const [spark, delta, pivot, dbLastChange] = await Promise.all([
         getCompanyHiringSparkline(c.id, 8),
         getCompanyHiringDelta(c.id, 30),
@@ -146,20 +178,32 @@ export default async function CompaniesPage({
         signals: pivot.signals,
         lastChange,
         status: pivot.kind,
+        tier: "fintech",
       };
     })
   );
 
+  // Lens-tab counts. The `incumbent` badge is always the live bank count.
+  // The fintech pivot sub-counts require pivot classification, which only
+  // runs when a fintech lens is active — on the Incumbents lens we have no
+  // fintech rows loaded, so those sub-counts show 0 until the user switches
+  // back to a fintech lens (each lens switch is a full server re-render).
   const counts: Record<LensKey, number> = {
-    all: rows.length,
+    all: isIncumbentLens ? 0 : rows.length,
     new: 0,
     accel: 0,
     quiet: 0,
     cont: 0,
+    incumbent: incumbentCount ?? 0,
   };
-  for (const r of rows) counts[r.status] += 1;
+  if (!isIncumbentLens) {
+    for (const r of rows) counts[r.status] += 1;
+  }
 
-  const filtered = lens === "all" ? rows : rows.filter((r) => r.status === lens);
+  const filtered =
+    lens === "all" || isIncumbentLens
+      ? rows
+      : rows.filter((r) => r.status === lens);
   const sorted =
     view === "signal"
       ? [...filtered].sort(
@@ -199,6 +243,15 @@ export default async function CompaniesPage({
         </div>
       </div>
 
+      {/* Incumbents lens caption — defines the "Reference" marker once, at
+          the section level, so no per-row tooltip is needed (spec §Surface 4). */}
+      {isIncumbentLens && (
+        <p className="text-[12.5px] text-muted-foreground">
+          Big-6 banks · tracked for senior-role signal · excluded from all
+          volume aggregates
+        </p>
+      )}
+
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         {/* Header row — only renders at lg+, matching the row grid. Below
@@ -211,13 +264,17 @@ export default async function CompaniesPage({
           <div />
           <div>Company · thesis</div>
           <div />
-          <div>30d activity</div>
-          <div>Active signals · last change</div>
+          <div>{isIncumbentLens ? "Activity" : "30d activity"}</div>
+          <div>
+            {isIncumbentLens ? "Signal" : "Active signals · last change"}
+          </div>
         </div>
 
         {sorted.length === 0 ? (
           <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-            No companies in this lens this week.
+            {isIncumbentLens
+              ? "No incumbent banks tracked yet. Big-6 banks appear here as they come online."
+              : "No companies in this lens this week."}
           </div>
         ) : (
           sorted.map((row, i) => (
@@ -233,15 +290,19 @@ export default async function CompaniesPage({
         )}
       </div>
 
-      {/* Footer */}
+      {/* Footer — the strip-color legend is fintech pivot vocabulary, so it
+          is suppressed on the Incumbents lens (incumbents use a neutral
+          strip and a static "Reference" marker). */}
       <div className="flex flex-col gap-1.5 text-[11.5px] leading-[1.5] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>{syncedLabel}</span>
-        <span>
-          Strip ·{" "}
-          <span className="font-semibold text-highlight">coral = new</span> ·{" "}
-          <span className="font-semibold text-sun-700">yellow = accelerating</span> ·{" "}
-          <span className="font-semibold text-sand-500">grey = quiet</span>
-        </span>
+        {!isIncumbentLens && (
+          <span>
+            Strip ·{" "}
+            <span className="font-semibold text-highlight">coral = new</span> ·{" "}
+            <span className="font-semibold text-sun-700">yellow = accelerating</span> ·{" "}
+            <span className="font-semibold text-sand-500">grey = quiet</span>
+          </span>
+        )}
       </div>
     </div>
   );

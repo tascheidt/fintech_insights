@@ -3,7 +3,12 @@
     "version": "2.1.0",
     "date": "2026-05-21",
     "changes": [
-      { "type": "feature", "description": "Incumbent Watch — the weekly digest now closes its cross-company section with a clearly-bounded interlude on senior big-bank hiring. Each Big-6 bank gets one bullet (\"RBC · 3 senior AI/ML & Data roles\") with a one-line AI interpretation; the block is omitted entirely on weeks with no qualifying senior bank hire, and bank volume stays excluded from the digest totals." }
+      { "type": "feature", "description": "Incumbent intelligence — the Big-6 Canadian banks (starting with RBC) are now tracked as a curated signal lens. Their hiring never enters a dashboard metric, competitive-matrix row, or digest theme; instead it surfaces only in dedicated, clearly-labelled places so bank volume never overwhelms the fintech view." },
+      { "type": "feature", "description": "Incumbent Bets dashboard rail — a full-width module surfacing senior Big-6-bank hires (staff+ in AI/ML, Data and Risk-AI), grouped by bank, over the last 30 days. Reads structured fields only, carries an \"excluded from all dashboard metrics\" note, and is omitted entirely on weeks with no qualifying senior hire." },
+      { "type": "feature", "description": "Incumbent Watch — the weekly digest now closes its cross-company section with a clearly-bounded interlude on senior big-bank hiring. Each Big-6 bank gets one bullet (\"RBC · 3 senior AI/ML & Data roles\") with a one-line AI interpretation; the block is omitted on weeks with no qualifying senior bank hire, and bank volume stays excluded from the digest totals." },
+      { "type": "feature", "description": "Incumbents companies lens — a new tab on the Companies list shows the tracked Big-6 banks as a deliberate, separate view. Incumbent rows carry an \"Incumbent\" badge and a static \"Reference\" marker instead of the fintech pivot signals, and their job counts never mix into the fintech list's sort." },
+      { "type": "feature", "description": "Jobs list Tier filter — a Fintech / Incumbent / All control lets you opt into seeing big-bank postings; the list defaults to fintech-only and incumbent jobs carry an \"Incumbent\" badge." },
+      { "type": "improvement", "description": "Incumbent company pages — a bank's detail page now reads honestly: an \"Incumbent\" badge, a context note explaining why its counts don't appear on the dashboard, and a \"Senior hiring signal\" panel pairing total open postings with the senior-role signal count." }
     ]
   },
   {

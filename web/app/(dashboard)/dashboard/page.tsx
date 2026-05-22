@@ -8,6 +8,7 @@
  * - ROW 3: Net Hiring Flow chart (full width)
  * - ROW 4: Competitive Matrix (2/3) + Function Mix donut (1/3)
  * - ROW 5: Hot Roles Feed (1/2) + Strategy Signals (1/2)
+ * - ROW 6: Incumbent Bets rail (full width; omitted entirely when empty)
  */
 
 import { Suspense } from "react";
@@ -20,6 +21,7 @@ import { FunctionBreakdownContainer } from "@/components/dashboard/charts/Functi
 import { CompetitiveMatrix } from "@/components/dashboard/CompaniesOverview";
 import { StrategySignals } from "@/components/dashboard/StrategicHighlights";
 import { HotRolesFeed } from "@/components/dashboard/HotRolesFeed";
+import { IncumbentBetsRail } from "@/components/dashboard/IncumbentBetsRail";
 import {
   getCompanyBackfillCutoffs,
   getPostingTrends,
@@ -29,6 +31,7 @@ import {
   getLatestDigest,
   getHotRoles,
   getNetThisWeek,
+  getIncumbentBets,
 } from "@/lib/dashboard-queries";
 
 const RANGE_TO_DAYS: Record<string, number> = {
@@ -73,6 +76,7 @@ export default async function DashboardPage({
     competitiveMatrix,
     latestDigest,
     hotRoles,
+    incumbentBets,
     { data: companiesRaw },
   ] = await Promise.all([
     // Active jobs count (current snapshot, no backfill filter needed).
@@ -100,6 +104,9 @@ export default async function DashboardPage({
     getLatestDigest(),
     // Hot roles feed
     getHotRoles(cutoffs),
+    // Incumbent Bets rail (ROW 6) — senior big-bank hires, last 30 days.
+    // Incumbent-only by construction; never touches a fintech aggregate.
+    getIncumbentBets(),
     // Companies for filter dropdown (fintech-only — the dashboard is the
     // fintech surface; incumbents are excluded from the count + dropdown).
     supabase
@@ -176,6 +183,13 @@ export default async function DashboardPage({
         <HotRolesFeed roles={hotRoles} />
         <StrategySignals digest={latestDigest} />
       </div>
+
+      {/* ROW 6: Incumbent Bets rail — full width, last position. Omitted
+          entirely when there is no qualifying senior bank hire (empty =
+          absent, per the design spec). */}
+      {incumbentBets.length > 0 && (
+        <IncumbentBetsRail companies={incumbentBets} />
+      )}
     </div>
   );
 }

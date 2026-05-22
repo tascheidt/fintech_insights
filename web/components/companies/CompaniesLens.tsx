@@ -18,18 +18,22 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Landmark,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type LensKey = "all" | "new" | "accel" | "quiet" | "cont";
+export type LensKey = "all" | "new" | "accel" | "quiet" | "cont" | "incumbent";
 
+// `incumbent` is placed last, after `cont`. It uses the same segmented-control
+// styling as every other tab — no special color (Phase 2 spec §Surface 4).
 const TABS: Array<{ key: LensKey; label: string; Icon: LucideIcon }> = [
   { key: "all", label: "All", Icon: List },
   { key: "new", label: "Pivoting now", Icon: Sparkle },
   { key: "accel", label: "Accelerating", Icon: TrendingUp },
   { key: "quiet", label: "Going quiet", Icon: TrendingDown },
   { key: "cont", label: "Continuity", Icon: Minus },
+  { key: "incumbent", label: "Incumbents", Icon: Landmark },
 ];
 
 export interface CompaniesLensProps {

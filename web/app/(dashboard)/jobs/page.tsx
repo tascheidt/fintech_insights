@@ -12,6 +12,8 @@
  *   - theme       (role theme id; filters via classifyJob)
  *   - inDigest    (weekly_digests UUID — scopes to that digest's job_ids)
  *   - from, to    (ISO date strings; bound first_seen_date)
+ *   - tier        (fintech | incumbent | all — scopes which company tiers
+ *                  the list shows; default/absent = fintech-only)
  *
  * Note: the company-scoped Jobs tab inside companies/[slug] still uses
  * `JobHistoryView` — do NOT remove that component.
@@ -24,6 +26,7 @@ import {
   getFunctionHeatData,
   getCrossCompanyThemes,
   type JobsListRow,
+  type CompanyTier,
 } from "@/lib/dashboard-queries";
 import { CATEGORY_GROUPS } from "@/lib/analysis/function-categories";
 import { JobsPageClient } from "@/components/jobs/JobsPageClient";
@@ -43,7 +46,28 @@ type JobsPageSearchParams = {
   company?: string;
   function?: string;
   recency?: string;
+  tier?: string;
 };
+
+/**
+ * Resolve the `?tier=` param to the company tiers the Jobs list should show.
+ * Default / absent / unrecognized → fintech-only (the Jobs page is a fintech
+ * surface by default). `incumbent` → banks only; `all` → both tiers.
+ */
+function parseTierParam(value: string | undefined): readonly CompanyTier[] {
+  if (value === "incumbent") return ["incumbent"];
+  if (value === "all") return ["fintech", "incumbent"];
+  return ["fintech"];
+}
+
+/** Normalize the `?tier=` param for the JobsHeader filter control. */
+function parseTierFilter(
+  value: string | undefined
+): "fintech" | "incumbent" | "all" {
+  if (value === "incumbent") return "incumbent";
+  if (value === "all") return "all";
+  return "fintech";
+}
 
 type DigestCompanyRow = {
   company_id: string;
@@ -88,6 +112,8 @@ export default async function JobsPage({
   const inDigestParam = params.inDigest?.trim() || null;
   const fromParam = parseIsoDateParam(params.from);
   const toParam = parseIsoDateParam(params.to);
+  const tiers = parseTierParam(params.tier);
+  const tierFilter = parseTierFilter(params.tier);
 
   // Resolve digest snapshot scope — when inDigest is set, the relevant
   // job IDs are pulled from weekly_digest_companies.job_ids and act as
@@ -124,8 +150,11 @@ export default async function JobsPage({
     digestJobIds = Array.from(ids);
   }
 
+  // The jobs list honors the `?tier=` toggle. The right rail (function heat /
+  // cross-company themes) deliberately stays fintech-only regardless of the
+  // toggle — those are fintech-pivot surfaces, not tier-scoped.
   const [rows, heat, themes] = await Promise.all([
-    getJobsListData({ jobIds: digestJobIds }),
+    getJobsListData({ jobIds: digestJobIds, tiers }),
     getFunctionHeatData(30),
     getCrossCompanyThemes(),
   ]);
@@ -213,6 +242,7 @@ export default async function JobsPage({
       activeCount={activeCount}
       newCount={newCount}
       companyCount={companyCount ?? companies.length}
+      tierFilter={tierFilter}
     />
   );
 }

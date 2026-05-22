@@ -21,6 +21,7 @@ import {
   FunctionDot,
   SignalTag,
 } from "@/components/design";
+import { TierBadge } from "@/components/ui/TierBadge";
 import type { JobsListRow } from "@/lib/dashboard-queries";
 import { useJobSelection } from "@/components/jobs/JobSelectionContext";
 
@@ -301,6 +302,7 @@ export function JobsListTable({ rows }: JobsListTableProps) {
                 <span className="inline-flex items-center gap-1">
                   <MonogramAvatar size="sm" name={row.companyName} />
                   <span className="font-medium text-sand-700">{row.companyName}</span>
+                  <TierBadge tier={row.companyTier} size="sm" />
                 </span>
                 {row.functionGroup && (
                   <>
@@ -352,6 +354,7 @@ export function JobsListTable({ rows }: JobsListTableProps) {
               >
                 {row.companyName}
               </span>
+              <TierBadge tier={row.companyTier} size="sm" />
             </div>
 
             {/* Function cell */}

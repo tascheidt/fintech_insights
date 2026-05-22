@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TierBadge } from "@/components/ui/TierBadge";
 
 type JobRecord = {
   id: string;
@@ -26,7 +27,12 @@ type JobRecord = {
   first_seen_date?: string | null;
 };
 
-type CompanyRef = { id: string; name: string; slug: string };
+type CompanyRef = {
+  id: string;
+  name: string;
+  slug: string;
+  tier?: string | null;
+};
 
 type StrategicInsight = {
   id: string;
@@ -48,7 +54,7 @@ export default async function JobDetailPage({
 
   const { data: job, error } = await supabase
     .from("job_postings")
-    .select("*, companies(id, name, slug), standardized_department")
+    .select("*, companies(id, name, slug, tier), standardized_department")
     .eq("id", id)
     .single();
 
@@ -92,9 +98,12 @@ export default async function JobDetailPage({
         {/* Posting body */}
         <article className="min-w-0 space-y-6">
           <header className="space-y-3 border-b border-border pb-6">
-            <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-primary">
-              {company?.name ?? "Unknown company"}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-primary">
+                {company?.name ?? "Unknown company"}
+              </p>
+              <TierBadge tier={company?.tier} size="md" />
+            </div>
             <h1 className="font-display font-semibold text-[32px] tracking-[-0.018em] leading-[1.12] text-foreground">
               {j.title}
             </h1>
