@@ -23,6 +23,8 @@ import {
   DEFAULT_TIERS,
   type CompanyTier,
 } from "@/lib/dashboard-queries";
+import { isIncumbentSignalJob } from "@/lib/analysis/incumbent-signal";
+import { ROLE_CATEGORIES } from "@/lib/analysis/function-categories";
 
 export type { RoleThemeSummary } from "@/lib/analysis/role-themes";
 export { aggregateRoleThemes } from "@/lib/analysis/role-themes";
@@ -134,6 +136,35 @@ export interface GlobalSummary extends DigestCommentary {
   key_insight: string;
 }
 
+/**
+ * One bank's worth of "Incumbent Watch" digest data.
+ *
+ * `head` is the structured, always-present head bullet ("RBC · 3 senior
+ * AI/ML & Data roles"). `interpretation` is the one-line AI prose; it is
+ * `null` whenever the Flash call failed — the structured fallback ships the
+ * head alone rather than dropping the block (see Surface 3 spec).
+ */
+export interface IncumbentWatchBank {
+  company_id: string;
+  company_name: string;
+  company_slug: string;
+  /** Count of senior signal roles (sum of collapsed role counts). */
+  signal_role_count: number;
+  /** Structured head bullet, e.g. "RBC · 3 senior AI/ML & Data roles". */
+  head: string;
+  /** One-line AI interpretation, or null when the Flash call failed. */
+  interpretation: string | null;
+}
+
+/**
+ * The "Incumbent Watch" weekly-digest block — a curated, clearly-bounded
+ * interlude on senior big-bank hiring. Omitted entirely (null) when no
+ * incumbent bank had a qualifying senior hire in the digest week.
+ */
+export interface IncumbentWatch {
+  banks: IncumbentWatchBank[];
+}
+
 export interface WeeklyDigest {
   week_start: string;
   week_end: string;
@@ -145,6 +176,8 @@ export interface WeeklyDigest {
   industry_trends: IndustryTrend[];
   strategy_signals: StrategySignal[];
   notable_movements: NotableMovement[];
+  /** Senior big-bank hiring interlude. null = no qualifying hires this week. */
+  incumbent_watch: IncumbentWatch | null;
 }
 
 export interface CompanyJobData {
@@ -614,6 +647,302 @@ function buildStrategySignals(companies: CompanyWeeklySummary[]): StrategySignal
     }));
 }
 
+// ============================================================================
+// Incumbent Watch — senior big-bank hiring interlude (Phase 2, Surface 3)
+// ============================================================================
+
+/** One gated incumbent signal job pulled for the Incumbent Watch block. */
+interface IncumbentSignalJobRow {
+  company_id: string;
+  company_name: string;
+  company_slug: string;
+  title: string;
+  seniority_level: string | null;
+  function_category: string | null;
+}
+
+/** Per-bank accumulation while shaping the Incumbent Watch block. */
+interface IncumbentBankAccum {
+  company_id: string;
+  company_name: string;
+  company_slug: string;
+  jobs: IncumbentSignalJobRow[];
+}
+
+/**
+ * Build the short function descriptor for a bank's head bullet. The signal
+ * whitelist spans AI/ML, Data & Analytics, and Risk-AI; we collapse the
+ * present categories' high-level groups into a compact phrase like
+ * "AI/ML & Data" or "AI/ML, Data & Risk-AI".
+ */
+function describeIncumbentFunctions(jobs: IncumbentSignalJobRow[]): string {
+  const groups = new Set<string>();
+  for (const job of jobs) {
+    const cat = job.function_category;
+    if (!cat || !(ROLE_CATEGORIES as readonly string[]).includes(cat)) continue;
+    if (cat === "engineering-ai-ml") {
+      groups.add("AI/ML");
+    } else if (
+      cat === "data-science" ||
+      cat === "data-analytics-bi" ||
+      cat === "analytics-engineering"
+    ) {
+      groups.add("Data");
+    } else {
+      // risk-management / compliance / aml-financial-crime
+      groups.add("Risk-AI");
+    }
+  }
+  // Stable, readable order.
+  const order = ["AI/ML", "Data", "Risk-AI"];
+  const present = order.filter((g) => groups.has(g));
+  if (present.length === 0) return "senior";
+  if (present.length === 1) return present[0];
+  if (present.length === 2) return `${present[0]} & ${present[1]}`;
+  return `${present[0]}, ${present[1]} & ${present[2]}`;
+}
+
+/** The always-present structured head bullet for a bank, e.g.
+ *  "RBC · 3 senior AI/ML & Data roles". */
+function buildIncumbentHead(
+  companyName: string,
+  signalRoleCount: number,
+  jobs: IncumbentSignalJobRow[]
+): string {
+  const functions = describeIncumbentFunctions(jobs);
+  const roleWord = signalRoleCount === 1 ? "role" : "roles";
+  return `${companyName} · ${signalRoleCount} senior ${functions} ${roleWord}`;
+}
+
+/**
+ * Fetch the gated incumbent slice for the digest week: `tier='incumbent'`
+ * jobs first-seen in [weekStart, weekEnd], filtered by `isIncumbentSignalJob`
+ * (staff+ in AI/ML / Data / Risk-AI). Grouped by bank, banks with no
+ * qualifying role omitted.
+ */
+async function getIncumbentWatchJobs(
+  weekStart: Date,
+  weekEnd: Date
+): Promise<IncumbentBankAccum[]> {
+  const supabase = createAdminClient();
+
+  const { data: jobs, error } = await supabase
+    .from("job_postings")
+    .select(
+      `id, title, seniority_level, function_category, company_id,
+       companies!inner ( id, name, slug, is_active, tier )`
+    )
+    .eq("companies.is_active", true)
+    .eq("companies.tier", "incumbent")
+    .gte("first_seen_date", weekStart.toISOString())
+    .lte("first_seen_date", weekEnd.toISOString());
+
+  if (error) {
+    console.error("[digest] Failed to fetch incumbent watch jobs:", error);
+    return [];
+  }
+
+  const byCompany = new Map<string, IncumbentBankAccum>();
+  for (const row of jobs ?? []) {
+    if (
+      !isIncumbentSignalJob({
+        seniority_level: row.seniority_level,
+        function_category: row.function_category,
+      })
+    ) {
+      continue;
+    }
+    const company = Array.isArray(row.companies)
+      ? row.companies[0]
+      : row.companies;
+    if (!company) continue;
+    // Defensive: the query filters tier='incumbent', but the block is a
+    // strict incumbent lens — never group a non-incumbent row even if one
+    // were ever returned.
+    if ((company as { tier?: string }).tier !== "incumbent") continue;
+
+    let accum = byCompany.get(row.company_id);
+    if (!accum) {
+      accum = {
+        company_id: row.company_id,
+        company_name: (company as { name: string }).name,
+        company_slug: (company as { slug: string }).slug,
+        jobs: [],
+      };
+      byCompany.set(row.company_id, accum);
+    }
+    accum.jobs.push({
+      company_id: row.company_id,
+      company_name: (company as { name: string }).name,
+      company_slug: (company as { slug: string }).slug,
+      title: row.title ?? "",
+      seniority_level: row.seniority_level,
+      function_category: row.function_category,
+    });
+  }
+
+  // Banks sorted by signal volume — the bank investing most is read first.
+  return Array.from(byCompany.values()).sort(
+    (a, b) => b.jobs.length - a.jobs.length
+  );
+}
+
+interface IncumbentWatchInterpretation {
+  company_name: string;
+  interpretation: string;
+}
+
+/**
+ * One ungrounded Flash call writes a short interpretation line per bank for
+ * the Incumbent Watch block. User-facing prose → the digest voice directive
+ * applies. On any failure the caller falls back to the structured heads.
+ */
+async function generateIncumbentWatchInterpretations(
+  banks: IncumbentBankAccum[],
+  config: WeeklyDigestAiConfig
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  if (banks.length === 0) return result;
+
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    console.warn(
+      "[digest] GEMINI_API_KEY not set — Incumbent Watch falls back to structured heads"
+    );
+    return result;
+  }
+
+  const bankSummaries = banks
+    .map((bank) => {
+      const titles = bank.jobs
+        .map((j) => j.title)
+        .filter(Boolean)
+        .slice(0, 8)
+        .join("; ");
+      return `- ${bank.company_name} (${bank.jobs.length} senior signal roles): ${titles || "no titles"}`;
+    })
+    .join("\n");
+
+  const taskPrompt = `You are writing the "Incumbent Watch" interlude in a weekly fintech hiring brief.
+
+These are senior (staff+ / principal / lead / executive) roles that big incumbent banks posted this week, in AI/ML, Data, and Risk-AI functions only. This is a small, curated signal — not bank hiring volume.
+
+Banks and their senior roles this week:
+${bankSummaries}
+
+For EACH bank, write exactly one short interpretation sentence (≤ 28 words) describing what the senior roles suggest the bank is staffing for — capability depth, governance, platform build, etc. Be concrete and grounded in the role titles. Do not mention total hiring volume. Do not invent roles not listed.
+
+Respond with ONLY valid JSON, an array with one object per bank:
+[{ "company_name": "RBC", "interpretation": "..." }]`;
+
+  const prompt = `${getVoiceDirective("digest")}\n\n${taskPrompt}`;
+
+  try {
+    const genAI = new GoogleGenerativeAI(key);
+    const model = genAI.getGenerativeModel({
+      model: config.model,
+      generationConfig: {
+        temperature: config.temperature,
+        maxOutputTokens: config.maxOutputTokens,
+      },
+    });
+
+    const _startMs = Date.now();
+    const response = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+
+    writeUsageEvent(
+      recordUsage({
+        callSite: "buildIncumbentWatch",
+        modelRequested: config.model,
+        groundingEnabled: false,
+        usageMetadata: response.response.usageMetadata,
+        latencyMs: Date.now() - _startMs,
+        status: "ok",
+        extra: { bankCount: banks.length },
+      })
+    );
+
+    const text = response.response.text()?.trim();
+    if (!text) return result;
+
+    const parsed = JSON.parse(cleanJsonText(text)) as
+      | IncumbentWatchInterpretation[]
+      | unknown;
+    if (!Array.isArray(parsed)) return result;
+
+    const byName = new Map(
+      banks.map((b) => [b.company_name.toLowerCase(), b.company_id])
+    );
+    for (const entry of parsed) {
+      if (!entry || typeof entry !== "object") continue;
+      const e = entry as Record<string, unknown>;
+      const name = typeof e.company_name === "string" ? e.company_name : "";
+      const interpretation =
+        typeof e.interpretation === "string"
+          ? e.interpretation.replace(/\s+/g, " ").trim()
+          : "";
+      if (!name || !interpretation) continue;
+      const companyId = byName.get(name.toLowerCase());
+      if (companyId) {
+        const voice = checkVoice({ headline: name, body: interpretation });
+        if (!voice.passed) {
+          console.warn(
+            `[voice] incumbent watch interpretation for ${name}:`,
+            voice.warnings.join("; ")
+          );
+        }
+        result.set(companyId, interpretation);
+      }
+    }
+  } catch (error) {
+    // Structured fallback — never let an AI failure drop the block.
+    console.warn(
+      "[digest] Incumbent Watch AI call failed; using structured fallback:",
+      error
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Build the "Incumbent Watch" digest block for the given week. Returns null
+ * when no incumbent bank had a qualifying senior hire — the block (and its
+ * surrounding dividers) is then omitted entirely. When structured data
+ * exists but the Flash call fails, the block still ships with per-bank head
+ * bullets and `interpretation: null`.
+ */
+export async function buildIncumbentWatch(
+  weekStart: Date,
+  weekEnd: Date,
+  config?: WeeklyDigestAiConfig
+): Promise<IncumbentWatch | null> {
+  const banks = await getIncumbentWatchJobs(weekStart, weekEnd);
+  if (banks.length === 0) return null;
+
+  const activeConfig = config ?? (await getActiveWeeklyDigestAiConfig());
+  const interpretations = await generateIncumbentWatchInterpretations(
+    banks,
+    activeConfig
+  );
+
+  const watchBanks: IncumbentWatchBank[] = banks.map((bank) => {
+    const signalRoleCount = bank.jobs.length;
+    return {
+      company_id: bank.company_id,
+      company_name: bank.company_name,
+      company_slug: bank.company_slug,
+      signal_role_count: signalRoleCount,
+      head: buildIncumbentHead(bank.company_name, signalRoleCount, bank.jobs),
+      interpretation: interpretations.get(bank.company_id) ?? null,
+    };
+  });
+
+  return { banks: watchBanks };
+}
+
 export async function generateWeeklyReport(
   weeklyData: Map<string, CompanyJobData>,
   parallelRequests: number = 3
@@ -670,6 +999,15 @@ export async function generateWeeklyReport(
   const strategySignals = buildStrategySignals(companies);
   const globalSummary = buildGlobalSummary(companies, industryTrends, totalJobs);
 
+  // Incumbent Watch — gated big-bank senior-hiring interlude. A failure here
+  // must never break the fintech-spined digest, so it degrades to null.
+  let incumbentWatch: IncumbentWatch | null = null;
+  try {
+    incumbentWatch = await buildIncumbentWatch(weekStart, weekEnd, config);
+  } catch (error) {
+    console.error("[digest] Incumbent Watch build failed; omitting block:", error);
+  }
+
   return {
     week_start: weekStart.toISOString(),
     week_end: weekEnd.toISOString(),
@@ -681,6 +1019,7 @@ export async function generateWeeklyReport(
     industry_trends: industryTrends,
     strategy_signals: strategySignals,
     notable_movements: [],
+    incumbent_watch: incumbentWatch,
   };
 }
 

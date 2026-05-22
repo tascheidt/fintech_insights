@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.1.0",
+    "date": "2026-05-21",
+    "changes": [
+      { "type": "feature", "description": "Incumbent Watch — the weekly digest now closes its cross-company section with a clearly-bounded interlude on senior big-bank hiring. Each Big-6 bank gets one bullet (\"RBC · 3 senior AI/ML & Data roles\") with a one-line AI interpretation; the block is omitted entirely on weeks with no qualifying senior bank hire, and bank volume stays excluded from the digest totals." }
+    ]
+  },
+  {
     "version": "2.0.2",
     "date": "2026-05-18",
     "changes": [

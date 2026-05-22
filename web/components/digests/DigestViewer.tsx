@@ -3,10 +3,11 @@
 import type { WeeklyDigest } from "@/lib/analysis/digest";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { Building2, TrendingUp, Target, Briefcase, ExternalLink } from "lucide-react";
+import { Building2, TrendingUp, Target, Briefcase, ExternalLink, Landmark } from "lucide-react";
 import {
   buildCompanySectionViews,
   buildDigestTopLinks,
+  buildIncumbentWatchView,
   buildIndustryTrendRows,
   buildStrategySignalRows,
   getYearLabel,
@@ -32,6 +33,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
   const topLinks = buildDigestTopLinks(ctx);
   const trendRows = buildIndustryTrendRows(digest, ctx);
   const signalRows = buildStrategySignalRows(digest, ctx);
+  const incumbentWatch = buildIncumbentWatchView(digest, ctx);
   const companyViews = buildCompanySectionViews(digest, ctx);
 
   return (
@@ -254,6 +256,51 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Incumbent Watch — senior big-bank hiring interlude.
+          Omitted entirely when there is no qualifying hire this week. */}
+      {incumbentWatch && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+              <Landmark className="h-4 w-4 text-muted-foreground" />
+              Incumbent Watch
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              What the big banks hired for this week
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {incumbentWatch.rows.map((row) => (
+                <div key={row.bank.company_id} className="space-y-1">
+                  <div className="text-sm font-semibold text-foreground/90">
+                    {row.head}
+                  </div>
+                  {row.interpretation && (
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      {row.interpretation}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 space-y-1">
+              <p className="text-xs text-muted-foreground">
+                Bank hiring volume is excluded from the totals above.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                <Link
+                  href={incumbentWatch.dashboardHref}
+                  className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
+                >
+                  See Incumbent Bets on the dashboard →
+                </Link>
+              </p>
             </div>
           </CardContent>
         </Card>
