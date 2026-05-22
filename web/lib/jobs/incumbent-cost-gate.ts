@@ -7,64 +7,20 @@
  * jobs are operational hiring noise, not strategic signal.
  *
  * For `tier='incumbent'` jobs we keep Flash extraction (cheap, hash-gated)
- * and ONLY run the Pro analyzer when both the role's seniority AND function
- * indicate a high-signal hire — e.g. "RBC posted 2 staff AI researchers"
- * surfaces, but "RBC posted a junior teller" does not.
+ * and ONLY run the Pro analyzer for high-signal hires — staff+ seniority in
+ * an AI/ML / Data / Risk-AI function. That "high-signal" definition lives in
+ * `web/lib/analysis/incumbent-signal.ts` and is shared with the Incumbent
+ * Bets rail and the Incumbent Watch digest, so the gate and the surfaces
+ * never drift. This module adds the tier short-circuit and the granular,
+ * telemetry-friendly skip reasons on top of that shared definition.
  *
  * For `tier='fintech'` jobs the gate is a no-op: every fintech job analyzes.
- *
- * Configuration (whitelists) lives here so it can be unit-tested and tuned
- * without touching analyzer.ts. Mirrors the function-category enum in
- * `web/lib/analysis/function-categories.ts`.
  */
 
-import type { RoleCategory } from "@/lib/analysis/function-categories";
-
-export type Seniority =
-  | "intern"
-  | "junior"
-  | "mid"
-  | "senior"
-  | "staff"
-  | "principal"
-  | "lead"
-  | "executive";
-
-/**
- * Seniorities that qualify for Pro analysis at incumbent companies.
- *
- * The bar is intentionally high: staff+ at a big bank typically signals
- * strategic capability investment (a Staff ML Engineer hire is meaningful),
- * while senior and below are mostly headcount maintenance.
- */
-export const INCUMBENT_ANALYZE_SENIORITY_WHITELIST: readonly Seniority[] = [
-  "staff",
-  "principal",
-  "lead",
-  "executive",
-];
-
-/**
- * Function categories that qualify for Pro analysis at incumbent companies.
- *
- * Pulled from `function-categories.ts`. The narrow list captures the
- * categories where bank hiring directly informs fintech strategy:
- *   - AI/ML and data work tells us where banks are betting on automation
- *     and decisioning infrastructure.
- *   - Risk/compliance/AML hires signal regulatory posture and gating that
- *     fintechs need to navigate.
- *   - Embedded-finance / payments-product hires reveal where banks are
- *     trying to compete (or partner) in fintech distribution.
- */
-export const INCUMBENT_ANALYZE_FUNCTION_WHITELIST: readonly RoleCategory[] = [
-  "engineering-ai-ml",
-  "data-science",
-  "data-analytics-bi",
-  "analytics-engineering",
-  "risk-management",
-  "compliance",
-  "aml-financial-crime",
-];
+import {
+  INCUMBENT_SIGNAL_SENIORITY,
+  INCUMBENT_SIGNAL_FUNCTION_CATEGORIES,
+} from "@/lib/analysis/incumbent-signal";
 
 export interface IncumbentGateInput {
   tier: "fintech" | "incumbent" | null | undefined;
@@ -113,7 +69,7 @@ export function decideIncumbentGate(
   }
 
   const seniorityOk = (
-    INCUMBENT_ANALYZE_SENIORITY_WHITELIST as readonly string[]
+    INCUMBENT_SIGNAL_SENIORITY as readonly string[]
   ).includes(input.seniority_level);
   if (!seniorityOk) {
     return {
@@ -123,7 +79,7 @@ export function decideIncumbentGate(
   }
 
   const functionOk = (
-    INCUMBENT_ANALYZE_FUNCTION_WHITELIST as readonly string[]
+    INCUMBENT_SIGNAL_FUNCTION_CATEGORIES as readonly string[]
   ).includes(input.function_category);
   if (!functionOk) {
     return {

@@ -6,6 +6,7 @@ import {
   CATEGORY_GROUPS,
   ROLE_CATEGORIES,
 } from "@/lib/analysis/function-categories";
+import { isIncumbentSignalJob } from "@/lib/analysis/incumbent-signal";
 import { startOfWeek, format, subDays, parseISO, addHours } from "date-fns";
 
 /**
@@ -1041,6 +1042,8 @@ export interface JobsListRow {
   companyName: string;
   companySlug: string;
   companyId: string;
+  /** Owning company's tier — drives the <TierBadge> on incumbent rows. */
+  companyTier: "fintech" | "incumbent";
   functionCategory: string | null;
   functionGroup: string | null;
   location: string | null;
@@ -1069,8 +1072,8 @@ interface JobsListRawRow {
   keywords: unknown;
   company_id: string;
   companies:
-    | { id: string; name: string; slug: string }
-    | { id: string; name: string; slug: string }[]
+    | { id: string; name: string; slug: string; tier: string }
+    | { id: string; name: string; slug: string; tier: string }[]
     | null;
 }
 
@@ -1150,6 +1153,7 @@ export async function getJobsListData(
       companyName: company?.name ?? "—",
       companySlug: company?.slug ?? "",
       companyId: j.company_id,
+      companyTier: company?.tier === "incumbent" ? "incumbent" : "fintech",
       functionCategory: j.function_category,
       functionGroup,
       location: j.location,
@@ -1161,6 +1165,173 @@ export async function getJobsListData(
       standardizedDepartment: j.standardized_department,
     };
   });
+}
+
+// ============================================================================
+// Incumbent Bets — senior big-bank hiring signal (Phase 2)
+// ============================================================================
+
+/** One role group inside a bank's Incumbent Bets list. Identical postings
+ *  (same title + location) collapse into a single row with a `count`. */
+export interface IncumbentBetRole {
+  title: string;
+  seniority: string | null;
+  functionCategory: string | null;
+  location: string | null;
+  /** How many postings collapsed into this row. */
+  count: number;
+  /** A representative posting id, for deep-linking. */
+  sampleJobId: string;
+}
+
+/** One bank's worth of Incumbent Bets data. */
+export interface IncumbentBetCompany {
+  companyId: string;
+  companyName: string;
+  companySlug: string;
+  /** Signal roles (staff+ in AI/ML / Data / Risk-AI), grouped + sorted. */
+  roles: IncumbentBetRole[];
+  /** Total signal roles = sum of role `count`s. */
+  signalRoleCount: number;
+  /** ALL active postings for this bank — for the company-detail page's
+   *  honest "1,487 total · 9 senior" line. Not shown on the rail. */
+  totalOpenJobs: number;
+}
+
+const INCUMBENT_BETS_WINDOW_DAYS = 30;
+
+/**
+ * Senior big-bank hiring signal for the "Incumbent Bets" dashboard rail
+ * and the per-company "Senior hiring signal" panel.
+ *
+ * Returns only `tier='incumbent'` companies, only their high-signal roles
+ * (`isIncumbentSignalJob` — staff+ in AI/ML / Data / Risk-AI) first seen in
+ * the last 30 days. Reads structured fields only — no AI. Banks with no
+ * qualifying role in the window are omitted entirely (the rail renders
+ * nothing rather than an empty card).
+ *
+ * @param options.companyId  Scope to one bank (the company-detail panel).
+ * @param options.windowDays Override the 30-day signal window.
+ */
+export async function getIncumbentBets(options?: {
+  companyId?: string;
+  windowDays?: number;
+}): Promise<IncumbentBetCompany[]> {
+  const supabase = await createClient();
+  const windowDays = options?.windowDays ?? INCUMBENT_BETS_WINDOW_DAYS;
+  const windowStart = subDays(new Date(), windowDays).toISOString();
+
+  // Signal-window jobs: active incumbent postings first seen in the window.
+  let signalQuery = supabase
+    .from("job_postings")
+    .select(
+      "id, title, seniority_level, function_category, location, company_id, companies!inner(id, name, slug, is_active, tier)"
+    )
+    .eq("is_active", true)
+    .eq("companies.is_active", true)
+    .eq("companies.tier", "incumbent")
+    .gte("first_seen_date", windowStart);
+  if (options?.companyId) {
+    signalQuery = signalQuery.eq("company_id", options.companyId);
+  }
+
+  // All active incumbent postings (no window, no signal filter) — for the
+  // per-company total. Only the id+company is needed; tally in JS.
+  let totalQuery = supabase
+    .from("job_postings")
+    .select("company_id, companies!inner(is_active, tier)")
+    .eq("is_active", true)
+    .eq("companies.is_active", true)
+    .eq("companies.tier", "incumbent");
+  if (options?.companyId) {
+    totalQuery = totalQuery.eq("company_id", options.companyId);
+  }
+
+  const [{ data: signalJobs }, { data: totalJobs }] = await Promise.all([
+    signalQuery,
+    totalQuery,
+  ]);
+
+  const totalOpenByCompany = new Map<string, number>();
+  for (const job of totalJobs ?? []) {
+    totalOpenByCompany.set(
+      job.company_id,
+      (totalOpenByCompany.get(job.company_id) ?? 0) + 1
+    );
+  }
+
+  // Group signal jobs by company, then collapse identical roles.
+  interface CompanyAccum {
+    companyId: string;
+    companyName: string;
+    companySlug: string;
+    roleGroups: Map<string, IncumbentBetRole>;
+  }
+  const byCompany = new Map<string, CompanyAccum>();
+
+  for (const job of signalJobs ?? []) {
+    if (
+      !isIncumbentSignalJob({
+        seniority_level: job.seniority_level,
+        function_category: job.function_category,
+      })
+    ) {
+      continue;
+    }
+    const company = Array.isArray(job.companies)
+      ? job.companies[0]
+      : job.companies;
+    if (!company) continue;
+
+    let accum = byCompany.get(job.company_id);
+    if (!accum) {
+      accum = {
+        companyId: job.company_id,
+        companyName: (company as { name: string }).name,
+        companySlug: (company as { slug: string }).slug,
+        roleGroups: new Map(),
+      };
+      byCompany.set(job.company_id, accum);
+    }
+
+    // Collapse identical postings: same title (normalized) + location.
+    const title = (job.title ?? "").trim();
+    const location = job.location ?? null;
+    const key = `${title.toLowerCase()}|${(location ?? "").toLowerCase()}`;
+    const existing = accum.roleGroups.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      accum.roleGroups.set(key, {
+        title,
+        seniority: job.seniority_level ?? null,
+        functionCategory: job.function_category ?? null,
+        location,
+        count: 1,
+        sampleJobId: job.id,
+      });
+    }
+  }
+
+  const result: IncumbentBetCompany[] = Array.from(byCompany.values()).map(
+    (accum) => {
+      const roles = Array.from(accum.roleGroups.values()).sort(
+        (a, b) => b.count - a.count || a.title.localeCompare(b.title)
+      );
+      const signalRoleCount = roles.reduce((sum, r) => sum + r.count, 0);
+      return {
+        companyId: accum.companyId,
+        companyName: accum.companyName,
+        companySlug: accum.companySlug,
+        roles,
+        signalRoleCount,
+        totalOpenJobs: totalOpenByCompany.get(accum.companyId) ?? 0,
+      };
+    }
+  );
+
+  // Banks sorted by signal volume — the bank investing most is read first.
+  return result.sort((a, b) => b.signalRoleCount - a.signalRoleCount);
 }
 
 // ============================================================================

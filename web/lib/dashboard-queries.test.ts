@@ -56,6 +56,7 @@ import {
   getCrossCompanyThemes,
   getFunctionHeatData,
   getHotRoles,
+  getIncumbentBets,
   getJobsListData,
   getNetHiringFlow,
   getNetThisWeek,
@@ -175,6 +176,32 @@ describe("getJobsListData tier filter (Phase 2 Step 1 — leak G4)", () => {
     const result = await getJobsListData({ jobIds: [] });
     expect(result).toEqual([]);
     expect(tierFilterArgs("job_postings")).toEqual([]);
+  });
+});
+
+describe("getIncumbentBets (Phase 2 — Incumbent Bets rail / company panel)", () => {
+  function eqArgs(table: string): unknown[][] {
+    const log = callLogs[table] ?? [];
+    return log.filter((c) => c.method === "eq").map((c) => c.args as unknown[]);
+  }
+
+  it("scopes strictly to tier='incumbent' — the inverse of the volume aggregators", async () => {
+    await getIncumbentBets();
+    const eqs = eqArgs("job_postings");
+    expect(eqs).toContainEqual(["companies.tier", "incumbent"]);
+    // It must never fintech-scope — this surface is incumbent-only.
+    expect(eqs).not.toContainEqual(["companies.tier", "fintech"]);
+  });
+
+  it("returns an empty array (not an error) when there are no incumbent jobs", async () => {
+    const result = await getIncumbentBets();
+    expect(result).toEqual([]);
+  });
+
+  it("accepts a companyId scope for the per-company 'Senior hiring signal' panel", async () => {
+    await getIncumbentBets({ companyId: "rbc-uuid" });
+    const eqs = eqArgs("job_postings");
+    expect(eqs).toContainEqual(["company_id", "rbc-uuid"]);
   });
 });
 
