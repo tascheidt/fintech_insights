@@ -33,9 +33,13 @@ Avature CRM is a different vendor from Phenom; the white-labelled pages render p
 
 Workday exposes a documented JSON POST endpoint (`/wday/cxs/<tenant>/<site>/jobs`) so these are HTTP fetch-based, not Puppeteer. They are nonetheless **offloaded to GitHub Actions** (see `isBrowserScraper` in `index.ts`) because a cold ~1,500-job scrape with per-job description GETs exceeds Vercel's 300s function budget. `AbortSignal.timeout(15_000)` on every fetch; non-2xx throws (no in-code retry — the daily cron is the retry).
 
-- **`workday-utils.ts`** — pure shared helpers: `buildWorkdayUrls`, `parseWorkdayListingRow`, `parseWorkdayJobDetail`, `resolveWorkdayJobCap`. Used by every tenant-specific Workday scraper. Intentionally NOT a base class — fork-per-tenant.
+- **`workday-utils.ts`** — pure shared helpers: `buildWorkdayUrls`, `parseWorkdayListingRow`, `parseWorkdayJobDetail`, `resolveWorkdayJobCap`. Also exports `buildWorkdayHeaders` + `extractCookieJar` (defensive — not required for current tenants but harmless if Akamai posture tightens). Used by every tenant-specific Workday scraper. Intentionally NOT a base class — fork-per-tenant.
 - **`workday-td.ts`** — TD Bank (`td.wd3.myworkdayjobs.com/en-US/TD_Bank_Careers`).
 - **`workday-cibc.ts`** — CIBC (`cibc.wd3.myworkdayjobs.com/search`). Also exports `isSimpliiPosting` — a Simplii-Financial classifier currently running in **log-only mode**. The companies row for Simplii and the `companySlugOverride` routing land in a follow-up after production logs confirm Simplii postings actually surface in CIBC's Workday.
+
+### Workday URL gotcha (read this before changing `buildWorkdayUrls`)
+
+Workday returns `externalPath` already prefixed with `/job/...`. The detail URL builder MUST append it verbatim — do NOT prepend another `/job` or every detail GET returns 406. The May 2026 incident shipped that bug for a week and the misdiagnosis ("Akamai bot-detection") cost a 60-line cookie/header machine that was never the fix. **When debugging a Workday detail 406, the first move is `curl` against the constructed URL — not adding headers.**
 
 ### `browser.ts` is 1131 LOC — leave it alone pre-launch
 
@@ -53,9 +57,11 @@ Resist the urge to refactor `browser.ts` before launch. It works. The complexity
 
 ## Adding a new ATS
 
+0. **Verify the ATS against live HTML before assuming.** Don't trust pattern-matching from a sibling brand — `curl` the careers URL, grep for known markers: `phApp` / `eagerLoadRefineSearch` → Phenom, `data-avaturetemplate` / `avacdn.net` → Avature, `wd[0-9]+.myworkdayjobs.com` → Workday, `boards.greenhouse.io` → Greenhouse, etc. The parent corporate brand tells you nothing — BNC was on Avature while its sibling RBC was on Phenom (May 2026).
 1. Decide: API or browser-based?
-2. Create the file (`web/lib/scrapers/<name>.ts`) implementing the shared `JobData` shape.
-3. Add a `case "<name>":` to `fetchJobs` in `index.ts`.
-4. If browser-based, route through `scrape-heavy.yml` — do **not** add a new browser scrape on the Vercel hot path.
-5. Add the company config (see `config/companies.yaml` for the Python side; `web/lib/scrapers/detect-ats.ts` for the web side).
-6. Update this file with a one-line description of the new scraper.
+2. **Probe the documented endpoint with `curl` before writing parser code.** Confirm the response shape, status codes, and any required headers. If something looks like bot-detection (406/403), `curl` with the *simplest possible* headers FIRST — if it works, it's not bot-detection. Unit tests on fixtures don't catch URL-shape bugs (the May 2026 Workday `/job/job/` doubling shipped because the test pinned the buggy URL).
+3. Create the file (`web/lib/scrapers/<name>.ts`) implementing the shared `JobData` shape.
+4. Add a `case "<name>":` to `fetchJobs` in `index.ts`.
+5. If browser-based, route through `scrape-heavy.yml` — do **not** add a new browser scrape on the Vercel hot path.
+6. Add the company config (see `config/companies.yaml` for the Python side; `web/lib/scrapers/detect-ats.ts` for the web side).
+7. Update this file with a one-line description of the new scraper.

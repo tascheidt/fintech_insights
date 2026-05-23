@@ -16,9 +16,11 @@ Every Gemini call site writes to `gemini_usage_events`:
 
 If your call is wrapped by an existing helper that already meters, do not meter again. Double-counting is as misleading as missing data.
 
+**Gemini 2.5 reasoning tokens.** The 2.5 series (Pro AND Flash with structured-output prompts) returns reasoning/"thinking" tokens in `usageMetadata.thoughtsTokenCount`, and folds them into `totalTokenCount`. They are billed at the **output** rate. `recordUsage` reads the named field OR infers from the `totalTokenCount` residual when the SDK omits it (Flash 2.5 does this in practice). If a future SDK version exposes more named fields, update `gemini-meter.ts` AND backfill historical rows. The May 2026 audit found we'd been silently undercounting Flash extract spend ~3x by ignoring this; see v2.2.1 changelog.
+
 ## Pricing & cost math
 
-- **`gemini-pricing.ts`** — Per-model token pricing used by the meter and the comparison harness. Update when Google's price list changes.
+- **`gemini-pricing.ts`** — Per-model token pricing used by the meter and the comparison harness. Update when Google's price list changes. **`estimateUsd` bills reasoning tokens at the output rate** — don't add a separate "thoughts" price column unless Google starts charging differently.
 
 ## Voice directive
 
