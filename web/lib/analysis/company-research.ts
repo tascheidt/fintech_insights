@@ -491,8 +491,6 @@ export async function performDeepResearch(
         }
       }
 
-      // Add delay to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
       const shouldRetryWithFallback =
@@ -514,28 +512,36 @@ export async function performDeepResearch(
     }
   }
 
-  // Tier 1: Always available (basic research)
-  await performSearch(`"${companyName}" financial services company strategy mission`, "official");
-  await performSearch(`"${companyName}" fintech bank wealth payments news announcement 2025 2026`, "news");
-  await performSearch(`"${companyName}" press release`, "news");
+  // Build the full query list upfront so we can fire searches in parallel.
+  // Sequential awaits push wall-clock time past Vercel's 120s function cap on
+  // incumbents (8 grounded calls × ~10s each). Searches are independent —
+  // results merge into the shared `sources` array and dedupe at the end.
+  const queries: Array<[string, VerifiedSource["sourceType"]]> = [
+    [`"${companyName}" financial services company strategy mission`, "official"],
+    [`"${companyName}" fintech bank wealth payments news announcement 2025 2026`, "news"],
+    [`"${companyName}" press release`, "news"],
+  ];
 
   if (options.depth === "deep") {
-    // More comprehensive basic research
-    await performSearch(`"${companyName}" fintech funding round investment`, "funding");
-    await performSearch(`"${companyName}" CEO interview digital banking strategy`, "news");
+    queries.push(
+      [`"${companyName}" fintech funding round investment`, "funding"],
+      [`"${companyName}" CEO interview digital banking strategy`, "news"],
+    );
 
-    // Tier 2: Public companies only
     if (options.isPublic) {
-      await performSearch(`"${companyName}" SEC filing 10-K site:sec.gov`, "sec_filing");
-      await performSearch(`"${companyName}" earnings call transcript`, "sec_filing");
-      await performSearch(`"${companyName}" investor presentation`, "sec_filing");
+      queries.push(
+        [`"${companyName}" SEC filing 10-K site:sec.gov`, "sec_filing"],
+        [`"${companyName}" earnings call transcript`, "sec_filing"],
+        [`"${companyName}" investor presentation`, "sec_filing"],
+      );
     } else {
       limitations.push("Private company - SEC filings and earnings data unavailable");
     }
 
-    // Tier 3: Best effort (may be paywalled)
-      await performSearch(`"${companyName}" fintech analyst report research`, "analyst");
+    queries.push([`"${companyName}" fintech analyst report research`, "analyst"]);
   }
+
+  await Promise.all(queries.map(([query, sourceType]) => performSearch(query, sourceType)));
 
   const filteredSources = dedupeSources(sources).filter((source) =>
     isLikelyRelevantSource(companyName, source)
@@ -544,13 +550,13 @@ export async function performDeepResearch(
   // Calculate quality score
   const qualityScore = calculateResearchQuality(filteredSources, options.isPublic);
 
-  // Extract stated strategy from sources
-  const statedStrategy = await extractStatedStrategy(genAI, companyName, filteredSources);
-  estimatedCost += 0.03; // Cost for strategy extraction
-
-  // Extract financial context
-  const financialContext = await extractFinancialContext(genAI, companyName, filteredSources);
-  estimatedCost += 0.02; // Cost for financial extraction
+  // Strategy + financial extraction are independent Flash calls over the same
+  // source set — fire them in parallel to save another ~10s.
+  const [statedStrategy, financialContext] = await Promise.all([
+    extractStatedStrategy(genAI, companyName, filteredSources),
+    extractFinancialContext(genAI, companyName, filteredSources),
+  ]);
+  estimatedCost += 0.05; // 0.03 strategy + 0.02 financial
 
   // Add limitations based on research results
   if (filteredSources.length < 3) {

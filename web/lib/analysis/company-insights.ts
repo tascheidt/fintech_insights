@@ -231,13 +231,13 @@ export async function generateCompanyInsight(
       }
     }
 
-    // Step 3: Build extended historical context (reuses context-builder.ts)
-    log.info(`Building historical context for ${companyName}...`);
-    const context = await buildExtendedHistoricalContext(companyId, periodDays);
-
-    // Step 4: Detect company type (public vs private)
-    log.info(`Detecting company type for ${companyName}...`);
-    const companyType = await detectCompanyType(companyName);
+    // Steps 3-4: Historical context (DB) + company-type detection (Flash) are
+    // independent — fire concurrently to keep us well under Vercel's 120s cap.
+    log.info(`Building historical context and detecting type for ${companyName}...`);
+    const [context, companyType] = await Promise.all([
+      buildExtendedHistoricalContext(companyId, periodDays),
+      detectCompanyType(companyName),
+    ]);
 
     // Step 5: Perform deep research
     log.info(`Performing ${researchDepth} research for ${companyName}...`);

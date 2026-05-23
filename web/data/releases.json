@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.2.3",
+    "date": "2026-05-23",
+    "changes": [
+      { "type": "fix", "description": "\"Generate Insight\" no longer 504s for incumbent banks. `performDeepResearch` was firing 8 grounded Gemini searches sequentially (~80–100s wall time for public companies like BMO), routinely overrunning Vercel's 120s function cap. Parallelized the searches and the strategy/financial extraction calls; also ran historical-context build and company-type detection concurrently. Total expected wall time drops from ~100s to ~15–20s." }
+    ]
+  },
+  {
     "version": "2.2.2",
     "date": "2026-05-23",
     "changes": [
