@@ -23,10 +23,10 @@ describe("buildWorkdayUrls", () => {
     );
   });
 
-  it("produces a detail URL by appending externalPath after the `/job` segment", () => {
+  it("produces a detail URL by appending externalPath verbatim (Workday's externalPath already starts with `/job/...`)", () => {
     const urls = buildWorkdayUrls("cibc", "wd3", "search");
     expect(urls.jobGetUrl("/job/Toronto/Senior-Engineer_R-1")).toBe(
-      "https://cibc.wd3.myworkdayjobs.com/wday/cxs/cibc/search/job/job/Toronto/Senior-Engineer_R-1"
+      "https://cibc.wd3.myworkdayjobs.com/wday/cxs/cibc/search/job/Toronto/Senior-Engineer_R-1"
     );
   });
 
