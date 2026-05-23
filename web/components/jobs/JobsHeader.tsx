@@ -67,6 +67,13 @@ export interface JobsHeaderProps {
     companyName: string | null;
   };
 
+  /**
+   * Active company-tier scope (URL-seeded). Unlike the other filters this
+   * one drives a server re-query — changing it does a router.push of the
+   * `?tier=` param rather than living in client state.
+   */
+  tierFilter: "fintech" | "incumbent" | "all";
+
   /** Notify parent of filter changes (debounced search inside). */
   onChange: (next: JobsFilterState) => void;
 
@@ -94,6 +101,7 @@ export function JobsHeader({
   totalCount,
   initial,
   digestContext,
+  tierFilter,
   onChange,
   onExportCsv,
 }: JobsHeaderProps) {
@@ -177,6 +185,25 @@ export function JobsHeader({
   React.useEffect(() => {
     syncUrl({ q: debouncedQ, company, fn, recency });
   }, [debouncedQ, company, fn, recency, syncUrl]);
+
+  // The tier control re-queries on the server, so it pushes the `?tier=`
+  // param directly (preserving the other live filter params) instead of
+  // going through client filter state. `fintech` is the default → drop the
+  // param entirely so a plain /jobs URL stays canonical.
+  const setTier = React.useCallback(
+    (next: "fintech" | "incumbent" | "all") => {
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
+      if (next === "fintech") params.delete("tier");
+      else params.set("tier", next);
+      const qs = params.toString();
+      router.push(
+        qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+        { scroll: false }
+      );
+    },
+    [router]
+  );
 
   const hasDigestContext =
     Boolean(digestContext.themeId) ||
@@ -338,6 +365,34 @@ export function JobsHeader({
                 key={k}
                 type="button"
                 onClick={() => setRecency(k)}
+                className={cn(
+                  "rounded px-2.5 py-1.5 text-[11.5px] font-medium transition-colors",
+                  active
+                    ? "bg-sand-50 text-sand-900 ring-1 ring-sand-200"
+                    : "text-sand-500 hover:text-sand-700"
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tier segmented control — scopes which company tiers the list
+            shows. Drives the `?tier=` URL param (server re-query). Kept
+            understated: same segmented styling as the recency control. */}
+        <div className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]">
+          {([
+            ["fintech", "Fintech"],
+            ["incumbent", "Incumbent"],
+            ["all", "All"],
+          ] as const).map(([k, label]) => {
+            const active = tierFilter === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setTier(k)}
                 className={cn(
                   "rounded px-2.5 py-1.5 text-[11.5px] font-medium transition-colors",
                   active

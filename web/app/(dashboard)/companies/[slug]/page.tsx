@@ -26,13 +26,16 @@ import { GenerateInsightButton } from "@/components/companies/GenerateInsightBut
 import { WorkingThesisCard } from "@/components/companies/WorkingThesisCard";
 import { CompanyOverviewBets } from "@/components/companies/CompanyOverviewBets";
 import { CompanyHeaderPill } from "@/components/companies/CompanyHeaderPill";
+import { IncumbentSignalPanel } from "@/components/companies/IncumbentSignalPanel";
 import { MonogramAvatar } from "@/components/design";
+import { TierBadge } from "@/components/ui/TierBadge";
 import { Button } from "@/components/ui/button";
 import {
   getCompanyDrillDownData,
   getAllCompanyJobsWithBets,
+  getIncumbentBets,
 } from "@/lib/dashboard-queries";
-import { Bell, ExternalLink } from "lucide-react";
+import { Bell, ExternalLink, Info } from "lucide-react";
 import { format } from "date-fns";
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -43,6 +46,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     ? await supabase.from("profiles").select("role").eq("id", user.id).single()
     : { data: null };
   const canEdit = ["editor", "admin"].includes(profile?.role ?? "");
+  const isAdmin = (profile?.role ?? "") === "admin";
 
   const drilldown = await getCompanyDrillDownData(slug);
   if (!drilldown) notFound();
@@ -54,6 +58,15 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     .eq("is_active", true)
     .single();
   if (error || !company) notFound();
+
+  // Phase 2: incumbent banks get a deliberately quieter Overview — a
+  // "Senior hiring signal" panel instead of the bets-first editorial, an
+  // expectation-management callout, and an admin-only Generate Insight
+  // button. The fintech path below is unchanged.
+  const isIncumbent = company.tier === "incumbent";
+  const incumbentBet = isIncumbent
+    ? (await getIncumbentBets({ companyId: company.id }))[0] ?? null
+    : null;
 
   const allJobsWithBets = await getAllCompanyJobsWithBets(drilldown.company.id);
 
@@ -154,7 +167,101 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab — bets-first editorial v2 */}
+        {/* Overview Tab — incumbent variant: a quieter "Senior hiring
+            signal" panel instead of the bets-first editorial (spec §Surface 5). */}
+        {isIncumbent ? (
+          <TabsContent value="overview" className="space-y-6">
+            {/* Breadcrumb */}
+            <div className="font-sans text-[12.5px] text-muted-foreground">
+              <Link href="/companies" className="hover:text-primary">
+                Companies
+              </Link>
+              <span className="mx-1.5">/</span>
+              <span>{company.name}</span>
+            </div>
+
+            {/* Company head — avatar + name + TierBadge + meta. */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3.5">
+                <MonogramAvatar size="lg" name={company.name} />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-3">
+                    <h1 className="m-0 font-display font-semibold text-foreground text-[26px] leading-[1.15] tracking-[-0.02em] sm:text-[32px]">
+                      {company.name}
+                    </h1>
+                    <TierBadge
+                      tier="incumbent"
+                      size="md"
+                      className="self-center"
+                    />
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-[12.5px] text-muted-foreground">
+                    {company.country && <span>{company.country}</span>}
+                    {company.country && company.ats_type && (
+                      <span aria-hidden>·</span>
+                    )}
+                    {company.ats_type && <span>ATS: {company.ats_type}</span>}
+                    <span aria-hidden>·</span>
+                    <CompanyHeaderPill
+                      activeJobCount={drilldown.activeJobCount}
+                      companyName={company.name}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="ghost" size="sm" disabled title="Coming soon">
+                  <Bell className="h-3.5 w-3.5" /> Watch
+                </Button>
+                {company.careers_url && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <a
+                      href={company.careers_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> Careers site
+                    </a>
+                  </Button>
+                )}
+                {/* Generate Insight is admin-only for incumbents — a grounded
+                    Pro analysis is expensive and not the default flow here
+                    (spec §Surface 5 §4 / locked Q4). Hidden, not disabled. */}
+                {isAdmin && (
+                  <GenerateInsightButton
+                    companyId={company.id}
+                    companyName={company.name}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Context callout — the key expectation-management surface. */}
+            <div className="flex items-start gap-2 rounded-lg bg-secondary px-3.5 py-2.5">
+              <Info
+                className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
+              <p className="text-[12.5px] leading-relaxed text-muted-foreground">
+                {company.name} is an incumbent bank. Its hiring is tracked for
+                senior-role signal and is deliberately excluded from
+                cross-fintech volume metrics — its posting counts will not
+                match the dashboard.
+              </p>
+            </div>
+
+            {/* Senior hiring signal panel */}
+            <IncumbentSignalPanel bet={incumbentBet} />
+
+            {/* Tech Stack */}
+            <CompanyTechStack
+              companyId={company.id}
+              initialTechStack={company.tech_stack ?? null}
+              initialGeneratedAt={company.tech_stack_generated_at ?? null}
+            />
+          </TabsContent>
+        ) : (
+        /* Overview Tab — bets-first editorial v2 (fintech) */
         <TabsContent value="overview" className="space-y-6">
           {/* Breadcrumb */}
           <div className="font-sans text-[12.5px] text-muted-foreground">
@@ -527,6 +634,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             />
           )}
         </TabsContent>
+        )}
 
         {/* Jobs Tab */}
         <TabsContent value="jobs">

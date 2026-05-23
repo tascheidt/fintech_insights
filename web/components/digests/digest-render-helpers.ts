@@ -21,6 +21,7 @@
  */
 import type {
   CompanyWeeklySummary,
+  IncumbentWatchBank,
   IndustryTrend,
   StrategySignal,
   WeeklyDigest,
@@ -288,4 +289,58 @@ export function buildCompanySectionViews(
   return digest.companies.map((company) =>
     buildCompanySectionView(company, yearStartIso, ctx)
   );
+}
+
+// ---------------------------------------------------------------------------
+// Incumbent Watch
+// ---------------------------------------------------------------------------
+
+/** Hard cap on per-bank bullets in the Incumbent Watch block (Surface 3). */
+const INCUMBENT_WATCH_MAX_BANKS = 5;
+
+/**
+ * One per-bank row of the "Incumbent Watch" digest block. `head` is the
+ * always-present structured bullet ("RBC · 3 senior AI/ML & Data roles");
+ * `interpretation` is the AI prose line, null when the Flash call failed
+ * (the structured fallback — the row still renders its head).
+ */
+export interface IncumbentWatchRow {
+  bank: IncumbentWatchBank;
+  head: string;
+  /** AI interpretation line, or null — render head only when null. */
+  interpretation: string | null;
+}
+
+/** The dashboard deep-link shown in the Incumbent Watch closing disclaimer. */
+export interface IncumbentWatchView {
+  rows: IncumbentWatchRow[];
+  /** Href to the Incumbent Bets dashboard module. */
+  dashboardHref: string;
+}
+
+/**
+ * Shape the `incumbent_watch` payload into renderable rows. Returns null
+ * when the block should be omitted entirely (no payload / no banks) — both
+ * surfaces then drop the section and its surrounding dividers.
+ */
+export function buildIncumbentWatchView(
+  digest: WeeklyDigest,
+  ctx: SurfaceContext
+): IncumbentWatchView | null {
+  const watch = digest.incumbent_watch;
+  if (!watch || watch.banks.length === 0) return null;
+
+  const link = makeLinkBuilder(ctx);
+  const rows: IncumbentWatchRow[] = watch.banks
+    .slice(0, INCUMBENT_WATCH_MAX_BANKS)
+    .map((bank) => ({
+      bank,
+      head: bank.head,
+      interpretation: bank.interpretation,
+    }));
+
+  return {
+    rows,
+    dashboardHref: link({ kind: "dashboard" }),
+  };
 }

@@ -6,6 +6,7 @@ import type {
   IndustryTrend,
   StrategySignal,
   NotableMovement,
+  IncumbentWatch,
 } from "@/lib/analysis/digest";
 import { Calendar, Clock } from "lucide-react";
 import { DigestViewer } from "@/components/digests/DigestViewer";
@@ -59,6 +60,7 @@ export default async function DigestDetailPage({
   const industryTrends = (digest.industry_trends as IndustryTrend[] | null) ?? [];
   const strategySignals = (digest.strategy_signals as StrategySignal[] | null) ?? [];
   const notableMovements = (digest.notable_movements as NotableMovement[] | null) ?? [];
+  const incumbentWatch = (digest.incumbent_watch as IncumbentWatch | null) ?? null;
 
   const digestData = {
     week_start: digest.week_start,
@@ -74,6 +76,7 @@ export default async function DigestDetailPage({
     industry_trends: industryTrends,
     strategy_signals: strategySignals,
     notable_movements: notableMovements,
+    incumbent_watch: incumbentWatch,
     companies: (companies || []).map((c: {
       companies: { id?: string; name?: string; slug?: string } | { id?: string; name?: string; slug?: string }[];
       new_job_count?: number;

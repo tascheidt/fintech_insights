@@ -123,6 +123,7 @@ async function regenerateDigest() {
       industry_trends: digest.industry_trends,
       strategy_signals: digest.strategy_signals,
       notable_movements: digest.notable_movements,
+      incumbent_watch: digest.incumbent_watch,
       email_sent: false,
     })
     .select("id")
@@ -150,6 +151,7 @@ async function regenerateDigest() {
             industry_trends: digest.industry_trends,
             strategy_signals: digest.strategy_signals,
             notable_movements: digest.notable_movements,
+            incumbent_watch: digest.incumbent_watch,
           })
           .eq("id", existing.id);
 

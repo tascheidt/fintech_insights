@@ -55,12 +55,18 @@ export interface ReleasesLinkTarget {
   kind: "releases";
 }
 
+/** The main dashboard (`/dashboard`) — hosts the Incumbent Bets rail. */
+export interface DashboardLinkTarget {
+  kind: "dashboard";
+}
+
 export type DigestLinkKind =
   | JobsLinkTarget
   | CompanyLinkTarget
   | DigestLinkTarget
   | CompaniesIndexLinkTarget
-  | ReleasesLinkTarget;
+  | ReleasesLinkTarget
+  | DashboardLinkTarget;
 
 export interface BuildDigestLinkOptions {
   /** "email" = absolute URL + UTM; "app" = relative path, no UTM. */
@@ -106,6 +112,8 @@ function resolvePath(target: DigestLinkKind, digestId: string): string {
       return `/digests/${digestId}`;
     case "releases":
       return "/releases";
+    case "dashboard":
+      return "/dashboard";
   }
 }
 

@@ -42,6 +42,8 @@ export interface JobsPageClientProps {
   activeCount: number;
   newCount: number;
   companyCount: number;
+  /** Active tier scope, URL-seeded — drives the JobsHeader tier control. */
+  tierFilter: "fintech" | "incumbent" | "all";
 }
 
 export function JobsPageClient(props: JobsPageClientProps) {
@@ -63,6 +65,7 @@ function JobsPageClientInner({
   activeCount,
   newCount,
   companyCount,
+  tierFilter,
 }: JobsPageClientProps) {
   const [filters, setFilters] = React.useState<JobsFilterState>(initial);
   const { selected, clear } = useJobSelection();
@@ -122,6 +125,7 @@ function JobsPageClientInner({
         totalCount={rows.length}
         initial={initial}
         digestContext={digestContext}
+        tierFilter={tierFilter}
         onChange={onChange}
         onExportCsv={() => {
           const stem =

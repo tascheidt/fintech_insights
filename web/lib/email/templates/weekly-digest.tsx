@@ -15,6 +15,7 @@ import type { GlobalSummary, WeeklyDigest } from "@/lib/analysis/digest";
 import {
   buildCompanySectionViews,
   buildDigestTopLinks,
+  buildIncumbentWatchView,
   buildIndustryTrendRows,
   buildStrategySignalRows,
   formatDateRange,
@@ -169,6 +170,7 @@ export function WeeklyDigestEmail({
   const topLinks = buildDigestTopLinks(ctx);
   const trendRows = buildIndustryTrendRows(digest, ctx);
   const signalRows = buildStrategySignalRows(digest, ctx);
+  const incumbentWatch = buildIncumbentWatchView(digest, ctx);
   const companyViews = buildCompanySectionViews(digest, ctx);
   const yearLabel = `${new Date(digest.week_end).getUTCFullYear()}`;
 
@@ -330,6 +332,42 @@ export function WeeklyDigestEmail({
                     ))}
                   </tbody>
                 </table>
+              </Section>
+            </>
+          )}
+
+          {/* Incumbent Watch — senior big-bank hiring interlude.
+              Bracketed by dividers; empty => block and both dividers omitted. */}
+          {incumbentWatch && (
+            <>
+              <Hr style={divider} />
+              <Section style={companySection}>
+                <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "4px" }}>
+                  Incumbent Watch
+                </Heading>
+                <Text style={{ fontSize: "13px", color: EMAIL_COLORS.fgMuted, marginBottom: "12px" }}>
+                  What the big banks hired for this week
+                </Text>
+                {incumbentWatch.rows.map((row, idx) => (
+                  <div key={row.bank.company_id} style={{ marginBottom: idx < incumbentWatch.rows.length - 1 ? "16px" : "12px" }}>
+                    <Text style={{ fontSize: "14px", fontWeight: "600", color: EMAIL_COLORS.fg2, margin: "0 0 4px" }}>
+                      {row.head}
+                    </Text>
+                    {row.interpretation && (
+                      <Text style={{ fontSize: "13px", lineHeight: "1.6", color: EMAIL_COLORS.fg2, margin: "0" }}>
+                        {row.interpretation}
+                      </Text>
+                    )}
+                  </div>
+                ))}
+                <Text style={{ fontSize: "12px", color: EMAIL_COLORS.fgMuted, margin: "0", lineHeight: "1.5" }}>
+                  Bank hiring volume is excluded from the totals above.
+                </Text>
+                <Text style={{ fontSize: "12px", color: EMAIL_COLORS.fgMuted, margin: "0" }}>
+                  <Link href={incumbentWatch.dashboardHref} style={inlineLink}>
+                    See Incumbent Bets on the dashboard →
+                  </Link>
+                </Text>
               </Section>
             </>
           )}

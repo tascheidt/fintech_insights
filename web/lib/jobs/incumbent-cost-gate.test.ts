@@ -8,11 +8,11 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { decideIncumbentGate } from "./incumbent-cost-gate";
 import {
-  decideIncumbentGate,
-  INCUMBENT_ANALYZE_FUNCTION_WHITELIST,
-  INCUMBENT_ANALYZE_SENIORITY_WHITELIST,
-} from "./incumbent-cost-gate";
+  INCUMBENT_SIGNAL_FUNCTION_CATEGORIES,
+  INCUMBENT_SIGNAL_SENIORITY,
+} from "@/lib/analysis/incumbent-signal";
 
 describe("decideIncumbentGate", () => {
   describe("fintech tier", () => {
@@ -114,9 +114,9 @@ describe("decideIncumbentGate", () => {
     });
   });
 
-  describe("whitelist constants", () => {
+  describe("whitelist constants (shared from incumbent-signal.ts)", () => {
     it("seniority whitelist is staff+ only — by design, no senior/mid/junior", () => {
-      expect([...INCUMBENT_ANALYZE_SENIORITY_WHITELIST]).toEqual([
+      expect([...INCUMBENT_SIGNAL_SENIORITY]).toEqual([
         "staff",
         "principal",
         "lead",
@@ -125,7 +125,7 @@ describe("decideIncumbentGate", () => {
     });
 
     it("function whitelist excludes generic engineering, GTM, ops — only signal-bearing categories", () => {
-      const list = [...INCUMBENT_ANALYZE_FUNCTION_WHITELIST];
+      const list = [...INCUMBENT_SIGNAL_FUNCTION_CATEGORIES];
       expect(list).toContain("engineering-ai-ml");
       expect(list).toContain("data-science");
       expect(list).toContain("compliance");
