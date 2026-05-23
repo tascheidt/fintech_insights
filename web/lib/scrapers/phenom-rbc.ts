@@ -41,7 +41,7 @@
 
 import type { JobData } from "./types";
 import type { Browser, Page } from "puppeteer-core";
-import { detectLocationType, htmlToText } from "./utils";
+import { decodeHtmlEntities, detectLocationType, htmlToText } from "./utils";
 import { log } from "@/lib/log";
 
 const RBC_LISTING_URL = "https://jobs.rbc.com/ca/en/search-results";
@@ -139,20 +139,10 @@ export function extractEagerLoadPayload(
   return null;
 }
 
-/**
- * Schema.org `description` from JSON-LD arrives HTML-entity-encoded
- * (`&lt;div&gt;…`). Decode so what we store is real HTML.
- */
-export function decodeHtmlEntities(s: string): string {
-  return s
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&"); // last — otherwise we re-encode the above
-}
+// `decodeHtmlEntities` moved to `./utils` so the four scrapers that need it
+// (phenom-rbc, scotiabank, workday-td, workday-cibc) share one definition.
+// Re-exported here for the existing test + any external imports.
+export { decodeHtmlEntities } from "./utils";
 
 /**
  * Map one Phenom row to the canonical `JobData` shape. Pure transformation

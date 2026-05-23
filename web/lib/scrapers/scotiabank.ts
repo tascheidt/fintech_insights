@@ -10,7 +10,7 @@
  */
 
 import type { JobData } from "./types";
-import { htmlToText, detectLocationType } from "./utils";
+import { decodeHtmlEntities, detectLocationType, htmlToText } from "./utils";
 import { log } from "@/lib/log";
 
 const BASE_URL = "https://jobs.scotiabank.com";
@@ -212,17 +212,10 @@ function buildJobData(
   };
 }
 
-/** Decode common HTML entities */
-function decodeHtmlEntities(str: string): string {
-  return str
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'");
-}
+// `decodeHtmlEntities` moved to `./utils` (had a real bug here — `&amp;`
+// was being decoded FIRST, which meant doubly-encoded sequences like
+// `&amp;lt;` were collapsing to `<` instead of staying as `&lt;`. The
+// canonical version in `./utils` decodes `&amp;` last.).
 
 /** Escape a string for use in a RegExp */
 function escapeRegex(str: string): string {
