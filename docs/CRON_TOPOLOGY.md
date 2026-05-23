@@ -55,6 +55,33 @@ it needs Supabase + Gemini credentials in addition to `CRON_SECRET`:
    `job_runs` row (`job_type` from the approved enum, see `CLAUDE.md`).
 4. Update this file.
 
+## Heavy-scraper offload (`scrape-heavy.yml`)
+
+The daily `collect` cron does not directly run browser-based / long-running
+scrapers. When `isBrowserScraper(atsType)` is true (see
+`web/lib/scrapers/index.ts`), the collect route calls
+`triggerScrapeWorkflow(companyId, taskId)` in `web/lib/github.ts`, which
+`workflow_dispatch`-es `.github/workflows/scrape-heavy.yml` for that one
+company. Each bank scrape is its own GH Actions run — they execute in
+parallel, independent of each other and the cron tick.
+
+Currently offloaded:
+
+| Type            | Companies (live + planned)                     | Why                             |
+|-----------------|------------------------------------------------|---------------------------------|
+| `phenom`        | RBC, BMO, National Bank                        | Phenom is client-rendered → Puppeteer |
+| `workday-td`    | TD                                             | API-based but a ~1,500-job cold scrape exceeds Vercel's 300s |
+| `workday-cibc`  | CIBC (+ Simplii classifier log-only)           | Same                            |
+| `dayforce`      | (none currently active)                        | Browser scrape                  |
+| `successfactors`| Tangerine                                      | Browser scrape (Scotia portal)  |
+
+The `workday-td` and `workday-cibc` scrapers are HTTP-only and could in
+principle run inline in Vercel, but a cold corpus run with description
+enrichment exceeds the 300s function budget — so they're routed through
+GH Actions like the Puppeteer scrapers. Daily-incremental runs (≤ ~100
+new postings) would fit inline, but the offload path is simpler and
+isolates Workday's rate-limit posture from the live cron tick.
+
 ## Sentry alerts
 
 Every cron route is wrapped in `Sentry.withMonitor(...)` (slug + `crontab`

@@ -21,8 +21,23 @@ export interface ScraperIssue {
   closedThisRun: number;
 }
 
+/**
+ * Fragility canary — fired when an incumbent scraper shows a >50% drop in
+ * new postings versus its 7-day rolling average. Distinct from `issues`
+ * because the scraper itself did not error: it just returned less than
+ * expected. See `lib/email/scraper-health.ts#detectIncumbentCanaries`.
+ */
+export interface ScraperCanary {
+  companyName: string;
+  companySlug: string;
+  todayNewJobs: number;
+  rollingAvg7d: number;
+  explanation: string;
+}
+
 interface ScraperAlertEmailProps {
   issues: ScraperIssue[];
+  canaries?: ScraperCanary[];
   jobRunId: string;
   appUrl?: string;
 }
@@ -34,14 +49,23 @@ const ISSUE_LABELS: Record<ScraperIssue["issueType"], string> = {
 
 export function ScraperAlertEmail({
   issues,
+  canaries = [],
   jobRunId,
   appUrl = "https://fintech-talent-brief.vercel.app",
 }: ScraperAlertEmailProps) {
   const adminUrl = `${appUrl}/admin`;
-  const subject =
-    issues.length === 1
-      ? `Scraper alert: ${issues[0].companyName} — ${ISSUE_LABELS[issues[0].issueType]}`
-      : `Scraper alert: ${issues.length} companies need attention`;
+  const totalCount = issues.length + canaries.length;
+  const subject = (() => {
+    if (issues.length === 0 && canaries.length > 0) {
+      return canaries.length === 1
+        ? `Scraper-break canary: ${canaries[0].companyName}`
+        : `Scraper-break canary: ${canaries.length} incumbent scrapers`;
+    }
+    if (issues.length === 1 && canaries.length === 0) {
+      return `Scraper alert: ${issues[0].companyName} — ${ISSUE_LABELS[issues[0].issueType]}`;
+    }
+    return `Scraper alert: ${totalCount} ${totalCount === 1 ? "issue" : "issues"} need attention`;
+  })();
 
   return (
     <Html>
@@ -57,41 +81,72 @@ export function ScraperAlertEmail({
           <Hr style={divider} />
 
           <Section style={content}>
-            <Text style={body}>
-              {issues.length === 1
-                ? "1 company had a collection issue in the latest run."
-                : `${issues.length} companies had collection issues in the latest run.`}{" "}
-              Review and fix to ensure data stays accurate.
-            </Text>
-
-            {issues.map((issue) => (
-              <Section key={issue.companySlug} style={issueCard}>
-                <Text style={companyName}>{issue.companyName}</Text>
-                <Text
-                  style={
-                    issue.issueType === "failed" ? tagError : tagWarning
-                  }
-                >
-                  {ISSUE_LABELS[issue.issueType]}
+            {issues.length > 0 && (
+              <>
+                <Text style={body}>
+                  {issues.length === 1
+                    ? "1 company had a collection issue in the latest run."
+                    : `${issues.length} companies had collection issues in the latest run.`}{" "}
+                  Review and fix to ensure data stays accurate.
                 </Text>
-                {issue.issueType === "empty" && (
-                  <Text style={detail}>
-                    Scraper returned 0 jobs —{" "}
-                    <strong>{issue.closedThisRun} role(s)</strong> were closed
-                    as a result. Active count is now{" "}
-                    <strong>0</strong>.
-                  </Text>
-                )}
-                {issue.issueType === "failed" && issue.errorMessage && (
-                  <Text style={errorText}>{issue.errorMessage}</Text>
-                )}
-                {issue.issueType === "failed" && (
-                  <Text style={detail}>
-                    Active job count: <strong>{issue.activeJobCount}</strong>
-                  </Text>
-                )}
-              </Section>
-            ))}
+
+                {issues.map((issue) => (
+                  <Section key={issue.companySlug} style={issueCard}>
+                    <Text style={companyName}>{issue.companyName}</Text>
+                    <Text
+                      style={
+                        issue.issueType === "failed" ? tagError : tagWarning
+                      }
+                    >
+                      {ISSUE_LABELS[issue.issueType]}
+                    </Text>
+                    {issue.issueType === "empty" && (
+                      <Text style={detail}>
+                        Scraper returned 0 jobs —{" "}
+                        <strong>{issue.closedThisRun} role(s)</strong> were
+                        closed as a result. Active count is now{" "}
+                        <strong>0</strong>.
+                      </Text>
+                    )}
+                    {issue.issueType === "failed" && issue.errorMessage && (
+                      <Text style={errorText}>{issue.errorMessage}</Text>
+                    )}
+                    {issue.issueType === "failed" && (
+                      <Text style={detail}>
+                        Active job count:{" "}
+                        <strong>{issue.activeJobCount}</strong>
+                      </Text>
+                    )}
+                  </Section>
+                ))}
+              </>
+            )}
+
+            {canaries.length > 0 && (
+              <>
+                <Text style={canaryHeading}>Scraper-break canary</Text>
+                <Text style={body}>
+                  {canaries.length === 1
+                    ? "1 incumbent scraper is showing a partial-corpus drop today."
+                    : `${canaries.length} incumbent scrapers are showing partial-corpus drops today.`}{" "}
+                  Silent partial drops are scarier than outages — confirm
+                  pagination, location filters, and site sections still
+                  resolve.
+                </Text>
+
+                {canaries.map((canary) => (
+                  <Section key={canary.companySlug} style={canaryCard}>
+                    <Text style={companyName}>{canary.companyName}</Text>
+                    <Text style={tagCanary}>Partial corpus drop</Text>
+                    <Text style={detail}>
+                      Today: <strong>{canary.todayNewJobs}</strong> new — 7-day
+                      avg: <strong>{canary.rollingAvg7d.toFixed(1)}/day</strong>
+                    </Text>
+                    <Text style={detail}>{canary.explanation}</Text>
+                  </Section>
+                ))}
+              </>
+            )}
 
             <Text style={metaText}>Job run ID: {jobRunId}</Text>
           </Section>
@@ -196,6 +251,28 @@ const tagWarning: React.CSSProperties = {
   ...tagError,
   backgroundColor: EMAIL_COLORS.accentSoft,
   color: EMAIL_COLORS.accentSoftFg,
+};
+
+const tagCanary: React.CSSProperties = {
+  ...tagError,
+  backgroundColor: EMAIL_COLORS.highlightSoft,
+  color: EMAIL_COLORS.highlightSoftFg,
+};
+
+const canaryHeading: React.CSSProperties = {
+  color: EMAIL_COLORS.fg,
+  fontSize: "15px",
+  fontWeight: "700",
+  margin: "24px 0 8px",
+  letterSpacing: "0.2px",
+};
+
+const canaryCard: React.CSSProperties = {
+  backgroundColor: EMAIL_COLORS.surfaceMuted,
+  borderLeft: `3px solid ${EMAIL_COLORS.highlight}`,
+  padding: "12px 16px",
+  marginBottom: "12px",
+  borderRadius: "0 6px 6px 0",
 };
 
 const detail: React.CSSProperties = {

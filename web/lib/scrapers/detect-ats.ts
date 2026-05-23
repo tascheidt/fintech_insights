@@ -79,7 +79,21 @@ const ATS_PATTERNS: ATSPattern[] = [
       return parts[0] || null;
     },
   },
-  // Workday: {company}.wd{number}.myworkdayjobs.com or {company}.myworkdayjobs.com
+  // Workday tenants with dedicated scrapers (must precede the generic
+  // Workday entry below so they win the iteration).
+  {
+    type: "workday-td",
+    patterns: [/^td\.wd\d+\.myworkdayjobs\.com$/i],
+    extractIdentifier: () => "td",
+  },
+  {
+    type: "workday-cibc",
+    patterns: [/^cibc\.wd\d+\.myworkdayjobs\.com$/i],
+    extractIdentifier: () => "cibc",
+  },
+  // Workday (generic fallback): {company}.wd{number}.myworkdayjobs.com or
+  // {company}.myworkdayjobs.com — for any tenant we don't have a dedicated
+  // scraper for yet. Routed to scrapeGenericJobBoard.
   {
     type: "workday",
     patterns: [
@@ -153,18 +167,22 @@ const ATS_PATTERNS: ATSPattern[] = [
     },
   },
   // Phenom CareerConnect: vendor-hosted but white-labelled to each tenant's
-  // own domain (jobs.rbc.com, jobs.bmo.com, etc.), so detection works off a
-  // known-tenant allowlist rather than a vendor subdomain. The identifier
-  // is just the hostname's leading bank slug — used for telemetry/display,
-  // not for URL construction (the scraper uses `careersUrl` directly).
+  // own domain (jobs.rbc.com, jobs.bmo.com, emplois.bnc.ca, etc.), so
+  // detection works off a known-tenant allowlist rather than a vendor
+  // subdomain. The identifier is the canonical bank slug — used to dispatch
+  // to the right tenant-specific scraper in `fetchJobs`.
   {
     type: "phenom",
     patterns: [
       /^jobs\.rbc\.com$/i,
       /^jobs\.bmo\.com$/i,
+      /^emplois\.bnc\.ca$/i,
+      /^jobs\.nbc\.ca$/i, // National Bank also serves jobs.nbc.ca → 301 to emplois.bnc.ca
     ],
     extractIdentifier: (url: URL) => {
       const host = url.hostname.toLowerCase();
+      if (/^emplois\.bnc\.ca$/i.test(host)) return "bnc";
+      if (/^jobs\.nbc\.ca$/i.test(host)) return "bnc";
       const match = host.match(/^jobs\.([a-z0-9-]+)\.com$/i);
       return match ? match[1] : null;
     },
@@ -227,7 +245,9 @@ export const SUPPORTED_ATS = [
   { value: "ashby", label: "Ashby", implemented: true },
   { value: "dayforce", label: "Dayforce", implemented: true },
   { value: "phenom", label: "Phenom CareerConnect", implemented: true },
-  { value: "workday", label: "Workday", implemented: false },
+  { value: "workday-td", label: "Workday (TD Bank)", implemented: true },
+  { value: "workday-cibc", label: "Workday (CIBC)", implemented: true },
+  { value: "workday", label: "Workday (generic)", implemented: false },
   { value: "smartrecruiters", label: "SmartRecruiters", implemented: false },
   { value: "bamboohr", label: "BambooHR", implemented: false },
   { value: "jazzhr", label: "JazzHR", implemented: false },

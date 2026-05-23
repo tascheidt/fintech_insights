@@ -1,0 +1,92 @@
+{
+  "totalHits": 1247,
+  "hits": 3,
+  "data": {
+    "jobs": [
+      {
+        "subCategory": "Data Science & Machine Learning",
+        "ml_skills": [
+          "machine learning",
+          "python",
+          "deep learning",
+          "model risk",
+          "credit risk modeling",
+          "statistical analysis",
+          "pytorch",
+          "sql",
+          "regulatory model validation"
+        ],
+        "type": "Full time",
+        "descriptionTeaser": "Join BMO's AI & Data team as a Senior Machine Learning Engineer driving credit-risk modeling across our retail and commercial portfolios. Partner with model-risk management to ship production-grade Python/PyTorch systems while navigating OSFI and SR 11-7 compliance.",
+        "state": "Ontario",
+        "multi_category": [
+          "Technology | Data | Analytics"
+        ],
+        "reqId": "R-2400512",
+        "city": "Toronto",
+        "multi_location": [
+          "Toronto, Ontario, Canada"
+        ],
+        "applyUrl": "https://bmo.wd3.myworkdayjobs.com/External/job/Toronto-Ontario-Canada/Senior-Machine-Learning-Engineer_R-2400512/apply",
+        "country": "Canada",
+        "jobId": "R-2400512",
+        "title": "Senior Machine Learning Engineer",
+        "postedDate": "2026-03-04T00:00:00.000+0000",
+        "category": "Technology | Data | Analytics"
+      },
+      {
+        "subCategory": "Capital Markets & Investment Banking",
+        "ml_skills": [
+          "equity research",
+          "financial modeling",
+          "valuation",
+          "client coverage",
+          "presentation skills"
+        ],
+        "type": "Full time",
+        "descriptionTeaser": "BMO Capital Markets is hiring a Vice President, Equity Research covering North American banks. Build differentiated coverage models, drive thought leadership, and partner with sales & trading on actionable client narratives.",
+        "state": "New York",
+        "multi_category": [
+          "Capital Markets | Investment Banking | Wealth"
+        ],
+        "reqId": "R-2400771",
+        "city": "New York",
+        "multi_location": [
+          "New York, New York, United States of America"
+        ],
+        "applyUrl": "https://bmo.wd3.myworkdayjobs.com/External/job/New-York-United-States/Vice-President-Equity-Research_R-2400771/apply",
+        "country": "United States of America",
+        "jobId": "R-2400771",
+        "title": "Vice President, Equity Research",
+        "postedDate": "2026-01-22T00:00:00.000+0000",
+        "category": "Capital Markets | Investment Banking | Wealth"
+      },
+      {
+        "subCategory": "Branch Banking",
+        "ml_skills": [
+          "customer service",
+          "cash handling",
+          "retail banking",
+          "sales targets"
+        ],
+        "type": "Part time",
+        "descriptionTeaser": "We are looking for a Customer Service Representative to join our team in Calgary. Deliver exceptional in-branch service, identify customer needs, and connect clients to the right BMO products. Bilingual French/English an asset.",
+        "state": "Alberta",
+        "multi_category": [
+          "Personal & Commercial Banking"
+        ],
+        "reqId": "R-2400988",
+        "city": "CALGARY",
+        "multi_location": [
+          "CALGARY, Alberta, Canada"
+        ],
+        "applyUrl": "https://bmo.wd3.myworkdayjobs.com/External/job/Calgary-Alberta-Canada/Customer-Service-Representative_R-2400988/apply",
+        "country": "Canada",
+        "jobId": "R-2400988",
+        "title": "Customer Service Representative",
+        "postedDate": "2026-04-18T00:00:00.000+0000",
+        "category": "Personal & Commercial Banking"
+      }
+    ]
+  }
+}

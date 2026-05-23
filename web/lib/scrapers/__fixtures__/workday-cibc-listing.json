@@ -1,0 +1,34 @@
+{
+  "total": 4,
+  "jobPostings": [
+    {
+      "title": "Manager, Capital Markets Technology",
+      "externalPath": "/job/Toronto-ON/Manager--Capital-Markets-Technology_2521234",
+      "locationsText": "Toronto, ON",
+      "postedOn": "2026-05-15",
+      "bulletFields": ["2521234", "CIBC", "Regular"]
+    },
+    {
+      "title": "Banking Advisor, Simplii Financial",
+      "externalPath": "/job/Mississauga-ON/Banking-Advisor--Simplii-Financial_2521456",
+      "locationsText": "Mississauga, ON",
+      "postedOn": "2026-05-14",
+      "bulletFields": ["2521456", "Simplii Financial", "Full time"]
+    },
+    {
+      "title": "Senior Data Engineer",
+      "externalPath": "/job/Toronto-ON/Senior-Data-Engineer_2521789",
+      "locationsText": "Toronto, ON",
+      "postedOn": "2026-05-10",
+      "bulletFields": ["2521789", "CIBC", "Full time"],
+      "businessUnit": "Simplii Financial Direct Bank"
+    },
+    {
+      "title": "Simply Excellent Service Representative",
+      "externalPath": "/job/Vancouver-BC/Simply-Excellent-Service-Representative_2522000",
+      "locationsText": "Vancouver, BC",
+      "postedOn": "2026-05-09",
+      "bulletFields": ["2522000", "CIBC", "Part time"]
+    }
+  ]
+}

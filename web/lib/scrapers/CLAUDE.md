@@ -19,7 +19,18 @@ These need Puppeteer because the ATS doesn't expose a clean JSON feed. They are 
 
 - **`dayforce.ts`** — Dayforce boards.
 - **`scotiabank.ts`** — Scotiabank custom careers site.
+- **`phenom-rbc.ts`** — RBC's Phenom CareerConnect tenant (`jobs.rbc.com`). Reads server-rendered `phApp.eagerLoadRefineSearch` + JSON-LD `JobPosting` per detail page. Chunked enrichment (50/batch, concurrency=4).
+- **`phenom-bmo.ts`** — BMO's Phenom tenant (`jobs.bmo.com`). Same shape as phenom-rbc.
+- **`phenom-bnc.ts`** — National Bank's Phenom tenant (white-labelled `emplois.bnc.ca`). Same shape.
 - **`browser.ts`** — Generic Puppeteer helpers (`scrapeJobsWithBrowser`, `scrapeGenericJobBoard`, `scrapeSuccessFactors`).
+
+## Offloaded API scrapers — Workday tenants
+
+Workday exposes a documented JSON POST endpoint (`/wday/cxs/<tenant>/<site>/jobs`) so these are HTTP fetch-based, not Puppeteer. They are nonetheless **offloaded to GitHub Actions** (see `isBrowserScraper` in `index.ts`) because a cold ~1,500-job scrape with per-job description GETs exceeds Vercel's 300s function budget. `AbortSignal.timeout(15_000)` on every fetch; non-2xx throws (no in-code retry — the daily cron is the retry).
+
+- **`workday-utils.ts`** — pure shared helpers: `buildWorkdayUrls`, `parseWorkdayListingRow`, `parseWorkdayJobDetail`, `resolveWorkdayJobCap`. Used by every tenant-specific Workday scraper. Intentionally NOT a base class — fork-per-tenant.
+- **`workday-td.ts`** — TD Bank (`td.wd3.myworkdayjobs.com/en-US/TD_Bank_Careers`).
+- **`workday-cibc.ts`** — CIBC (`cibc.wd3.myworkdayjobs.com/search`). Also exports `isSimpliiPosting` — a Simplii-Financial classifier currently running in **log-only mode**. The companies row for Simplii and the `companySlugOverride` routing land in a follow-up after production logs confirm Simplii postings actually surface in CIBC's Workday.
 
 ### `browser.ts` is 1131 LOC — leave it alone pre-launch
 

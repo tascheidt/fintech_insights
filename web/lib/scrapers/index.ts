@@ -7,6 +7,10 @@ import { fetchAshbyJobs } from "./ashby";
 import { fetchDayforceJobs } from "./dayforce";
 import { fetchScotiabankJobs } from "./scotiabank";
 import { fetchPhenomRbcJobs } from "./phenom-rbc";
+import { fetchPhenomBmoJobs } from "./phenom-bmo";
+import { fetchPhenomBncJobs } from "./phenom-bnc";
+import { fetchWorkdayTdJobs } from "./workday-td";
+import { fetchWorkdayCibcJobs } from "./workday-cibc";
 
 export type { JobData } from "./types";
 export { jobToRow } from "./types";
@@ -42,19 +46,33 @@ export async function fetchJobs(
 
     case "phenom": {
       // Phenom CareerConnect is white-labelled to each bank's own domain
-      // (jobs.rbc.com, jobs.bmo.com, etc.). Dispatch by tenant since the
-      // listing-page URL and per-tenant quirks differ. The pure-logic
-      // pieces (eagerLoadRefineSearch parsing, JSON-LD enrichment) are
-      // exported from phenom-rbc.ts and can be reused by future
-      // phenom-bmo.ts etc. — extract a shared helper once 2+ tenants ship.
+      // (jobs.rbc.com, jobs.bmo.com, emplois.bnc.ca, etc.). Dispatch by
+      // tenant since each tenant's listing URL and per-site quirks differ.
+      // The pure-logic pieces (eagerLoadRefineSearch parsing, JSON-LD
+      // enrichment, decodeHtmlEntities in ./utils) are shared across the
+      // tenant scrapers; no Workday-style base class — pattern is
+      // fork-per-tenant.
       const tenant = atsIdentifier.toLowerCase();
-      if (tenant === "rbc") {
-        return fetchPhenomRbcJobs(atsIdentifier, browser);
-      }
+      if (tenant === "rbc") return fetchPhenomRbcJobs(atsIdentifier, browser);
+      if (tenant === "bmo") return fetchPhenomBmoJobs(atsIdentifier, browser);
+      if (tenant === "bnc") return fetchPhenomBncJobs(atsIdentifier, browser);
       throw new Error(
         `No Phenom scraper for tenant '${atsIdentifier}'. Add a tenant-specific scraper modeled on phenom-rbc.ts.`
       );
     }
+
+    // Workday tenants with dedicated scrapers. Each is a distinct ats_type
+    // (workday-td, workday-cibc) rather than a single "workday" with tenant
+    // dispatch — keeps the existing generic `case "workday"` fallback below
+    // available for any new Workday tenant we don't yet have a tenant-
+    // specific scraper for. Both these are API-based (HTTP fetch) but are
+    // still routed through scrape-heavy.yml (offloaded — see
+    // isBrowserScraper) because a cold ~1,500-job scrape with description
+    // enrichment exceeds the 300s Vercel function budget.
+    case "workday-td":
+      return fetchWorkdayTdJobs();
+    case "workday-cibc":
+      return fetchWorkdayCibcJobs();
 
     case "successfactors": {
       if (!careersUrl) {
@@ -114,6 +132,8 @@ export function isBrowserScraper(atsType: string): boolean {
   // These will be offloaded to GitHub Actions
   const browserScrapers = [
     'workday',
+    'workday-td',     // API-based, but still offloaded — see fetchJobs comment.
+    'workday-cibc',   // API-based, but still offloaded.
     'bamboohr',
     'smartrecruiters',
     'dayforce',

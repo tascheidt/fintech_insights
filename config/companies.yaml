@@ -76,3 +76,49 @@ companies:
     careers_url: https://jobs.rbc.com/ca/en/search-results
     tier: incumbent
     is_active: false
+
+  # Phase 3 additions — each ships is_active=false; flip after the first
+  # smoke + 24h of clean job_runs entries. The 4 banks together roughly 5×
+  # the active job_postings volume; see the perf indexes migration
+  # 20260522000000_phase3_indexes.sql and the scraper-break canary.
+  - name: BMO
+    slug: bmo
+    country: CA
+    ats_type: phenom
+    ats_identifier: bmo
+    careers_url: https://jobs.bmo.com/ca/en/search-results
+    tier: incumbent
+    is_active: false
+
+  - name: TD
+    slug: td
+    country: CA
+    ats_type: workday-td
+    ats_identifier: td
+    careers_url: https://td.wd3.myworkdayjobs.com/en-US/TD_Bank_Careers
+    tier: incumbent
+    is_active: false
+
+  - name: CIBC
+    slug: cibc
+    country: CA
+    ats_type: workday-cibc
+    ats_identifier: cibc
+    careers_url: https://cibc.wd3.myworkdayjobs.com/search
+    tier: incumbent
+    is_active: false
+    # Note: Simplii Financial postings (if any) surface inside CIBC's
+    # Workday tenant. The scraper's `isSimpliiPosting` classifier runs in
+    # log-only mode for Phase 3 — no row is added for Simplii yet. After
+    # the first scrape confirms Simplii postings appear in the data, a
+    # follow-up adds the `simplii` row (tier=fintech) and flips the
+    # classifier to actually route via `companySlugOverride`.
+
+  - name: National Bank
+    slug: bnc
+    country: CA
+    ats_type: phenom
+    ats_identifier: bnc
+    careers_url: https://emplois.bnc.ca/fr_CA/careers/searchjobs
+    tier: incumbent
+    is_active: false
