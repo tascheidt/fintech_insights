@@ -46,17 +46,29 @@ export const GROUNDING_PER_REQUEST_USD = 0.035;
 /**
  * Rough USD estimate for a single Gemini call. Returns 0 for unknown models
  * (callers should detect this via `isPricedModel`).
+ *
+ * `thoughtsTokens` (Gemini 2.5 reasoning/thinking tokens) are billed at the
+ * output rate per Google's documented pricing. Older callers that don't
+ * pass it default to 0; the meter infers it from `totalTokenCount` residual
+ * when the SDK omits the named field. Until 2026-05 our formula skipped
+ * thinking tokens entirely, undercounting Flash extraction spend by ~3x.
  */
 export function estimateUsd(
   model: string,
-  opts: { inputTokens: number; outputTokens: number; groundingEnabled: boolean }
+  opts: {
+    inputTokens: number;
+    outputTokens: number;
+    thoughtsTokens?: number;
+    groundingEnabled: boolean;
+  }
 ): number {
   const rates = GEMINI_PRICING[model];
   if (!rates) return 0;
   const inputCost = (opts.inputTokens / 1_000_000) * rates.inputPerM;
   const outputCost = (opts.outputTokens / 1_000_000) * rates.outputPerM;
+  const thoughtsCost = ((opts.thoughtsTokens ?? 0) / 1_000_000) * rates.outputPerM;
   const groundingCost = opts.groundingEnabled ? GROUNDING_PER_REQUEST_USD : 0;
-  return inputCost + outputCost + groundingCost;
+  return inputCost + outputCost + thoughtsCost + groundingCost;
 }
 
 export function isPricedModel(model: string): boolean {
