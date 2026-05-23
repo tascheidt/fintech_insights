@@ -253,6 +253,39 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             {/* Senior hiring signal panel */}
             <IncumbentSignalPanel bet={incumbentBet} />
 
+            {/* Strategic insight (admin-generated). The fintech variant
+                renders this as a multi-section editorial; on incumbents we
+                surface only the executive summary + discrepancies as a
+                compact card so the surface stays "lens not canvas". */}
+            {insight && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-4">
+                  <h2 className="font-semibold">Strategic Insight</h2>
+                  <span className="font-sans text-[12px] text-muted-foreground">
+                    Generated {format(new Date(insight.generated_at), "MMM d, yyyy")}
+                  </span>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                    {insight.executive_summary}
+                  </p>
+                  {discrepancies.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-border">
+                      <h3 className="text-sm font-semibold">Discrepancies</h3>
+                      <ul className="space-y-1.5">
+                        {discrepancies.map((d, i) => (
+                          <li key={i} className="text-sm text-muted-foreground">
+                            <span className="font-medium text-foreground">{d.area}</span>
+                            {d.implication ? ` — ${d.implication}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Tech Stack */}
             <CompanyTechStack
               companyId={company.id}

@@ -18,6 +18,8 @@ import type { JobData } from "./types";
 import { htmlToText } from "./utils";
 import {
   buildWorkdayUrls,
+  buildWorkdayHeaders,
+  extractCookieJar,
   parseWorkdayListingRow,
   parseWorkdayJobDetail,
   resolveWorkdayJobCap,
@@ -81,20 +83,23 @@ export function isSimpliiPosting(raw: WorkdayListingRow): {
 
 export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
   const urls = buildWorkdayUrls(TENANT, INSTANCE, SITE);
+  const headers = buildWorkdayHeaders(TENANT, INSTANCE, SITE);
   const cap = resolveWorkdayJobCap(process.env.WORKDAY_CIBC_MAX_JOBS);
 
   const jobs: JobData[] = [];
   let offset = 0;
   let total: number | null = null;
   let simpliiSeen = 0;
+  let cookieJar = "";
 
   // Step 1: paginate the listing.
   while (true) {
     const res = await fetch(urls.listingPostUrl, {
       method: "POST",
       headers: {
+        ...headers,
         "Content-Type": "application/json",
-        Accept: "application/json",
+        ...(cookieJar ? { Cookie: cookieJar } : {}),
       },
       body: JSON.stringify({
         limit: PAGE_LIMIT,
@@ -107,6 +112,7 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
     if (!res.ok) {
       throw new Error(`Workday CIBC listing error: ${res.status}`);
     }
+    if (!cookieJar) cookieJar = extractCookieJar(res);
     const data = (await res.json()) as WorkdayListingResponse;
     const rows = data.jobPostings ?? [];
     if (rows.length === 0) break;
@@ -160,7 +166,10 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
     if (!externalPath) continue;
     try {
       const detailRes = await fetch(urls.jobGetUrl(externalPath), {
-        headers: { Accept: "application/json" },
+        headers: {
+          ...headers,
+          ...(cookieJar ? { Cookie: cookieJar } : {}),
+        },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!detailRes.ok) {

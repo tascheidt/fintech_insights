@@ -167,24 +167,37 @@ const ATS_PATTERNS: ATSPattern[] = [
     },
   },
   // Phenom CareerConnect: vendor-hosted but white-labelled to each tenant's
-  // own domain (jobs.rbc.com, jobs.bmo.com, emplois.bnc.ca, etc.), so
-  // detection works off a known-tenant allowlist rather than a vendor
-  // subdomain. The identifier is the canonical bank slug — used to dispatch
-  // to the right tenant-specific scraper in `fetchJobs`.
+  // own domain (jobs.rbc.com, jobs.bmo.com, etc.), so detection works off a
+  // known-tenant allowlist rather than a vendor subdomain. The identifier
+  // is the canonical bank slug — used to dispatch to the right
+  // tenant-specific scraper in `fetchJobs`.
   {
     type: "phenom",
     patterns: [
       /^jobs\.rbc\.com$/i,
       /^jobs\.bmo\.com$/i,
+    ],
+    extractIdentifier: (url: URL) => {
+      const host = url.hostname.toLowerCase();
+      const match = host.match(/^jobs\.([a-z0-9-]+)\.com$/i);
+      return match ? match[1] : null;
+    },
+  },
+  // Avature CRM: also vendor-hosted but white-labelled per tenant. Tight
+  // allowlist for now — National Bank's `emplois.bnc.ca` is the only
+  // tenant we ship a scraper for, plus the legacy `jobs.nbc.ca` host that
+  // 301s to it. Add more entries here as new Avature sites are onboarded.
+  {
+    type: "avature",
+    patterns: [
       /^emplois\.bnc\.ca$/i,
-      /^jobs\.nbc\.ca$/i, // National Bank also serves jobs.nbc.ca → 301 to emplois.bnc.ca
+      /^jobs\.nbc\.ca$/i, // legacy host; redirects to emplois.bnc.ca
     ],
     extractIdentifier: (url: URL) => {
       const host = url.hostname.toLowerCase();
       if (/^emplois\.bnc\.ca$/i.test(host)) return "bnc";
       if (/^jobs\.nbc\.ca$/i.test(host)) return "bnc";
-      const match = host.match(/^jobs\.([a-z0-9-]+)\.com$/i);
-      return match ? match[1] : null;
+      return null;
     },
   },
 ];
@@ -245,6 +258,7 @@ export const SUPPORTED_ATS = [
   { value: "ashby", label: "Ashby", implemented: true },
   { value: "dayforce", label: "Dayforce", implemented: true },
   { value: "phenom", label: "Phenom CareerConnect", implemented: true },
+  { value: "avature", label: "Avature CRM", implemented: true },
   { value: "workday-td", label: "Workday (TD Bank)", implemented: true },
   { value: "workday-cibc", label: "Workday (CIBC)", implemented: true },
   { value: "workday", label: "Workday (generic)", implemented: false },

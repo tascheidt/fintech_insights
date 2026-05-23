@@ -24,6 +24,8 @@ import type { JobData } from "./types";
 import { htmlToText } from "./utils";
 import {
   buildWorkdayUrls,
+  buildWorkdayHeaders,
+  extractCookieJar,
   parseWorkdayListingRow,
   parseWorkdayJobDetail,
   resolveWorkdayJobCap,
@@ -40,19 +42,25 @@ const FETCH_TIMEOUT_MS = 15_000;
 
 export async function fetchWorkdayTdJobs(): Promise<JobData[]> {
   const urls = buildWorkdayUrls(TENANT, INSTANCE, SITE);
+  const headers = buildWorkdayHeaders(TENANT, INSTANCE, SITE);
   const cap = resolveWorkdayJobCap(process.env.WORKDAY_TD_MAX_JOBS);
 
   const jobs: JobData[] = [];
   let offset = 0;
   let total: number | null = null;
+  // Captured once from the first successful listing POST and replayed on
+  // every detail GET — keeps Akamai's `_abck` fingerprint stable for the
+  // run. Empty until the first response comes back.
+  let cookieJar = "";
 
   // Step 1: paginate the listing.
   while (true) {
     const res = await fetch(urls.listingPostUrl, {
       method: "POST",
       headers: {
+        ...headers,
         "Content-Type": "application/json",
-        Accept: "application/json",
+        ...(cookieJar ? { Cookie: cookieJar } : {}),
       },
       body: JSON.stringify({
         limit: PAGE_LIMIT,
@@ -65,6 +73,7 @@ export async function fetchWorkdayTdJobs(): Promise<JobData[]> {
     if (!res.ok) {
       throw new Error(`Workday TD listing error: ${res.status}`);
     }
+    if (!cookieJar) cookieJar = extractCookieJar(res);
     const data = (await res.json()) as WorkdayListingResponse;
     const rows = data.jobPostings ?? [];
     if (rows.length === 0) break;
@@ -101,7 +110,10 @@ export async function fetchWorkdayTdJobs(): Promise<JobData[]> {
     if (!externalPath) continue;
     try {
       const detailRes = await fetch(urls.jobGetUrl(externalPath), {
-        headers: { Accept: "application/json" },
+        headers: {
+          ...headers,
+          ...(cookieJar ? { Cookie: cookieJar } : {}),
+        },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!detailRes.ok) {
