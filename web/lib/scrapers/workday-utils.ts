@@ -205,6 +205,66 @@ export function parseWorkdayJobDetail(raw: WorkdayJobDetailResponse): {
 }
 
 // ---------------------------------------------------------------------------
+// Request hygiene — browser-like headers + cookie replay
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the canonical browser-like header set every Workday request needs.
+ * Workday tenants sit behind Akamai, whose content-negotiation rules return
+ * **406 Not Acceptable** (not 403/429) when a bare `Accept: application/json`
+ * arrives without a real User-Agent / Accept-Language / Referer. Adding
+ * these to BOTH the listing POST and the detail GET makes both calls look
+ * like the same browser session — which is also what we want for cookie
+ * continuity (see `extractCookieJar`).
+ */
+export function buildWorkdayHeaders(
+  tenant: string,
+  instance: string,
+  site: string
+): Record<string, string> {
+  void tenant;
+  void instance;
+  return {
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    Accept: "application/json",
+    "Accept-Language": "en-US,en;q=0.9",
+    Referer: `https://${tenant}.${instance}.myworkdayjobs.com/en-US/${site}`,
+  };
+}
+
+/**
+ * Capture Set-Cookie values from a Workday Response into a Cookie header
+ * string the caller can replay on subsequent requests. Workday's `_abck`
+ * (Akamai bot-cookie) is set by the first successful listing POST; replaying
+ * it on every detail GET keeps the Akamai fingerprint stable for the run.
+ *
+ * Without this, every detail GET is a fresh "unfingerprinted" client and
+ * Akamai disguises the block as 406 (content negotiation failure).
+ */
+export function extractCookieJar(response: Response): string {
+  type SetCookieHeaders = Headers & { getSetCookie?: () => string[] };
+  const headers = response.headers as SetCookieHeaders;
+  const setCookies =
+    typeof headers.getSetCookie === "function"
+      ? headers.getSetCookie()
+      : (() => {
+          const single = response.headers.get("set-cookie");
+          if (!single) return [];
+          // Best-effort split on `,` only when followed by a `<name>=`. This
+          // is the standard heuristic — Date attributes contain commas too.
+          return single.split(/,(?=\s*[A-Za-z0-9_!#$%&'*+\-.^`|~]+=)/);
+        })();
+  const pairs: string[] = [];
+  for (const sc of setCookies) {
+    const firstSemi = sc.indexOf(";");
+    const pair = firstSemi === -1 ? sc.trim() : sc.slice(0, firstSemi).trim();
+    if (pair && pair.includes("=")) pairs.push(pair);
+  }
+  return pairs.join("; ");
+}
+
+// ---------------------------------------------------------------------------
 // Job cap
 // ---------------------------------------------------------------------------
 

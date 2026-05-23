@@ -24,11 +24,13 @@ export function GenerateInsightButton({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   async function handleGenerate() {
     setLoading(true);
     setError(null);
+    setInfo(null);
     setSuccess(false);
 
     try {
@@ -44,8 +46,8 @@ export function GenerateInsightButton({
       const data = await res.json();
 
       if (res.status === 200 && data.message === "Recent insight exists") {
-        setError(
-          `An insight was recently generated. Next generation allowed after ${new Date(data.nextAllowedAt).toLocaleDateString()}.`
+        setInfo(
+          `An insight already exists for this period. The page is showing the most recent one — next regeneration available ${new Date(data.nextAllowedAt).toLocaleDateString()}.`
         );
         return;
       }
@@ -96,6 +98,12 @@ export function GenerateInsightButton({
           {error && (
             <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200 text-sm">
               {error}
+            </div>
+          )}
+
+          {info && (
+            <div className="mt-4 p-3 rounded-lg bg-muted text-muted-foreground text-sm">
+              {info}
             </div>
           )}
 
