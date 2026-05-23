@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.2.2",
+    "date": "2026-05-23",
+    "changes": [
+      { "type": "fix", "description": "Workday detail-page URLs were doubled (`/job/job/...`), causing every TD and CIBC detail enrichment to return 406. Root cause: Workday's `externalPath` already starts with `/job/...`, but `buildWorkdayUrls.jobGetUrl` was prepending another `/job`. Verified against the live API: corrected URLs return 200 even without browser-like headers. The browser-header machinery added earlier in v2.2.0 was a red herring caused by misdiagnosis." }
+    ]
+  },
+  {
     "version": "2.2.1",
     "date": "2026-05-23",
     "changes": [

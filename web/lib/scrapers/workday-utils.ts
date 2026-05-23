@@ -67,10 +67,14 @@ export interface WorkdayJobDetailResponse {
  * Build the listing POST URL and the per-job detail GET URL builder for a
  * given Workday tenant. Pure — no HTTP.
  *
- * Example: `td` / `wd3` / `TD_Bank_Careers` →
+ * Workday returns `externalPath` already prefixed with `/job/...`, so the
+ * detail URL builder appends it verbatim — DO NOT prepend an extra `/job`
+ * or the call returns 406 from the Akamai edge (May 2026 incident).
+ *
+ * Example: `td` / `wd3` / `TD_Bank_Careers` with externalPath `/job/Toronto/X_R-1` →
  *   listingPostUrl = "https://td.wd3.myworkdayjobs.com/wday/cxs/td/TD_Bank_Careers/jobs"
- *   jobGetUrl("/job/Toronto/Software-Engineer_R-123") =
- *     "https://td.wd3.myworkdayjobs.com/wday/cxs/td/TD_Bank_Careers/job/Toronto/Software-Engineer_R-123"
+ *   jobGetUrl      = "https://td.wd3.myworkdayjobs.com/wday/cxs/td/TD_Bank_Careers/job/Toronto/X_R-1"
+ *   jobPublicUrl   = "https://td.wd3.myworkdayjobs.com/TD_Bank_Careers/job/Toronto/X_R-1"
  */
 export function buildWorkdayUrls(
   tenant: string,
@@ -85,7 +89,7 @@ export function buildWorkdayUrls(
   const cxs = `${base}/wday/cxs/${tenant}/${site}`;
   return {
     listingPostUrl: `${cxs}/jobs`,
-    jobGetUrl: (externalPath: string) => `${cxs}/job${externalPath}`,
+    jobGetUrl: (externalPath: string) => `${cxs}${externalPath}`,
     // Public-facing apply URL (the one we store on JobData.url).
     jobPublicUrl: (externalPath: string) => `${base}/${site}${externalPath}`,
   };
