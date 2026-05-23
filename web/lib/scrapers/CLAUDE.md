@@ -21,8 +21,13 @@ These need Puppeteer because the ATS doesn't expose a clean JSON feed. They are 
 - **`scotiabank.ts`** — Scotiabank custom careers site.
 - **`phenom-rbc.ts`** — RBC's Phenom CareerConnect tenant (`jobs.rbc.com`). Reads server-rendered `phApp.eagerLoadRefineSearch` + JSON-LD `JobPosting` per detail page. Chunked enrichment (50/batch, concurrency=4).
 - **`phenom-bmo.ts`** — BMO's Phenom tenant (`jobs.bmo.com`). Same shape as phenom-rbc.
-- **`phenom-bnc.ts`** — National Bank's Phenom tenant (white-labelled `emplois.bnc.ca`). Same shape.
 - **`browser.ts`** — Generic Puppeteer helpers (`scrapeJobsWithBrowser`, `scrapeGenericJobBoard`, `scrapeSuccessFactors`).
+
+## Avature scrapers (offloaded to GitHub Actions)
+
+Avature CRM is a different vendor from Phenom; the white-labelled pages render plain HTML (no `phApp`, no JSON-LD JobPosting), so the parsing strategy is HTML-string-in → DOM-out via jsdom/DOMParser. Same `scrape-heavy.yml` offload path as the Phenom scrapers.
+
+- **`avature-bnc.ts`** — National Bank's Avature CRM tenant (`emplois.bnc.ca`). Listing pagination via `?jobOffset=N` with stride 20 (Avature's `jobRecordsPerPage` cap); detail descriptions concatenated from every `article__content__view__field__value` under the `.main-panel` container, excluding the metadata-only first block. Chunked enrichment (50/batch, concurrency=4).
 
 ## Offloaded API scrapers — Workday tenants
 

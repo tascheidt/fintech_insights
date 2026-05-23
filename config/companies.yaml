@@ -117,8 +117,8 @@ companies:
   - name: National Bank
     slug: bnc
     country: CA
-    ats_type: phenom
+    ats_type: avature
     ats_identifier: bnc
-    careers_url: https://emplois.bnc.ca/fr_CA/careers/searchjobs
+    careers_url: https://emplois.bnc.ca/en_CA/careers/searchjobs
     tier: incumbent
     is_active: false

@@ -8,7 +8,7 @@ import { fetchDayforceJobs } from "./dayforce";
 import { fetchScotiabankJobs } from "./scotiabank";
 import { fetchPhenomRbcJobs } from "./phenom-rbc";
 import { fetchPhenomBmoJobs } from "./phenom-bmo";
-import { fetchPhenomBncJobs } from "./phenom-bnc";
+import { fetchAvatureBncJobs } from "./avature-bnc";
 import { fetchWorkdayTdJobs } from "./workday-td";
 import { fetchWorkdayCibcJobs } from "./workday-cibc";
 
@@ -46,18 +46,28 @@ export async function fetchJobs(
 
     case "phenom": {
       // Phenom CareerConnect is white-labelled to each bank's own domain
-      // (jobs.rbc.com, jobs.bmo.com, emplois.bnc.ca, etc.). Dispatch by
-      // tenant since each tenant's listing URL and per-site quirks differ.
-      // The pure-logic pieces (eagerLoadRefineSearch parsing, JSON-LD
-      // enrichment, decodeHtmlEntities in ./utils) are shared across the
-      // tenant scrapers; no Workday-style base class — pattern is
-      // fork-per-tenant.
+      // (jobs.rbc.com, jobs.bmo.com, etc.). Dispatch by tenant since each
+      // tenant's listing URL and per-site quirks differ. The pure-logic
+      // pieces (eagerLoadRefineSearch parsing, JSON-LD enrichment,
+      // decodeHtmlEntities in ./utils) are shared across the tenant
+      // scrapers; no Workday-style base class — pattern is fork-per-tenant.
       const tenant = atsIdentifier.toLowerCase();
       if (tenant === "rbc") return fetchPhenomRbcJobs(atsIdentifier, browser);
       if (tenant === "bmo") return fetchPhenomBmoJobs(atsIdentifier, browser);
-      if (tenant === "bnc") return fetchPhenomBncJobs(atsIdentifier, browser);
       throw new Error(
         `No Phenom scraper for tenant '${atsIdentifier}'. Add a tenant-specific scraper modeled on phenom-rbc.ts.`
+      );
+    }
+
+    case "avature": {
+      // Avature CRM is white-labelled to each tenant's own domain
+      // (emplois.bnc.ca today). Currently single-tenant — dispatch by
+      // identifier when a second Avature site lands so each can have its
+      // own per-site quirks isolated.
+      const tenant = atsIdentifier.toLowerCase();
+      if (tenant === "bnc") return fetchAvatureBncJobs(atsIdentifier, browser);
+      throw new Error(
+        `No Avature scraper for tenant '${atsIdentifier}'. Add a tenant-specific scraper modeled on avature-bnc.ts.`
       );
     }
 
@@ -139,6 +149,7 @@ export function isBrowserScraper(atsType: string): boolean {
     'dayforce',
     'successfactors',
     'phenom',
+    'avature',
     'taleo',
     'icims',
   ];
