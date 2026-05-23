@@ -1,0 +1,12 @@
+{
+  "jobPostingInfo": {
+    "title": "Senior Software Engineer",
+    "jobDescription": "<div><h2>About this opportunity</h2><p>TD is hiring a <strong>Senior Software Engineer</strong> to join our Cloud Platform team in Toronto. You will design, build, and operate microservices that power core banking experiences.</p><h3>Responsibilities</h3><ul><li>Lead the design of scalable backend systems.</li><li>Mentor mid-level engineers.</li></ul></div>",
+    "location": "Toronto, Ontario, Canada",
+    "country": { "descriptor": "Canada" },
+    "postedOn": "2026-05-12",
+    "jobReqId": "R-0000123456",
+    "externalUrl": "https://td.wd3.myworkdayjobs.com/TD_Bank_Careers/job/Toronto-Ontario/Senior-Software-Engineer_R-0000123456",
+    "timeType": "Full time"
+  }
+}

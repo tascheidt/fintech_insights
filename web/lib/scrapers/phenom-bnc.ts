@@ -1,42 +1,29 @@
 /**
- * RBC (Royal Bank of Canada) — Phenom CareerConnect scraper.
+ * BNC (National Bank of Canada / Banque Nationale) — Phenom CareerConnect
+ * scraper on a white-labeled domain.
  *
- * Browser-based. Lives in scrape-heavy.yml's offload set (see
- * `isBrowserScraper` in `./index.ts`). Daily cadence is fine — fragility
- * budget is wide because we read from documented surfaces, not CSS.
+ * Mirrors the proven RBC scraper (`./phenom-rbc.ts`) exactly — BNC runs on
+ * the same Phenom CareerConnect platform behind a white-labeled host
+ * (`emplois.bnc.ca`). The canonical landing is the French URL because BNC
+ * is a Quebec-headquartered bilingual institution; the underlying data
+ * shape is identical to the rest of the Phenom family.
  *
- * Two data surfaces, both server-rendered into the HTML:
+ * Two data surfaces:
  *
  *   1. Listing pages embed `phApp.eagerLoadRefineSearch.data.jobs[]` with
- *      ~40 fields per posting: title, reqId, city/state/country,
- *      multi_category (department), subCategory (team), postedDate,
- *      descriptionTeaser. Pagination via `?from=<offset>`; default page
- *      size is 10, totalHits indicates the corpus size.
+ *      ~40 fields per posting (title, reqId, city/state/country,
+ *      multi_category → department, subCategory → team, postedDate,
+ *      descriptionTeaser). Pagination via `?from=<offset>` at 10/page.
  *
  *   2. Detail pages embed a `<script type="application/ld+json">`
- *      JobPosting (schema.org) block with the full HTML description as
- *      `description` (HTML-entity-encoded). schema.org is documented and
- *      Google-indexed, so Phenom is unlikely to drop it. Phenom's own
- *      `phApp.ddo.jobDetail.data.job.description` is a structurally
- *      equivalent fallback.
+ *      JobPosting (schema.org) block with the full HTML description.
+ *      `phApp.ddo.jobDetail.data.job.description` is the fallback.
  *
- * The scraper paginates the FULL listing first (cheap — one page-load
- * per 10 jobs), then enriches every posting's description with a per-job
- * detail-page fetch. Description enrichment runs in batches of
- * `ENRICH_BATCH_SIZE` (50): each batch uses concurrency=4 with fresh
- * puppeteer pages that are closed when the batch finishes, so page
- * memory doesn't accumulate across a multi-thousand-job run. Progress is
- * logged per batch.
+ * Lives in scrape-heavy.yml's offload set (browser-based via puppeteer).
  *
- * Cost knob: `PHENOM_RBC_MAX_JOBS` env var is an OPTIONAL cap. Unset (the
- * production default) means "process the entire RBC corpus" — pagination
- * runs until totalHits is exhausted. Set it for smoke tests or to impose
- * a cost ceiling. Full RBC is ~1,500 jobs; at 4-concurrent description
- * fetches × ~5s each that's ~30min on cold-start (fine for GitHub
- * Actions). The processor's `description_hash` gate makes subsequent
- * runs cheap (no Gemini re-extraction on unchanged jobs), but the
- * per-page Puppeteer load is still incurred — that's the next
- * optimization frontier if cost becomes real.
+ * Cost knob: `PHENOM_BNC_MAX_JOBS` env var is an OPTIONAL cap. Unset (the
+ * production default) means "process the entire BNC corpus." Set it for
+ * smoke tests or to impose a cost ceiling.
  */
 
 import type { JobData } from "./types";
@@ -44,11 +31,9 @@ import type { Browser, Page } from "puppeteer-core";
 import { decodeHtmlEntities, detectLocationType, htmlToText } from "./utils";
 import { log } from "@/lib/log";
 
-const RBC_LISTING_URL = "https://jobs.rbc.com/ca/en/search-results";
+const BNC_LISTING_URL = "https://emplois.bnc.ca/fr_CA/careers/searchjobs";
+const BNC_JOB_BASE_URL = "https://emplois.bnc.ca/fr_CA/careers/jobdetail";
 const DESCRIPTION_CONCURRENCY = 4;
-// Description enrichment is processed in batches of this size: fresh
-// puppeteer pages per batch, closed at batch end. Bounds page-memory
-// growth over a full ~1,500-job corpus and gives per-batch progress logs.
 const ENRICH_BATCH_SIZE = 50;
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -139,11 +124,6 @@ export function extractEagerLoadPayload(
   return null;
 }
 
-// `decodeHtmlEntities` moved to `./utils` so the four scrapers that need it
-// (phenom-rbc, scotiabank, workday-td, workday-cibc) share one definition.
-// Re-exported here for the existing test + any external imports.
-export { decodeHtmlEntities } from "./utils";
-
 /**
  * Map one Phenom row to the canonical `JobData` shape. Pure transformation
  * — no I/O, fully unit-testable.
@@ -155,7 +135,7 @@ export { decodeHtmlEntities } from "./utils";
  * `description_text` is set to the listing-time teaser as a stand-in; the
  * description-enrichment pass replaces it with the full extracted text.
  */
-export function mapPhenomJob(raw: PhenomRawJob): JobData {
+export function mapBncJob(raw: PhenomRawJob): JobData {
   const externalId = raw.reqId || raw.jobId || "";
   const locationParts = raw.multi_location?.length
     ? raw.multi_location.join("; ")
@@ -180,14 +160,13 @@ export function mapPhenomJob(raw: PhenomRawJob): JobData {
     if (!isNaN(parsed.getTime())) postedDate = parsed;
   }
 
-  // Canonical Phenom URL — independent of whatever applyUrl Phenom rendered
-  // (apply URLs route into Workday). Slug is title with non-alnum collapsed.
+  // Canonical Phenom URL — slug is title with non-alnum collapsed.
   const slug = (raw.title || "")
     .trim()
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
   const url = externalId
-    ? `https://jobs.rbc.com/ca/en/job/${externalId}/${slug}`
+    ? `${BNC_JOB_BASE_URL}/${externalId}/${slug}`
     : raw.jobUrl || raw.applyUrl || "";
 
   // Phenom occasionally encodes employment type as "Full time" / "Contract".
@@ -213,6 +192,9 @@ export function mapPhenomJob(raw: PhenomRawJob): JobData {
     url,
   };
 }
+
+// Re-exported for the existing test + any external imports.
+export { decodeHtmlEntities } from "./utils";
 
 // ---------------------------------------------------------------------------
 // Browser-side extractor (string-sourced so tsx's `__name` helper can't
@@ -284,8 +266,6 @@ interface BrowserHandles {
 
 async function acquireBrowser(injected?: Browser): Promise<BrowserHandles> {
   if (injected) return { browser: injected, owned: false };
-  // Match the loader in `./browser.ts`. We don't reach into that module
-  // directly because we want to manage our own pages/lifecycle.
   const puppeteer = await import("puppeteer-core");
   const chromiumModule = await import("@sparticuz/chromium");
   type ChromiumLike = {
@@ -310,10 +290,8 @@ async function fetchListingPage(
   page: Page,
   from: number
 ): Promise<PhenomSearchPayload | null> {
-  const url = from === 0 ? RBC_LISTING_URL : `${RBC_LISTING_URL}?from=${from}`;
+  const url = from === 0 ? BNC_LISTING_URL : `${BNC_LISTING_URL}?from=${from}`;
   await page.goto(url, { waitUntil: "networkidle2", timeout: 45_000 });
-  // Phenom hydrates after initial paint — small wait gives the SSR blob
-  // time to settle on slow connections.
   await new Promise((r) => setTimeout(r, 2_000));
   const html = await page.content();
   return extractEagerLoadPayload(html);
@@ -364,7 +342,7 @@ async function enrichBatch(
                 reqId: job.external_id,
                 err: e instanceof Error ? e.message : String(e),
               },
-              "[phenom-rbc] description enrichment failed"
+              "[phenom-bnc] description enrichment failed"
             );
           }
         }
@@ -379,8 +357,8 @@ async function enrichBatch(
 /**
  * Enrich every job's description, walking the corpus in chunks of
  * `batchSize`. Each chunk is a self-contained `enrichBatch` call; progress
- * is logged after each so a long (~1,500-job) run is observable and a
- * crash leaves a clear high-water mark in the logs.
+ * is logged after each so a long-running scrape is observable and a crash
+ * leaves a clear high-water mark in the logs.
  */
 async function enrichDescriptions(
   browser: Browser,
@@ -406,12 +384,12 @@ async function enrichDescriptions(
         enrichedSoFar: totalEnriched,
         failedSoFar: totalFailed,
       },
-      "[phenom-rbc] enrichment batch complete"
+      "[phenom-bnc] enrichment batch complete"
     );
   }
   log.info(
     { enriched: totalEnriched, failed: totalFailed, total: jobs.length },
-    "[phenom-rbc] description enrichment complete"
+    "[phenom-bnc] description enrichment complete"
   );
 }
 
@@ -420,14 +398,14 @@ async function enrichDescriptions(
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve the optional per-run cap. `PHENOM_RBC_MAX_JOBS`:
+ * Resolve the optional per-run cap. `PHENOM_BNC_MAX_JOBS`:
  *   - unset (production default) → null → process the entire corpus
  *   - a positive integer → cap the run to that many jobs (smoke tests,
  *     cost ceilings)
  * Exported for unit testing.
  */
 export function resolveJobCap(
-  rawEnv: string | undefined = process.env.PHENOM_RBC_MAX_JOBS
+  rawEnv: string | undefined = process.env.PHENOM_BNC_MAX_JOBS
 ): number | null {
   if (rawEnv && /^\d+$/.test(rawEnv)) {
     return Math.max(1, parseInt(rawEnv, 10));
@@ -435,12 +413,12 @@ export function resolveJobCap(
   return null;
 }
 
-export async function fetchPhenomRbcJobs(
+export async function fetchPhenomBncJobs(
   atsIdentifier: string,
   browser?: Browser
 ): Promise<JobData[]> {
-  // `atsIdentifier` is "rbc" today — accepted in the signature so the
-  // factory can dispatch by tenant once more Phenom tenants land.
+  // `atsIdentifier` is "bnc" today — accepted so the factory can dispatch
+  // by tenant once more Phenom tenants land.
   void atsIdentifier;
 
   const cap = resolveJobCap();
@@ -462,7 +440,7 @@ export async function fetchPhenomRbcJobs(
       const payload = await fetchListingPage(listingPage, from);
       if (!payload?.data?.jobs?.length) break;
       totalHits = payload.totalHits ?? totalHits;
-      jobs.push(...payload.data.jobs.map(mapPhenomJob));
+      jobs.push(...payload.data.jobs.map(mapBncJob));
       from += payload.data.jobs.length;
       if (cap != null && jobs.length >= cap) break;
       if (totalHits != null && from >= totalHits) break;
@@ -478,7 +456,7 @@ export async function fetchPhenomRbcJobs(
         cap: cap ?? "uncapped",
         batchSize: ENRICH_BATCH_SIZE,
       },
-      "[phenom-rbc] listings complete; enriching descriptions in batches"
+      "[phenom-bnc] listings complete; enriching descriptions in batches"
     );
 
     if (jobs.length > 0) {

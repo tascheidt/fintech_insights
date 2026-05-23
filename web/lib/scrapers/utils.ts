@@ -22,3 +22,24 @@ export function normalizeCommitment(commitment: string): string | null {
   if (/intern/.test(c)) return "internship";
   return commitment;
 }
+
+/**
+ * Decode the common HTML entities that ATS providers double-escape into
+ * embedded JSON (`&lt;div&gt;` style). `&amp;` is decoded LAST — otherwise
+ * a doubly-encoded sequence like `&amp;lt;` would first become `&lt;` then
+ * incorrectly be decoded to `<`. The previous order-sensitive bug existed
+ * in two private copies (phenom-rbc.ts, scotiabank.ts); this is the
+ * canonical implementation — import from here instead of recreating.
+ */
+export function decodeHtmlEntities(s: string): string {
+  if (!s) return s;
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&"); // last — see header
+}

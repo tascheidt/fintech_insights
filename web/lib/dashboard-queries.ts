@@ -1105,7 +1105,14 @@ function coerceKeywords(raw: unknown): string[] {
  * incumbent (big-bank) postings do not flood the Jobs list, its company
  * dropdown, or the eyebrow stats. The Jobs-page Tier toggle opts in by
  * passing `tiers` explicitly.
+ *
+ * Hard-capped at `JOBS_LIST_MAX_ROWS` (most-recent first). Without a cap, an
+ * `?tier=incumbent` or `?tier=all` query would ship the entire ~7k-row
+ * active corpus on every page render (~22MB JSON, painful client-side).
+ * Phase 3 follow-up will replace this with server-side pagination.
  */
+export const JOBS_LIST_MAX_ROWS = 500;
+
 export async function getJobsListData(
   options: { jobIds?: string[] | null; tiers?: readonly CompanyTier[] } = {}
 ): Promise<JobsListRow[]> {
@@ -1124,7 +1131,8 @@ export async function getJobsListData(
       "id, title, standardized_department, function_category, location, location_structured, is_active, first_seen_date, keywords, company_id, companies!inner(id, name, slug, tier)"
     )
     .in("companies.tier", tierList)
-    .order("first_seen_date", { ascending: false });
+    .order("first_seen_date", { ascending: false })
+    .limit(JOBS_LIST_MAX_ROWS);
 
   if (options.jobIds && options.jobIds.length > 0) {
     query = query.in("id", options.jobIds);

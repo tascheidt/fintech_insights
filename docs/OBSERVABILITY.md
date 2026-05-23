@@ -46,6 +46,22 @@ Sentry dashboard → "Issues". The cron monitors live under "Crons". Alerts rout
 
 If you add a new outbound `resend.emails.send(...)` or `resend.batch.send(...)` call, wrap it with `retryResendCall` for symmetry.
 
+## Scraper-break canary (partial-corpus drop)
+
+Outright scraper errors and zero-result wipes are already caught by [`web/lib/email/scraper-health.ts`](../web/lib/email/scraper-health.ts) at the end of every `/api/cron/collect` run (issue types `failed` and `empty`). Silent partial drops — the scraper still returns *some* jobs but is missing pagination or a careers-site section — used to slip through.
+
+The Phase-3 fragility canary closes that gap for `tier='incumbent'` companies. For each active incumbent at the end of `collect`, it computes:
+
+- `todayNewJobs` — new postings whose `first_seen_date` falls in the current UTC day.
+- `rollingAvg7d` — average new-postings per day over the 7 calendar days *before* today.
+
+The canary fires for a bank when BOTH thresholds hold:
+
+- `todayNewJobs < 0.5 * rollingAvg7d` (a >50% day-over-day drop), AND
+- `rollingAvg7d > 5` (suppress the alert on banks with low baseline volume so a legitimately quiet day doesn't page).
+
+The pure threshold rule is `evaluateCanary({today, rolling}) → { fire, reason }` in [`web/lib/email/scraper-health.ts`](../web/lib/email/scraper-health.ts); it has unit tests in `scraper-health.test.ts`. Firing canaries are appended to the existing scraper-alert email under a "Scraper-break canary" section so admins don't get a second message. Failed canary detection logs a structured `log.error` but never blocks the rest of the scraper-health flow.
+
 ## Daily Gemini cost alarm
 
 A GitHub Actions workflow ([`gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml)) runs daily at 14:00 UTC and `curl`s `/api/admin/cost-alarm` with `Authorization: Bearer ${CRON_SECRET}`.

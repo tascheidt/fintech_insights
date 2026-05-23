@@ -1,5 +1,18 @@
 [
   {
+    "version": "2.2.0",
+    "date": "2026-05-22",
+    "changes": [
+      { "type": "feature", "description": "Phase 3 — scaled the incumbent lens from RBC alone to all 5 Big-6 Canadian banks. BMO and National Bank join via Phenom CareerConnect (mirror of the RBC scraper); TD and CIBC join via dedicated Workday scrapers built on a shared `workday-utils.ts` (no base class — fork-per-tenant). Each bank seeded `is_active=false`; flip after smoke." },
+      { "type": "feature", "description": "Simplii Financial classifier — `workday-cibc.ts` exports `isSimpliiPosting` and runs in log-only mode for now. Once production logs confirm Simplii postings actually surface inside CIBC's Workday tenant, a follow-up adds the `simplii` companies row (tier=fintech) and routes via `companySlugOverride`." },
+      { "type": "feature", "description": "Cost-gate calibration script (`web/scripts/calibrate-incumbent-gate.ts`) — read-only Markdown + JSON report on the incumbent corpus: seniority distribution, function-category distribution, pass rate under the production whitelist, simulated pass rates under candidate whitelists (e.g. include `senior`, drop `aml-financial-crime`), and the top-20 near-miss `senior`-in-whitelisted-function titles. Run after each Phase-3 ramp." },
+      { "type": "improvement", "description": "Scraper-break canary — the scraper-health alert email now fires on partial-corpus drops, not only outages. For each tracked incumbent bank, if today's new-jobs count is below 50% of the 7-day rolling average AND that rolling average is above 5, a \"Scraper-break canary\" section appears in the next alert email." },
+      { "type": "improvement", "description": "Two partial indexes on the read-hot tables (`idx_job_postings_company_active_first_seen`, `idx_companies_tier_active`) for the per-company windowed queries and the cross-company tier joins. Pre-empts the query-plan degradation Luke's plan review flagged at 5× scale." },
+      { "type": "improvement", "description": "`/jobs` hard-capped at the 500 most-recent postings (`JOBS_LIST_MAX_ROWS`). Without it, a `?tier=incumbent` or `?tier=all` view would ship ~22 MB of JSON on every page render once the bank ramp finishes." },
+      { "type": "improvement", "description": "`decodeHtmlEntities` consolidated into `web/lib/scrapers/utils.ts` (was duplicated twice; scotiabank's copy decoded `&amp;` first — a subtle bug that collapsed doubly-encoded sequences like `&amp;lt;` to `<` instead of leaving them as `&lt;`)." }
+    ]
+  },
+  {
     "version": "2.1.0",
     "date": "2026-05-21",
     "changes": [

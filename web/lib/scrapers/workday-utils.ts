@@ -1,0 +1,225 @@
+/**
+ * Workday-family shared helpers.
+ *
+ * Workday tenants expose a documented JSON API (`/wday/cxs/...`) — no
+ * Puppeteer needed. Two endpoints per tenant:
+ *
+ *   1. Listing (POST `.../jobs`) — paginated by `offset` += 20, returns
+ *      `{ total, jobPostings: [{ title, externalPath, locationsText,
+ *      postedOn, bulletFields }] }`.
+ *
+ *   2. Detail (GET `.../job<externalPath>`) — returns
+ *      `{ jobPostingInfo: { jobDescription /* HTML *\/, location, country,
+ *      postedOn, jobReqId, ... } }`. `externalPath` already starts with `/`.
+ *
+ * Every Workday tenant in the corpus runs on the same surface, so the
+ * three helpers below (URL builder + two pure mappers) are extracted up
+ * front. Per Farhan's call ("guaranteed-shared, duplicating them is
+ * future merge conflict") we do NOT extract a `WorkdayBaseScraper` class
+ * — too premature with two tenants.
+ */
+
+import type { JobData } from "./types";
+import { htmlToText, detectLocationType, normalizeCommitment } from "./utils";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** One entry from the listing response's `jobPostings[]` array. */
+export interface WorkdayListingRow {
+  title?: string;
+  externalPath?: string;
+  locationsText?: string;
+  postedOn?: string;
+  bulletFields?: string[];
+  // Some tenants surface additional optional metadata (brand, business
+  // unit) inline. We keep the type open via `[k: string]: unknown` so
+  // tenant-specific classifiers (e.g. Simplii) can probe without
+  // re-typing the row.
+  [key: string]: unknown;
+}
+
+export interface WorkdayListingResponse {
+  total?: number;
+  jobPostings?: WorkdayListingRow[];
+}
+
+export interface WorkdayJobDetailResponse {
+  jobPostingInfo?: {
+    jobDescription?: string;
+    location?: string;
+    country?: { descriptor?: string } | string;
+    postedOn?: string;
+    jobReqId?: string;
+    title?: string;
+    externalUrl?: string;
+    timeType?: string;
+    [key: string]: unknown;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// URL builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the listing POST URL and the per-job detail GET URL builder for a
+ * given Workday tenant. Pure — no HTTP.
+ *
+ * Example: `td` / `wd3` / `TD_Bank_Careers` →
+ *   listingPostUrl = "https://td.wd3.myworkdayjobs.com/wday/cxs/td/TD_Bank_Careers/jobs"
+ *   jobGetUrl("/job/Toronto/Software-Engineer_R-123") =
+ *     "https://td.wd3.myworkdayjobs.com/wday/cxs/td/TD_Bank_Careers/job/Toronto/Software-Engineer_R-123"
+ */
+export function buildWorkdayUrls(
+  tenant: string,
+  instance: string,
+  site: string
+): {
+  listingPostUrl: string;
+  jobGetUrl: (externalPath: string) => string;
+  jobPublicUrl: (externalPath: string) => string;
+} {
+  const base = `https://${tenant}.${instance}.myworkdayjobs.com`;
+  const cxs = `${base}/wday/cxs/${tenant}/${site}`;
+  return {
+    listingPostUrl: `${cxs}/jobs`,
+    jobGetUrl: (externalPath: string) => `${cxs}/job${externalPath}`,
+    // Public-facing apply URL (the one we store on JobData.url).
+    jobPublicUrl: (externalPath: string) => `${base}/${site}${externalPath}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pure mappers
+// ---------------------------------------------------------------------------
+
+/**
+ * Map one listing row to a `JobData` (without description — the detail
+ * endpoint owns that and the result is merged downstream). Pure.
+ *
+ * `urlBuilder` is passed in so the same mapper works for every Workday
+ * tenant.
+ *
+ * Returns `null` if the row is missing both `externalPath` and `title`
+ * (nothing we can do with it).
+ */
+export function parseWorkdayListingRow(
+  raw: WorkdayListingRow,
+  urlBuilder: (externalPath: string) => string
+): JobData | null {
+  const title = raw.title?.trim() || "";
+  const externalPath = raw.externalPath?.trim() || "";
+  if (!title && !externalPath) return null;
+
+  // `externalPath` is the canonical id we have access to at listing time.
+  // Strip the leading `/job/<tenant>/` if present so the id is stable
+  // across URL-format changes; fall back to the full path otherwise.
+  // Example: "/job/MONTRAL/Senior-Engineer_R-12345" → "Senior-Engineer_R-12345"
+  const externalId = externalPath
+    ? externalPath.split("/").filter(Boolean).pop() || externalPath
+    : "";
+
+  const location = raw.locationsText?.trim() || null;
+
+  let postedDate: Date | null = null;
+  if (raw.postedOn) {
+    // Workday emits a variety of strings here. ISO and "Posted Yesterday"
+    // style both appear. We only parse ISO/Date-parseable values; relative
+    // strings get dropped to null and the detail endpoint can fill in.
+    const parsed = new Date(raw.postedOn);
+    if (!isNaN(parsed.getTime())) postedDate = parsed;
+  }
+
+  // `bulletFields` is Workday's catch-all for unstructured metadata —
+  // often holds the brand name (for CIBC → Simplii). We don't interpret
+  // it here; tenant-specific classifiers do.
+  const bullets = Array.isArray(raw.bulletFields) ? raw.bulletFields : [];
+
+  let commitment: string | null = "full-time";
+  const titleLower = title.toLowerCase();
+  if (/intern/.test(titleLower)) commitment = "internship";
+  else if (/contract/.test(titleLower)) commitment = "contract";
+  else if (/part-time|part time/.test(titleLower)) commitment = "part-time";
+  // Workday sometimes encodes employment type in bulletFields ("Regular",
+  // "Temporary"). Try normalizeCommitment on each as a soft signal.
+  for (const b of bullets) {
+    if (typeof b !== "string") continue;
+    const normalized = normalizeCommitment(b);
+    if (normalized && /contract|part|intern/.test(normalized)) {
+      commitment = normalized;
+      break;
+    }
+  }
+
+  return {
+    external_id: externalId,
+    title,
+    department: null,
+    team: null,
+    location,
+    location_type: location ? detectLocationType(location, "") : null,
+    description_html: null,
+    description_text: null,
+    commitment,
+    posted_date: postedDate,
+    url: externalPath ? urlBuilder(externalPath) : null,
+  };
+}
+
+/**
+ * Map a Workday detail response to the fields the description-enrichment
+ * step needs. Pure.
+ *
+ * `jobDescription` is HTML; we keep both the raw HTML and a text
+ * conversion so downstream consumers (hash gate, AI extractor) can
+ * choose.
+ */
+export function parseWorkdayJobDetail(raw: WorkdayJobDetailResponse): {
+  description_html: string;
+  description_text: string;
+  location?: string;
+  posted_date?: Date | null;
+} {
+  const info = raw.jobPostingInfo ?? {};
+  const descriptionHtml = typeof info.jobDescription === "string" ? info.jobDescription : "";
+
+  let location: string | undefined;
+  if (typeof info.location === "string" && info.location.trim()) {
+    location = info.location.trim();
+  }
+
+  let postedDate: Date | null | undefined;
+  if (info.postedOn) {
+    const parsed = new Date(info.postedOn);
+    if (!isNaN(parsed.getTime())) postedDate = parsed;
+  }
+
+  return {
+    description_html: descriptionHtml,
+    description_text: htmlToText(descriptionHtml),
+    location,
+    posted_date: postedDate,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Job cap
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve an optional per-run cap from an env var. Same semantics as
+ * `resolveJobCap` in phenom-rbc.ts:
+ *   - unset / non-numeric → null → process entire corpus
+ *   - positive integer → cap (smoke tests, cost ceilings)
+ *   - 0 → 1 (a zero cap is a useless run)
+ *
+ * Exported so workday-td/workday-cibc share one definition.
+ */
+export function resolveWorkdayJobCap(rawEnv: string | undefined): number | null {
+  if (rawEnv && /^\d+$/.test(rawEnv)) {
+    return Math.max(1, parseInt(rawEnv, 10));
+  }
+  return null;
+}

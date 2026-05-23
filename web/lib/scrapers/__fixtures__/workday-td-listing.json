@@ -1,0 +1,26 @@
+{
+  "total": 3,
+  "jobPostings": [
+    {
+      "title": "Senior Software Engineer",
+      "externalPath": "/job/Toronto-Ontario/Senior-Software-Engineer_R-0000123456",
+      "locationsText": "Toronto, Ontario, Canada",
+      "postedOn": "2026-05-12",
+      "bulletFields": ["R-0000123456", "Regular"]
+    },
+    {
+      "title": "Data Analytics Intern",
+      "externalPath": "/job/Montreal-Quebec/Data-Analytics-Intern_R-0000123789",
+      "locationsText": "Montreal, Quebec, Canada",
+      "postedOn": "Posted Yesterday",
+      "bulletFields": ["R-0000123789", "Internship"]
+    },
+    {
+      "title": "Director, Risk Management",
+      "externalPath": "/job/New-York/Director--Risk-Management_R-0000124001",
+      "locationsText": "New York, New York, United States of America",
+      "postedOn": "2026-05-08T00:00:00.000Z",
+      "bulletFields": ["R-0000124001", "Full time"]
+    }
+  ]
+}
