@@ -18,6 +18,14 @@ export interface GeminiUsageMetadata {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
   cachedContentTokenCount?: number;
+  /**
+   * Reasoning/thinking tokens (Gemini 2.5 series). Billed at the OUTPUT
+   * rate and NOT included in `candidatesTokenCount`. Older payloads omit
+   * this field; newer payloads may also omit it on a per-call basis when
+   * the model didn't need to think. The meter falls back to inferring it
+   * from `totalTokenCount - prompt - candidates - cached` when missing.
+   */
+  thoughtsTokenCount?: number;
   totalTokenCount?: number;
 }
 
@@ -30,6 +38,8 @@ export interface UsageRecord {
   inputTokens: number;
   outputTokens: number;
   cachedTokens: number;
+  /** Reasoning/thinking tokens — billed at the output rate. */
+  thoughtsTokens: number;
   totalTokens: number;
   estimatedUsd: number;
   latencyMs: number;
@@ -57,9 +67,17 @@ export function recordUsage(opts: {
   const outputTokens = opts.usageMetadata?.candidatesTokenCount ?? 0;
   const cachedTokens = opts.usageMetadata?.cachedContentTokenCount ?? 0;
   const totalTokens = opts.usageMetadata?.totalTokenCount ?? inputTokens + outputTokens;
+  // Gemini 2.5 Flash often returns thinking-token totals without naming the
+  // field — totalTokenCount > prompt + candidates + cached. Infer the
+  // residual so legacy/edge payloads still get billed correctly.
+  const reportedThoughts = opts.usageMetadata?.thoughtsTokenCount;
+  const thoughtsTokens =
+    reportedThoughts ??
+    Math.max(0, totalTokens - inputTokens - outputTokens - cachedTokens);
   const estimatedUsd = estimateUsd(modelServed, {
     inputTokens,
     outputTokens,
+    thoughtsTokens,
     groundingEnabled: opts.groundingEnabled,
   });
 
@@ -71,6 +89,7 @@ export function recordUsage(opts: {
     inputTokens,
     outputTokens,
     cachedTokens,
+    thoughtsTokens,
     totalTokens,
     estimatedUsd,
     latencyMs: opts.latencyMs,

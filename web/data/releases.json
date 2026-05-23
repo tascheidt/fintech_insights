@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.2.1",
+    "date": "2026-05-23",
+    "changes": [
+      { "type": "fix", "description": "Gemini cost telemetry now bills reasoning (\"thinking\") tokens at the output rate. Gemini 2.5 (both Pro and Flash) returns thinking tokens in `totalTokenCount` without naming them; our formula previously dropped them entirely, undercounting Flash extraction spend by ~3x. Backfilled all 2,936 historical events; recovered $10.57 of previously-hidden cost." }
+    ]
+  },
+  {
     "version": "2.2.0",
     "date": "2026-05-22",
     "changes": [
