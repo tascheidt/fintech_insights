@@ -63,6 +63,18 @@ const BANKS: IncumbentBankSeed[] = [
     ats_identifier: "bnc",
     careers_url: "https://emplois.bnc.ca/en_CA/careers/searchjobs",
   },
+  {
+    // Scotia parent brand. Tangerine — Scotia's digital subsidiary — is
+    // already tracked separately under the same SuccessFactors host but a
+    // different brand path (`/Tangerine/`), and stays as a fintech-tier
+    // company. Scotia parent is the 5th and final Big-6 incumbent.
+    name: "Scotiabank",
+    slug: "scotiabank",
+    country: "CA",
+    ats_type: "scotiabank",
+    ats_identifier: "Scotiabank",
+    careers_url: "https://jobs.scotiabank.com/Scotiabank/search/",
+  },
 ];
 
 async function main(): Promise<void> {
@@ -104,7 +116,7 @@ async function main(): Promise<void> {
     console.log(`[seed-phase3] upserted ${bank.slug} (${bank.name})`);
   }
 
-  // Tier-integrity assert (Luke's blocker #7). If any of the 4 came back
+  // Tier-integrity assert (Luke's blocker #7). If any seeded row came back
   // with the default 'fintech' tier — e.g. an older row already existed
   // with that value and upsert didn't overwrite it — fail loudly. A bank
   // silently in the fintech tier would leak straight into every aggregator
@@ -129,7 +141,9 @@ async function main(): Promise<void> {
         .join(", ")}`
     );
   }
-  console.log(`[seed-phase3] tier integrity ok — 4/4 rows confirmed 'incumbent'`);
+  console.log(
+    `[seed-phase3] tier integrity ok — ${verify.length}/${BANKS.length} rows confirmed 'incumbent'`
+  );
   console.log(`[seed-phase3] all is_active=false; flip after smoke.`);
 }
 

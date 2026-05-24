@@ -183,6 +183,18 @@ const ATS_PATTERNS: ATSPattern[] = [
       return match ? match[1] : null;
     },
   },
+  // Scotiabank SuccessFactors portal: `jobs.scotiabank.com` hosts every
+  // Scotia-family brand under a per-brand path (e.g. `/Scotiabank/...`,
+  // `/Tangerine/...`). The brand path is the identifier — extracted from
+  // the URL path's first segment.
+  {
+    type: "scotiabank",
+    patterns: [/^jobs\.scotiabank\.com$/i],
+    extractIdentifier: (url: URL) => {
+      const first = url.pathname.split("/").filter(Boolean)[0];
+      return first ?? null;
+    },
+  },
   // Avature CRM: also vendor-hosted but white-labelled per tenant. Tight
   // allowlist for now — National Bank's `emplois.bnc.ca` is the only
   // tenant we ship a scraper for, plus the legacy `jobs.nbc.ca` host that
@@ -259,6 +271,7 @@ export const SUPPORTED_ATS = [
   { value: "dayforce", label: "Dayforce", implemented: true },
   { value: "phenom", label: "Phenom CareerConnect", implemented: true },
   { value: "avature", label: "Avature CRM", implemented: true },
+  { value: "scotiabank", label: "Scotiabank SuccessFactors", implemented: true },
   { value: "workday-td", label: "Workday (TD Bank)", implemented: true },
   { value: "workday-cibc", label: "Workday (CIBC)", implemented: true },
   { value: "workday", label: "Workday (generic)", implemented: false },

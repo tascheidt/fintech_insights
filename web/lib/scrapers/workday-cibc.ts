@@ -116,7 +116,12 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
     const data = (await res.json()) as WorkdayListingResponse;
     const rows = data.jobPostings ?? [];
     if (rows.length === 0) break;
-    total = data.total ?? total;
+    // Workday returns the real `total` only on the first page; subsequent
+    // pages echo `total: 0` while still returning real `jobPostings`. Treat
+    // any non-positive value as missing or we exit the loop at offset=40.
+    if (typeof data.total === "number" && data.total > 0) {
+      total = data.total;
+    }
 
     for (const row of rows) {
       const job = parseWorkdayListingRow(row, urls.jobPublicUrl);

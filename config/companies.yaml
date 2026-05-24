@@ -122,3 +122,16 @@ companies:
     careers_url: https://emplois.bnc.ca/en_CA/careers/searchjobs
     tier: incumbent
     is_active: false
+
+  # Scotiabank (parent brand). Shares jobs.scotiabank.com with Tangerine but
+  # under a different brand path. The same `scotiabank.ts` SuccessFactors
+  # scraper handles both — Tangerine's hrefs include the `/Tangerine/` brand
+  # prefix, Scotia parent omits it, so the parser matches both shapes.
+  - name: Scotiabank
+    slug: scotiabank
+    country: CA
+    ats_type: scotiabank
+    ats_identifier: Scotiabank
+    careers_url: https://jobs.scotiabank.com/Scotiabank/search/
+    tier: incumbent
+    is_active: false

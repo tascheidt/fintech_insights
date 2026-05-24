@@ -144,6 +144,8 @@ export function isBrowserScraper(atsType: string): boolean {
     'workday',
     'workday-td',     // API-based, but still offloaded — see fetchJobs comment.
     'workday-cibc',   // API-based, but still offloaded.
+    'scotiabank',     // HTML-fetch, but a 1,900-job Scotia parent + per-job
+                      // detail enrichment exceeds Vercel's 300s budget.
     'bamboohr',
     'smartrecruiters',
     'dayforce',

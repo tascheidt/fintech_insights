@@ -1,5 +1,20 @@
 [
   {
+    "version": "2.3.0",
+    "date": "2026-05-23",
+    "changes": [
+      { "type": "feature", "description": "Scotiabank — 5th and final Big-6 incumbent — joins the lens. The parent brand shares Scotia's `jobs.scotiabank.com` SuccessFactors portal with Tangerine (already tracked as a fintech subsidiary), so a single `scotiabank.ts` parser drives both: the brand-path prefix in job hrefs is matched as an optional regex group (Tangerine includes `/Tangerine/`, Scotia parent omits it). Wires the new `scotiabank` ATS through detect-ats, the GitHub-Actions offload list (1,900 jobs × per-detail enrichment doesn't fit in Vercel's 300s budget), and the Phase-3 seed. 19 unit tests cover total-count parsing (handles SuccessFactors's `<b>`-wrapped count), row parsing for both brand-path shapes, postal-code-strip, dedupe, entity decode, description extraction, and the new `SCOTIABANK_MAX_PAGES` env cap." },
+      { "type": "fix", "description": "Scotiabank scraper's hardcoded 20-page cap (~500 jobs) silently truncated any brand larger than ~500 — fine for Tangerine, broken for Scotia parent (~1,900). Default raised to 200 (5,000-job ceiling, ~2.5× headroom); `SCOTIABANK_MAX_PAGES` env overrides for smoke runs." }
+    ]
+  },
+  {
+    "version": "2.2.4",
+    "date": "2026-05-23",
+    "changes": [
+      { "type": "fix", "description": "TD and CIBC Workday scrapers were stopping at 40 jobs (2 pages × 20) instead of pulling the full corpus (~1,531 and ~535 respectively). Root cause: Workday returns the real `total` only on the first page; subsequent pages echo `total: 0` while still returning real `jobPostings`. The loop used `data.total ?? total`, which doesn't fall back on `0`, so `total` got clobbered to `0` and the next `offset >= total` check exited immediately. Now we only update `total` when the value is positive." }
+    ]
+  },
+  {
     "version": "2.2.3",
     "date": "2026-05-23",
     "changes": [
