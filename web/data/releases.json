@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.3.1",
+    "date": "2026-05-23",
+    "changes": [
+      { "type": "fix", "description": "Incumbent insight generation no longer dies on truncated JSON. `maxOutputTokens` for `generateInsightWithLLM` raised from 4096 to 8192 — incumbent banks with rich grounded-research context routinely overran the old cap mid-string, producing \"Unterminated string in JSON\" parse failures that killed the call. Also added empty-response and parse-failure retries (up to 2 attempts each, with backoff) matching the pattern already used in `detectCompanyType`, so a single transient bad response no longer aborts the whole backfill." }
+    ]
+  },
+  {
     "version": "2.3.0",
     "date": "2026-05-23",
     "changes": [

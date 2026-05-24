@@ -534,7 +534,8 @@ async function generateInsightWithLLM(
     headline: string | null;
     key_signal: string | null;
     executive_summary: string | null;
-  } | null
+  } | null,
+  retryCount = 0
 ): Promise<GeneratedInsightContent> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
@@ -546,7 +547,10 @@ async function generateInsightWithLLM(
     model: "gemini-flash-latest",
     generationConfig: {
       temperature: 0.25,
-      maxOutputTokens: 4096,
+      // 8192 was 4096 — incumbent banks (BMO/RBC/Scotia) with grounded
+      // research context routinely truncated mid-JSON, producing
+      // "Unterminated string" parse failures that killed the whole call.
+      maxOutputTokens: 8192,
       responseMimeType: "application/json",
     },
   });
@@ -584,9 +588,16 @@ async function generateInsightWithLLM(
 
     const text = result.response.text()?.trim() ?? "";
 
-    // Handle empty response
+    // Handle empty response — Gemini sometimes returns nothing on first
+    // call, especially when context is large; retry once or twice before
+    // failing so the whole bank isn't lost on a transient hiccup.
     if (!text || text.length === 0) {
       log.warn(`Empty response from Gemini for company insight generation: ${companyName}`);
+      if (retryCount < 2) {
+        log.info(`Retrying company insight for "${companyName}" due to empty response (attempt ${retryCount + 2}/3)`);
+        await new Promise((r) => setTimeout(r, 1000 * (retryCount + 1)));
+        return generateInsightWithLLM(companyName, context, research, _companyType, previousInsight, retryCount + 1);
+      }
       throw new Error("Empty response from LLM");
     }
 
@@ -624,21 +635,28 @@ async function generateInsightWithLLM(
             log.info(`Successfully parsed JSON after fixing trailing commas for company insight "${companyName}"`);
           } catch (fixError) {
             log.error(`Failed to parse JSON for company insight "${companyName}" after extraction attempts. Error: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
-            // Log the problematic JSON snippet for debugging
             if (jsonMatch[0].length < 500) {
               log.error(`Problematic JSON snippet: ${jsonMatch[0]}`);
             }
-            // Log full response if it's short enough to be useful
             if (text.length < 1000) {
               log.error(`Full response: ${text}`);
+            }
+            if (retryCount < 2) {
+              log.info(`Retrying company insight for "${companyName}" due to JSON parse failure (attempt ${retryCount + 2}/3)`);
+              await new Promise((r) => setTimeout(r, 1000 * (retryCount + 1)));
+              return generateInsightWithLLM(companyName, context, research, _companyType, previousInsight, retryCount + 1);
             }
             throw new Error(`Failed to parse JSON response: ${fixError instanceof Error ? fixError.message : String(fixError)}`);
           }
         } else {
           log.error(`No JSON found in response for company insight "${companyName}". Response length: ${text.length}, Preview: ${responsePreview}`);
-          // Log full response if it's short enough to be useful
           if (text.length < 1000) {
             log.error(`Full response: ${text}`);
+          }
+          if (retryCount < 2) {
+            log.info(`Retrying company insight for "${companyName}" due to no-JSON response (attempt ${retryCount + 2}/3)`);
+            await new Promise((r) => setTimeout(r, 1000 * (retryCount + 1)));
+            return generateInsightWithLLM(companyName, context, research, _companyType, previousInsight, retryCount + 1);
           }
           throw new Error("No JSON found in LLM response");
         }
