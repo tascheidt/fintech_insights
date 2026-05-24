@@ -63,26 +63,78 @@ let existingRows: Array<{
   id: string;
   external_id: string;
   description_hash: string | null;
+  company_id?: string;
 }> = [];
 
+// For tests that need to control the companySlugOverride child lookup.
+let overrideCompanyRows: Array<{
+  id: string;
+  slug: string;
+  name: string;
+  parent_company_id: string;
+}> = [];
+
+// Track inserted job_postings rows so override-routing tests can assert
+// what landed where.
+let insertedRows: Array<Record<string, unknown>> = [];
+
 function buildSupabaseMock() {
-  const updateChain = {
-    eq: vi.fn(() => Promise.resolve({ count: 0, data: null, error: null })),
-    select: vi.fn(() => updateChain),
-    single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  // Update chain supports: .eq(...), .eq(...).eq(...) (closure path), .in(...)
+  // (companies.last_collected_at over parent + sub-brands), and being
+  // awaited directly. Implemented as a chainable thenable.
+  const makeThenableChain = (
+    payload: { count?: number; data?: unknown; error?: unknown } = { count: 0, data: null, error: null }
+  ) => {
+    const chain: Record<string, unknown> = {};
+    chain.eq = vi.fn(() => makeThenableChain(payload));
+    chain.in = vi.fn(() => makeThenableChain(payload));
+    chain.select = vi.fn(() => chain);
+    chain.single = vi.fn(() => Promise.resolve(payload));
+    chain.then = (onFulfilled: (v: unknown) => unknown) =>
+      Promise.resolve(payload).then(onFulfilled);
+    return chain;
   };
+  const buildUpdateChain = () => makeThenableChain();
+
   const insertChain: Record<string, unknown> = {};
   insertChain.select = vi.fn(() => insertChain);
-  insertChain.single = vi.fn(() => Promise.resolve({ data: { id: "new-job-id" }, error: null }));
-  const selectChain = {
-    eq: vi.fn(() => Promise.resolve({ data: existingRows, error: null })),
-  };
+  insertChain.single = vi.fn(() =>
+    Promise.resolve({ data: { id: `new-job-${insertedRows.length}` }, error: null })
+  );
+
   return {
-    from: vi.fn(() => ({
-      select: vi.fn(() => selectChain),
-      update: vi.fn(() => updateChain),
-      insert: vi.fn(() => insertChain),
-    })),
+    from: vi.fn((table: string) => {
+      if (table === "companies") {
+        // companies query: `.select('id, slug, name, parent_company_id').in('slug', [...]).eq('parent_company_id', cid)`
+        const eqStep = (data: unknown) => Promise.resolve({ data, error: null });
+        const inChain: Record<string, unknown> = {};
+        inChain.eq = vi.fn(() => eqStep(overrideCompanyRows));
+        const selectChain: Record<string, unknown> = {};
+        selectChain.in = vi.fn(() => inChain);
+        return {
+          select: vi.fn(() => selectChain),
+          update: vi.fn(() => buildUpdateChain()),
+          insert: vi.fn(() => insertChain),
+        };
+      }
+      // job_postings: `.select(...).in('company_id', [...])`
+      const inChain: Record<string, unknown> = {
+        then: undefined,
+      };
+      Object.assign(inChain, Promise.resolve({ data: existingRows, error: null }));
+      const selectChain: Record<string, unknown> = {
+        in: vi.fn(() => Promise.resolve({ data: existingRows, error: null })),
+        eq: vi.fn(() => Promise.resolve({ data: existingRows, error: null })),
+      };
+      return {
+        select: vi.fn(() => selectChain),
+        update: vi.fn(() => buildUpdateChain()),
+        insert: vi.fn((row: Record<string, unknown>) => {
+          insertedRows.push(row);
+          return insertChain;
+        }),
+      };
+    }),
   };
 }
 
@@ -122,6 +174,8 @@ describe("runIngestStage description_hash gate", () => {
   beforeEach(() => {
     extractJobStructureMock.mockClear();
     existingRows = [];
+    overrideCompanyRows = [];
+    insertedRows = [];
   });
 
   it("skips the Gemini extraction call when the stored hash matches the new description", async () => {
@@ -130,6 +184,7 @@ describe("runIngestStage description_hash gate", () => {
         id: "existing-job-1",
         external_id: FIXTURE_JOB.external_id,
         description_hash: STORED_HASH_MATCH,
+        company_id: FIXTURE_COMPANY.id,
       },
     ];
 
@@ -145,6 +200,7 @@ describe("runIngestStage description_hash gate", () => {
         id: "existing-job-1",
         external_id: FIXTURE_JOB.external_id,
         description_hash: STORED_HASH_DIFFERENT,
+        company_id: FIXTURE_COMPANY.id,
       },
     ];
 
@@ -152,5 +208,75 @@ describe("runIngestStage description_hash gate", () => {
     await runIngestStage("task-2", FIXTURE_COMPANY as never, [FIXTURE_JOB] as never);
 
     expect(extractJobStructureMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("runIngestStage companySlugOverride routing", () => {
+  beforeEach(() => {
+    extractJobStructureMock.mockClear();
+    existingRows = [];
+    overrideCompanyRows = [];
+    insertedRows = [];
+  });
+
+  it("routes a job with companySlugOverride to the matching sub-brand's company_id", async () => {
+    // Parent (CIBC analogue) has no existing rows; sub-brand (Simplii) is
+    // a known child of the parent.
+    overrideCompanyRows = [
+      {
+        id: "sub-co-1",
+        slug: "subbrand",
+        name: "Sub Brand",
+        parent_company_id: FIXTURE_COMPANY.id,
+      },
+    ];
+
+    const childJob = {
+      ...FIXTURE_JOB,
+      external_id: "ext-sub-1",
+      title: "Director, Sub Brand",
+      companySlugOverride: "subbrand",
+    };
+    const parentJob = {
+      ...FIXTURE_JOB,
+      external_id: "ext-parent-1",
+      title: "Director, Parent",
+    };
+
+    const { runIngestStage } = await import("./processor");
+    await runIngestStage(
+      "task-override",
+      FIXTURE_COMPANY as never,
+      [parentJob, childJob] as never
+    );
+
+    // Both rows should have been inserted, each under the correct company_id.
+    const parentRow = insertedRows.find((r) => r.external_id === "ext-parent-1");
+    const childRow = insertedRows.find((r) => r.external_id === "ext-sub-1");
+    expect(parentRow?.company_id).toBe(FIXTURE_COMPANY.id);
+    expect(childRow?.company_id).toBe("sub-co-1");
+  });
+
+  it("falls back to the parent company_id when the override slug is unknown", async () => {
+    // No sub-brand rows configured → override lookup returns empty.
+    overrideCompanyRows = [];
+
+    const childJob = {
+      ...FIXTURE_JOB,
+      external_id: "ext-ghost-1",
+      title: "Ghost role",
+      companySlugOverride: "does-not-exist",
+    };
+
+    const { runIngestStage } = await import("./processor");
+    await runIngestStage(
+      "task-fallback",
+      FIXTURE_COMPANY as never,
+      [childJob] as never
+    );
+
+    // Falls back to parent — the job is inserted under the parent company_id.
+    expect(insertedRows).toHaveLength(1);
+    expect(insertedRows[0].company_id).toBe(FIXTURE_COMPANY.id);
   });
 });

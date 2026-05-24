@@ -58,11 +58,14 @@ async function runCollect(req: NextRequest) {
       log.info({ staleTaskCount: staleTasks.length }, "Cleaned up stale tasks before collection run");
     }
 
-    // Get all active companies
+    // Get all active companies. Skip sub-brands that piggy-back on a
+    // parent's scrape (parent_company_id IS NOT NULL) — their jobs land
+    // via the parent's scraper with `companySlugOverride` routing.
     const { data: companies, error: companiesError } = await supabase
       .from("companies")
       .select("id, name, ats_type")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .is("parent_company_id", null);
 
     if (companiesError) {
       log.error({ err: companiesError.message }, "Failed to fetch companies");

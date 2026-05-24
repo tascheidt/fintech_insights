@@ -3,12 +3,13 @@
  *
  * Tenant: `cibc`. Instance: `wd3`. Site: `search`.
  *
- * **Simplii classifier is LOG-ONLY for Phase 3.** Each listing row is
- * inspected for a Simplii brand marker (in `bulletFields`, title, or any
- * other visible string). When matched, we log and continue — we do NOT
- * set a `companySlugOverride` field. Per Farhan: confirm Simplii postings
- * actually surface from CIBC's Workday in production before adding the
- * override mechanism + the Simplii companies row (Phase 3.5).
+ * **Simplii classifier is live.** Each listing row is inspected for a
+ * Simplii brand marker (in title, bulletFields, or any tenant-emitted
+ * brand/business-unit field). When matched, the job is tagged with
+ * `companySlugOverride: 'simplii'` and the processor routes it to the
+ * Simplii companies row (tier=fintech, parent_company_id=cibc.id)
+ * instead of CIBC. Sub-brand split is per-row only — there is no
+ * separate Simplii URL or listing endpoint.
  *
  * Cost knob: `WORKDAY_CIBC_MAX_JOBS` env caps the run. Unset → full
  * corpus.
@@ -127,18 +128,20 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
       const job = parseWorkdayListingRow(row, urls.jobPublicUrl);
       if (!job) continue;
 
-      // Simplii classifier — log-only mode for Phase 3. Do NOT mutate
-      // the job; Phase 3.5 wires the override + companies row.
+      // Simplii classifier. When matched, tag the job with the override
+      // slug; the processor reads `companySlugOverride` and writes the
+      // job under the Simplii companies row (parent_company_id=cibc).
       const simplii = isSimpliiPosting(row);
       if (simplii.isMatch) {
         simpliiSeen++;
+        job.companySlugOverride = "simplii";
         log.info(
           {
             jobReqId: job.external_id,
             title: job.title,
             marker: simplii.marker,
           },
-          "[workday-cibc] would-route-to-simplii (log-only Phase 3)"
+          "[workday-cibc] routing to simplii"
         );
       }
 

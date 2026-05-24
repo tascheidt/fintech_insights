@@ -11,11 +11,13 @@
  * re-runs are safe. is_active stays false on first insert — flip it after
  * smoke + 24h of clean job_runs entries.
  *
- * NOTE: There is intentionally NO `simplii` row in this seed. Phase 3
- * ships the Simplii classifier in LOG-ONLY mode (see workday-cibc.ts).
- * Once production logs confirm Simplii postings actually surface inside
- * CIBC's Workday tenant, a follow-up adds the row + flips the classifier
- * to route via `companySlugOverride`.
+ * NOTE: This seeder owns the 4 incumbent rows only. Simplii Financial
+ * (CIBC's direct-bank sub-brand) is seeded by migration
+ * `20260524000000_parent_company.sql` because it carries a
+ * `parent_company_id` FK to CIBC and tier=fintech — different shape
+ * from the rows here. The Simplii classifier in workday-cibc.ts is now
+ * live (no longer log-only); it sets `companySlugOverride: 'simplii'`
+ * and the processor routes those jobs to the simplii companies row.
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";

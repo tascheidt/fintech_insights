@@ -10,6 +10,15 @@ export interface JobData {
   commitment?: string | null;
   posted_date?: Date | null;
   url?: string | null;
+  /**
+   * Routing hint: when set, the processor inserts this job under the
+   * named company slug instead of the parent company being scraped.
+   * Used for sub-brands that share an ATS tenant (e.g. Simplii on
+   * CIBC's Workday). The target company must exist with
+   * `parent_company_id` pointing at the parent. Not persisted to the
+   * `job_postings` row.
+   */
+  companySlugOverride?: string;
 }
 
 export function jobToRow(job: JobData) {
