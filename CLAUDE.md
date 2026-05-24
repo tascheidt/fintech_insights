@@ -113,12 +113,15 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 - **Build before push:** `cd web && npm run build` is the contract. Vercel will fail the deploy on a TS error that local dev tolerates.
 - **Changelog discipline:** every user-facing change gets an entry in `web/data/releases.json`. Types: `feature` | `fix` | `improvement`. Bump `web/package.json` version per semver: patch (1.0.x) bug fixes, minor (1.x.0) features, major (x.0.0) breaking changes.
 - **Tests:** Vitest for unit (pure functions only), Playwright for one smoke (`e2e/smoke.spec.ts`); see `docs/AGENTS.md`#Tests.
+- **Vercel webhook hiccup recipe:** if a merge to `main` shows GitHub status `Vercel - Deployment failed.` with **no** target URL and **no** entry in Vercel's Deployments tab, the webhook was rejected upstream of any build — there's no log to read because no build happened. Push an empty commit to retrigger: `git commit --allow-empty -m "chore: retrigger Vercel" && git push origin main`. Don't chase a phantom build error; verify a deployment record exists before debugging code.
+- **Tier-/role-variant rendering:** when adding a tier or role variant of an existing page (`{isIncumbent ? <IncumbentBranch /> : <FintechBranch />}`), walk every conditional render block from the original (`{insight && ...}`, `{coreFunctions.length && ...}`) and decide explicitly: keep / drop / replace. The May 2026 incumbent-variant work loaded `latestInsight` for the page but had no code to render it, so admin-generated insights silently went nowhere.
 
 ## 8. Anti-patterns
 
 Things that will get a PR rejected:
 
 - Adding a third Vercel cron. The cap is two — route long-running work through GitHub Actions instead.
+- Pinning `node-version: '20'` (or older) in a `.github/workflows/*.yml` file. Node 20 is deprecated for GitHub Actions runners (forced to 24 by default starting June 2026, removed September 2026). Use `'22'` or newer.
 - Hardcoding a model string outside `web/lib/ai/prompt-config.ts`.
 - Hardcoding a color outside `web/app/globals.css` (raw hex, rgb, hsl, oklch, or `bg-[#…]`). Add a token instead. Lint rule: `design-system/no-raw-color`.
 - Using Fraunces (`font-display`) outside the four approved editorial surfaces (digest hero, marketing hero, login hero, company stated-strategy callout).
