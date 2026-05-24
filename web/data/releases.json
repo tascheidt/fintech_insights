@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.4.0",
+    "date": "2026-05-24",
+    "changes": [
+      { "type": "feature", "description": "Simplii Financial split out as a distinct fintech card. Simplii (CIBC's direct digital bank) has no separate careers portal — every Simplii role posts through CIBC's Workday. The Phase 3 classifier (previously log-only) now tags those rows with a sub-brand override; the ingestion processor routes them to a separate `simplii` companies row (tier=fintech, parent=cibc) so Simplii gets its own strategic-insight + tech-stack panel and is excluded from CIBC's totals." }
+    ]
+  },
+  {
     "version": "2.3.1",
     "date": "2026-05-23",
     "changes": [
