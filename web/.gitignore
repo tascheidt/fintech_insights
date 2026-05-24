@@ -51,3 +51,7 @@ next-env.d.ts
 # are kept; the transient *-page.html and *-smoke.json outputs aren't.
 scripts/artifacts/*-smoke.json
 scripts/artifacts/*-page.html
+
+# Generated extracts from one-off reporting scripts
+# (e.g. scripts/report-ai-engineering-roles.ts).
+reports/
