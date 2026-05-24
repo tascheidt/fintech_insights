@@ -29,7 +29,7 @@ interface FixtureJob {
   description_text: string;
 }
 
-const TARGET_TOTAL = 20;
+const TARGET_TOTAL = 30;
 const MIN_DESCRIPTION_CHARS = 500;
 
 async function main() {

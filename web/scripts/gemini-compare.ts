@@ -156,9 +156,9 @@ function parseFlags(argv: string[]): Flags {
     throw new Error(`--variant=no-prefetch only applies to --scenario=analyze-advanced`);
   }
 
-  if (model && scenario !== "extract-structure") {
-    throw new Error(`--model override only applies to --scenario=extract-structure`);
-  }
+  // --model is supported for both scenarios. For extract-structure it routes
+  // through DEFAULT_JOB_STRUCTURE_AI_CONFIG; for analyze-advanced it sets
+  // analyzeJobAdvanced's analysisModel option.
 
   return { scenario, mode, variant, limit, dryRun, model };
 }
@@ -376,6 +376,13 @@ async function runAnalyzeAdvanced(
         ...(flags.variant === "no-prefetch"
           ? { webSearchContext: { synthesis: "", results: [] } }
           : {}),
+        // --model override (e.g. swap gemini-pro-latest → gemini-3.5-flash
+        // to evaluate cost/quality trade-offs). When omitted, the default
+        // PRO_MODEL inside analyzeJobAdvanced is used.
+        ...(flags.model ? { analysisModel: flags.model } : {}),
+        // Disable the auto-fallback to Flash-on-quota for evals so we
+        // measure the requested model honestly.
+        analysisQuotaFallback: false,
         onUsage: (u) => callsForJob.push({ ...u, extra: { ...u.extra, jobId: job.id } }),
       });
       results.push({

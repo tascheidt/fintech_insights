@@ -1,0 +1,1149 @@
+{
+  "scenario": "analyze-advanced",
+  "mode": "baseline",
+  "variant": "default",
+  "gitSha": "7c9cd81",
+  "generatedAt": "2026-05-23T21:44:55.965Z",
+  "fixtureFile": "/Users/tscheidt/Fintech_insights/web/scripts/fixtures/gemini-sample-jobs.json",
+  "fixtureCount": 24,
+  "processedCount": 24,
+  "totals": {
+    "calls": 24,
+    "inputTokens": 63320,
+    "outputTokens": 16392,
+    "cachedTokens": 0,
+    "totalTokens": 158218,
+    "estimatedUsd": 0,
+    "avgLatencyMs": 19768
+  },
+  "byCallSite": {
+    "analyzeJobAdvanced+grounding": {
+      "calls": 24,
+      "inputTokens": 63320,
+      "outputTokens": 16392,
+      "totalTokens": 158218,
+      "estimatedUsd": 0,
+      "avgLatencyMs": 19768,
+      "modelsServed": [
+        "gemini-3.5-flash"
+      ]
+    }
+  },
+  "perJob": [
+    {
+      "jobId": "645839c0-151d-4404-8d8f-940ea48f368a",
+      "title": "ServiceNow Engineer",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2918,
+          "outputTokens": 742,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3180,
+          "totalTokens": 6840,
+          "estimatedUsd": 0,
+          "latencyMs": 18648,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "ServiceNow Engineer",
+            "fellBackToFlash": false,
+            "jobId": "645839c0-151d-4404-8d8f-940ea48f368a"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank expands ServiceNow Centre of Excellence with engineering roles",
+        "category": "technology",
+        "insight_summary": "EQ Bank is expanding its internal ServiceNow Centre of Excellence by recruiting for multiple engineering roles, including this ServiceNow Engineer position. This hiring pattern follows recent postings for Lead and Senior ServiceNow Engineers, alongside a CMDB Administrator. The expansion indicates a focus on scaling internal workflow automation and IT service management capabilities.",
+        "what_it_means": "EQ Bank is building out a dedicated internal team to develop and maintain its ServiceNow platform, reducing reliance on external implementation partners.",
+        "strategic_signals": [
+          "The role reports directly to the Manager of the ServiceNow Centre of Excellence, confirming a structured internal platform team [1.1.1].",
+          "Recent parallel postings for Lead and Senior ServiceNow Engineers indicate a multi-tiered engineering expansion.",
+          "The job description emphasizes custom application design, scripting, and integration with external systems to automate workflows.",
+          "Requirements include specialized ServiceNow certifications such as Certified Application Developer and Certified Implementation Specialist."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 4,
+        "novelty_reasoning": "While EQ Bank has previously utilized ServiceNow, recruiting a full suite of engineering levels (Lead, Senior, and mid-level) within a short window indicates a concentrated effort to scale the internal Centre of Excellence rather than a routine replacement hire.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The expansion of the ServiceNow Centre of Excellence is likely designed to support the bank's operational scaling. With the announced acquisition of PC Financial in late 2025, EQ Bank's customer base is projected to grow to over three million. Standardizing and automating internal IT service management, software asset management, and workflow integrations on ServiceNow allows the bank to maintain operational efficiency during this integration phase. However, without direct public statements from leadership on ServiceNow specifically, this remains an operational inference.",
+        "web_corroboration": "Public records show EQ Bank announced an agreement to acquire PC Financial in December 2025, which will significantly expand its customer and asset base upon closing in 2026. Additionally, a recent April 2026 posting for an Operations Analyst in Technology Vendor Management specifically cited the use of ServiceNow for Software Asset Management (SAM). These elements align with an active effort to mature internal IT governance and platform automation.",
+        "model_reasoning": "The confidence is high because the analysis is directly supported by the current job posting, multiple concurrent ServiceNow engineering listings found in web registries (Lead and Senior roles), and recent operational postings (CMDB Administrator, Operations Analyst). The strategic context is grounded in the bank's public financial and acquisition announcements from late 2025 and early 2026."
+      }
+    },
+    {
+      "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d",
+      "title": "Senior Estates and Trust Coordinator",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2253,
+          "outputTokens": 812,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3795,
+          "totalTokens": 6860,
+          "estimatedUsd": 0,
+          "latencyMs": 23051,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "Senior Estates and Trust Coordinator",
+            "fellBackToFlash": false,
+            "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d"
+          }
+        }
+      ],
+      "output": null
+    },
+    {
+      "jobId": "9af5a8d4-c15e-490c-b2a6-6f34d804e1b9",
+      "title": "Senior Backend Engineer (CARE Pod)",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2374,
+          "outputTokens": 674,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3042,
+          "totalTokens": 6090,
+          "estimatedUsd": 0,
+          "latencyMs": 17082,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "Senior Backend Engineer (CARE Pod)",
+            "fellBackToFlash": false,
+            "jobId": "9af5a8d4-c15e-490c-b2a6-6f34d804e1b9"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank recruits backend engineer to build agentic AI workflows",
+        "category": "technology",
+        "insight_summary": "EQ Bank is expanding its Digital Banking and Channel Tech team to build and productionize agentic AI workflows. The role focuses on automating back-office investigations and customer support workflows within the CARE Pod. This hiring aligns with other recent AI-focused roles, including an AI enablement manager and a finance experimentation intern.",
+        "what_it_means": "The bank is shifting from basic chatbots to deterministic, agentic AI systems to automate customer support and back-office operations.",
+        "strategic_signals": [
+          "The CARE Pod is developing agentic task flows for tool use, orchestration, and workflow state in back-office automation [1.1.1].",
+          "The role requires building evaluation harnesses to validate correctness boundaries for non-deterministic LLM systems.",
+          "The bank is establishing repeatable evaluation and regression gating to align AI outputs with its release governance model.",
+          "This technical hire follows recent operational AI postings, including an AI enablement operations manager in early 2026."
+        ],
+        "is_new_direction": true,
+        "confidence": "high",
+        "novelty_score": 7,
+        "novelty_reasoning": "While EQ Bank has historically focused its engineering hires on general operations and finance systems, this role introduces specialized requirements for LLM evaluation, agent orchestration, and non-deterministic system testing. This represents a technical evolution from traditional API integration to agentic automation.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "EQ Bank is seeking to lower customer support costs and accelerate back-office incident resolution by deploying agentic AI workflows. By building internal evaluation harnesses and maintaining human-in-the-loop oversight, the bank aims to mitigate the compliance and operational risks associated with deploying non-deterministic LLM systems in a regulated financial environment.",
+        "web_corroboration": "Public job data shows EQ Bank is systematically embedding AI across departments, evidenced by recent postings for an AI Enablement Operations Manager and a Finance Innovation Studio intern. This technical role in the CARE Pod provides the engineering foundation to productionize these agentic workflows safely.",
+        "model_reasoning": "The job description provides highly specific details regarding the CARE Pod's mandate, including tool use, agent orchestration, and evaluation harnesses. This technical detail, combined with corroborating job postings for AI operations and finance sandboxes, supports a high-confidence assessment of a coordinated AI automation strategy."
+      }
+    },
+    {
+      "jobId": "5add9237-0247-4579-ba5f-38199b5dad8c",
+      "title": "Senior People Partner",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2833,
+          "outputTokens": 672,
+          "cachedTokens": 0,
+          "thoughtsTokens": 2893,
+          "totalTokens": 6398,
+          "estimatedUsd": 0,
+          "latencyMs": 19193,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Senior People Partner",
+            "fellBackToFlash": false,
+            "jobId": "5add9237-0247-4579-ba5f-38199b5dad8c"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Koho recruits Senior People Partner to transition human resources operations",
+        "category": "operational",
+        "insight_summary": "Koho is hiring a Senior People Partner to transition its traditional human resources function into an AI-integrated people enablement model. This role focuses on scaling internal operations, managing compensation, and ensuring regulatory compliance across Canadian and US markets. The hire follows a series of leadership additions in risk, product, and growth as the company prepares for its banking licence.",
+        "what_it_means": "The transition to an AI-enabled people operations model suggests Koho is prioritizing workforce efficiency and lean scaling as it nears its Schedule 1 banking licence.",
+        "strategic_signals": [
+          "Transitioning from traditional HR to a modern People Enablement model focused on removing operational friction",
+          "Mandating comfort with AI tools, reflecting the company's self-description as an AI Native organization",
+          "Requiring compliance and operations experience in both Canadian and US markets, indicating potential cross-border talent management",
+          "Standardizing compensation and performance frameworks to support a workforce of over 400 employees"
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 6,
+        "novelty_reasoning": "While Koho has recently established its HR department with only two tracked postings in the last 90 days, this role represents a structured evolution rather than a complete pivot. It formalizes the transition to an AI-driven People Enablement model to support existing headcount.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "Koho is restructuring its internal people operations to maintain a lean organizational structure while preparing for the regulatory and operational demands of an imminent Schedule 1 banking licence. The emphasis on AI integration in HR workflows suggests a strategy to limit headcount growth overhead while supporting a highly specialized workforce. The requirement for US compliance knowledge suggests Koho may be expanding its remote talent pool or preparing for future cross-border initiatives, though its primary market remains Canada.",
+        "web_corroboration": "In May 2026, Koho's CEO announced the company is close to securing its Schedule 1 banking licence and has surpassed 2 million users. The company has also integrated with Interac and launched crypto trading. These milestones require robust risk and compliance frameworks, which is reflected in Koho's recent hiring of a Director of Financial Risk and VP of Credit Risk. The Senior People Partner role supports this scaling workforce by modernizing internal systems without adding bureaucratic overhead, aligning with the CEO's stated focus on efficiency.",
+        "model_reasoning": "The job description's emphasis on an AI Native setup and leaner, smarter operations directly corroborates recent news of Koho's rapid scaling and its imminent banking licence. The connection between the HR transformation and the company's broader operational scaling is highly consistent, supporting a high confidence rating."
+      }
+    },
+    {
+      "jobId": "a67a3e67-354b-40dc-abfc-c10b6318bfe5",
+      "title": "Senior Manager, Financial Risk",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 3825,
+          "outputTokens": 548,
+          "cachedTokens": 0,
+          "thoughtsTokens": 2839,
+          "totalTokens": 7212,
+          "estimatedUsd": 0,
+          "latencyMs": 17910,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Senior Manager, Financial Risk",
+            "fellBackToFlash": false,
+            "jobId": "a67a3e67-354b-40dc-abfc-c10b6318bfe5"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Koho expands financial risk team ahead of expected banking license",
+        "category": "compliance",
+        "insight_summary": "Koho is expanding its risk management function with the addition of a Senior Manager for Financial Risk Strategy & Analytics. This role follows recent leadership hires in credit and financial risk, indicating a structured build-out of the company's risk infrastructure. The position focuses on IFRS 9 compliance, loss forecasting, and stress testing to support portfolio resilience.",
+        "what_it_means": "Koho is establishing the institutional risk frameworks required to operate as a regulated Schedule 1 bank in Canada.",
+        "strategic_signals": [
+          "Implementation of IFRS 9 and Expected Credit Loss forecasting models to manage credit portfolio health.",
+          "Establishment of second-line defense frameworks for interest rate, market, and liquidity risk.",
+          "Integration of risk assessments into product and marketing launches to evaluate credit impact before release.",
+          "Collaboration with data science teams to automate anomaly detection and enhance risk data pipelines."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "The role represents a continuation of Koho's recent hiring pattern in risk management, following the recent postings for a Director of Financial Risk and a VP of Credit Risk.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The expansion of the financial risk team suggests Koho is preparing its risk infrastructure for its transition to a Schedule 1 bank. The focus on capital planning, stress testing, and IFRS 9 compliance aligns with regulatory requirements for licensed banks. While the CEO has stated a license is imminent, the exact timing remains subject to regulatory approval.",
+        "web_corroboration": "In May 2026, Koho's CEO announced the company is close to securing a Schedule 1 banking license. This follows a $190 million CAD funding round in late 2024 dedicated to expanding its lending book and supporting its bank license application. The focus on institutional risk modeling directly supports these strategic initiatives.",
+        "model_reasoning": "The high confidence rating is based on the direct alignment between the job description's regulatory risk requirements (such as IFRS 9, ECL, and capital stress testing) and the company's public efforts to secure a Canadian banking license. The hiring timeline closely matches recent executive risk hires and public executive commentary."
+      }
+    },
+    {
+      "jobId": "e64cce30-4b02-42c6-83a3-a22cc989f667",
+      "title": "Director, Financial Risk",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 4299,
+          "outputTokens": 708,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3787,
+          "totalTokens": 8794,
+          "estimatedUsd": 0,
+          "latencyMs": 20055,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Director, Financial Risk",
+            "fellBackToFlash": false,
+            "jobId": "e64cce30-4b02-42c6-83a3-a22cc989f667"
+          }
+        }
+      ],
+      "output": {
+        "headline": "KOHO expands financial risk leadership ahead of anticipated banking license",
+        "category": "compliance",
+        "insight_summary": "KOHO is recruiting a Director of Financial Risk to oversee credit, market, and liquidity risk frameworks. This hiring activity coincides with the company's active application for a Canadian Schedule 1 banking license. The role focuses on regulatory compliance, including IFRS 9 provisioning and capital stress testing.",
+        "what_it_means": "The addition of this role suggests KOHO is strengthening its risk governance and regulatory readiness to transition from a fintech platform to a licensed Schedule 1 bank.",
+        "strategic_signals": [
+          "The role requires 10+ years of experience in retail credit risk and treasury management.",
+          "Responsibilities include overseeing IFRS 9 provisioning, Expected Credit Loss (ECL) calculations, and capital stress testing.",
+          "The position establishes second-line oversight of financial risk models and provides effective challenge to first-line teams.",
+          "This hire follows the recent addition of a Vice President of Credit Risk in January 2026."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 4,
+        "novelty_reasoning": "The role represents a continuation and formalization of KOHO's risk management function rather than a pivot. KOHO previously posted a Vice President of Credit Risk role in January 2026, and the Finance department has shown steady growth with six postings in the last 90 days compared to two in the prior period.",
+        "is_executive_movement": true,
+        "executive_context": "This Director-level hire, alongside the January 2026 recruitment of a Vice President of Credit Risk, indicates a structured build-out of KOHO's risk leadership. This team is tasked with establishing bank-grade risk governance and model oversight as the company nears its Schedule 1 banking license approval.",
+        "strategic_hypothesis": "The primary driver for this role is KOHO's imminent transition to a Schedule 1 regulated bank. Operating as a bank requires compliance with Office of the Superintendent of Financial Institutions (OSFI) standards, including formal capital planning, liquidity risk frameworks, and IFRS 9 reporting. This role bridges the gap between fintech operations and federal banking regulations.",
+        "web_corroboration": "In May 2026, KOHO's CEO stated that the company is close to securing its Schedule 1 banking license. Additionally, KOHO recently joined Payments Canada and the Interac e-transfer service directly. These milestones require robust, audited financial risk and liquidity frameworks, directly aligning with the responsibilities outlined in this job description.",
+        "model_reasoning": "The confidence level is high because the job description's focus on IFRS 9, stress testing, and liquidity risk directly maps to the regulatory requirements of a Schedule 1 Canadian bank. Public statements from KOHO's executive leadership in May 2026 confirm that the bank licensing process is in its final stages, providing clear external validation for the timing and seniority of this hire."
+      }
+    },
+    {
+      "jobId": "025a033e-94e6-4dd5-97c2-d800ce743bb8",
+      "title": "Banking Advisor",
+      "companySlug": "bnc",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2135,
+          "outputTokens": 581,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3495,
+          "totalTokens": 6211,
+          "estimatedUsd": 0,
+          "latencyMs": 18278,
+          "status": "ok",
+          "extra": {
+            "companyName": "National Bank",
+            "jobTitle": "Banking Advisor",
+            "fellBackToFlash": false,
+            "jobId": "025a033e-94e6-4dd5-97c2-d800ce743bb8"
+          }
+        }
+      ],
+      "output": {
+        "headline": "National Bank adds retail banking advisor role in Quebec branch network",
+        "category": "expansion",
+        "insight_summary": "National Bank continues to hire retail banking advisors in its home market of Quebec. This recruitment supports the bank's personal and small business advisory services in the Longueuil region. The hiring aligns with the bank's ongoing integration of recently acquired retail portfolios.",
+        "what_it_means": "The addition of licensed advisors helps National Bank retain and cross-sell services to its expanding retail client base.",
+        "strategic_signals": [
+          "The role requires obtaining a Mutual Fund Representative licence within three months of hiring.",
+          "Bilingualism in French and English is mandatory to serve the regional client base.",
+          "The advisor will manage personal and small business client needs, including mortgage renewals and estate planning.",
+          "The position reports to the Branch Manager and emphasizes structured on-the-job training."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 2,
+        "novelty_reasoning": "The role is a standard retail advisory position, representing a continuation of existing branch operations rather than a new strategic pivot.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "National Bank is likely reinforcing its branch-level advisory capacity to support its expanded retail footprint following the acquisition of Laurentian Bank's retail portfolio. Sponsoring mutual fund licensing suggests a focus on growing fee-based wealth management revenues from these clients. A key uncertainty is the transition timeline for migrating acquired accounts to National Bank's systems.",
+        "web_corroboration": "In late 2025, National Bank agreed to acquire Laurentian Bank's retail and SME portfolios in Quebec, adding $3.3 billion in loans and $7.6 billion in deposits. This acquisition, along with the earlier integration of Canadian Western Bank, drives the need for localized advisory staff to manage client transition and retention.",
+        "model_reasoning": "Confidence is high because the job requirements directly match National Bank's public strategy of expanding its retail presence and fee-based assets in Quebec. The connection between branch hiring and the Laurentian Bank portfolio acquisition is supported by recent financial disclosures."
+      }
+    },
+    {
+      "jobId": "763200a2-89d6-4a37-83e8-eaa028abf273",
+      "title": "Banking Advisor Jobs for Indigenous People",
+      "companySlug": "bnc",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2346,
+          "outputTokens": 670,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3124,
+          "totalTokens": 6140,
+          "estimatedUsd": 0,
+          "latencyMs": 17822,
+          "status": "ok",
+          "extra": {
+            "companyName": "National Bank",
+            "jobTitle": "Banking Advisor Jobs for Indigenous People",
+            "fellBackToFlash": false,
+            "jobId": "763200a2-89d6-4a37-83e8-eaa028abf273"
+          }
+        }
+      ],
+      "output": {
+        "headline": "National Bank expands Indigenous recruitment with Montreal advisory roles",
+        "category": "customer",
+        "insight_summary": "National Bank is recruiting bilingual Banking Advisors in Montreal specifically targeting Indigenous candidates. This posting aligns with the bank's established Indigenous talent recruitment program operated in collaboration with the First Nations Human Resources Development Commission of Quebec. The role focuses on personal banking, client education, and transactional support, offering a starting wage of $18.73 per hour.",
+        "what_it_means": "The posting indicates a structured effort to increase Indigenous representation within the bank's retail branch network and customer support operations.",
+        "strategic_signals": [
+          "Targeted recruitment of Indigenous candidates for retail banking advisor roles in Quebec [1.1.7]",
+          "Integration of new hires into personal banking, investment, and compliance-regulated advisory services",
+          "Alignment with the bank's formal partnership with the First Nations Human Resources Development Commission of Quebec",
+          "Requirement for bilingualism to support diverse regional client bases"
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "The bank has maintained an active Indigenous talent recruitment program in collaboration with regional commissions since at least 2023. This posting represents a continuation of that strategy rather than a novel operational direction.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The bank is actively working to meet its public commitments under the Progressive Aboriginal Relations program and address employment equity goals. By offering structured entry-level advisory roles with clear pathways to mutual fund licensing, the bank aims to build a representative talent pipeline in its core Quebec market.",
+        "web_corroboration": "Public disclosures confirm National Bank's partnership with the First Nations Human Resources Development Commission of Quebec and its participation in the Canadian Human Rights Commission's horizontal audit on Indigenous employment. The bank also maintains an Indigenous Relations division led by a Managing Director, corroborating the structured nature of this recruitment drive.",
+        "model_reasoning": "The job description explicitly reserves the listing for Indigenous applicants as part of an equity initiative. Web research confirms this is part of a long-standing, formalized corporate diversity strategy rather than an isolated hiring event. The confidence is high because the posting details directly match the bank's documented partnership commitments and regional hiring practices."
+      }
+    },
+    {
+      "jobId": "0dd79afa-9afa-47cd-90fb-fc0fc2c6a665",
+      "title": "Banking Advisor",
+      "companySlug": "bnc",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2073,
+          "outputTokens": 715,
+          "cachedTokens": 0,
+          "thoughtsTokens": 2703,
+          "totalTokens": 5491,
+          "estimatedUsd": 0,
+          "latencyMs": 20168,
+          "status": "ok",
+          "extra": {
+            "companyName": "National Bank",
+            "jobTitle": "Banking Advisor",
+            "fellBackToFlash": false,
+            "jobId": "0dd79afa-9afa-47cd-90fb-fc0fc2c6a665"
+          }
+        }
+      ],
+      "output": {
+        "headline": "National Bank adds retail banking advisor in Quebec branch network",
+        "category": "customer",
+        "insight_summary": "National Bank continues to hire retail banking advisors in its core Quebec market. This recruitment aligns with the bank's ongoing integration of Laurentian Bank's retail portfolio, which is scheduled to close in late 2026. The role emphasizes digital literacy and client transition support, reflecting broader branch optimization efforts.",
+        "what_it_means": "The hiring of branch-level advisory staff suggests National Bank is reinforcing its physical footprint to absorb and retain acquired retail clients in Quebec.",
+        "strategic_signals": [
+          "The role requires digital literacy to assist clients with banking applications, supporting the bank's digital-first service model.",
+          "The position focuses on personal banking advisory services and referral of clients to specialized wealth or mortgage colleagues.",
+          "Hiring in Sorel-Tracy, Quebec, reinforces National Bank's dominant regional footprint during a period of retail portfolio expansion.",
+          "The role supports the integration of approximately 260,000 retail clients acquired from Laurentian Bank's portfolio [2.2.6]."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 2,
+        "novelty_reasoning": "The Banking Advisor role is a standard retail position within National Bank's established branch network. The company has posted 19 support roles in the past 90 days, indicating a steady continuation of baseline retail operations rather than a novel strategic pivot.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The recruitment of branch-level advisors in Quebec is likely intended to maintain service capacity and client retention as National Bank prepares to integrate Laurentian Bank's retail and SME portfolios by late 2026. Ensuring high-quality in-person and digital support at regional branches like Sorel-Tracy mitigates the risk of client churn during the transition of 260,000 acquired accounts.",
+        "web_corroboration": "Public announcements from December 2025 confirm that National Bank is acquiring Laurentian Bank's retail and SME banking portfolios, which include $3.3 billion in retail loans and $7.6 billion in deposits. This acquisition is expected to close in late 2026. The job description's focus on digital application support and client relationship building directly aligns with the bank's stated strategy to transition acquired Laurentian clients to National Bank's digital platforms and branch network.",
+        "model_reasoning": "The analysis is based on a direct comparison of the job description with National Bank's public M&A activity. The confidence level is high because the role's responsibilities (digital onboarding, advisory services, and client retention) directly map to the operational requirements of integrating Laurentian Bank's retail portfolio in Quebec, which is National Bank's primary market. The historical hiring data also confirms steady support and sales recruitment, validating this as a standard but strategically timed hire."
+      }
+    },
+    {
+      "jobId": "9a297c56-b3ba-47fa-9393-01a4f3b1d951",
+      "title": "Sales Representative - Southgate Mall",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2391,
+          "outputTokens": 615,
+          "cachedTokens": 0,
+          "thoughtsTokens": 2825,
+          "totalTokens": 5831,
+          "estimatedUsd": 0,
+          "latencyMs": 19287,
+          "status": "ok",
+          "extra": {
+            "companyName": "Neo Financial",
+            "jobTitle": "Sales Representative - Southgate Mall",
+            "fellBackToFlash": false,
+            "jobId": "9a297c56-b3ba-47fa-9393-01a4f3b1d951"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Neo Financial continues retail sales hiring in Alberta",
+        "category": "operational",
+        "insight_summary": "Neo Financial is hiring a contract Sales Representative for Southgate Mall in Edmonton, Alberta. This role focuses on direct customer acquisition for credit and deposit products via in-person retail activations. The posting aligns with the company's established mall kiosk acquisition strategy and follows the recent hiring of a Director of Sales for Alberta.",
+        "what_it_means": "The hiring indicates that Neo Financial continues to rely on physical retail footprints for regional customer acquisition in Western Canada.",
+        "strategic_signals": [
+          "The role utilizes a commission-heavy compensation structure to incentivize direct-to-consumer sign-ups.",
+          "Physical retail kiosks remain a core channel for acquiring credit card and deposit account customers.",
+          "The position is supported by regional leadership, following the April 2026 hiring of a Director of Sales for Alberta.",
+          "Overall sales postings have declined from 79 to 37 over the past 90 days, suggesting a potential optimization of the retail footprint."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 2,
+        "novelty_reasoning": "This position represents a continuation of Neo Financial's long-standing retail kiosk sales model. The company has historically posted numerous similar roles across Canadian shopping centers, and sales remains their largest hiring department despite recent volume declines.",
+        "is_executive_movement": false,
+        "executive_context": "While this specific role is entry-level, Neo Financial recently added several marketing and sales leaders in May 2026, including a Director of Sales for Alberta, a Director of Lifecycle Analytics, and a Director of Marketing Analytics. This leadership cluster suggests an effort to optimize customer acquisition efficiency and regional sales performance.",
+        "strategic_hypothesis": "Neo Financial is maintaining its physical retail footprint in key Alberta markets to drive customer acquisition. The contract nature and commission structure of the role limit fixed overhead costs. However, the decline in overall sales postings alongside a surge in marketing analytics leadership hires suggests the company may be shifting toward data-driven optimization of its acquisition channels.",
+        "web_corroboration": "Public company profiles and employee reviews confirm that mall kiosks are a primary, long-standing customer acquisition channel for Neo Financial. Recent hires in marketing technology and analytics corroborate a strategic focus on measuring and improving the efficiency of these direct sales channels.",
+        "model_reasoning": "The analysis is based on Neo Financial's historical hiring data, which shows sales as the dominant department, combined with recent executive hires in the region and department. Web research confirms mall kiosks are a permanent fixture of Neo's business model. The high confidence rating is supported by the direct alignment between the job description, historical patterns, and regional leadership hires."
+      }
+    },
+    {
+      "jobId": "96a9b880-5540-42a4-b7ec-388280623af6",
+      "title": "Director, Marketing Analytics",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2348,
+          "outputTokens": 750,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3191,
+          "totalTokens": 6289,
+          "estimatedUsd": 0,
+          "latencyMs": 17424,
+          "status": "ok",
+          "extra": {
+            "companyName": "Neo Financial",
+            "jobTitle": "Director, Marketing Analytics",
+            "fellBackToFlash": false,
+            "jobId": "96a9b880-5540-42a4-b7ec-388280623af6"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Neo Financial expands marketing leadership to support increased brand spend",
+        "category": "marketing",
+        "insight_summary": "Neo Financial is hiring a Director of Marketing Analytics to build a consolidated measurement function reporting directly to the Chief Marketing Officer. This hire coincides with three other director-level marketing postings in May 2026, indicating a structured expansion of the company's marketing leadership. The job description states that the company plans to increase its marketing spend significantly, requiring new analytical infrastructure to track attribution and channel efficiency.",
+        "what_it_means": "The company is transitioning from fragmented, product-led marketing to a centralized, data-driven brand strategy supported by increased capital allocation.",
+        "strategic_signals": [
+          "The company plans to significantly increase its marketing budget, requiring new attribution and performance tracking systems.",
+          "Neo Financial is building a consolidated marketing analytics function from the ground up, moving away from fragmented, team-specific data reporting.",
+          "The role is structured as a high-leverage individual contributor reporting directly to the Chief Marketing Officer rather than managing a large team.",
+          "The hiring aligns with a broader May 2026 recruitment drive for marketing directors, including roles in lifecycle analytics, integrated marketing, and brand communications."
+        ],
+        "is_new_direction": true,
+        "confidence": "high",
+        "novelty_score": 8,
+        "novelty_reasoning": "The role represents a new consolidated function within the company, which previously lacked a centralized marketing analytics department. Additionally, the posting is part of a highly concentrated cluster of four marketing director roles published within a 48-hour window in May 2026. This represents a significant pivot from the department's historical baseline of 11 total postings over the past 180 days.",
+        "is_executive_movement": true,
+        "executive_context": "The appointment of a Director of Marketing Analytics reporting to the CMO, alongside concurrent searches for Directors of Lifecycle Analytics, Integrated Marketing, and Brand Marketing, indicates a comprehensive restructuring of the marketing leadership team to support scaled growth campaigns.",
+        "strategic_hypothesis": "The recruitment drive suggests that Neo Financial is scaling up its customer acquisition efforts following its March 2026 launch of the 'Get What You've Earned' brand platform. The company is establishing analytical guardrails to optimize its increased marketing spend and prevent inefficient capital allocation across its digital and social channels. However, there is uncertainty regarding the exact scale of the planned budget increase and the timeline for implementing the new data infrastructure.",
+        "web_corroboration": "In March 2026, Neo Financial launched its new national brand platform, 'Get What You've Earned,' marking a strategic shift from product-led promotions to emotional brand storytelling. The campaign focused its initial media investments on YouTube and paid social to drive reach. The job posting's disclosure of a planned increase in marketing spend directly aligns with this brand expansion and the need to measure the efficiency of these new national campaigns.",
+        "model_reasoning": "The confidence level is high because the job description explicitly details the strategic context, including the planned increase in marketing spend and the lack of existing analytical infrastructure. Furthermore, public press releases from March 2026 confirm the launch of a major new brand campaign, providing external validation for the timing and purpose of this marketing leadership expansion."
+      }
+    },
+    {
+      "jobId": "eb3e9b33-7ca4-4ed7-9b6d-3e46494280d0",
+      "title": " Représentant des ventes - Laval ",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2364,
+          "outputTokens": 624,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3178,
+          "totalTokens": 6166,
+          "estimatedUsd": 0,
+          "latencyMs": 19880,
+          "status": "ok",
+          "extra": {
+            "companyName": "Neo Financial",
+            "jobTitle": " Représentant des ventes - Laval ",
+            "fellBackToFlash": false,
+            "jobId": "eb3e9b33-7ca4-4ed7-9b6d-3e46494280d0"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Neo Financial recruits bilingual sales representatives to expand Quebec retail footprint",
+        "category": "expansion",
+        "insight_summary": "Neo Financial is hiring bilingual sales representatives in Laval, Quebec, to drive direct customer acquisition for its credit card and savings products. This recruitment aligns with recent regional sales leadership hires in Ontario and Alberta, indicating a sustained physical retail acquisition strategy. While overall sales postings have declined from 79 to 37 over the past 90 days, regional field sales recruitment remains active.",
+        "what_it_means": "The company continues to rely on in-person, retail-partner-based customer acquisition to grow its Canadian user base, expanding its footprint into Quebec.",
+        "strategic_signals": [
+          "Targeted geographic expansion into the Quebec market requiring bilingual capabilities.",
+          "Continued focus on direct-to-consumer acquisition via physical retail partners, malls, and campuses.",
+          "Commission-incentivized compensation structure designed to drive immediate product sign-ups.",
+          "Alignment with recent regional sales leadership hires in other Canadian provinces like Ontario and Alberta."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "The role represents a continuation of Neo's established mall and retail-based field sales strategy. The minor novelty stems from the geographic focus on Quebec (Laval) and the explicit bilingual requirement, contrasting with recent Ontario and Alberta leadership hires.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "Neo Financial is leveraging its retail partner network of over 10,000 partners to scale customer acquisition in Quebec. By hiring local, bilingual field agents in Laval, the company aims to replicate its Ontario and Western Canada retail acquisition model in the French-speaking market, offsetting a general slowdown in overall sales volumes with targeted regional campaigns.",
+        "web_corroboration": "Recent financial developments, including a $150 million credit card securitization in April 2026 and a $68.5 million equity raise in February 2026, suggest Neo Financial is actively scaling its credit portfolio. Expanding direct sales in Quebec, where the company historically had a delayed rollout compared to other provinces, supports this asset-backed growth strategy by bringing in new regional cardholders.",
+        "model_reasoning": "The analysis is based on the provided job description for Laval, Quebec, and historical hiring data showing a decline in overall sales roles but a consistent pattern of regional 'Team Lead' hires in Ontario and Alberta. Web research confirms Neo's recent capital raises aimed at credit portfolio growth, validating the hypothesis that local sales recruitment is designed to feed this securitization pipeline. Confidence is high due to the direct alignment between the job's bilingual requirements, geographic location, and established corporate growth patterns."
+      }
+    },
+    {
+      "jobId": "492f71bc-ab2d-447e-a076-5affe0038756",
+      "title": "Third Party Risk and Vendor Management Officer",
+      "companySlug": "questrade",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2465,
+          "outputTokens": 666,
+          "cachedTokens": 0,
+          "thoughtsTokens": 2537,
+          "totalTokens": 5668,
+          "estimatedUsd": 0,
+          "latencyMs": 17680,
+          "status": "ok",
+          "extra": {
+            "companyName": "Questrade",
+            "jobTitle": "Third Party Risk and Vendor Management Officer",
+            "fellBackToFlash": false,
+            "jobId": "492f71bc-ab2d-447e-a076-5affe0038756"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Questrade hires risk officer to support Questbank regulatory compliance",
+        "category": "compliance",
+        "insight_summary": "Questrade continues to expand its risk management capacity following its recent regulatory approval to launch Questbank. The new Third Party Risk and Vendor Management Officer will focus on establishing a centralized compliance framework aligned with OSFI B-10 guidelines. This recruitment coincides with the integration of Temenos core banking software as the firm prepares to roll out consumer banking products.",
+        "what_it_means": "The hiring of this officer suggests Questrade is prioritizing regulatory compliance and operational readiness ahead of its planned Questbank consumer product launch.",
+        "strategic_signals": [
+          "Establishment of a centralized Third Party Risk Management Framework specifically tailored for the newly licensed Questbank.",
+          "Strict alignment with Canadian OSFI B-10 guidelines to meet federal banking regulatory expectations.",
+          "Creation of a liaison role between internal risk domains, contract owners, and the technical development team for the risk platform.",
+          "Integration of risk requirements into technical system workflows, supporting the broader digital-first banking infrastructure."
+        ],
+        "is_new_direction": true,
+        "confidence": "high",
+        "novelty_score": 8,
+        "novelty_reasoning": "The role focuses specifically on Questbank, a newly licensed Schedule I bank approved by OSFI in late 2025. While Questrade has existing compliance functions for its brokerage business, building a centralized third-party risk management framework aligned with OSFI B-10 guidelines represents a novel regulatory requirement for its new banking entity.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "Questrade is building the necessary regulatory compliance infrastructure to satisfy OSFI requirements prior to launching Questbank's consumer deposit and mortgage products. The timing of this hire, following the May 2026 integration of Temenos core banking software, suggests that establishing a robust first line of defense for third-party risk is a critical prerequisite for commencing public operations. The primary uncertainty is the exact launch date of Questbank's consumer-facing products, which has been projected for the first half of 2026.",
+        "web_corroboration": "Public records show Questrade received OSFI approval to launch Questbank as a Schedule I bank in November 2025. In May 2026, Questrade went live with Temenos core banking software configured to meet OSFI requirements. The job posting's emphasis on OSFI B-10 compliance directly aligns with these regulatory milestones as the company prepares to roll out its banking services.",
+        "model_reasoning": "Confidence is high because the job description explicitly names Questbank and references OSFI B-10 guidelines, which are the exact regulatory standards governing Canadian federal financial institutions. This directly matches recent news of Questrade's transition into a Schedule I bank and its May 2026 core banking software implementation. The evidence-first alignment between the job posting and public regulatory filings provides strong validation for this analysis."
+      }
+    },
+    {
+      "jobId": "afb62032-c97d-492f-a9f2-fbbcd65dc103",
+      "title": "Analyst, Mutual Fund, Security Master and Physical Securities (Contract)",
+      "companySlug": "questrade",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2681,
+          "outputTokens": 688,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3302,
+          "totalTokens": 6671,
+          "estimatedUsd": 0,
+          "latencyMs": 20520,
+          "status": "ok",
+          "extra": {
+            "companyName": "Questrade",
+            "jobTitle": "Analyst, Mutual Fund, Security Master and Physical Securities (Contract)",
+            "fellBackToFlash": false,
+            "jobId": "afb62032-c97d-492f-a9f2-fbbcd65dc103"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Questrade hires contract operations analyst for mutual fund and security clearing",
+        "category": "operational",
+        "insight_summary": "Questrade is hiring a contract operations analyst to manage back-office clearing, mutual funds, and physical securities. This role addresses an existing vacancy within the clearing operations team, focusing on day-to-day reconciliation and third-party vendor management. The hiring aligns with a broader expansion in the operations department, which added 46 postings in the past 90 days.",
+        "what_it_means": "The contract hiring suggests Questrade is maintaining operational capacity for traditional brokerage assets while scaling its newer digital banking infrastructure.",
+        "strategic_signals": [
+          "The role manages physical certificate processing, including deposits to depositories like CDS, DTC, and APEX.",
+          "The position serves as the primary point of contact for outsourced back-office staff and third-party services like Broadridge and Fundserv.",
+          "The analyst handles administrative reconciliation for precious metals, mutual funds, GICs, and exempt market products.",
+          "The 12-month contract structure indicates temporary capacity backfilling rather than a permanent headcount expansion for this specific desk."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 2,
+        "novelty_reasoning": "The role is explicitly designated as an existing vacancy on a temporary 12-month contract. It requires standard industry qualifications, such as the Canadian Securities Course (CSC), and utilizes established platforms like Broadridge (BPS) and Fundserv, indicating routine operational maintenance rather than a strategic shift.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "Questrade is backfilling a vacancy to ensure uninterrupted clearing operations for its core brokerage business. While the company expands into digital banking via Questbank and adopts cloud-native core banking SaaS, it must maintain compliance and processing standards for legacy assets like physical certificates, mutual funds, and precious metals. Utilizing a 12-month contract limits long-term fixed costs on legacy operational desks.",
+        "web_corroboration": "Recent news indicates Questrade is expanding its digital ecosystem, having secured regulatory approval for Questbank in late 2025 and partnering with Temenos in May 2026 for core banking SaaS. While public announcements focus heavily on digital banking and advanced trading platforms, this job posting demonstrates the ongoing necessity of manual, back-office operations to support physical certificates and traditional mutual fund clearing.",
+        "model_reasoning": "The analysis is based directly on the provided job description, which explicitly details the day-to-day tasks of physical certificate handling, vault counts, and Broadridge reconciliation. The high confidence rating is supported by the explicit mention of 'existing vacancy' and '12-month contract' in the text, alongside recent public press releases detailing Questrade's transition toward digital banking (Questbank) and SaaS infrastructure, which contrasts with the manual nature of this specific operational role."
+      }
+    },
+    {
+      "jobId": "7ddca5ee-2708-4120-a8b9-fa703115d899",
+      "title": "Head of Marketing - Questbank",
+      "companySlug": "questrade",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2617,
+          "outputTokens": 833,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3989,
+          "totalTokens": 7439,
+          "estimatedUsd": 0,
+          "latencyMs": 21883,
+          "status": "ok",
+          "extra": {
+            "companyName": "Questrade",
+            "jobTitle": "Head of Marketing - Questbank",
+            "fellBackToFlash": false,
+            "jobId": "7ddca5ee-2708-4120-a8b9-fa703115d899"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Questrade hires Head of Marketing to launch Questbank B2B services",
+        "category": "leadership",
+        "insight_summary": "Questrade is recruiting a Head of Marketing for its newly approved banking entity, Questbank, to drive B2B growth. The role focuses on building go-to-market strategies for third-party distribution channels, including mortgage brokers and financial advisors. This hire coincides with other recent Questbank-specific technical roles, indicating an active pre-launch operational phase.",
+        "what_it_means": "The hire indicates that Questbank is transitioning from regulatory approval and core infrastructure setup to commercial launch preparation.",
+        "strategic_signals": [
+          "Questrade is targeting intermediary distribution networks, such as mortgage brokerages and financial advisors, to scale Questbank's lending and deposit products [1.1.1].",
+          "The role requires compliance oversight for marketing collateral to meet OSFI and Canadian banking regulatory standards.",
+          "Recent hiring data shows a cluster of Questbank-specific roles, including engineering and marketing, signaling active team building for the new bank.",
+          "The focus on B2B marketing suggests Questbank will rely heavily on third-party channels rather than solely direct-to-consumer retail acquisition."
+        ],
+        "is_new_direction": true,
+        "confidence": "high",
+        "novelty_score": 8,
+        "novelty_reasoning": "While Questrade secured its banking license in late 2025, hiring a dedicated Head of Marketing for Questbank represents a shift from regulatory and technical preparation to active market entry. This is a new leadership vertical focused on B2B banking distribution.",
+        "is_executive_movement": true,
+        "executive_context": "The Head of Marketing - Questbank is a strategic leadership role reporting to executive stakeholders, collaborating with the Chief Marketing Officer and Chief Operating Officer to align the bank's commercial strategy with the broader Questrade Financial Group.",
+        "strategic_hypothesis": "Questrade is positioning Questbank to compete with incumbent Canadian banks by leveraging third-party intermediary networks (brokers and advisors) to rapidly scale its mortgage and wholesale deposit portfolios. By focusing on B2B channels, Questbank can acquire volume more efficiently than relying solely on direct-to-consumer marketing, utilizing its newly implemented Temenos core banking platform to process these transactions in real time.",
+        "web_corroboration": "In November 2025, Questrade received OSFI approval to launch Questbank as a Schedule I bank. In May 2026, the company went live with Temenos core banking software to support its deposit and mortgage products. The job posting's focus on B2B mortgage broker networks and OSFI compliance directly aligns with these recent operational milestones.",
+        "model_reasoning": "The confidence is high because the job description's focus on B2B channels, mortgage brokers, and OSFI compliance perfectly matches documented news of Questrade's recent Schedule I banking license approval and its May 2026 Temenos core banking integration. The hiring timeline (May 2026) aligns precisely with the technical go-live announcement, confirming a transition to commercial readiness."
+      }
+    },
+    {
+      "jobId": "70658554-12d3-4e79-884d-b98cec3fa40a",
+      "title": "Clearing & Custody Wealth Management Banker",
+      "companySlug": "rbc",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2699,
+          "outputTokens": 823,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3592,
+          "totalTokens": 7114,
+          "estimatedUsd": 0,
+          "latencyMs": 23314,
+          "status": "ok",
+          "extra": {
+            "companyName": "RBC",
+            "jobTitle": "Clearing & Custody Wealth Management Banker",
+            "fellBackToFlash": false,
+            "jobId": "70658554-12d3-4e79-884d-b98cec3fa40a"
+          }
+        }
+      ],
+      "output": {
+        "headline": "RBC recruits New York banker to drive clearing and custody lending",
+        "category": "expansion",
+        "insight_summary": "RBC is hiring a Clearing & Custody Wealth Management Banker in New York to accelerate the adoption of cash management and lending solutions among independent broker-dealers and registered investment advisors. The role focuses on expanding securities-based lending and bank deposit products to deepen client relationships in the independent wealth management channel. This hiring aligns with RBC's broader strategy to leverage its balance sheet and custody platform to capture market share in the growing independent advisory sector.",
+        "what_it_means": "RBC is actively leveraging its balance sheet to cross-sell lending and cash management products to independent advisors, aiming to increase interest income and asset retention within its US custody business.",
+        "strategic_signals": [
+          "Targeting independent broker-dealers and registered investment advisors to drive adoption of securities-based loans and bank deposits [1.2.4].",
+          "Establishing a dedicated sales pipeline focused on loan commitments, balances, revenue, and advisor participation metrics.",
+          "Requiring FINRA licensing including SIE, Series 7, and Series 63 to ensure compliant distribution of sophisticated wealth management products.",
+          "Collaborating with internal Associate Bankers to deliver integrated cash management and lending support to external advisors."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "While RBC has long offered clearing and custody services, this role represents a continuation of its established US wealth management strategy rather than a structural pivot. The focus on cross-selling lending and cash products to independent RIAs and broker-dealers is a standard industry practice to improve custody margins.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "RBC aims to offset potential fee compression in standard custody services by expanding higher-margin interest-earning products like securities-based lending and cash sweeps. By embedding a specialized banker within the Clearing & Custody channel, RBC seeks to capture a larger share of independent advisor assets. However, success depends on advisor willingness to shift clients to RBC's proprietary banking products amid intense competition from other custodians.",
+        "web_corroboration": "RBC's public strategy emphasizes leveraging its strong balance sheet and high credit ratings to support its US Wealth Management division, which includes RBC Clearing & Custody. The bank's product offerings, such as the RBC Cash Management Account and securities-based lending, are actively marketed as key differentiators to help independent broker-dealers and RIAs grow their practices. This job posting directly operationalizes this strategy by hiring dedicated sales talent to drive the distribution of these specific products.",
+        "model_reasoning": "The job description provides highly specific details regarding the target audience, product focus, and performance metrics. This clarity, combined with public marketing materials from RBC Clearing & Custody confirming their focus on these exact products, allows for a high-confidence analysis of the role's strategic intent."
+      }
+    },
+    {
+      "jobId": "f6357a87-6877-4a5e-8371-4a95d507693c",
+      "title": "Senior Network Analyst",
+      "companySlug": "rbc",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2582,
+          "outputTokens": 684,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3947,
+          "totalTokens": 7213,
+          "estimatedUsd": 0,
+          "latencyMs": 23492,
+          "status": "ok",
+          "extra": {
+            "companyName": "RBC",
+            "jobTitle": "Senior Network Analyst",
+            "fellBackToFlash": false,
+            "jobId": "f6357a87-6877-4a5e-8371-4a95d507693c"
+          }
+        }
+      ],
+      "output": {
+        "headline": "RBC adds senior network analyst to support SRE operations",
+        "category": "technology",
+        "insight_summary": "RBC is expanding its Site Reliability Engineering Network Operations team with a focus on SD-WAN and multi-vendor wireless environments. This hiring pattern aligns with the bank's active engineering recruitment, which accounts for 178 of its 1,000 tracked postings over the past 180 days. The role emphasizes automation and incident management to maintain network uptime across hybrid cloud platforms.",
+        "what_it_means": "The addition of this role suggests RBC is prioritizing network reliability and automation to support its ongoing hybrid cloud and infrastructure modernization initiatives.",
+        "strategic_signals": [
+          "Integration of Site Reliability Engineering principles into core network operations to automate incident response.",
+          "Requirement for multi-vendor SD-WAN expertise, specifically Silver Peak Edge Connect, to manage distributed network infrastructure.",
+          "Alignment with recent leadership additions, including a Senior Director of Network Strategy and Analytics hired in May 2026.",
+          "Focus on network automation using Python and Ansible to reduce operational toil in a 24/7 rotation environment."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "The role represents a continuation of RBC's established SRE and hybrid cloud strategy rather than a new operational direction. SRE practices have been integrated at the bank for several years, and the engineering department remains one of the top three hiring areas with 178 recent postings.",
+        "is_executive_movement": true,
+        "executive_context": "The recent posting for a Senior Director of Network Strategy and Analytics in May 2026 suggests a coordinated effort to align high-level network design with operational execution. Additionally, the hiring of a Director of Identity Platform Enablement Engineering indicates a parallel focus on securing network and platform access.",
+        "strategic_hypothesis": "RBC is expanding its SRE network operations to support increased traffic and complexity from its hybrid cloud migration and the integration of acquired assets, such as HSBC Canada. By hiring for SD-WAN and automation capabilities, the bank aims to lower operational costs and improve network resilience. However, the exact scale of the network migration remains private, leaving some uncertainty regarding the total capacity requirements.",
+        "web_corroboration": "RBC's public strategy emphasizes building a unified hybrid cloud using Infrastructure as Code and SRE principles to automate operations. The focus on SD-WAN also aligns with recent Canadian cybersecurity guidance highlighting threats to SD-WAN architectures, explaining the emphasis on secure network operations. Furthermore, the bank's integration of HSBC Canada assets requires robust, scalable network infrastructure to support migrated commercial clients.",
+        "model_reasoning": "The analysis is based directly on the provided job description, historical hiring data showing Engineering as a top-three department, and verified public sources regarding RBC's hybrid cloud and SRE strategy. The alignment between the Senior Network Analyst role and the recently posted Senior Director of Network Strategy & Analytics role provides strong evidence of a coordinated network modernization initiative, justifying a high confidence level."
+      }
+    },
+    {
+      "jobId": "2c0ddecd-ae50-4e65-8a43-6e2c585416e3",
+      "title": "2026 CFO, Data Governance Summer Analyst (4 Months)",
+      "companySlug": "rbc",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2488,
+          "outputTokens": 762,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3002,
+          "totalTokens": 6252,
+          "estimatedUsd": 0,
+          "latencyMs": 19966,
+          "status": "ok",
+          "extra": {
+            "companyName": "RBC",
+            "jobTitle": "2026 CFO, Data Governance Summer Analyst (4 Months)",
+            "fellBackToFlash": false,
+            "jobId": "2c0ddecd-ae50-4e65-8a43-6e2c585416e3"
+          }
+        }
+      ],
+      "output": {
+        "headline": "RBC adds data governance summer analyst within office of CFO",
+        "category": "data",
+        "insight_summary": "The Royal Bank of Canada is hiring a Data Governance Summer Analyst for a four-month co-op term within the Office of the CFO in Toronto. The role focuses on documenting data standards, mapping data flows, and maintaining metadata inventories to support financial data accuracy and security. This recruitment aligns with broader data governance and analytics expansion efforts across RBC's finance and wealth management divisions.",
+        "what_it_means": "RBC continues to build its pipeline of early-career data talent to support the modernization and governance of its core financial data systems.",
+        "strategic_signals": [
+          "The position is situated within the Office of the CFO platform, indicating a focus on financial data integrity and regulatory compliance [1.1.2].",
+          "Key responsibilities include maintaining data dictionaries, glossaries, and mapping data flows between systems.",
+          "The role requires proficiency in Excel and familiarity with SQL, reflecting standard data management requirements.",
+          "This internship is part of a broader pattern of data governance and analytics hiring across RBC's corporate functions."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 2,
+        "novelty_reasoning": "This role represents a standard, recurring summer co-op position rather than a new strategic direction. However, placing a data governance analyst specifically within the Office of the CFO highlights the ongoing operational focus on financial data quality and compliance.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "RBC is leveraging its co-op and internship programs to address the increasing administrative and technical demands of financial data governance. By embedding data science and business analytics students in the Office of the CFO, the bank can cost-effectively manage data dictionaries, metadata, and data flow mapping while evaluating future full-time talent.",
+        "web_corroboration": "Recent job postings and executive interviews indicate that RBC is actively expanding its data governance frameworks and cloud-native data architectures. For instance, the bank recently posted roles for a Manager of Data Governance in Enterprise Finance and a Manager of Data Governance Practices in Wealth Management. This summer analyst role supports these broader, permanent initiatives by handling foundational documentation and requirements gathering.",
+        "model_reasoning": "The job posting provides explicit details regarding the role's responsibilities, platform (Office of the CFO), and requirements. Web research corroborates that RBC has a sustained focus on data governance across multiple business units. The confidence is high because the role's scope is clearly defined as a standard student co-op rather than a strategic shift."
+      }
+    },
+    {
+      "jobId": "4a410d00-c43c-49c8-95b1-407cdfad1cee",
+      "title": "Senior Manager, External Communications &amp; Community Investment - 18-month contract - Tangerine",
+      "companySlug": "tangerine",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2494,
+          "outputTokens": 553,
+          "cachedTokens": 0,
+          "thoughtsTokens": 2527,
+          "totalTokens": 5574,
+          "estimatedUsd": 0,
+          "latencyMs": 15004,
+          "status": "ok",
+          "extra": {
+            "companyName": "Tangerine",
+            "jobTitle": "Senior Manager, External Communications &amp; Community Investment - 18-month contract - Tangerine",
+            "fellBackToFlash": false,
+            "jobId": "4a410d00-c43c-49c8-95b1-407cdfad1cee"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Tangerine recruits communications manager to direct Project Forward initiative",
+        "category": "marketing",
+        "insight_summary": "Tangerine is hiring a Senior Manager for External Communications & Community Investment on an 18-month contract. This role oversees the brand's media relations, crisis communications, and the Project Forward corporate social responsibility program. The fixed-term contract suggests a temporary backfill to maintain operational continuity rather than a permanent expansion.",
+        "what_it_means": "Tangerine is maintaining its public relations and community investment operations through a temporary leadership role focused on its established youth CSR platform.",
+        "strategic_signals": [
+          "The role manages external communications, media relations, and reputational risk for the digital bank.",
+          "The position directs the Project Forward initiative, which focuses on youth empowerment partnerships in Canada.",
+          "The candidate will oversee community investment budgets, contract negotiations, and corporate social responsibility objectives.",
+          "The 18-month contract structure indicates a temporary assignment or parental leave coverage rather than a permanent headcount addition."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "This role represents a continuation of Tangerine's established Project Forward CSR program, which has been active for several years. The 18-month contract format indicates a temporary backfill rather than a new strategic direction or permanent expansion of the marketing department.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "Tangerine is seeking to maintain continuity in its external PR and CSR efforts during a temporary vacancy without expanding permanent headcount. The role ensures that Project Forward youth initiatives and media relations remain managed under Scotiabank's broader governance framework.",
+        "web_corroboration": "Tangerine's 2025 Public Accountability Statement confirms Project Forward is an active initiative with over $434,000 in annual spend. The trademark for Tangerine Project Forward was officially registered by parent company Scotiabank in November 2025, confirming ongoing institutional alignment.",
+        "model_reasoning": "The analysis is based on the provided job description, historical hiring patterns showing stable but slightly declining marketing roles, and public trademark and financial disclosures from Tangerine and Scotiabank. The 18-month contract duration strongly supports the inference of a temporary backfill, leading to a low novelty score of 3 and high confidence in the assessment."
+      }
+    },
+    {
+      "jobId": "ecdfc114-788a-45ca-a90e-3b1631c33fb4",
+      "title": "Senior Database Administrator",
+      "companySlug": "tangerine",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2887,
+          "outputTokens": 572,
+          "cachedTokens": 0,
+          "thoughtsTokens": 2231,
+          "totalTokens": 5690,
+          "estimatedUsd": 0,
+          "latencyMs": 15609,
+          "status": "ok",
+          "extra": {
+            "companyName": "Tangerine",
+            "jobTitle": "Senior Database Administrator",
+            "fellBackToFlash": false,
+            "jobId": "ecdfc114-788a-45ca-a90e-3b1631c33fb4"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Tangerine recruits senior database administrator to support hybrid cloud migration",
+        "category": "technology",
+        "insight_summary": "Tangerine is hiring a Senior Database Administrator to manage its hybrid database infrastructure. The role requires experience with legacy Oracle systems alongside Google Cloud Platform database services like AlloyDB and Cloud SQL. This hiring pattern aligns with parent company Scotiabank's multi-year initiative to migrate core systems to Google Cloud.",
+        "what_it_means": "The hiring of this role suggests Tangerine is actively transitioning its core database workloads from on-premises Oracle environments to Google Cloud Platform.",
+        "strategic_signals": [
+          "Integration of legacy Oracle databases with Google Cloud Platform services including AlloyDB and Cloud SQL",
+          "Requirement for infrastructure-as-code expertise using Terraform to automate database deployments",
+          "Focus on high-availability and disaster recovery using Oracle Dataguard and multi-tenant architectures",
+          "Adoption of Redis Enterprise for in-memory data store and caching operations"
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "The role represents a continuation of Tangerine's established engineering hiring, which has remained stable with 43 postings over the past 180 days. The inclusion of Google Cloud Platform and Terraform requirements reflects the ongoing execution of Scotiabank's cloud migration strategy rather than a novel technical direction.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The role is designed to bridge the gap between legacy on-premises Oracle databases and modern cloud-native databases on Google Cloud Platform. This is supported by requirements for both Oracle Dataguard and GCP AlloyDB. The primary operational challenge is the complexity of migrating highly regulated financial data while maintaining strict uptime and compliance standards.",
+        "web_corroboration": "Scotiabank expanded its strategic partnership with Google Cloud in April 2024, aiming to migrate the majority of its information and systems to the cloud. This job posting directly reflects that strategy by requiring experience with GCP database services like AlloyDB and Cloud SQL alongside legacy Oracle systems.",
+        "model_reasoning": "The analysis is based on direct requirements listed in the job description, historical hiring data showing stable engineering recruitment, and public press releases regarding Scotiabank's partnership with Google Cloud. The alignment between the job's technical requirements (GCP, AlloyDB, Oracle) and the public corporate strategy provides high confidence in the assessment."
+      }
+    },
+    {
+      "jobId": "6a5cba55-4879-4046-b5e8-4bc97d73e198",
+      "title": "Sr DevOps Specialist, Tools and Administration - Tangerine",
+      "companySlug": "tangerine",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2379,
+          "outputTokens": 724,
+          "cachedTokens": 0,
+          "thoughtsTokens": 3189,
+          "totalTokens": 6292,
+          "estimatedUsd": 0,
+          "latencyMs": 21273,
+          "status": "ok",
+          "extra": {
+            "companyName": "Tangerine",
+            "jobTitle": "Sr DevOps Specialist, Tools and Administration - Tangerine",
+            "fellBackToFlash": false,
+            "jobId": "6a5cba55-4879-4046-b5e8-4bc97d73e198"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Tangerine hires senior DevOps specialist for cloud migration and platform modernization",
+        "category": "technology",
+        "insight_summary": "Tangerine is hiring a Senior DevOps Specialist to manage cloud migration and CI/CD pipelines on Google Cloud Platform. This role supports a broader technology modernization effort, including the administration of development tools for over 800 users. The position aligns with the bank's recent multi-year agreement to upgrade its core banking system to a cloud-native platform.",
+        "what_it_means": "The hiring of this specialist indicates that Tangerine is actively executing its cloud migration and core platform modernization strategies.",
+        "strategic_signals": [
+          "The role requires experience with Google Cloud Platform, Terraform, and Kubernetes to support application modernization [1.1.1].",
+          "The specialist will administer DevOps tools, including Jira, GitHub, and Jenkins, for a user base of over 800 internal developers.",
+          "The position requires exposure to AI Ops, aligning with recent leadership hires in AI engineering and enablement.",
+          "This technical expansion supports Tangerine's November 2025 agreement to migrate its core banking system to Engine by Starling's cloud-native platform."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "While Tangerine has a stable history of engineering hires, this role specifically targets cloud migration and tool administration for 800+ users. This supports the bank's active transition to a cloud-native core banking platform, rather than representing a completely new operational direction.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "Tangerine is likely expanding its infrastructure engineering capacity to execute its 10-year core banking upgrade agreement with Engine by Starling, signed in late 2025. The emphasis on Google Cloud migration, Kubernetes, and AI Ops suggests the bank is preparing its internal development environment to support a modernized, cloud-native architecture.",
+        "web_corroboration": "In November 2025, Tangerine announced a major core banking modernization partnership with Engine by Starling to transition its systems to a cloud-native SaaS platform. Additionally, public profiles of Tangerine's cloud architects confirm ongoing migrations of legacy workloads to Google Cloud Platform, which directly matches the requirements of this DevOps posting.",
+        "model_reasoning": "The confidence is high because the job description's requirements (Google Cloud, application modernization, Kubernetes) directly align with documented corporate announcements, specifically the November 2025 core banking upgrade with Engine by Starling and recent hires for AI platform engineering. The scale of 800+ users indicates a mature, centralized engineering tooling team."
+      }
+    },
+    {
+      "jobId": "a9ad7dc0-9fe1-483e-bb62-712bc980ca5c",
+      "title": "Specialist, Derivatives Risk Remediation",
+      "companySlug": "wealthsimple",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2934,
+          "outputTokens": 542,
+          "cachedTokens": 0,
+          "thoughtsTokens": 2974,
+          "totalTokens": 6450,
+          "estimatedUsd": 0,
+          "latencyMs": 18524,
+          "status": "ok",
+          "extra": {
+            "companyName": "Wealthsimple",
+            "jobTitle": "Specialist, Derivatives Risk Remediation",
+            "fellBackToFlash": false,
+            "jobId": "a9ad7dc0-9fe1-483e-bb62-712bc980ca5c"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Wealthsimple hires derivatives risk specialist amid retail futures trading launch",
+        "category": "operational",
+        "insight_summary": "Wealthsimple is expanding its Derivative Risk Remediation team within Credit Risk Operations to manage retail derivative exposures exceeding $1 billion. This hiring coincides with the company's May 2026 expansion into retail futures contracts and complex multi-leg options. The role focuses on daily risk monitoring, option liquidations, and ensuring compliance with regulatory margin rules.",
+        "what_it_means": "Wealthsimple is scaling its risk management infrastructure to mitigate the financial and regulatory risks associated with its new high-leverage retail trading products.",
+        "strategic_signals": [
+          "The Derivative Risk Remediation team monitors retail derivative exposures exceeding $1 billion, indicating significant trading volume.",
+          "The role requires specialized knowledge of retail option strategies, including vertical spreads, iron condors, and naked options.",
+          "The specialist will execute option assignments, restrict accounts, and perform position liquidations to manage live market risk.",
+          "The position integrates technical skills, requiring SQL, Python, and AI tools to build and maintain risk monitoring dashboards."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 6,
+        "novelty_reasoning": "While Wealthsimple has offered basic options trading historically, the explicit inclusion of futures risk management represents a new operational capability. The hire supports a recently announced product line rather than establishing an entirely new business division.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The launch of retail futures and complex options increases Wealthsimple's exposure to rapid market shifts and leverage-induced client defaults. Scaling the risk remediation team suggests the company is proactively establishing guardrails to protect its capital and ensure compliance with CIRO margin requirements as active trading volume grows.",
+        "web_corroboration": "On May 1, 2026, Wealthsimple announced the launch of futures contracts and expanded options trading features to attract active Canadian investors. The job posting's focus on futures, multi-leg options, and CIRO compliance directly supports this public product rollout.",
+        "model_reasoning": "Confidence is high because the job description's specific requirements for futures and options risk management directly align with Wealthsimple's documented May 2026 product announcements. The operational hiring serves as a direct backend requirement for the front-end product expansion."
+      }
+    },
+    {
+      "jobId": "c1f15941-82a8-426c-933a-d2c7c42f2d9b",
+      "title": "Senior Analyst, Quantitative Research",
+      "companySlug": "wealthsimple",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2391,
+          "outputTokens": 670,
+          "cachedTokens": 0,
+          "thoughtsTokens": 4546,
+          "totalTokens": 7607,
+          "estimatedUsd": 0,
+          "latencyMs": 22934,
+          "status": "ok",
+          "extra": {
+            "companyName": "Wealthsimple",
+            "jobTitle": "Senior Analyst, Quantitative Research",
+            "fellBackToFlash": false,
+            "jobId": "c1f15941-82a8-426c-933a-d2c7c42f2d9b"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Wealthsimple recruits quantitative research analyst to scale portfolio optimization models",
+        "category": "data",
+        "insight_summary": "Wealthsimple is recruiting a Senior Analyst for its Investment Research Team to design and validate portfolio optimization models, factor frameworks, and risk analytics. This role focuses on translating quantitative research into live production systems in collaboration with Engineering. The hire supports the scaling of Wealthsimple's managed portfolios, which recently reached $124.8 billion in assets under administration.",
+        "what_it_means": "Wealthsimple is institutionalizing its portfolio construction and risk management capabilities to support increasingly complex investment products at scale.",
+        "strategic_signals": [
+          "The role focuses on practical implementation of mean-variance and risk-parity optimization frameworks for a retail client base.",
+          "The analyst will partner with Engineering to transition quantitative prototypes into live production models.",
+          "The position requires expertise in factor-based risk decomposition, tail risk analysis, and stress testing across asset classes.",
+          "The hire supports the Investment Research Team, which designs the strategies behind Wealthsimple's managed portfolios."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 4,
+        "novelty_reasoning": "While Wealthsimple has offered managed portfolios since its inception, this role represents a continuation and refinement of its quantitative capabilities rather than a new business direction. The Product department's hiring has remained stable with 19 total postings over the past 180 days, indicating steady incremental growth.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The expansion of Wealthsimple's assets under administration to $124.8 billion as of Q1 2026, combined with the recent launch of complex products like the Summit portfolio and direct indexing, requires more robust, automated portfolio construction and risk analytics. This role is designed to bridge the gap between theoretical quantitative research and production-level engineering to ensure these models scale safely.",
+        "web_corroboration": "Wealthsimple's Q1 2026 financial reports show a 71% year-over-year increase in assets under administration to $124.8 billion. Additionally, the company's late 2025 product launches focused on advanced investor tools, including direct indexing and the multi-asset Summit portfolio. The job posting's emphasis on factor frameworks and risk models directly supports these sophisticated, high-tier investment offerings.",
+        "model_reasoning": "The connection between the job description's technical requirements and Wealthsimple's public product roadmap is highly direct. Public financial data confirms rapid asset growth, which justifies the need for dedicated quantitative risk and optimization personnel to ensure portfolio stability at scale. The low volume of Product department postings (19 over 180 days) suggests this is a targeted, strategic addition rather than a broad hiring surge, supporting a high-confidence assessment."
+      }
+    },
+    {
+      "jobId": "286a62b4-5991-4eb8-897d-819faae319e2",
+      "title": "Senior Software Developer, Ledger",
+      "companySlug": "wealthsimple",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-3.5-flash",
+          "modelServed": "gemini-3.5-flash",
+          "groundingEnabled": true,
+          "inputTokens": 2544,
+          "outputTokens": 764,
+          "cachedTokens": 0,
+          "thoughtsTokens": 4618,
+          "totalTokens": 7926,
+          "estimatedUsd": 0,
+          "latencyMs": 25423,
+          "status": "ok",
+          "extra": {
+            "companyName": "Wealthsimple",
+            "jobTitle": "Senior Software Developer, Ledger",
+            "fellBackToFlash": false,
+            "jobId": "286a62b4-5991-4eb8-897d-819faae319e2"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Wealthsimple recruits ledger developer to scale financial infrastructure",
+        "category": "technology",
+        "insight_summary": "Wealthsimple is expanding its engineering team to build high-throughput, double-entry ledger systems using Java and Kotlin. This recruitment occurs alongside the establishment of a new Accounting Policy function led by a recently posted Director role. The hiring pattern indicates a systematic upgrade of transaction infrastructure to support institutional-grade financial reporting.",
+        "what_it_means": "The company is transitioning its core transaction systems to support higher regulatory scrutiny and audit readiness as assets under administration scale.",
+        "strategic_signals": [
+          "Integration of ledger infrastructure with ERP systems like Oracle EBS to automate financial reconciliation [1.1.7].",
+          "Adoption of event-driven architectures using Kafka to handle high-throughput transaction processing.",
+          "Coordinated scaling of engineering and finance departments, including the creation of a founding Accounting Policy function.",
+          "Implementation of AI-first workflows and agentic automation within core backend engineering."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 4,
+        "novelty_reasoning": "While Wealthsimple has historically maintained ledger and transaction systems, this role represents a structured push toward institutional-grade financial controls. It coincides directly with the creation of a new Accounting Policy department and follows the company surpassing 100 billion dollars in assets under administration in late 2025.",
+        "is_executive_movement": false,
+        "executive_context": "The analyzed role is not an executive position, but it directly supports the newly established Accounting Policy function led by the recently posted Director, Accounting Policy.",
+        "strategic_hypothesis": "Wealthsimple is upgrading its financial infrastructure to support its rapid scale, having surpassed 100 billion dollars in assets under administration in late 2025. The integration of ledger systems with ERPs like Oracle EBS, combined with the parallel creation of the Accounting Policy function, suggests preparation for stricter regulatory compliance or potential future public market readiness. However, it remains uncertain whether these initiatives are driven by immediate regulatory mandates or proactive operational scaling.",
+        "web_corroboration": "Public disclosures from late 2025 confirm that Wealthsimple surpassed 100 billion dollars in assets under administration, achieving its target three years ahead of schedule. Technical interviews from 2023 confirm the company's historical reliance on Kafka and Oracle EBS for its general ledger, indicating that this hire represents an expansion of an established technical framework rather than a novel architectural shift. The simultaneous recruitment of a founding Director of Accounting Policy in April 2026 corroborates a broader corporate focus on institutionalizing financial controls.",
+        "model_reasoning": "The analysis is based on direct alignment between the analyzed job description, historical hiring data, and verified corporate milestones. The job description's mention of Oracle EBS and Kafka matches historical technical interviews, confirming the continuity of the tech stack. The parallel posting for a Director of Accounting Policy provides strong evidence of a coordinated organizational push toward formalized financial reporting, justifying a high confidence level."
+      }
+    }
+  ]
+}
