@@ -18,7 +18,7 @@ These hit the ATS provider's JSON endpoint. They run inside Vercel functions and
 These need Puppeteer because the ATS doesn't expose a clean JSON feed. They are too long-running / memory-heavy to run reliably inside a Vercel cron, so the live flow offloads them via `triggerScrapeWorkflow` in `web/lib/github.ts`, which `workflow_dispatch`-es `.github/workflows/scrape-heavy.yml`.
 
 - **`dayforce.ts`** — Dayforce boards.
-- **`scotiabank.ts`** — Scotiabank custom careers site.
+- **`scotiabank.ts`** — Scotiabank SuccessFactors portal (`jobs.scotiabank.com`). One parser drives every Scotia-family brand: the parent **Scotiabank** brand (incumbent, ~1,900 jobs, hrefs omit the brand prefix) and **Tangerine** (fintech subsidiary, ~30 jobs, hrefs include `/Tangerine/`). The brand-path prefix in hrefs is matched as an optional regex group so both shapes work. `SCOTIABANK_MAX_PAGES` env caps per-run pagination (default 200 = 5,000-job ceiling). Offloaded to `scrape-heavy.yml` for the parent — 1,900 jobs × per-page + per-detail fetches don't fit in Vercel's 300s budget.
 - **`phenom-rbc.ts`** — RBC's Phenom CareerConnect tenant (`jobs.rbc.com`). Reads server-rendered `phApp.eagerLoadRefineSearch` + JSON-LD `JobPosting` per detail page. Chunked enrichment (50/batch, concurrency=4).
 - **`phenom-bmo.ts`** — BMO's Phenom tenant (`jobs.bmo.com`). Same shape as phenom-rbc.
 - **`browser.ts`** — Generic Puppeteer helpers (`scrapeJobsWithBrowser`, `scrapeGenericJobBoard`, `scrapeSuccessFactors`).

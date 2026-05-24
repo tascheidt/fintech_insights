@@ -28,7 +28,11 @@ export async function fetchScotiabankJobs(
   const pageSize = 25; // SuccessFactors default
   let startRow = 0;
   let totalJobs = Infinity;
-  const maxPages = 20; // safety limit
+  // Page safety + smoke cap. The original 20-page cap silently truncated
+  // brands larger than ~500 jobs (Scotia parent has ~1,900). Default
+  // raised to 200 (= 5,000-job ceiling, ~2.5× headroom over Scotia parent).
+  // `SCOTIABANK_MAX_PAGES=N` overrides for smoke tests.
+  const maxPages = resolveMaxPages(process.env.SCOTIABANK_MAX_PAGES);
   let page = 0;
 
   while (startRow < totalJobs && page < maxPages) {
@@ -56,11 +60,11 @@ export async function fetchScotiabankJobs(
 
     const html = await res.text();
 
-    // Parse total from "Results 1 – 25 of 26"
+    // Parse total from "Results 1 – 25 of 26".
     if (totalJobs === Infinity) {
-      const totalMatch = html.match(/Results\s+\d+\s*[–-]\s*\d+\s+of\s+(\d+)/);
-      if (totalMatch) {
-        totalJobs = parseInt(totalMatch[1], 10);
+      const parsed = extractTotalJobsFromHtml(html);
+      if (parsed !== null) {
+        totalJobs = parsed;
         log.info(`[scotiabank] Total jobs: ${totalJobs}`);
       }
     }
@@ -99,10 +103,44 @@ export async function fetchScotiabankJobs(
 }
 
 /**
+ * Resolve the per-run page cap from an optional env var.
+ *
+ * Returns 200 by default (5,000-job ceiling, ~2.5× headroom over Scotia
+ * parent). A positive integer in `SCOTIABANK_MAX_PAGES` overrides — used by
+ * the smoke script (e.g. SCOTIABANK_MAX_PAGES=2 → ~50 jobs, ~10s run).
+ * Non-numeric, missing, or zero values fall back to the default.
+ *
+ * Exported for testing.
+ */
+export function resolveMaxPages(raw: string | undefined): number {
+  if (!raw) return 200;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return 200;
+  return n;
+}
+
+/**
+ * Extract the "Results 1 – 25 of N" total count from a listing page.
+ *
+ * SuccessFactors wraps both sides of the count in `<b>` tags on some brand
+ * portals (e.g. the Scotiabank parent brand) but not others (Tangerine).
+ * We strip the inline markup first so a single regex handles both.
+ *
+ * Exported for testing.
+ */
+export function extractTotalJobsFromHtml(html: string): number | null {
+  const flatHeader = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  const totalMatch = flatHeader.match(/Results\s+\d+\s*[–-]\s*\d+\s+of\s+(\d+)/);
+  return totalMatch ? parseInt(totalMatch[1], 10) : null;
+}
+
+/**
  * Parse job listings from SuccessFactors HTML.
  * Extracts data from the server-rendered table rows.
+ *
+ * Exported for testing — production callers should use `fetchScotiabankJobs`.
  */
-function parseJobsFromHtml(
+export function parseJobsFromHtml(
   html: string,
   brandPath: string,
   seenIds: Set<string>
@@ -114,13 +152,19 @@ function parseJobsFromHtml(
   const rowRegex = /<tr\s+class="data-row[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
   let rowMatch;
 
+  // The brand-path prefix in job hrefs is OPTIONAL: Tangerine includes it
+  // (`/Tangerine/job/...`), the Scotiabank parent brand omits it
+  // (`/job/...`). Match both shapes with a non-capturing optional group so
+  // a single parser handles every Scotiabank SuccessFactors brand.
+  const hrefPrefix = `(?:/${escapeRegex(brandPath)})?/job/`;
+
   while ((rowMatch = rowRegex.exec(html)) !== null) {
     const rowHtml = rowMatch[1];
 
     // Extract job link, title, and ID
     // Pattern: <a href="/Tangerine/job/Toronto-.../598714517/" title="Mobile Architect">
     const linkRegex = new RegExp(
-      `<a[^>]*href="(/${escapeRegex(brandPath)}/job/[^"]+/(\\d+)/?)"[^>]*title="([^"]*)"`,
+      `<a[^>]*href="(${hrefPrefix}[^"]+/(\\d+)/?)"[^>]*title="([^"]*)"`,
       "i"
     );
     const linkMatch = linkRegex.exec(rowHtml);
@@ -128,7 +172,7 @@ function parseJobsFromHtml(
     if (!linkMatch) {
       // Try alternate pattern: title in the link text instead of attribute
       const altLinkRegex = new RegExp(
-        `<a[^>]*href="(/${escapeRegex(brandPath)}/job/[^"]+/(\\d+)/?)"[^>]*>([^<]+)</a>`,
+        `<a[^>]*href="(${hrefPrefix}[^"]+/(\\d+)/?)"[^>]*>([^<]+)</a>`,
         "i"
       );
       const altMatch = altLinkRegex.exec(rowHtml);
@@ -138,7 +182,7 @@ function parseJobsFromHtml(
       if (seenIds.has(jobId)) continue;
       seenIds.add(jobId);
 
-      const jobData = buildJobData(jobId, title.trim(), path, rowHtml);
+      const jobData = buildJobData(jobId, decodeHtmlEntities(title.trim()), path, rowHtml);
       if (jobData) jobs.push(jobData);
       continue;
     }
@@ -286,7 +330,8 @@ export async function enrichScotiabankJobDescriptions(
   return enriched;
 }
 
-function extractScotiabankDescriptionHtml(html: string): string | null {
+/** Exported for testing. */
+export function extractScotiabankDescriptionHtml(html: string): string | null {
   const descriptionByItemprop = extractBalancedSpanInnerHtml(
     html,
     /<span[^>]*itemprop="description"[^>]*>/i
