@@ -103,6 +103,8 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 | `src/scrapers/` | Legacy Python CLI scrapers. |
 | `config/companies.yaml` | Company configs (`name`, `slug`, `country`, `ats_type`, `ats_identifier`). |
 | `docs/` | Long-form architecture docs. Start with `docs/AGENTS.md`. |
+| `.claude/agents/` | Project subagent definitions (`senior-architect`, `senior-staff-code-reviewer`, `ux-design-advisor`). Committed; treat edits as code changes. |
+| `web/.claude/agent-memory/` | Per-agent learned memory. Local-only; gitignored. |
 
 ## 7. Conventions
 
@@ -132,6 +134,7 @@ Things that will get a PR rejected:
 - Adding the voice directive to internal extraction/classification prompts (it only burns tokens; users never see the output).
 - Mocking the Supabase DB in tests instead of using the test schema.
 - Referencing `cron_logs` (deprecated and removed).
+- Gitignoring `.claude/agents/` or moving agent definitions back under `web/.claude/`. Agent definitions are part of the project contract and live at the repo root.
 - Touching `web/lib/scrapers/browser.ts` (1131 LOC) for a refactor before launch.
 - Editing architecture/cron/AI/auth/schema without updating the relevant `.md` (see section 9).
 
