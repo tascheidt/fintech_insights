@@ -10,9 +10,13 @@ dist/
 build/
 .DS_Store
 
+# Claude Code: agent definitions (.claude/agents/) are committed.
+# Agent learned-memory and harness worktrees are local-only.
+.claude/worktrees/
+web/.claude/agent-memory/*/MEMORY.md
+web/.claude/settings.local.json
+
 # Web app (Next.js)
-# Claude Code agent memory (local / machine-specific)
-web/.claude/
 web/node_modules/
 web/.next/
 web/.env.local
