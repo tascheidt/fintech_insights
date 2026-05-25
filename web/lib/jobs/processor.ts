@@ -202,19 +202,71 @@ export async function runIngestStage(
   });
 
   try {
-    // Get existing job postings
+    // Sub-brand override routing: scrapers can tag a job with
+    // `companySlugOverride` to route it to a different companies row
+    // that shares the parent's ATS (e.g. Simplii on CIBC's Workday).
+    // Resolve overrides up-front so we can build per-company maps.
+    const overrideSlugs = new Set<string>();
+    for (const j of jobs) {
+      if (j.companySlugOverride && j.companySlugOverride !== company.slug) {
+        overrideSlugs.add(j.companySlugOverride);
+      }
+    }
+    const overrideCompanies = new Map<string, { id: string; name: string }>();
+    if (overrideSlugs.size > 0) {
+      const { data: rows } = await supabase
+        .from('companies')
+        .select('id, slug, name, parent_company_id')
+        .in('slug', Array.from(overrideSlugs))
+        .eq('parent_company_id', company.id);
+      for (const r of rows ?? []) {
+        overrideCompanies.set(r.slug as string, { id: r.id as string, name: r.name as string });
+      }
+      const missing = Array.from(overrideSlugs).filter((s) => !overrideCompanies.has(s));
+      if (missing.length > 0) {
+        log.warn(
+          { parent: company.slug, missingChildSlugs: missing },
+          '[ingest] companySlugOverride references unknown sub-brand(s); falling back to parent'
+        );
+      }
+    }
+    const resolveCompanyId = (job: JobData): string => {
+      if (job.companySlugOverride) {
+        const child = overrideCompanies.get(job.companySlugOverride);
+        if (child) return child.id;
+      }
+      return company.id;
+    };
+
+    // Load existing job_postings for parent + every resolved sub-brand
+    // so per-company existingMap/fetchedIds (used by closure detection)
+    // are computed correctly.
+    const ingestCompanyIds = [company.id, ...Array.from(overrideCompanies.values()).map((c) => c.id)];
     const { data: existing } = await supabase
       .from('job_postings')
-      .select('id, external_id, description_hash')
-      .eq('company_id', company.id);
+      .select('id, external_id, description_hash, company_id')
+      .in('company_id', ingestCompanyIds);
 
-    const existingMap = new Map(
-      (existing ?? []).map((e) => [
-        e.external_id,
-        { id: e.id as string, descriptionHash: (e.description_hash ?? null) as string | null },
-      ])
-    );
-    const fetchedIds = new Set(jobs.map((j) => j.external_id));
+    const existingByCompany = new Map<
+      string,
+      Map<string, { id: string; descriptionHash: string | null }>
+    >();
+    for (const cid of ingestCompanyIds) existingByCompany.set(cid, new Map());
+    for (const e of existing ?? []) {
+      const m = existingByCompany.get(e.company_id as string);
+      if (!m) continue;
+      m.set(e.external_id as string, {
+        id: e.id as string,
+        descriptionHash: (e.description_hash ?? null) as string | null,
+      });
+    }
+
+    const fetchedByCompany = new Map<string, Set<string>>();
+    for (const cid of ingestCompanyIds) fetchedByCompany.set(cid, new Set());
+    for (const j of jobs) {
+      const cid = resolveCompanyId(j);
+      fetchedByCompany.get(cid)?.add(j.external_id);
+    }
 
     let newJobs = 0;
     let updatedJobs = 0;
@@ -222,20 +274,29 @@ export async function runIngestStage(
     let extractionsSkippedByHash = 0;
     const newJobIds: string[] = [];
     const extractionPromises: Promise<void>[] = [];
+    const overrideRoutedCount = new Map<string, number>();
 
     const total = jobs.length;
     let processed = 0;
 
     // Process each job
     for (const job of jobs) {
+      const targetCompanyId = resolveCompanyId(job);
+      if (job.companySlugOverride && targetCompanyId !== company.id) {
+        overrideRoutedCount.set(
+          job.companySlugOverride,
+          (overrideRoutedCount.get(job.companySlugOverride) ?? 0) + 1
+        );
+      }
+
       const row = {
         ...jobToRow(job),
-        company_id: company.id,
+        company_id: targetCompanyId,
         last_seen_date: new Date().toISOString(),
         is_active: true,
       };
 
-      const existingEntry = existingMap.get(job.external_id);
+      const existingEntry = existingByCompany.get(targetCompanyId)?.get(job.external_id);
       // Content fingerprint for the description_hash gate (Phase 2). A null
       // stored hash is treated as "changed" so the first scrape after deploy
       // still populates everything, matching the intent of the SQL backfill.
@@ -345,30 +406,47 @@ export async function runIngestStage(
       );
     }
 
-    // Mark jobs as closed if no longer in feed
-    // Only update jobs that are currently active to avoid overwriting
-    // closed_date on already-closed jobs every collection run
-    for (const [extId, entry] of existingMap) {
-      if (!fetchedIds.has(extId)) {
-        const { count } = await supabase
-          .from('job_postings')
-          .update({
-            is_active: false,
-            closed_date: new Date().toISOString(),
-          })
-          .eq('id', entry.id)
-          .eq('is_active', true);
-        if (count && count > 0) {
-          closedJobs++;
+    // Mark jobs as closed if no longer in feed. Runs per ingest-target
+    // company (parent + every sub-brand we routed jobs into) — a job that
+    // was last seen under CIBC but is now classified as Simplii would
+    // otherwise be flagged "closed" forever under CIBC. Each company
+    // closes only those of its own rows that didn't show up in this run.
+    for (const cid of ingestCompanyIds) {
+      const existingMap = existingByCompany.get(cid);
+      const fetchedIds = fetchedByCompany.get(cid);
+      if (!existingMap || !fetchedIds) continue;
+      for (const [extId, entry] of existingMap) {
+        if (!fetchedIds.has(extId)) {
+          const { count } = await supabase
+            .from('job_postings')
+            .update({
+              is_active: false,
+              closed_date: new Date().toISOString(),
+            })
+            .eq('id', entry.id)
+            .eq('is_active', true);
+          if (count && count > 0) {
+            closedJobs++;
+          }
         }
       }
     }
 
-    // Update company's last_collected_at
+    // Update last_collected_at on every ingest-target company (parent +
+    // sub-brands). Sub-brands don't have their own scrape, so the parent's
+    // run is the authoritative refresh signal.
     await supabase
       .from('companies')
       .update({ last_collected_at: new Date().toISOString() })
-      .eq('id', company.id);
+      .in('id', ingestCompanyIds);
+
+    // Sub-brand routing telemetry.
+    for (const [slug, n] of overrideRoutedCount) {
+      log.info(
+        { parent: company.slug, child: slug, routed: n },
+        '[ingest] sub-brand routing'
+      );
+    }
 
     // Update task with results
     await supabase

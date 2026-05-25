@@ -107,12 +107,21 @@ companies:
     careers_url: https://cibc.wd3.myworkdayjobs.com/search
     tier: incumbent
     is_active: false
-    # Note: Simplii Financial postings (if any) surface inside CIBC's
-    # Workday tenant. The scraper's `isSimpliiPosting` classifier runs in
-    # log-only mode for Phase 3 — no row is added for Simplii yet. After
-    # the first scrape confirms Simplii postings appear in the data, a
-    # follow-up adds the `simplii` row (tier=fintech) and flips the
-    # classifier to actually route via `companySlugOverride`.
+
+  - name: Simplii Financial
+    slug: simplii
+    country: CA
+    # Simplii shares CIBC's Workday tenant — no own listing endpoint.
+    # In the DB this row has parent_company_id=<cibc.id>, which causes
+    # the collect cron to skip it. Its jobs land via CIBC's scrape with
+    # `companySlugOverride: 'simplii'` set by the `isSimpliiPosting`
+    # classifier in workday-cibc.ts. ats_type/identifier mirror CIBC for
+    # parity but aren't used at runtime.
+    ats_type: workday-cibc
+    ats_identifier: cibc
+    careers_url: https://www.simplii.com
+    tier: fintech
+    is_active: false
 
   - name: National Bank
     slug: bnc

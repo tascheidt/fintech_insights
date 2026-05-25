@@ -62,6 +62,7 @@ export interface JobRun {
 
 export interface Company {
   id: string;
+  slug: string;
   name: string;
   ats_type: string;
   ats_identifier: string | null;
