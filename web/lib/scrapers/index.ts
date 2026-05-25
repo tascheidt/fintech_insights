@@ -154,6 +154,7 @@ export function isBrowserScraper(atsType: string): boolean {
     'avature',
     'taleo',
     'icims',
+    'custom',         // Generic Puppeteer scraper — needs browser, offload.
   ];
   
   return browserScrapers.includes(normalized);

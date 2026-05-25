@@ -45,6 +45,12 @@ Workday returns `externalPath` already prefixed with `/job/...`. The detail URL 
 
 Resist the urge to refactor `browser.ts` before launch. It works. The complexity is load-bearing — selector heuristics, retry logic, and per-site quirks are baked in. Post-launch, split it by site and add tests; before launch, do not.
 
+## Custom scrapers (offloaded to GitHub Actions)
+
+Companies with `ats_type: custom` use the generic Puppeteer scraper (`scrapeGenericJobBoard` from `browser.ts`). They are offloaded to GitHub Actions via `isBrowserScraper`.
+
+- **Revolut Canada** — `slug: revolut-canada`, `careers_url: https://www.revolut.com/en-US/careers/?city=Canada`. Revolut uses a custom-built SPA careers page (not a known ATS). Location filtering via the `?city=Canada` query parameter. Seeded by `web/scripts/seed-revolut-canada.ts`.
+
 ## ATS detection
 
 - **`detect-ats.ts`** — `detectATSFromUrl` infers the ATS type from a careers URL. Used by the company-onboarding flow.
