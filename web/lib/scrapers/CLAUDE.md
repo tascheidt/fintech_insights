@@ -35,7 +35,7 @@ Workday exposes a documented JSON POST endpoint (`/wday/cxs/<tenant>/<site>/jobs
 
 - **`workday-utils.ts`** — pure shared helpers: `buildWorkdayUrls`, `parseWorkdayListingRow`, `parseWorkdayJobDetail`, `resolveWorkdayJobCap`. Also exports `buildWorkdayHeaders` + `extractCookieJar` (defensive — not required for current tenants but harmless if Akamai posture tightens). Used by every tenant-specific Workday scraper. Intentionally NOT a base class — fork-per-tenant.
 - **`workday-td.ts`** — TD Bank (`td.wd3.myworkdayjobs.com/en-US/TD_Bank_Careers`).
-- **`workday-cibc.ts`** — CIBC (`cibc.wd3.myworkdayjobs.com/search`). Also exports `isSimpliiPosting` — a Simplii-Financial classifier currently running in **log-only mode**. The companies row for Simplii and the `companySlugOverride` routing land in a follow-up after production logs confirm Simplii postings actually surface in CIBC's Workday.
+- **`workday-cibc.ts`** — CIBC (`cibc.wd3.myworkdayjobs.com/search`). Also exports `isSimpliiPosting` — a Simplii-Financial classifier that is **live**. Each listing row is inspected for a case-insensitive `\bsimplii\b` match in title, bulletFields, or any tenant-emitted brand/business-unit field. When matched, the job gets `companySlugOverride: 'simplii'` and the processor routes it to the Simplii companies row (`parent_company_id = cibc.id`, `tier = fintech`). Simplii itself is skipped by the collect cron (because `parent_company_id IS NOT NULL`); its jobs arrive exclusively via CIBC's scrape.
 
 ### Workday URL gotcha (read this before changing `buildWorkdayUrls`)
 

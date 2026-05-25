@@ -4,9 +4,9 @@
  * Pure-fixture coverage plus the Simplii classifier. Per Farhan's spec,
  * **no `fetch` allowed inside tests**.
  *
- * The Simplii classifier is the load-bearing piece — it's log-only for
- * Phase 3 but the data shape must be confirmed before Phase 3.5 ships
- * the actual override mechanism.
+ * The Simplii classifier is the load-bearing piece — it tags matched jobs
+ * with `companySlugOverride: 'simplii'` so the processor routes them to the
+ * Simplii companies row instead of CIBC.
  */
 
 import { readFileSync } from "node:fs";
@@ -83,7 +83,7 @@ describe("workday-cibc detail fixture", () => {
   });
 });
 
-describe("isSimpliiPosting (log-only classifier)", () => {
+describe("isSimpliiPosting (brand classifier)", () => {
   it("matches when the title contains 'Simplii'", () => {
     const row = LISTING_FIXTURE.jobPostings!.find((r) =>
       r.title?.includes("Simplii")
