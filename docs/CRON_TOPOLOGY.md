@@ -20,9 +20,12 @@ Source of truth:
 - Vercel: [`web/vercel.json`](../web/vercel.json) `crons` array.
 - GitHub Actions: [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml), [`.github/workflows/editorial-cron.yml`](../.github/workflows/editorial-cron.yml), [`.github/workflows/gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml).
 
-The `report` job also generates one company insight per run as a side effect,
-so the GH Actions trigger is incremental — it just keeps the rolling backlog
-covered between weekly digest runs.
+The `report` job also generates one company insight per run as a side effect.
+The GH Actions `company-insights` workflow loops one-company-per-HTTP-request
+until the route reports `hasMore: false`, with a safety cap of 50 iterations
+and a 60-minute job timeout. Both fintech and incumbent tiers are eligible —
+incumbents used to be skipped, but the workflow now covers every active
+company so newly added banks don't sit insight-less for weeks.
 
 ## Required secrets
 

@@ -27,7 +27,10 @@ on:
 jobs:
   trigger:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Generous budget for a full backfill: each insight is one Pro+grounded
+    # call (~1–2 min), and a fresh deploy could need to seed every active
+    # company. We loop one-per-request, so the runner mostly waits on HTTP.
+    timeout-minutes: 60
     steps:
       - name: Validate required secrets
         env:
@@ -50,36 +53,69 @@ jobs:
           COMPANY_ID: ${{ inputs.company_id }}
         run: |
           set -u
-          # The route handler is GET-only and reads ?companyId= from the query string.
-          QUERY=""
+          # The route handler is GET-only, processes ONE company per call,
+          # and returns `hasMore: true` while more companies need processing.
+          # We loop until either:
+          #   - the response says `hasMore: false` (or no companies needed),
+          #   - we hit MAX_ITER (safety cap against runaway loops),
+          #   - the workflow's timeout-minutes fires.
+          # When the workflow_dispatch supplies a companyId, we only do one
+          # iteration regardless (single-company mode).
+          MAX_ITER=50
+          ITER=0
+
+          QUERY_BASE=""
           if [ -n "${COMPANY_ID:-}" ]; then
-            QUERY="?companyId=${COMPANY_ID}"
+            QUERY_BASE="?companyId=${COMPANY_ID}"
+          fi
+          URL="https://${APP_HOST}/api/cron/company-insights${QUERY_BASE}"
+
+          while [ "${ITER}" -lt "${MAX_ITER}" ]; do
+            ITER=$((ITER + 1))
+            echo "::group::Iteration ${ITER} → ${URL}"
+
+            HTTP_STATUS=$(curl \
+              --silent \
+              --show-error \
+              --output /tmp/response.json \
+              --write-out "%{http_code}" \
+              --max-time 540 \
+              --request GET \
+              --header "Authorization: Bearer ${CRON_SECRET}" \
+              --header "User-Agent: github-actions-cron/company-insights" \
+              "${URL}")
+
+            echo "HTTP ${HTTP_STATUS}"
+            echo "--- response body ---"
+            cat /tmp/response.json || true
+            echo
+            echo "---------------------"
+            echo "::endgroup::"
+
+            if [ "${HTTP_STATUS}" -lt 200 ] || [ "${HTTP_STATUS}" -ge 300 ]; then
+              echo "::error::Non-2xx response from /api/cron/company-insights (HTTP ${HTTP_STATUS}) on iteration ${ITER}"
+              exit 1
+            fi
+
+            # Single-company mode (workflow_dispatch with companyId): always stop
+            # after the first successful call.
+            if [ -n "${COMPANY_ID:-}" ]; then
+              echo "Single-company mode — stopping after iteration ${ITER}."
+              break
+            fi
+
+            # Parse `hasMore`. The route omits the field when no company was
+            # processed ("All companies have recent insights"), so a missing
+            # value also means we're done.
+            HAS_MORE=$(jq -r '.hasMore // false' /tmp/response.json 2>/dev/null || echo "false")
+            if [ "${HAS_MORE}" != "true" ]; then
+              echo "No more companies to process — stopping after iteration ${ITER}."
+              break
+            fi
+          done
+
+          if [ "${ITER}" -ge "${MAX_ITER}" ]; then
+            echo "::warning::Hit safety cap of ${MAX_ITER} iterations before \`hasMore\` went false. Some companies may still need processing — the next scheduled run will pick them up."
           fi
 
-          URL="https://${APP_HOST}/api/cron/company-insights${QUERY}"
-          echo "POST-equivalent GET to ${URL}"
-
-          # -sS shows errors but suppresses the progress bar.
-          # --fail-with-body prints the response body even on non-2xx so we can debug.
-          # We capture status separately so we can exit non-zero on >=300.
-          HTTP_STATUS=$(curl \
-            --silent \
-            --show-error \
-            --output /tmp/response.json \
-            --write-out "%{http_code}" \
-            --max-time 540 \
-            --request GET \
-            --header "Authorization: Bearer ${CRON_SECRET}" \
-            --header "User-Agent: github-actions-cron/company-insights" \
-            "${URL}")
-
-          echo "HTTP ${HTTP_STATUS}"
-          echo "--- response body ---"
-          cat /tmp/response.json || true
-          echo
-          echo "---------------------"
-
-          if [ "${HTTP_STATUS}" -lt 200 ] || [ "${HTTP_STATUS}" -ge 300 ]; then
-            echo "::error::Non-2xx response from /api/cron/company-insights (HTTP ${HTTP_STATUS})"
-            exit 1
-          fi
+          echo "Completed ${ITER} iteration(s)."
