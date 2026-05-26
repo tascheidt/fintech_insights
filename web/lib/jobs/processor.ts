@@ -310,6 +310,11 @@ export async function runIngestStage(
         // Note: location will be updated by extractAndUpdateStructure with validated/AI-extracted value
         // For now, validate scraper location and set to null if invalid (will be replaced by AI extraction)
         const validatedLocation = isValidLocation(row.location) ? row.location : null;
+        // Re-open jobs that reappear in a scrape. Without this, a job
+        // wrongly closed by a partial scrape (e.g. May 2026 Workday
+        // pagination bug) stays closed forever — every subsequent scrape
+        // refreshes `last_seen_date` but leaves `closed_date` / `is_active`
+        // untouched, so the dashboard undercounts the live corpus.
         await supabase
           .from('job_postings')
           .update({
@@ -323,6 +328,8 @@ export async function runIngestStage(
             commitment: row.commitment,
             url: row.url,
             posted_date: row.posted_date,
+            is_active: true,
+            closed_date: null,
           })
           .eq('id', existingId);
         updatedJobs++;

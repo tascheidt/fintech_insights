@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.4.1",
+    "date": "2026-05-26",
+    "changes": [
+      { "type": "fix", "description": "Job-postings ingest now re-opens jobs that reappear in a scrape. The update path bumped `last_seen_date` but never cleared `closed_date` or restored `is_active=true`, so any job wrongly marked closed by a partial scrape (e.g. the May 2026 Workday pagination bug that returned only the first 40 jobs) stayed closed forever even when subsequent scrapes saw it. Repaired the historical state in the same release: 860 TD, 467 CIBC, and 2 Simplii rows reopened where `last_seen_date > closed_date`. TD open count moves from 632 → 1,492 (site shows 1,531); CIBC from 90 → 557 (site shows 535)." }
+    ]
+  },
+  {
     "version": "2.4.0",
     "date": "2026-05-24",
     "changes": [
