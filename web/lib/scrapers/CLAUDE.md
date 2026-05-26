@@ -45,11 +45,17 @@ Workday returns `externalPath` already prefixed with `/job/...`. The detail URL 
 
 Resist the urge to refactor `browser.ts` before launch. It works. The complexity is load-bearing — selector heuristics, retry logic, and per-site quirks are baked in. Post-launch, split it by site and add tests; before launch, do not.
 
-## Custom scrapers (offloaded to GitHub Actions)
+## Revolut (offloaded to GitHub Actions)
 
-Companies with `ats_type: custom` use the generic Puppeteer scraper (`scrapeGenericJobBoard` from `browser.ts`). They are offloaded to GitHub Actions via `isBrowserScraper`.
+Revolut's careers page is a custom-built Next.js SPA behind Cloudflare anti-bot. Not on any third-party ATS (probed Smartrecruiters / Lever / Greenhouse / Workable — all return 404 or empty for any Revolut slug variant). The generic `scrapeGenericJobBoard` drops every job because Revolut URLs are slug+UUID (`/careers/position/head-of-risk-257ab149-12e7-4a84-bda0-1ab1a1d36760/`), not `/jobs/<digits>` as the generic ID-extraction regex requires.
 
-- **Revolut Canada** — `slug: revolut-canada`, `careers_url: https://www.revolut.com/en-US/careers/?city=Canada`. Revolut uses a custom-built SPA careers page (not a known ATS). Location filtering via the `?city=Canada` query parameter. Seeded by `web/scripts/seed-revolut-canada.ts`.
+- **`revolut.ts`** — anchors on `a[href^="/careers/position/"]` and uses the trailing UUID as `external_id`. Listing is server-rendered on first response (no client-side pagination), so a single page load + `waitForSelector` is enough. Description enrichment is deferred to a follow-up (the hot path tolerates null descriptions). Cloudflare passes from a GH Actions runner IP but typically blocks local-dev Puppeteer; debug against the workflow.
+
+Tenants today: **Revolut Canada** — `slug: revolut-canada`, `ats_type: revolut`, `careers_url: https://www.revolut.com/en-US/careers/?city=Canada`. Location filtering happens server-side via the `?city=` query param, so the same scraper handles any Revolut-Country tenant by changing only the company row's `careers_url`.
+
+## Generic custom scrapers (offloaded to GitHub Actions)
+
+Companies with `ats_type: custom` use the generic Puppeteer scraper (`scrapeGenericJobBoard` from `browser.ts`). They are offloaded to GitHub Actions via `isBrowserScraper`. Use this only for sites whose URLs contain a numeric job ID (the generic ID extractor requires `\d+`) — slug-based custom careers pages need a dedicated scraper modeled on `revolut.ts`.
 
 ## ATS detection
 

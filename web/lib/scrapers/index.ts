@@ -11,6 +11,7 @@ import { fetchPhenomBmoJobs } from "./phenom-bmo";
 import { fetchAvatureBncJobs } from "./avature-bnc";
 import { fetchWorkdayTdJobs } from "./workday-td";
 import { fetchWorkdayCibcJobs } from "./workday-cibc";
+import { fetchRevolutJobs } from "./revolut";
 
 export type { JobData } from "./types";
 export { jobToRow } from "./types";
@@ -84,6 +85,14 @@ export async function fetchJobs(
     case "workday-cibc":
       return fetchWorkdayCibcJobs();
 
+    // Revolut runs a custom Next.js careers page behind Cloudflare. The
+    // generic Puppeteer scraper drops every job because their URLs are
+    // slug+UUID, not `/jobs/\d+`. This tenant-specific scraper anchors on
+    // the stable `/careers/position/` href prefix and uses the trailing
+    // UUID as external_id. See ./revolut.ts.
+    case "revolut":
+      return fetchRevolutJobs(atsIdentifier, careersUrl, browser);
+
     case "successfactors": {
       if (!careersUrl) {
         throw new Error(`${atsType} requires a careers URL for browser-based scraping`);
@@ -152,6 +161,7 @@ export function isBrowserScraper(atsType: string): boolean {
     'successfactors',
     'phenom',
     'avature',
+    'revolut',        // Custom Next.js careers page behind Cloudflare.
     'taleo',
     'icims',
     'custom',         // Generic Puppeteer scraper — needs browser, offload.

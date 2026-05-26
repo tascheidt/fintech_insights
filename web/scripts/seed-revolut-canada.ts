@@ -1,9 +1,10 @@
 /**
  * One-off seed: insert the Revolut Canada company row into the `companies`
- * table. Revolut uses a custom-built SPA careers page (not a known ATS like
- * Greenhouse/Lever/Ashby/Workable). The generic browser scraper
- * (`scrapeGenericJobBoard`) handles it via the `custom` ATS type, offloaded
- * to GitHub Actions.
+ * table. Revolut runs a custom-built Next.js careers SPA behind Cloudflare
+ * — the dedicated `web/lib/scrapers/revolut.ts` scraper handles it (the
+ * generic Puppeteer fallback drops every job because Revolut URLs are
+ * slug+UUID, not `/jobs/\d+`). Offloaded to GitHub Actions via
+ * `isBrowserScraper`.
  *
  * Usage (from `web/`):
  *   npx tsx --env-file=.env.local scripts/seed-revolut-canada.ts
@@ -33,8 +34,8 @@ async function main(): Promise<void> {
     name: "Revolut Canada",
     slug: "revolut-canada",
     country: "CA",
-    ats_type: "custom",
-    ats_identifier: "revolut-canada",
+    ats_type: "revolut",
+    ats_identifier: "revolut",
     careers_url: "https://www.revolut.com/en-US/careers/?city=Canada",
     is_active: false,
     tier: "fintech" as const,
