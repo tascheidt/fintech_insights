@@ -10,7 +10,7 @@ on:
 
 # Single place to update when new Claude models are released
 env:
-  CLAUDE_MODEL: claude-opus-4-6
+  CLAUDE_MODEL: claude-opus-4-7
 
 jobs:
   implement:
