@@ -76,28 +76,35 @@ export default async function CompaniesPage({
 
   const isIncumbentLens = lens === "incumbent";
 
-  // The Incumbents tab badge always reflects the live count of tracked
-  // incumbent banks, regardless of which lens is active.
-  const { count: incumbentCount } = await supabase
-    .from("companies")
-    .select("id", { count: "exact", head: true })
-    .eq("is_active", true)
-    .eq("tier", "incumbent");
+  // Load fintech and incumbent lists in parallel. We always need BOTH so the
+  // header counts stay stable regardless of which lens is active (fixing the
+  // bug where the pivot sub-counts and "All" reset to 0 on the Incumbents
+  // lens). The incumbent list is small (≤6 Big-6 banks); the fintech list is
+  // ≤30 per CLAUDE.md, so loading both is cheap.
+  const [
+    { data: fintechCompanies },
+    { data: incumbentCompanies },
+  ] = await Promise.all([
+    supabase
+      .from("companies")
+      .select("id, name, slug, country, thesis, last_change, last_change_at, last_collected_at")
+      .eq("is_active", true)
+      .eq("tier", "fintech")
+      .order("name"),
+    supabase
+      .from("companies")
+      .select("id, name, slug, country, thesis, last_change, last_change_at, last_collected_at")
+      .eq("is_active", true)
+      .eq("tier", "incumbent")
+      .order("name"),
+  ]);
 
-  // Fintech-only by default. Incumbent (big-bank) companies are surfaced
-  // through a dedicated "Incumbents" lens (Phase 2), never mixed into the
-  // default companies list — they'd otherwise carry meaningless fintech
-  // pivot classifications and ~1,500-job counts.
-  const { data: companies } = await supabase
-    .from("companies")
-    .select("id, name, slug, country, thesis, last_change, last_change_at, last_collected_at")
-    .eq("is_active", true)
-    .eq("tier", isIncumbentLens ? "incumbent" : "fintech")
-    .order("name");
+  const fintechList = fintechCompanies ?? [];
+  const incumbentList = incumbentCompanies ?? [];
+  // Active list = what we actually render below. Counts use both lists.
+  const list = isIncumbentLens ? incumbentList : fintechList;
 
-  const list = companies ?? [];
-
-  if (list.length === 0 && !isIncumbentLens) {
+  if (fintechList.length === 0 && !isIncumbentLens) {
     return (
       <div className="space-y-6">
         <CompaniesHeader count={0} canEdit={canEdit} />
@@ -122,6 +129,18 @@ export default async function CompaniesPage({
   for (const j of jobs ?? []) {
     jobsByCompany.set(j.company_id, (jobsByCompany.get(j.company_id) ?? 0) + 1);
   }
+
+  // Always compute the fintech pivot classification — even on the Incumbents
+  // lens — so the pivot tab counts (new / accel / quiet / cont) stay stable
+  // and accurate regardless of which lens is selected. On the fintech lenses
+  // these are reused per-row below; on the Incumbents lens they only feed
+  // the counts (the incumbent rows themselves don't carry pivot data).
+  const fintechPivots = await Promise.all(
+    fintechList.map((c) => classifyCompanyPivot(c.id))
+  );
+  const fintechPivotById = new Map(
+    fintechList.map((c, i) => [c.id, fintechPivots[i]])
+  );
 
   // Per-company editorial signals (small N — ≤30 companies per CLAUDE.md).
   //
@@ -148,12 +167,13 @@ export default async function CompaniesPage({
         };
       }
 
-      const [spark, delta, pivot, dbLastChange] = await Promise.all([
+      const [spark, delta, dbLastChange] = await Promise.all([
         getCompanyHiringSparkline(c.id, 8),
         getCompanyHiringDelta(c.id, 30),
-        classifyCompanyPivot(c.id),
         getCompanyLastChange(c.id),
       ]);
+      // Reuse the pivot classification already computed for the count strip.
+      const pivot = fintechPivotById.get(c.id) ?? { kind: "cont" as const, signals: [] };
 
       const lastChange = c.last_change
         ? {
@@ -183,22 +203,19 @@ export default async function CompaniesPage({
     })
   );
 
-  // Lens-tab counts. The `incumbent` badge is always the live bank count.
-  // The fintech pivot sub-counts require pivot classification, which only
-  // runs when a fintech lens is active — on the Incumbents lens we have no
-  // fintech rows loaded, so those sub-counts show 0 until the user switches
-  // back to a fintech lens (each lens switch is a full server re-render).
+  // Lens-tab counts are lens-INVARIANT: they always reflect the same totals
+  // regardless of which lens is currently active. "All" = fintech count
+  // (matches the default lens's visible rows). Pivot sub-counts derive from
+  // fintech pivot classification. "Incumbents" = live bank count.
   const counts: Record<LensKey, number> = {
-    all: isIncumbentLens ? 0 : rows.length,
+    all: fintechList.length,
     new: 0,
     accel: 0,
     quiet: 0,
     cont: 0,
-    incumbent: incumbentCount ?? 0,
+    incumbent: incumbentList.length,
   };
-  if (!isIncumbentLens) {
-    for (const r of rows) counts[r.status] += 1;
-  }
+  for (const p of fintechPivots) counts[p.kind] += 1;
 
   const filtered =
     lens === "all" || isIncumbentLens
