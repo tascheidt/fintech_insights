@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.5.0",
+    "date": "2026-05-27",
+    "changes": [
+      { "type": "feature", "description": "Sign up and sign in with email and password, in addition to Google. The login page now has a Log in / Sign up toggle that shows both Google OAuth and an email-and-password form; a separate forgot-password flow sends a Supabase reset link that lands users on a new set-a-new-password page. The marketing CTA deep-links to the Sign up tab so new visitors start in the right mode." }
+    ]
+  },
+  {
     "version": "2.4.1",
     "date": "2026-05-26",
     "changes": [

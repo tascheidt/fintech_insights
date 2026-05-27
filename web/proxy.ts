@@ -2,6 +2,15 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { fetchWithRetry } from "@/lib/supabase/fetch-retry";
 
+// Paths the unauthenticated user is allowed to reach. /account/update-password is
+// here because the reset-link flow lands the user with a fresh session that the
+// page itself reads; the page guards against missing sessions inline.
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/forgot-password",
+  "/account/update-password",
+]);
+
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -36,7 +45,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && pathname !== "/login") {
+  if (!user && !PUBLIC_PATHS.has(pathname)) {
     // Preserve the original destination so that links from emails (and
     // any other deep link) land where the user intended after logging in.
     const loginUrl = new URL("/login", request.url);
@@ -47,7 +56,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (user && pathname === "/login") {
+  if (user && (pathname === "/login" || pathname === "/forgot-password")) {
     const next = request.nextUrl.searchParams.get("next");
     const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
     return NextResponse.redirect(new URL(safeNext, request.url));
