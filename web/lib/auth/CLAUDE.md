@@ -51,3 +51,30 @@ if (denied) return denied;
 Anonymous routes are not allowed — if you genuinely need an unauthenticated
 public endpoint, document the exception in the route file and add rate
 limiting (see Stream P1 — `/api/feedback` rate limit).
+
+## Email + password auth (in addition to Google OAuth)
+
+Two client hooks back all browser-side auth:
+
+- **`useGoogleAuth()`** (`web/hooks/use-google-auth.ts`) — `signInWithOAuth({ provider: "google" })`.
+- **`useEmailAuth()`** (`web/hooks/use-email-auth.ts`) — wraps `signUp`,
+  `signInWithPassword`, `resetPasswordForEmail`, and `updateUser({ password })`.
+
+All flows land at `/auth/callback`, which calls `exchangeCodeForSession(code)` —
+provider-agnostic, so the same handler works for OAuth, email confirmation
+links, and password-reset links. The `auth_next` cookie (set on the client
+before any redirect) survives the email round-trip and tells the callback
+where to send the user.
+
+Confirmation and reset emails are sent by **Supabase's built-in email
+service**. To upgrade deliverability/rate limits, configure Resend SMTP in the
+Supabase Console → Auth → SMTP Settings — no app code changes required.
+
+Zod validation schemas live in `web/lib/auth/validation.ts`. Forms are plain
+controlled components (no react-hook-form) — keep it that way unless we add a
+materially more complex form.
+
+Public unauthenticated routes are gated in `web/proxy.ts` via the
+`PUBLIC_PATHS` set: `/login`, `/forgot-password`, `/account/update-password`.
+Add any new unauthenticated page to that set, not by widening the negative
+check.

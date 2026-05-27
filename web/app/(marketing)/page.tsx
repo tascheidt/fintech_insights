@@ -81,7 +81,7 @@ export default async function MarketingPage() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
-              href="/login"
+              href="/login?mode=signup"
               className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-pacific-600 transition-colors"
             >
               Get started free
