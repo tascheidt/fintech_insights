@@ -250,7 +250,7 @@ export async function detectIncumbentCanaries(
   try {
     const { data: companies, error: companiesError } = await supabase
       .from("companies")
-      .select("id, name, slug")
+      .select("id, name, slug, created_at")
       .eq("tier", "incumbent")
       .eq("is_active", true);
 
@@ -277,46 +277,71 @@ export async function detectIncumbentCanaries(
     const todayStartIso = todayStart.toISOString();
     const rollingStartIso = rollingStart.toISOString();
 
-    const companyIds = companies.map((c) => c.id);
+    // Per-company count() pairs. The previous implementation pulled every
+    // row in the 8-day window into memory, which silently capped at
+    // PostgREST's default 1000 rows — at ~6,500+ incumbent rows in the
+    // window the cap dropped today's freshly-inserted rows and produced
+    // false "0 new today" alerts for half the banks. count(head:true)
+    // returns only the aggregate, so no cap applies.
+    //
+    // The rolling-avg window also excludes the per-company backfill cutoff
+    // (created_at + 48h, same definition as `isBackfill` in
+    // dashboard-queries.ts). The big-bang onboarding ingest can dwarf
+    // organic daily volume by 100×, which would poison the rolling avg
+    // for ~7 days after every new incumbent comes online and keep this
+    // canary firing daily.
+    const counts = await Promise.all(
+      companies.map(async (company) => {
+        const backfillCutoffIso = company.created_at
+          ? new Date(
+              new Date(company.created_at as string).getTime() + 48 * 60 * 60 * 1000
+            ).toISOString()
+          : null;
+        const rollingFloorIso =
+          backfillCutoffIso && backfillCutoffIso > rollingStartIso
+            ? backfillCutoffIso
+            : rollingStartIso;
 
-    // One round-trip for the last 8 days' worth of incumbent postings.
-    // ~7,500 incumbent rows in steady state across 5 banks — this is cheap.
-    const { data: rows, error: rowsError } = await supabase
-      .from("job_postings")
-      .select("company_id, first_seen_date")
-      .in("company_id", companyIds)
-      .gte("first_seen_date", rollingStartIso)
-      .not("first_seen_date", "is", null);
+        const [{ count: todayCount }, { count: rollingCount }] = await Promise.all([
+          supabase
+            .from("job_postings")
+            .select("id", { count: "exact", head: true })
+            .eq("company_id", company.id)
+            .gte("first_seen_date", todayStartIso),
+          supabase
+            .from("job_postings")
+            .select("id", { count: "exact", head: true })
+            .eq("company_id", company.id)
+            .gte("first_seen_date", rollingFloorIso)
+            .lt("first_seen_date", todayStartIso),
+        ]);
 
-    if (rowsError) {
-      log.error(
-        { err: rowsError.message },
-        "Canary: failed to fetch recent postings"
-      );
-      return [];
-    }
-
-    const todayByCompany = new Map<string, number>();
-    const rollingByCompany = new Map<string, number>();
-    for (const row of rows ?? []) {
-      if (!row.first_seen_date) continue;
-      if (row.first_seen_date >= todayStartIso) {
-        todayByCompany.set(
-          row.company_id,
-          (todayByCompany.get(row.company_id) ?? 0) + 1
+        // Number of full days the rolling window actually covers (1-7).
+        // A bank onboarded 3 days ago has at most 3 days of organic data;
+        // dividing by 7 would understate the average and over-fire.
+        const rollingDays = Math.max(
+          1,
+          Math.min(
+            7,
+            Math.ceil(
+              (todayStart.getTime() - new Date(rollingFloorIso).getTime()) /
+                (24 * 60 * 60 * 1000)
+            )
+          )
         );
-      } else {
-        rollingByCompany.set(
-          row.company_id,
-          (rollingByCompany.get(row.company_id) ?? 0) + 1
-        );
-      }
-    }
+
+        return {
+          company,
+          today: todayCount ?? 0,
+          rollingTotal: rollingCount ?? 0,
+          rollingDays,
+        };
+      })
+    );
 
     const canaries: ScraperCanary[] = [];
-    for (const company of companies) {
-      const today = todayByCompany.get(company.id) ?? 0;
-      const rolling = (rollingByCompany.get(company.id) ?? 0) / 7;
+    for (const { company, today, rollingTotal, rollingDays } of counts) {
+      const rolling = rollingTotal / rollingDays;
       const decision = evaluateCanary({ today, rolling });
       if (!decision.fire) continue;
       canaries.push({

@@ -13,12 +13,20 @@ export async function updateTaskProgress(
   const supabase = createAdminClient();
 
   // Get current task to merge progress
-  const { data: task } = await supabase
+  const { data: task, error: fetchError } = await supabase
     .from('job_run_tasks')
     .select('stage_progress, current_stage')
     .eq('id', taskId)
-    .single();
+    .maybeSingle();
 
+  if (fetchError) {
+    // Without the underlying message, a PostgREST/RLS/transport failure
+    // surfaces as a generic "Task not found" downstream and the real cause
+    // is lost. See May 2026 TD ingest incident.
+    throw new Error(
+      `Task ${taskId} lookup failed: ${fetchError.message} (code=${fetchError.code ?? 'n/a'})`
+    );
+  }
   if (!task) {
     throw new Error(`Task ${taskId} not found`);
   }

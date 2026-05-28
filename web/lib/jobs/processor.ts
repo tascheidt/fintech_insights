@@ -240,12 +240,32 @@ export async function runIngestStage(
 
     // Load existing job_postings for parent + every resolved sub-brand
     // so per-company existingMap/fetchedIds (used by closure detection)
-    // are computed correctly.
+    // are computed correctly. Paginated because PostgREST caps a single
+    // .select() at 1000 rows — RBC/TD/Scotia each carry >1000 active
+    // postings, so the unpaginated query silently dropped dedup entries
+    // and the next scrape re-INSERTed already-known rows.
     const ingestCompanyIds = [company.id, ...Array.from(overrideCompanies.values()).map((c) => c.id)];
-    const { data: existing } = await supabase
-      .from('job_postings')
-      .select('id, external_id, description_hash, company_id')
-      .in('company_id', ingestCompanyIds);
+    const PAGE = 1000;
+    const existing: Array<{
+      id: string;
+      external_id: string;
+      description_hash: string | null;
+      company_id: string;
+    }> = [];
+    for (let offset = 0; ; offset += PAGE) {
+      const { data: page, error: pageError } = await supabase
+        .from('job_postings')
+        .select('id, external_id, description_hash, company_id')
+        .in('company_id', ingestCompanyIds)
+        .order('id', { ascending: true })
+        .range(offset, offset + PAGE - 1);
+      if (pageError) {
+        throw new Error(`Failed to load existing postings for dedup: ${pageError.message}`);
+      }
+      if (!page || page.length === 0) break;
+      existing.push(...(page as typeof existing));
+      if (page.length < PAGE) break;
+    }
 
     const existingByCompany = new Map<
       string,
