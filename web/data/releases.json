@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.5.2",
+    "date": "2026-05-28",
+    "changes": [
+      { "type": "improvement", "description": "TD heavy-scrape description enrichment runs concurrently (50-job batches, 4 workers) instead of sequentially. Cuts the TD run from ~18 min to ~4-5 min, shrinking the window where a transient Supabase or runner blip can kill an in-flight scrape. Tunable via the `WORKDAY_TD_CONCURRENCY` env." },
+      { "type": "fix", "description": "Heavy-scraper failure path now retries the `mark task failed` writes (3 attempts, exponential backoff) and installs SIGTERM / SIGINT handlers, so a Supabase recovery mid-ingest or a GH Actions workflow-cancel still marks the task `failed` with the underlying error instead of leaving it stuck in `running` until the next morning's heartbeat sweep relabels it `Timed out`." },
+      { "type": "fix", "description": "`updateTaskProgress` error message no longer collapses to `undefined (code=n/a)` when the underlying PostgREST error has empty `.message` / `.code` (e.g. during a Supabase Postgres recovery). Now formats every available field — `details`, `hint`, `name`, `cause`, plus a raw JSON fallback when every advertised field is empty — so the workflow log captures the real cause." },
+      { "type": "improvement", "description": "Heavy-scraper workflow now hard-caps at 30 min via `timeout-minutes`. A hung scrape fails the workflow cleanly within a deterministic budget instead of holding the task in `running` for hours." }
+    ]
+  },
+  {
     "version": "2.5.1",
     "date": "2026-05-28",
     "changes": [

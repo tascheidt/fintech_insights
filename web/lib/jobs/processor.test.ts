@@ -117,13 +117,26 @@ function buildSupabaseMock() {
           insert: vi.fn(() => insertChain),
         };
       }
-      // job_postings: `.select(...).in('company_id', [...])`
-      const inChain: Record<string, unknown> = {
-        then: undefined,
+      // job_postings:
+      //   `.select(...).in('company_id', [...]).order('id', {ascending:true}).range(offset, offset+999)`
+      // (paginated dedup loader — see runIngestStage in processor.ts)
+      const buildPaginatedChain = () => {
+        let served = false;
+        const rangeChain: Record<string, unknown> = {
+          range: vi.fn(() => {
+            // First page returns the fixture; subsequent pages return [] so
+            // the loop exits.
+            if (served) return Promise.resolve({ data: [], error: null });
+            served = true;
+            return Promise.resolve({ data: existingRows, error: null });
+          }),
+        };
+        return rangeChain;
       };
-      Object.assign(inChain, Promise.resolve({ data: existingRows, error: null }));
       const selectChain: Record<string, unknown> = {
-        in: vi.fn(() => Promise.resolve({ data: existingRows, error: null })),
+        in: vi.fn(() => ({
+          order: vi.fn(() => buildPaginatedChain()),
+        })),
         eq: vi.fn(() => Promise.resolve({ data: existingRows, error: null })),
       };
       return {

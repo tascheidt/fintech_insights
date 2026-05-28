@@ -39,6 +39,23 @@ const INSTANCE = "wd3";
 const SITE = "TD_Bank_Careers";
 const PAGE_LIMIT = 20;
 const FETCH_TIMEOUT_MS = 15_000;
+// Enrichment is chunked + concurrent: each batch drains a shared queue
+// with `ENRICH_CONCURRENCY` workers, then logs progress. TD's ~1,600 jobs
+// at 600-700ms each ran sequentially in ~18 min — too long a tail for
+// transient Supabase / runner hiccups (May 28 2026 incident). At
+// concurrency=4 the same corpus lands in ~4-5 min. Workday's Akamai edge
+// tolerates this — sibling tenants (`phenom-rbc`, `avature-bnc`) use the
+// same 50/4 shape against equally-protected surfaces.
+const ENRICH_BATCH_SIZE = 50;
+const DEFAULT_ENRICH_CONCURRENCY = 4;
+
+function resolveEnrichConcurrency(): number {
+  const raw = process.env.WORKDAY_TD_CONCURRENCY;
+  if (raw && /^\d+$/.test(raw)) {
+    return Math.max(1, Math.min(8, parseInt(raw, 10)));
+  }
+  return DEFAULT_ENRICH_CONCURRENCY;
+}
 
 export async function fetchWorkdayTdJobs(): Promise<JobData[]> {
   const urls = buildWorkdayUrls(TENANT, INSTANCE, SITE);
@@ -96,61 +113,116 @@ export async function fetchWorkdayTdJobs(): Promise<JobData[]> {
 
   if (cap != null && jobs.length > cap) jobs.length = cap;
 
+  const concurrency = resolveEnrichConcurrency();
   log.info(
-    { fetched: jobs.length, total, cap: cap ?? "uncapped" },
+    {
+      fetched: jobs.length,
+      total,
+      cap: cap ?? "uncapped",
+      batchSize: ENRICH_BATCH_SIZE,
+      concurrency,
+    },
     "[workday-td] listings complete; enriching descriptions"
   );
 
-  // Step 2: enrich each row with the detail response. Sequential because
-  // Workday's surface throttles aggressively on parallel fetches from a
-  // single IP — and the listing alone is enough to populate the dashboard
-  // even if enrichment partially fails.
-  let enriched = 0;
-  let failed = 0;
-  for (const job of jobs) {
-    if (!job.url) continue;
-    // Reconstruct externalPath from the public URL — same as listing row
-    // mapping but in reverse — or fall back to skipping.
-    const externalPath = extractExternalPathFromPublicUrl(job.url);
-    if (!externalPath) continue;
-    try {
-      const detailRes = await fetch(urls.jobGetUrl(externalPath), {
-        headers: {
-          ...headers,
-          ...(cookieJar ? { Cookie: cookieJar } : {}),
-        },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-      if (!detailRes.ok) {
-        throw new Error(`status ${detailRes.status}`);
-      }
-      const detail = (await detailRes.json()) as WorkdayJobDetailResponse;
-      const parsed = parseWorkdayJobDetail(detail);
-      if (parsed.description_html) {
-        job.description_html = parsed.description_html;
-        job.description_text = parsed.description_text || htmlToText(parsed.description_html);
-      }
-      if (parsed.location && !job.location) job.location = parsed.location;
-      if (parsed.posted_date && !job.posted_date) job.posted_date = parsed.posted_date;
-      enriched++;
-    } catch (e) {
-      failed++;
-      log.warn(
-        {
-          externalId: job.external_id,
-          err: e instanceof Error ? e.message : String(e),
-        },
-        "[workday-td] detail enrichment failed"
-      );
-    }
+  // Step 2: enrich descriptions. Chunked into `ENRICH_BATCH_SIZE` slices,
+  // each drained by `concurrency` workers sharing a queue. Same shape as
+  // `phenom-rbc` and `avature-bnc` — progress logs per batch leave a
+  // high-water mark if a long run is killed.
+  const detailHeaders = {
+    ...headers,
+    ...(cookieJar ? { Cookie: cookieJar } : {}),
+  };
+  const batchCount = Math.ceil(jobs.length / ENRICH_BATCH_SIZE);
+  let totalEnriched = 0;
+  let totalFailed = 0;
+  for (let i = 0; i < jobs.length; i += ENRICH_BATCH_SIZE) {
+    const batchNum = Math.floor(i / ENRICH_BATCH_SIZE) + 1;
+    const batch = jobs.slice(i, i + ENRICH_BATCH_SIZE);
+    const { enriched, failed } = await enrichBatch(
+      batch,
+      detailHeaders,
+      urls.jobGetUrl,
+      concurrency
+    );
+    totalEnriched += enriched;
+    totalFailed += failed;
+    log.info(
+      {
+        batch: batchNum,
+        batchCount,
+        processed: Math.min(i + ENRICH_BATCH_SIZE, jobs.length),
+        total: jobs.length,
+        enrichedSoFar: totalEnriched,
+        failedSoFar: totalFailed,
+      },
+      "[workday-td] enrichment batch complete"
+    );
   }
 
   log.info(
-    { enriched, failed, total: jobs.length },
+    { enriched: totalEnriched, failed: totalFailed, total: jobs.length },
     "[workday-td] description enrichment complete"
   );
 
   return jobs;
+}
+
+/**
+ * Enrich one batch of jobs. `concurrency` workers share a queue; each
+ * worker drains it sequentially. Per-job errors are logged + counted
+ * but do not abort the batch — partial enrichment is fine, the listing
+ * already populated the dashboard fields.
+ */
+async function enrichBatch(
+  batch: JobData[],
+  detailHeaders: Record<string, string>,
+  jobGetUrl: (externalPath: string) => string,
+  concurrency: number
+): Promise<{ enriched: number; failed: number }> {
+  const queue = [...batch];
+  let enriched = 0;
+  let failed = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, batch.length) }, async () => {
+      while (queue.length > 0) {
+        const job = queue.shift();
+        if (!job) break;
+        if (!job.url) continue;
+        const externalPath = extractExternalPathFromPublicUrl(job.url);
+        if (!externalPath) continue;
+        try {
+          const detailRes = await fetch(jobGetUrl(externalPath), {
+            headers: detailHeaders,
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+          });
+          if (!detailRes.ok) {
+            throw new Error(`status ${detailRes.status}`);
+          }
+          const detail = (await detailRes.json()) as WorkdayJobDetailResponse;
+          const parsed = parseWorkdayJobDetail(detail);
+          if (parsed.description_html) {
+            job.description_html = parsed.description_html;
+            job.description_text =
+              parsed.description_text || htmlToText(parsed.description_html);
+          }
+          if (parsed.location && !job.location) job.location = parsed.location;
+          if (parsed.posted_date && !job.posted_date) job.posted_date = parsed.posted_date;
+          enriched++;
+        } catch (e) {
+          failed++;
+          log.warn(
+            {
+              externalId: job.external_id,
+              err: e instanceof Error ? e.message : String(e),
+            },
+            "[workday-td] detail enrichment failed"
+          );
+        }
+      }
+    })
+  );
+  return { enriched, failed };
 }
 
 /**
