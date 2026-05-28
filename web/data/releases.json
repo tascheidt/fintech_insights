@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.5.1",
+    "date": "2026-05-28",
+    "changes": [
+      { "type": "fix", "description": "Scraper-break canary email no longer fires false alarms for incumbents. The canary's bulk `.select()` against the 8-day window silently hit PostgREST's 1000-row cap once the incumbent corpus exceeded that — today's freshly-inserted rows fell outside the returned window, so half the banks showed `0 new today` even when scrapers were ingesting normally. Rewritten as per-company `count(head:true)` pairs; no row materialization, no cap. The rolling-avg window also excludes the per-company backfill cutoff (created_at + 48h, same definition as the dashboard) so the one-shot onboarding ingest no longer poisons the average and keeps the canary firing daily for a week after every new incumbent comes online." },
+      { "type": "fix", "description": "Job-postings ingest dedup now loads the full existing corpus via paginated `.range()`. The previous unbounded `.select()` capped at 1000 rows, so for any company with >1000 active postings (RBC, TD, Scotia) the dedup map was incomplete and the next scrape re-INSERTed already-known rows. The incumbent-bets dashboard query had the same shape and is fixed the same way." },
+      { "type": "fix", "description": "`updateTaskProgress` now surfaces the underlying PostgREST error (code + message) when the task lookup fails, instead of the generic `Task X not found` that hid the real cause of the May 2026 TD ingest failure." }
+    ]
+  },
+  {
     "version": "2.5.0",
     "date": "2026-05-27",
     "changes": [

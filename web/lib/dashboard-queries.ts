@@ -1230,43 +1230,63 @@ export async function getIncumbentBets(options?: {
   const windowStart = subDays(new Date(), windowDays).toISOString();
 
   // Signal-window jobs: active incumbent postings first seen in the window.
-  let signalQuery = supabase
-    .from("job_postings")
-    .select(
-      "id, title, seniority_level, function_category, location, company_id, companies!inner(id, name, slug, is_active, tier)"
-    )
-    .eq("is_active", true)
-    .eq("companies.is_active", true)
-    .eq("companies.tier", "incumbent")
-    .gte("first_seen_date", windowStart);
-  if (options?.companyId) {
-    signalQuery = signalQuery.eq("company_id", options.companyId);
+  // Paginated because the unbounded .select() previously hit PostgREST's
+  // 1000-row default cap — incumbents carry ~6,000+ active postings, so
+  // the rail silently rendered partial data.
+  type SignalRow = {
+    id: string;
+    title: string | null;
+    seniority_level: string | null;
+    function_category: string | null;
+    location: string | null;
+    company_id: string;
+    companies: { id: string; name: string; slug: string; is_active: boolean; tier: string | null } |
+      Array<{ id: string; name: string; slug: string; is_active: boolean; tier: string | null }>;
+  };
+  const PAGE = 1000;
+  const signalJobs: SignalRow[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    let q = supabase
+      .from("job_postings")
+      .select(
+        "id, title, seniority_level, function_category, location, company_id, companies!inner(id, name, slug, is_active, tier)"
+      )
+      .eq("is_active", true)
+      .eq("companies.is_active", true)
+      .eq("companies.tier", "incumbent")
+      .gte("first_seen_date", windowStart)
+      .order("id", { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    if (options?.companyId) {
+      q = q.eq("company_id", options.companyId);
+    }
+    const { data: page } = await q;
+    if (!page || page.length === 0) break;
+    signalJobs.push(...(page as SignalRow[]));
+    if (page.length < PAGE) break;
   }
 
-  // All active incumbent postings (no window, no signal filter) — for the
-  // per-company total. Only the id+company is needed; tally in JS.
-  let totalQuery = supabase
-    .from("job_postings")
-    .select("company_id, companies!inner(is_active, tier)")
-    .eq("is_active", true)
-    .eq("companies.is_active", true)
-    .eq("companies.tier", "incumbent");
-  if (options?.companyId) {
-    totalQuery = totalQuery.eq("company_id", options.companyId);
-  }
-
-  const [{ data: signalJobs }, { data: totalJobs }] = await Promise.all([
-    signalQuery,
-    totalQuery,
-  ]);
-
+  // Per-company active totals via count() — no row materialization, no cap.
+  // Only the 6 incumbents are eligible, so this is at most ~6 round-trips.
   const totalOpenByCompany = new Map<string, number>();
-  for (const job of totalJobs ?? []) {
-    totalOpenByCompany.set(
-      job.company_id,
-      (totalOpenByCompany.get(job.company_id) ?? 0) + 1
-    );
-  }
+  const { data: incumbentCompanies } = await supabase
+    .from("companies")
+    .select("id")
+    .eq("is_active", true)
+    .eq("tier", "incumbent");
+  const eligibleIds = (incumbentCompanies ?? [])
+    .map((c) => c.id as string)
+    .filter((id) => !options?.companyId || id === options.companyId);
+  await Promise.all(
+    eligibleIds.map(async (cid) => {
+      const { count } = await supabase
+        .from("job_postings")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", cid)
+        .eq("is_active", true);
+      totalOpenByCompany.set(cid, count ?? 0);
+    })
+  );
 
   // Group signal jobs by company, then collapse identical roles.
   interface CompanyAccum {
