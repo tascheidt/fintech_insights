@@ -16,11 +16,75 @@
 
 import puppeteer from "puppeteer";
 import type { Browser } from "puppeteer-core";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchJobs } from "@/lib/scrapers";
 import { runIngestStage } from "@/lib/jobs/processor";
 import { triggerAnalysisForJobs } from "@/lib/jobs/runner";
 import type { Company } from "@/lib/jobs/types";
+
+/**
+ * Run a supabase write with bounded retries. The failure-path writes that
+ * mark a task `failed` MUST be resilient to transient DB outages — if
+ * those silently fail, the task stays `running` until the next morning's
+ * heartbeat sweep marks it `Timed out`, hiding the real error from the
+ * GH Actions logs (May 28 2026 TD incident).
+ */
+async function withRetry(
+  label: string,
+  fn: () => PromiseLike<{ error: { message?: string } | null }>,
+  attempts = 3
+): Promise<void> {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const { error } = await fn();
+      if (!error) return;
+      console.error(
+        `⚠️  ${label} failed (attempt ${i}/${attempts}): ${error.message ?? JSON.stringify(error)}`
+      );
+    } catch (e) {
+      console.error(
+        `⚠️  ${label} threw (attempt ${i}/${attempts}): ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+    if (i < attempts) {
+      const backoffMs = 1000 * 2 ** (i - 1); // 1s, 2s, 4s
+      await new Promise((r) => setTimeout(r, backoffMs));
+    }
+  }
+  console.error(`❌ ${label} gave up after ${attempts} attempts; task may be stuck in 'running'.`);
+}
+
+async function markTaskFailed(
+  supabase: SupabaseClient,
+  taskId: string,
+  jobRunId: string,
+  errorMessage: string,
+  stage: string
+): Promise<void> {
+  await withRetry(`mark task ${taskId} failed`, () =>
+    supabase
+      .from("job_run_tasks")
+      .update({
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error_message: errorMessage,
+        error_stage: stage,
+      })
+      .eq("id", taskId)
+  );
+  await withRetry(`mark job_run ${jobRunId} failed`, () =>
+    supabase
+      .from("job_runs")
+      .update({
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error_message: errorMessage,
+        failed_companies: 1,
+      })
+      .eq("id", jobRunId)
+  );
+}
 
 async function main() {
   console.log("🚀 Starting heavy scraper script...");
@@ -199,6 +263,23 @@ async function main() {
     console.log(`✅ Created new task: ${task.id}`);
   }
 
+  // SIGTERM/SIGINT handler: GH Actions sends SIGTERM on job cancel /
+  // timeout-minutes expiry. Without this the in-script try/catch never
+  // runs and the task is stuck in 'running'. Idempotent — if we exit
+  // cleanly later, this handler is a no-op.
+  const onSignal = (signal: NodeJS.Signals) => {
+    console.error(`⚠️  Received ${signal}; marking task failed before exit`);
+    const stage = task ? "scrape" : "init";
+    if (task && jobRun) {
+      void markTaskFailed(supabase, task.id, jobRun.id, `Process received ${signal}`, stage)
+        .finally(() => process.exit(1));
+    } else {
+      process.exit(1);
+    }
+  };
+  process.on("SIGTERM", onSignal);
+  process.on("SIGINT", onSignal);
+
   try {
     // Step 6: Fetch jobs using browser instance
     console.log(`🔎 Fetching jobs for ${company.name}...`);
@@ -292,26 +373,14 @@ async function main() {
       console.log("ℹ️  No new jobs — skipping analysis stage.");
     }
   } catch (error) {
-    console.error(`❌ Error during scraping: ${error instanceof Error ? error.message : String(error)}`);
-    
-    // Mark task as failed
-    await supabase
-      .from("job_run_tasks")
-      .update({
-        status: "failed",
-        error_message: error instanceof Error ? error.message : String(error),
-        error_stage: "scrape",
-      })
-      .eq("id", task.id);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`❌ Error during scraping: ${errorMessage}`);
 
-    await supabase
-      .from("job_runs")
-      .update({
-        status: "failed",
-        error_message: error instanceof Error ? error.message : String(error),
-        failed_companies: 1,
-      })
-      .eq("id", jobRun.id);
+    // Mark task + job_run as failed with retry. If the underlying cause
+    // was a transient Supabase outage (May 28 2026 TD incident), the
+    // unretried single-shot updates here silently failed against a DB
+    // that was mid-recovery and the task stayed in 'running'.
+    await markTaskFailed(supabase, task.id, jobRun.id, errorMessage, "scrape");
 
     throw error;
   } finally {

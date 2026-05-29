@@ -15,7 +15,12 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    
+    # TD is the largest corpus at ~1,600 jobs; with the workday-td
+    # concurrent enrichment path (50/batch, concurrency=4) full runs land
+    # well under 10 min. 30 min is a hard ceiling so a hung scrape fails
+    # the workflow cleanly instead of holding the task in 'running'.
+    timeout-minutes: 30
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
