@@ -47,6 +47,7 @@ type JobsPageSearchParams = {
   function?: string;
   recency?: string;
   tier?: string;
+  mode?: string; // "semantic" | "keyword" (default)
 };
 
 /**
@@ -151,6 +152,10 @@ export default async function JobsPage({
   }
 
   const initialQ = (params.q ?? "").trim();
+  const searchMode = params.mode === "semantic" ? "semantic" : "keyword";
+  // Relevance order only applies when a semantic search actually ran (query
+  // present + semantic mode); the table preserves the server's ranking then.
+  const relevanceOrder = searchMode === "semantic" && initialQ.length > 0;
 
   // The jobs list honors the `?tier=` toggle. The right rail (function heat /
   // cross-company themes) deliberately stays fintech-only regardless of the
@@ -160,6 +165,7 @@ export default async function JobsPage({
       jobIds: digestJobIds,
       tiers,
       searchQuery: initialQ || null,
+      searchMode,
     }),
     getFunctionHeatData(30),
     getCrossCompanyThemes(),
@@ -237,6 +243,7 @@ export default async function JobsPage({
         company: initialCompany,
         fn: initialFn,
         recency: initialRecency,
+        mode: searchMode,
       }}
       digestContext={{
         themeId: themeParam,
@@ -250,6 +257,7 @@ export default async function JobsPage({
       companyCount={companyCount ?? companies.length}
       tierFilter={tierFilter}
       searchTruncated={truncated}
+      relevanceOrder={relevanceOrder}
     />
   );
 }

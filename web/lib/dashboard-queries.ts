@@ -9,6 +9,7 @@ import {
 import { isIncumbentSignalJob } from "@/lib/analysis/incumbent-signal";
 import { startOfWeek, format, subDays, parseISO, addHours } from "date-fns";
 import { log } from "@/lib/log";
+import { embedText } from "@/lib/ai/embeddings";
 
 /**
  * Many of the company-scoped helpers below accept an optional Supabase
@@ -1126,12 +1127,128 @@ function coerceKeywords(raw: unknown): string[] {
  */
 export const JOBS_LIST_MAX_ROWS = 500;
 export const JOBS_LIST_SEARCH_MAX_ROWS = 1000;
+/** Semantic search returns a tighter set — relevance falls off a cliff past
+ *  the top matches, and it keeps the follow-up `.in("id", …)` URL bounded. */
+export const JOBS_SEMANTIC_MAX_ROWS = 200;
+
+/** How the search box interprets the query: lexical full-text vs. vector
+ *  similarity ("find roles like this"). */
+export type JobsSearchMode = "keyword" | "semantic";
 
 export interface JobsListResult {
   rows: JobsListRow[];
-  /** True when the search hit `JOBS_LIST_SEARCH_MAX_ROWS` — older matches
-   *  were not returned. The UI surfaces a banner so users can refine. */
+  /** True when the search hit its row cap — older / less-relevant matches were
+   *  not returned. The UI surfaces a banner so users can refine. */
   truncated: boolean;
+}
+
+const JOBS_LIST_SELECT =
+  "id, title, standardized_department, function_category, location, location_structured, is_active, first_seen_date, keywords, company_id, companies!inner(id, name, slug, tier)";
+
+/** Map one raw join row to the shape the Jobs table renders. */
+function mapJobRow(j: JobsListRawRow, now: number): JobsListRow {
+  const company = Array.isArray(j.companies) ? j.companies[0] : j.companies;
+  const ageDays = j.first_seen_date
+    ? Math.max(0, Math.floor((now - new Date(j.first_seen_date).getTime()) / 86_400_000))
+    : null;
+  const functionGroup =
+    j.function_category &&
+    (ROLE_CATEGORIES as readonly string[]).includes(j.function_category)
+      ? getCategoryGroup(j.function_category as RoleCategory)
+      : null;
+  return {
+    id: j.id,
+    title: j.title,
+    companyName: company?.name ?? "—",
+    companySlug: company?.slug ?? "",
+    companyId: j.company_id,
+    companyTier: company?.tier === "incumbent" ? "incumbent" : "fintech",
+    functionCategory: j.function_category,
+    functionGroup,
+    location: j.location,
+    locationStructured: coerceLocationStructured(j.location_structured),
+    firstSeenDate: j.first_seen_date,
+    isActive: j.is_active,
+    keywords: coerceKeywords(j.keywords),
+    ageDays,
+    standardizedDepartment: j.standardized_department,
+  };
+}
+
+/**
+ * Semantic-search branch: embed the query string, ask Postgres for the nearest
+ * job vectors (cosine, via the `match_job_ids_semantic` RPC over the HNSW
+ * index), then hydrate + reorder those rows by relevance. Returns `null` when
+ * the embedding is unavailable (no API key / transient error) so the caller
+ * can fall back to keyword search — semantic should degrade, never 500.
+ */
+async function runSemanticJobSearch(
+  supabase: SupabaseLike,
+  rawQuery: string,
+  tierList: CompanyTier[],
+  jobIds: string[] | null
+): Promise<JobsListResult | null> {
+  const startedAt = performance.now();
+  const embedded = await embedText(rawQuery, { callSite: "jobs.search.semantic" });
+  if (!embedded) {
+    log.info({ mode: "semantic", fell_back_to_keyword: true }, "jobs.search");
+    return null;
+  }
+
+  const { data: idRows, error: rpcError } = await supabase.rpc("match_job_ids_semantic", {
+    query_embedding: JSON.stringify(embedded.embedding),
+    tier_filter: tierList,
+    match_count: JOBS_SEMANTIC_MAX_ROWS,
+  });
+  if (rpcError || !idRows) {
+    log.info(
+      { mode: "semantic", has_error: true, duration_ms: Math.round(performance.now() - startedAt) },
+      "jobs.search"
+    );
+    return null;
+  }
+
+  let ranked = idRows as Array<{ id: string; distance: number }>;
+  if (jobIds && jobIds.length > 0) {
+    const allow = new Set(jobIds);
+    ranked = ranked.filter((r) => allow.has(r.id));
+  }
+  const orderedIds = ranked.map((r) => r.id);
+  const truncated = (idRows as unknown[]).length >= JOBS_SEMANTIC_MAX_ROWS;
+
+  if (orderedIds.length === 0) {
+    log.info(
+      { mode: "semantic", result_count: 0, duration_ms: Math.round(performance.now() - startedAt) },
+      "jobs.search"
+    );
+    return { rows: [], truncated: false };
+  }
+
+  const { data, error } = await supabase
+    .from("job_postings")
+    .select(JOBS_LIST_SELECT)
+    .in("companies.tier", tierList)
+    .in("id", orderedIds);
+  if (error || !data) return { rows: [], truncated: false };
+
+  const now = Date.now();
+  const byId = new Map<string, JobsListRow>();
+  for (const j of data as JobsListRawRow[]) byId.set(j.id, mapJobRow(j, now));
+  // Reorder to the RPC's relevance order (the fetch above is unordered).
+  const rows = orderedIds
+    .map((id) => byId.get(id))
+    .filter((r): r is JobsListRow => Boolean(r));
+
+  log.info(
+    {
+      mode: "semantic",
+      result_count: rows.length,
+      truncated,
+      duration_ms: Math.round(performance.now() - startedAt),
+    },
+    "jobs.search"
+  );
+  return { rows, truncated };
 }
 
 /** Max raw characters of search input we parse (phrases make queries longer
@@ -1219,6 +1336,10 @@ export async function getJobsListData(
     jobIds?: string[] | null;
     tiers?: readonly CompanyTier[];
     searchQuery?: string | null;
+    /** Search interpretation. Default "keyword" (lexical full-text). When
+     *  "semantic", embeds the query and ranks by vector similarity; falls
+     *  back to keyword if embedding is unavailable. */
+    searchMode?: JobsSearchMode;
   } = {}
 ): Promise<JobsListResult> {
   const supabase = await createClient();
@@ -1229,23 +1350,36 @@ export async function getJobsListData(
   }
 
   const tierList = [...(options.tiers ?? DEFAULT_TIERS)];
-  const tsQuery = options.searchQuery ? buildSearchTsQuery(options.searchQuery) : "";
+  const rawQuery = options.searchQuery?.trim() ?? "";
+
+  // Semantic mode embeds the query and ranks by vector similarity. On any
+  // embedding/RPC failure runSemanticJobSearch returns null and we fall
+  // through to keyword search, so search degrades rather than breaking.
+  if (rawQuery && options.searchMode === "semantic") {
+    const semantic = await runSemanticJobSearch(
+      supabase,
+      rawQuery,
+      tierList,
+      options.jobIds ?? null
+    );
+    if (semantic) return semantic;
+  }
+
+  const tsQuery = rawQuery ? buildSearchTsQuery(rawQuery) : "";
   const hasSearch = tsQuery.length > 0;
   const limit = hasSearch ? JOBS_LIST_SEARCH_MAX_ROWS : JOBS_LIST_MAX_ROWS;
 
   let query = supabase
     .from("job_postings")
-    .select(
-      "id, title, standardized_department, function_category, location, location_structured, is_active, first_seen_date, keywords, company_id, companies!inner(id, name, slug, tier)"
-    )
+    .select(JOBS_LIST_SELECT)
     .in("companies.tier", tierList)
     .order("first_seen_date", { ascending: false })
     .limit(limit);
 
   if (hasSearch) {
     // Full-text match on the GIN-indexed search_tsv column. Default fts type
-    // maps to `@@ to_tsquery(english, ...)`, which honours our `:*` prefix
-    // markers — so partial words typed mid-search still match.
+    // maps to `@@ to_tsquery(english, ...)`, which honours the `:*` prefix
+    // markers buildSearchTsQuery emits — so partial words match mid-type.
     query = query.textSearch("search_tsv", tsQuery, { config: "english" });
   }
 
@@ -1260,6 +1394,7 @@ export async function getJobsListData(
   if (hasSearch) {
     log.info(
       {
+        mode: "keyword",
         ts_query: tsQuery,
         result_count: data?.length ?? 0,
         truncated: (data?.length ?? 0) >= limit,
@@ -1273,37 +1408,7 @@ export async function getJobsListData(
   if (error || !data) return { rows: [], truncated: false };
 
   const now = Date.now();
-  const rows: JobsListRow[] = (data as JobsListRawRow[]).map((j) => {
-    const company = Array.isArray(j.companies) ? j.companies[0] : j.companies;
-    const ageDays = j.first_seen_date
-      ? Math.max(
-          0,
-          Math.floor((now - new Date(j.first_seen_date).getTime()) / 86_400_000)
-        )
-      : null;
-    const functionGroup =
-      j.function_category &&
-      (ROLE_CATEGORIES as readonly string[]).includes(j.function_category)
-        ? getCategoryGroup(j.function_category as RoleCategory)
-        : null;
-    return {
-      id: j.id,
-      title: j.title,
-      companyName: company?.name ?? "—",
-      companySlug: company?.slug ?? "",
-      companyId: j.company_id,
-      companyTier: company?.tier === "incumbent" ? "incumbent" : "fintech",
-      functionCategory: j.function_category,
-      functionGroup,
-      location: j.location,
-      locationStructured: coerceLocationStructured(j.location_structured),
-      firstSeenDate: j.first_seen_date,
-      isActive: j.is_active,
-      keywords: coerceKeywords(j.keywords),
-      ageDays,
-      standardizedDepartment: j.standardized_department,
-    };
-  });
+  const rows: JobsListRow[] = (data as JobsListRawRow[]).map((j) => mapJobRow(j, now));
 
   return { rows, truncated: hasSearch && rows.length >= limit };
 }

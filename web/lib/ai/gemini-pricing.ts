@@ -38,6 +38,11 @@ export const GEMINI_PRICING: Record<string, ModelRates> = {
     outputPerM: 10.0,
     notes: "Floating alias — tiered rates above ~200k-token prompts are not modeled here.",
   },
+  "gemini-embedding-001": {
+    inputPerM: 0.15,
+    outputPerM: 0,
+    notes: "Embedding model (no -latest alias published); output tokens N/A. Used by Jobs semantic search.",
+  },
 };
 
 /** Grounding (googleSearch) surcharge, USD per request. */

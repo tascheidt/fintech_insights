@@ -44,10 +44,13 @@ export interface JobsPageClientProps {
   companyCount: number;
   /** Active tier scope, URL-seeded — drives the JobsHeader tier control. */
   tierFilter: "fintech" | "incumbent" | "all";
-  /** True when the server-side search hit `JOBS_LIST_SEARCH_MAX_ROWS` and
-   *  older matches were trimmed. The banner only renders when a query is
+  /** True when the server-side search hit its row cap and older / less-
+   *  relevant matches were trimmed. The banner only renders when a query is
    *  actually active — a stale `truncated` from a prior URL has no effect. */
   searchTruncated: boolean;
+  /** True when the current rows came from a semantic search and are already
+   *  ranked by relevance — the table preserves that order by default. */
+  relevanceOrder: boolean;
 }
 
 export function JobsPageClient(props: JobsPageClientProps) {
@@ -71,6 +74,7 @@ function JobsPageClientInner({
   companyCount,
   tierFilter,
   searchTruncated,
+  relevanceOrder,
 }: JobsPageClientProps) {
   const [filters, setFilters] = React.useState<JobsFilterState>(initial);
   const { selected, clear } = useJobSelection();
@@ -136,7 +140,9 @@ function JobsPageClientInner({
 
       {searchTruncated && filters.q.trim().length > 0 && (
         <div className="rounded-lg border border-sand-200 bg-sand-50 px-3 py-2 text-[12.5px] text-sand-700">
-          Showing the 1,000 most recent matches. Refine your search to see older roles.
+          {relevanceOrder
+            ? "Showing the top 200 closest matches. Refine your search to narrow them."
+            : "Showing the 1,000 most recent matches. Refine your search to see older roles."}
         </div>
       )}
 
@@ -145,7 +151,7 @@ function JobsPageClientInner({
           single-digit pixels because the fixed cols (Company/Function/
           Location/Posted) plus a 280px rail starved everything else. */}
       <div className="grid grid-cols-1 gap-[18px] xl:grid-cols-[1fr_280px] [&>*]:min-w-0">
-        <JobsListTable rows={filtered} />
+        <JobsListTable rows={filtered} relevanceOrder={relevanceOrder} />
         <JobsRail heat={heat} themes={themes} />
       </div>
 

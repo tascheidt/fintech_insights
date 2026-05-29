@@ -52,6 +52,8 @@ We construct every tsquery operator (`:*`, `&`, `<->`, `!`) ourselves and feed `
 
 `search_tsv` is a STORED generated column, so it is auto-maintained — do **not** add a trigger that writes to it (a BEFORE trigger assigning a generated column errors and breaks ingest).
 
+**Semantic mode.** The search box has a Keyword | Semantic toggle (`?mode=semantic`). Semantic embeds the query with `gemini-embedding-001` (768d, via `embedText`) and ranks by cosine similarity over `job_postings.embedding` (pgvector, HNSW index, `idx_job_postings_embedding_hnsw`) through the `match_job_ids_semantic` RPC, then hydrates + reorders those rows by relevance. It fires on submit (Enter / toggling on), NOT per keystroke, because each query is a Gemini call. If embedding is unavailable it falls back to keyword search — semantic degrades, never 500s. Rows are embedded by the `embeddings-backfill` GH Actions cron (and an initial manual run of `web/scripts/backfill-job-embeddings.ts`); provenance columns `embedding_model`/`embedding_dims` guard against silently comparing vectors across models. Semantic results are capped at `JOBS_SEMANTIC_MAX_ROWS` (200, relevance falls off past that); the table preserves relevance order until the user clicks a column header.
+
 When a search is active the row cap lifts from 500 → 1000; if the cap is hit the function returns `truncated: true` and JobsPageClient renders a banner inviting the user to refine. Every search emits a `jobs.search` log event with `ts_query`, `result_count`, `truncated`, `duration_ms` — the canary for graduating to keyset pagination / `ts_rank` relevance ordering later.
 
 ## Verifying before deletion

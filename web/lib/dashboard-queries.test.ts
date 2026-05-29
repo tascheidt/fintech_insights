@@ -264,6 +264,16 @@ describe("getJobsListData full-text search (description match)", () => {
     const result = await getJobsListData({ searchQuery: "engineer" });
     expect(result).toEqual({ rows: [], truncated: false });
   });
+
+  it("semantic mode falls back to keyword search when embedding is unavailable", async () => {
+    // No GEMINI_API_KEY in the test env → embedText returns null → the
+    // semantic branch returns null → keyword full-text path runs instead.
+    // Search must degrade, never break.
+    await getJobsListData({ searchQuery: "staff engineer", searchMode: "semantic" });
+    const calls = textSearchCalls("job_postings");
+    expect(calls).toHaveLength(1);
+    expect(calls[0][1]).toBe("staff:* & engineer:*");
+  });
 });
 
 describe("getIncumbentBets (Phase 2 — Incumbent Bets rail / company panel)", () => {
