@@ -27,21 +27,31 @@ CREATE INDEX IF NOT EXISTS idx_job_postings_embedding_hnsw
 -- the given company tiers. search_path is locked to '' (repo security
 -- convention, see 20260425100000_function_search_path_lock.sql), so the vector
 -- type and operator are public-qualified.
+--
+-- plpgsql (not sql) so we can raise hnsw.ef_search at runtime: HNSW scans only
+-- ef_search candidates (default 40), which would silently cap results at ~40
+-- and hurt recall regardless of match_count. We set it transaction-locally
+-- (Supabase blocks the function-level SET clause for this GUC, but the runtime
+-- USERSET path is allowed) to comfortably cover the 200-row caller cap.
 CREATE OR REPLACE FUNCTION match_job_ids_semantic(
   query_embedding vector(768),
   tier_filter text[],
   match_count int DEFAULT 1000
 )
 RETURNS TABLE (id uuid, distance double precision)
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SET search_path = ''
 AS $$
-  SELECT jp.id, (jp.embedding OPERATOR(public.<=>) query_embedding) AS distance
-  FROM public.job_postings jp
-  JOIN public.companies c ON c.id = jp.company_id
-  WHERE jp.embedding IS NOT NULL
-    AND c.tier = ANY(tier_filter)
-  ORDER BY jp.embedding OPERATOR(public.<=>) query_embedding
-  LIMIT match_count;
+BEGIN
+  PERFORM set_config('hnsw.ef_search', '250', true);
+  RETURN QUERY
+    SELECT jp.id, (jp.embedding OPERATOR(public.<=>) query_embedding) AS distance
+    FROM public.job_postings jp
+    JOIN public.companies c ON c.id = jp.company_id
+    WHERE jp.embedding IS NOT NULL
+      AND c.tier = ANY(tier_filter)
+    ORDER BY jp.embedding OPERATOR(public.<=>) query_embedding
+    LIMIT match_count;
+END;
 $$;
