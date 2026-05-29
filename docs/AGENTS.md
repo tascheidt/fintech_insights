@@ -39,6 +39,21 @@ The hard cap is **two** Vercel crons. The third scheduled job moved to GitHub Ac
 
 All scheduled jobs MUST log into the `job_runs` table. `cron_logs` is deprecated and removed; never reference it.
 
+## Jobs page search
+
+The `/jobs` search box (`?q=` URL param) is server-side full-text search. [getJobsListData()](../web/lib/dashboard-queries.ts) matches against the `search_tsv` generated `tsvector` column on `job_postings` (title = weight A, location = B, description_text = C), GIN-indexed via `idx_job_postings_search_tsv` (migration `20260528120000_jobs_search_tsvector.sql`). It uses `tsvector @@ to_tsquery` rather than trigram ILIKE because ILIKE on long description text forces a bitmap-heap recheck against every candidate's full body (~1.3s for a broad term on the incumbent corpus); the `@@` match reads pre-lexemed tokens straight from the index (~10ms for the same query) and scales as the corpus grows.
+
+`buildSearchTsQuery` parses a small, Google-like query syntax into a `tsquery` (keep it in sync with the `SearchHelpPopover` examples):
+- `staff engineer` → `staff:* & engineer:*` — all words (AND), each prefix-matched so search-as-you-type works.
+- `"staff engineer"` → `(staff <-> engineer)` — exact phrase (adjacent, in order). An unterminated quote mid-type (`"staff eng`) keeps the last word as a prefix: `(staff <-> eng:*)`.
+- `engineer -contract` → `engineer:* & !contract:*` — leading `-` excludes a term (or a quoted phrase: `-"data entry"`).
+
+We construct every tsquery operator (`:*`, `&`, `<->`, `!`) ourselves and feed `to_tsquery` only sanitized alnum lexemes (NFKC; non-alnum stripped per token; 120-char / 12-group caps), so users cannot inject tsquery syntax or break the parse. There is no 3-char floor — short prefixes work. Company-name search is covered incidentally because most JD bodies mention the company; the Company dropdown owns precise company filtering.
+
+`search_tsv` is a STORED generated column, so it is auto-maintained — do **not** add a trigger that writes to it (a BEFORE trigger assigning a generated column errors and breaks ingest).
+
+When a search is active the row cap lifts from 500 → 1000; if the cap is hit the function returns `truncated: true` and JobsPageClient renders a banner inviting the user to refine. Every search emits a `jobs.search` log event with `ts_query`, `result_count`, `truncated`, `duration_ms` — the canary for graduating to keyset pagination / `ts_rank` relevance ordering later.
+
 ## Verifying before deletion
 
 When code *looks* unused, verify before you delete it:

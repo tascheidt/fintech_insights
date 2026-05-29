@@ -44,6 +44,10 @@ export interface JobsPageClientProps {
   companyCount: number;
   /** Active tier scope, URL-seeded — drives the JobsHeader tier control. */
   tierFilter: "fintech" | "incumbent" | "all";
+  /** True when the server-side search hit `JOBS_LIST_SEARCH_MAX_ROWS` and
+   *  older matches were trimmed. The banner only renders when a query is
+   *  actually active — a stale `truncated` from a prior URL has no effect. */
+  searchTruncated: boolean;
 }
 
 export function JobsPageClient(props: JobsPageClientProps) {
@@ -66,6 +70,7 @@ function JobsPageClientInner({
   newCount,
   companyCount,
   tierFilter,
+  searchTruncated,
 }: JobsPageClientProps) {
   const [filters, setFilters] = React.useState<JobsFilterState>(initial);
   const { selected, clear } = useJobSelection();
@@ -75,8 +80,11 @@ function JobsPageClientInner({
     setFilters(next);
   }, []);
 
+  // Server-side ILIKE in `getJobsListData` already filtered on the search
+  // term (title / description_text / location / companies.name). The client
+  // applies the remaining axes — company, function, recency, theme — that
+  // can change without a re-fetch.
   const filtered = React.useMemo(() => {
-    const q = filters.q.trim().toLowerCase();
     return rows.filter((r) => {
       if (filters.company !== "all" && r.companySlug !== filters.company) {
         return false;
@@ -91,18 +99,6 @@ function JobsPageClientInner({
       if (digestContext.themeId) {
         const themes = classifyJob(r.title, r.standardizedDepartment);
         if (!themes.includes(digestContext.themeId)) return false;
-      }
-      if (q) {
-        const hay = [
-          r.title,
-          r.companyName,
-          r.location ?? "",
-          r.functionGroup ?? "",
-          r.keywords.join(" "),
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!hay.includes(q)) return false;
       }
       return true;
     });
@@ -137,6 +133,12 @@ function JobsPageClientInner({
           downloadJobsCsv(filtered, stem);
         }}
       />
+
+      {searchTruncated && filters.q.trim().length > 0 && (
+        <div className="rounded-lg border border-sand-200 bg-sand-50 px-3 py-2 text-[12.5px] text-sand-700">
+          Showing the 1,000 most recent matches. Refine your search to see older roles.
+        </div>
+      )}
 
       {/* Rail only shows from xl (1280px+). Below that, the table has the
           whole row width — anything narrower forced the title column to

@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchHelpPopover } from "@/components/jobs/SearchHelpPopover";
 import { getThemeLabel } from "@/lib/analysis/role-themes";
 
 export type RecencyFilter = "any" | "7" | "30";
@@ -317,11 +318,12 @@ export function JobsHeader({
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-sand-400" />
           <Input
             type="search"
-            placeholder="Search title, signal, location…"
+            placeholder="Search roles, skills, descriptions…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="pl-9"
+            className="pl-9 pr-9"
           />
+          <SearchHelpPopover className="absolute right-2.5 top-1/2 -translate-y-1/2" />
         </div>
 
         <Select value={company} onValueChange={setCompany}>

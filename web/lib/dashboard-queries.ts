@@ -8,6 +8,7 @@ import {
 } from "@/lib/analysis/function-categories";
 import { isIncumbentSignalJob } from "@/lib/analysis/incumbent-signal";
 import { startOfWeek, format, subDays, parseISO, addHours } from "date-fns";
+import { log } from "@/lib/log";
 
 /**
  * Many of the company-scoped helpers below accept an optional Supabase
@@ -1106,24 +1107,131 @@ function coerceKeywords(raw: unknown): string[] {
  * dropdown, or the eyebrow stats. The Jobs-page Tier toggle opts in by
  * passing `tiers` explicitly.
  *
- * Hard-capped at `JOBS_LIST_MAX_ROWS` (most-recent first). Without a cap, an
- * `?tier=incumbent` or `?tier=all` query would ship the entire ~7k-row
- * active corpus on every page render (~22MB JSON, painful client-side).
- * Phase 3 follow-up will replace this with server-side pagination.
+ * Two row caps:
+ *   - Default browse (no search): `JOBS_LIST_MAX_ROWS` (500). Without a cap,
+ *     `?tier=incumbent` / `?tier=all` would ship the ~7k-row active corpus
+ *     each render.
+ *   - Search (`searchQuery` set): `JOBS_LIST_SEARCH_MAX_ROWS` (1000). Lifts
+ *     the cap so descriptions older than the 500th most recent can still
+ *     match. When the cap is hit, `truncated: true` so the UI can warn.
+ *
+ * When `searchQuery` is set, the match is pushed into Postgres full-text
+ * search against the `search_tsv` generated column (title=A, location=B,
+ * description_text=C), GIN-indexed — see migration
+ * `20260528120000_jobs_search_tsvector.sql`. `buildSearchTsQuery` turns the
+ * user's input into a `tsquery` (see its docblock for the supported syntax),
+ * and the `@@` match reads pre-lexemed tokens from the index with no big-text
+ * recheck (≈10ms even for broad terms on the incumbent corpus, vs ~1.3s for
+ * the equivalent trigram ILIKE).
  */
 export const JOBS_LIST_MAX_ROWS = 500;
+export const JOBS_LIST_SEARCH_MAX_ROWS = 1000;
+
+export interface JobsListResult {
+  rows: JobsListRow[];
+  /** True when the search hit `JOBS_LIST_SEARCH_MAX_ROWS` — older matches
+   *  were not returned. The UI surfaces a banner so users can refine. */
+  truncated: boolean;
+}
+
+/** Max raw characters of search input we parse (phrases make queries longer
+ *  than the bare-word case, so this is roomier than a single term). */
+const SEARCH_INPUT_MAX_CHARS = 120;
+/** Cap on parsed groups, so a pathological query can't build a huge tsquery. */
+const SEARCH_MAX_GROUPS = 12;
+
+/** Strip a single token down to its safe lexeme content: letters, digits and
+ *  internal hyphens only. Everything else (the structural quote/operator
+ *  characters we parse separately, plus punctuation) is dropped. */
+function sanitizeLexeme(token: string): string {
+  return token.normalize("NFKC").replace(/[^\p{L}\p{N}-]/gu, "");
+}
+
+/**
+ * Turn a user's free-text search box input into a Postgres `tsquery` string.
+ *
+ * Supported syntax (taught in the Jobs search help popover — keep the two in
+ * sync):
+ *   - `staff engineer`     → all words must appear (AND). Each word is matched
+ *                            as a prefix (`staff:* & engineer:*`) so partial
+ *                            words match while you type.
+ *   - `"staff engineer"`   → exact phrase: the words must be adjacent, in
+ *                            order (`staff <-> engineer`).
+ *   - `engineer -contract` → exclude: roles matching `contract` are removed
+ *                            (`engineer:* & !contract:*`).
+ *
+ * We construct every tsquery operator ourselves (`:*`, `&`, `<->`, `!`) and
+ * feed `to_tsquery` only sanitized alnum lexemes, so a user cannot inject
+ * tsquery syntax or break the parse. An unterminated quote (mid-type, e.g.
+ * `"staff eng`) is treated as a phrase whose last word is still being typed,
+ * so it keeps its prefix marker. Returns "" when nothing searchable survives.
+ */
+function buildSearchTsQuery(raw: string): string {
+  const input = raw.normalize("NFKC").slice(0, SEARCH_INPUT_MAX_CHARS);
+
+  // Split into groups: a quoted run is one group; each bare word is its own
+  // group. Capture the leading `-` (negation) and whether a quote closed.
+  type Group = { words: string[]; phrase: boolean; negate: boolean; open: boolean };
+  const groups: Group[] = [];
+  // Alt 1 = quoted run: m[1]=neg, m[2]=inner text, m[3]=closing quote ("" if
+  // unterminated). Alt 2 = bare token: m[4]=neg, m[5]=token (may be hyphenated).
+  const tokenRe = /(-?)"([^"]*)("?)|(-?)(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = tokenRe.exec(input)) && groups.length < SEARCH_MAX_GROUPS) {
+    if (m[2] !== undefined) {
+      const words = m[2].split(/[\s-]+/).map(sanitizeLexeme).filter(Boolean);
+      if (words.length) {
+        groups.push({ words, phrase: true, negate: m[1] === "-", open: m[3] === "" });
+      }
+    } else if (m[5] !== undefined) {
+      // A hyphenated bare token expands to several AND-ed prefix words.
+      const words = m[5].split(/[\s-]+/).map(sanitizeLexeme).filter(Boolean);
+      for (const w of words) {
+        groups.push({ words: [w], phrase: false, negate: m[4] === "-", open: true });
+      }
+    }
+  }
+
+  const parts = groups
+    .map((g) => {
+      if (!g.words.length) return "";
+      let expr: string;
+      if (g.phrase) {
+        // Adjacent words via FOLLOWED-BY. Prefix only the last word when the
+        // phrase is still being typed (unterminated quote).
+        expr = g.words
+          .map((w, i) => (g.open && i === g.words.length - 1 ? `${w}:*` : w))
+          .join(" <-> ");
+        if (g.words.length > 1) expr = `(${expr})`;
+      } else {
+        // Bare word: always prefix-matched for type-ahead.
+        expr = `${g.words[0]}:*`;
+      }
+      return g.negate ? `!${expr}` : expr;
+    })
+    .filter(Boolean);
+
+  return parts.join(" & ");
+}
 
 export async function getJobsListData(
-  options: { jobIds?: string[] | null; tiers?: readonly CompanyTier[] } = {}
-): Promise<JobsListRow[]> {
+  options: {
+    jobIds?: string[] | null;
+    tiers?: readonly CompanyTier[];
+    searchQuery?: string | null;
+  } = {}
+): Promise<JobsListResult> {
   const supabase = await createClient();
 
   // Digest snapshot with no captured jobs — short-circuit.
   if (options.jobIds !== undefined && options.jobIds !== null && options.jobIds.length === 0) {
-    return [];
+    return { rows: [], truncated: false };
   }
 
   const tierList = [...(options.tiers ?? DEFAULT_TIERS)];
+  const tsQuery = options.searchQuery ? buildSearchTsQuery(options.searchQuery) : "";
+  const hasSearch = tsQuery.length > 0;
+  const limit = hasSearch ? JOBS_LIST_SEARCH_MAX_ROWS : JOBS_LIST_MAX_ROWS;
 
   let query = supabase
     .from("job_postings")
@@ -1132,17 +1240,40 @@ export async function getJobsListData(
     )
     .in("companies.tier", tierList)
     .order("first_seen_date", { ascending: false })
-    .limit(JOBS_LIST_MAX_ROWS);
+    .limit(limit);
+
+  if (hasSearch) {
+    // Full-text match on the GIN-indexed search_tsv column. Default fts type
+    // maps to `@@ to_tsquery(english, ...)`, which honours our `:*` prefix
+    // markers — so partial words typed mid-search still match.
+    query = query.textSearch("search_tsv", tsQuery, { config: "english" });
+  }
 
   if (options.jobIds && options.jobIds.length > 0) {
     query = query.in("id", options.jobIds);
   }
 
+  const startedAt = performance.now();
   const { data, error } = await query;
-  if (error || !data) return [];
+  const durationMs = Math.round(performance.now() - startedAt);
+
+  if (hasSearch) {
+    log.info(
+      {
+        ts_query: tsQuery,
+        result_count: data?.length ?? 0,
+        truncated: (data?.length ?? 0) >= limit,
+        duration_ms: durationMs,
+        has_error: Boolean(error),
+      },
+      "jobs.search"
+    );
+  }
+
+  if (error || !data) return { rows: [], truncated: false };
 
   const now = Date.now();
-  return (data as JobsListRawRow[]).map((j) => {
+  const rows: JobsListRow[] = (data as JobsListRawRow[]).map((j) => {
     const company = Array.isArray(j.companies) ? j.companies[0] : j.companies;
     const ageDays = j.first_seen_date
       ? Math.max(
@@ -1173,6 +1304,8 @@ export async function getJobsListData(
       standardizedDepartment: j.standardized_department,
     };
   });
+
+  return { rows, truncated: hasSearch && rows.length >= limit };
 }
 
 // ============================================================================
