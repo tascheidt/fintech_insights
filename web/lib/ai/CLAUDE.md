@@ -5,6 +5,7 @@ Shared infrastructure for Gemini calls. The full hygiene rules live in [`docs/AI
 ## Single source of truth
 
 - **`prompt-config.ts`** — `AI_MODEL_OPTIONS` enum. **Every model string in the codebase resolves through here.** Do not hardcode `"gemini-flash-latest"` (or any other model name) anywhere else. If a new caller needs a model that isn't in the enum, add it to the enum.
+- **`prompt-config.ts`** also exports `EMBEDDING_MODEL` / `EMBEDDING_DIMS` (`gemini-embedding-001`, 768d) for Jobs semantic search. Embedding models have no floating `-latest` alias, so this one is pinned — but it's still the single source of truth; resolve through it, never hardcode. A change here means a re-embed backfill (rows stamp `embedding_model`/`embedding_dims`; cross-model vectors don't compare).
 
 ## Telemetry
 
@@ -33,6 +34,7 @@ When you change voice tone, update `docs/voice.md` and `voice.ts` in the same PR
 
 - **`strategy-analysis.ts`** — Strategy-narrative helpers shared by digest and company insight surfaces.
 - **`tech-stack-extraction.ts`** / **`tech-stack-aggregation.ts`** — Detects and aggregates company tech-stack signals from descriptions.
+- **`embeddings.ts`** — `embedText()` wraps `gemini-embedding-001` (768d, L2-normalized) for Jobs semantic search; meters like any other call site. Two callers: the `backfill-job-embeddings.ts` sweep and the `/jobs` semantic query path in `dashboard-queries.ts`. `jobEmbeddingInput()` composes the per-job text (title + summary/description).
 
 ## Rules of the road
 

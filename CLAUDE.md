@@ -53,13 +53,14 @@ Two AI calls per job. `analyzeJob` (in `web/lib/analysis/strategic.ts`) and `cat
 
 ## 4. Cron topology
 
-**Two Vercel crons (collect, report) + three GH Actions crons (company-insights, editorial, gemini-cost-alarm).** Hard cap: never more than two Vercel crons. Most GH Actions crons `curl` back into the deployed app with `Bearer ${CRON_SECRET}`; the editorial cron runs the regenerate script directly in the runner.
+**Two Vercel crons (collect, report) + four GH Actions crons (company-insights, editorial, gemini-cost-alarm, embeddings-backfill).** Hard cap: never more than two Vercel crons. Most GH Actions crons `curl` back into the deployed app with `Bearer ${CRON_SECRET}`; the editorial and embeddings-backfill crons run their script directly in the runner.
 
 - Vercel daily 6 AM UTC: `/api/cron/collect` — collects jobs and triggers analysis.
 - Vercel weekly Mon 5 AM UTC: `/api/cron/report` — generates the weekly digest.
 - GitHub Actions weekly Mon 9 AM UTC: `company-insights-cron.yml` — scheduled company-insight regeneration.
 - GitHub Actions weekly Mon 11 AM UTC: `editorial-cron.yml` — runs `web/scripts/regenerate-editorial.ts` against stale companies (`companies.thesis / interpretation / bets`) and refreshes cross-company theme labels.
 - GitHub Actions daily 14:00 UTC: `gemini-cost-alarm.yml` — sums last 24h `gemini_usage_events.estimated_usd` and fires `Sentry.captureMessage` over threshold.
+- GitHub Actions daily 07:30 UTC: `embeddings-backfill-cron.yml` — runs `web/scripts/backfill-job-embeddings.ts` to (re-)embed job rows with a null/stale `embedding` for Jobs semantic search. Decoupled from the ingest hot path on purpose.
 
 Heavy browser scraping is offloaded to GitHub Actions on demand via `triggerScrapeWorkflow` in `web/lib/github.ts` (`scrape-heavy.yml`). Full topology, secrets, and decision tree in [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md).
 
@@ -71,7 +72,8 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 
 - **Always use floating `-latest` aliases.** Never pin a versioned or preview model ID. The comparison harness (`web/scripts/gemini-compare.ts`) and `gemini_usage_events` telemetry are how we catch a bad alias rotation.
 - **Approved models:** `gemini-pro-latest` (grounded analysis), `gemini-flash-latest` (default), `gemini-flash-lite-latest` (high-volume low-stakes only, gated by ≥95% L1 field agreement in the harness report).
-- **All model strings resolve through `AI_MODEL_OPTIONS` in `web/lib/ai/prompt-config.ts`.** No hardcoded strings elsewhere.
+- **Embeddings are the one pinned exception.** Google publishes no `-latest` alias for embedding models, so Jobs semantic search pins `gemini-embedding-001` (768d) via `EMBEDDING_MODEL` / `EMBEDDING_DIMS` in `prompt-config.ts` — still the single source of truth, just not a floating alias. Every embedded row stamps `embedding_model` + `embedding_dims`; changing the model REQUIRES a re-embed (the backfill detects the mismatch). Comparing vectors across models is silently wrong.
+- **All model strings resolve through `AI_MODEL_OPTIONS` (and `EMBEDDING_MODEL`) in `web/lib/ai/prompt-config.ts`.** No hardcoded strings elsewhere.
 - **Every Gemini call writes to `gemini_usage_events`** via `writeUsageEvent` from `@/lib/ai/gemini-telemetry` (build the record with `recordUsage` from `@/lib/ai/gemini-meter`). Fire-and-forget; errors are swallowed.
 - **PRs touching `web/lib/ai/**` or `web/lib/analysis/**` MUST run `gemini-compare.ts`** and attach the markdown report; commit JSON artifacts under `web/scripts/artifacts/`.
 - **Don't stack grounded calls.** Before adding a new `googleSearch` call, check whether an upstream call already grounds.

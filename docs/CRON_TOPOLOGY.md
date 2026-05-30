@@ -1,10 +1,10 @@
 # Cron Topology
 
-Five scheduled jobs run in production. Two live on Vercel (Hobby plan caps at 2),
-three run from GitHub Actions. Most GH Actions cron jobs `curl` back into the
-deployed Next.js app; the editorial cron is the exception — it runs the
-regenerate script directly inside the runner because GH Actions has the
-runtime budget for the Pro calls.
+Six scheduled jobs run in production. Two live on Vercel (Hobby plan caps at 2),
+four run from GitHub Actions. Most GH Actions cron jobs `curl` back into the
+deployed Next.js app; the editorial and embeddings-backfill crons are the
+exceptions — they run a script directly inside the runner because GH Actions
+has the runtime budget for the long-running Gemini work.
 
 ## Jobs
 
@@ -15,10 +15,16 @@ runtime budget for the Pro calls.
 | company-insights   | GitHub Actions | `0 9 * * 1`    | `GET /api/cron/company-insights`                      | Workflow sends `Bearer CRON_SECRET`   |
 | editorial          | GitHub Actions | `0 11 * * 1`   | `npx tsx web/scripts/regenerate-editorial.ts`         | Service-role + Gemini secrets in repo |
 | gemini-cost-alarm  | GitHub Actions | `0 14 * * *`   | `GET /api/admin/cost-alarm`                           | Workflow sends `Bearer CRON_SECRET`   |
+| embeddings-backfill| GitHub Actions | `30 7 * * *`   | `npx tsx web/scripts/backfill-job-embeddings.ts`      | Service-role + Gemini secrets in repo |
 
 Source of truth:
 - Vercel: [`web/vercel.json`](../web/vercel.json) `crons` array.
-- GitHub Actions: [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml), [`.github/workflows/editorial-cron.yml`](../.github/workflows/editorial-cron.yml), [`.github/workflows/gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml).
+- GitHub Actions: [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml), [`.github/workflows/editorial-cron.yml`](../.github/workflows/editorial-cron.yml), [`.github/workflows/gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml), [`.github/workflows/embeddings-backfill-cron.yml`](../.github/workflows/embeddings-backfill-cron.yml).
+
+The embeddings-backfill cron sweeps job rows whose `embedding` is null or was
+produced by a stale model and (re-)embeds them for Jobs semantic search. It is
+idempotent and decoupled from the ingest hot path on purpose — an embedding-API
+outage must never stall job ingestion. Same script/secret pattern as editorial.
 
 The `report` job also generates one company insight per run as a side effect.
 The GH Actions `company-insights` workflow loops one-company-per-HTTP-request
