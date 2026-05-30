@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.6.0",
+    "date": "2026-05-29",
+    "changes": [
+      { "type": "feature", "description": "Jobs search now reads the full job description, not just the title — and understands a simple query syntax. Plain words match every term as you type (`staff engineer`); wrap words in quotes for an exact phrase (`\"staff engineer\"`); prefix a word with a minus to exclude it (`engineer -contract`). A new “?” next to the search box explains the syntax. Matching runs across the whole active corpus (not just the 500 most-recent), with a notice when a search tops 1,000 results. Powered by Postgres full-text search (a GIN-indexed `tsvector`), so results stay fast as we add companies." }
+    ]
+  },
+  {
     "version": "2.5.2",
     "date": "2026-05-28",
     "changes": [

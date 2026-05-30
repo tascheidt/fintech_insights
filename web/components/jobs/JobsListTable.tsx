@@ -8,8 +8,11 @@
  *    | Location (city + Hybrid/Remote tag) | Posted (mono right) | chevron]
  * The row is the link target — navigates to /jobs/[id].
  *
- * Sorting / filtering / search are local state. Row data is precomputed
- * on the server in `getJobsListData`.
+ * Sorting and the remaining filters (company / function / recency / theme)
+ * are local state. The free-text search is server-side: `getJobsListData`
+ * pushes the `?q=` term into Postgres full-text search over the `search_tsv`
+ * column (title + location + description body). Row data here is already the
+ * filtered set; this component does not re-search.
  */
 
 import * as React from "react";

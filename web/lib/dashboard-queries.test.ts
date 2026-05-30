@@ -174,8 +174,95 @@ describe("getJobsListData tier filter (Phase 2 Step 1 — leak G4)", () => {
 
   it("short-circuits an empty jobIds snapshot without issuing a query", async () => {
     const result = await getJobsListData({ jobIds: [] });
-    expect(result).toEqual([]);
+    expect(result).toEqual({ rows: [], truncated: false });
     expect(tierFilterArgs("job_postings")).toEqual([]);
+  });
+});
+
+describe("getJobsListData full-text search (description match)", () => {
+  function textSearchCalls(table: string): unknown[][] {
+    const log = callLogs[table] ?? [];
+    return log.filter((c) => c.method === "textSearch").map((c) => c.args as unknown[]);
+  }
+  function limitCalls(table: string): number[] {
+    const log = callLogs[table] ?? [];
+    return log.filter((c) => c.method === "limit").map((c) => c.args[0] as number);
+  }
+
+  it("issues no full-text search when searchQuery is null", async () => {
+    await getJobsListData({ searchQuery: null });
+    expect(textSearchCalls("job_postings")).toEqual([]);
+    expect(limitCalls("job_postings")).toEqual([500]);
+  });
+
+  it("issues no full-text search for whitespace-only searchQuery", async () => {
+    await getJobsListData({ searchQuery: "   " });
+    expect(textSearchCalls("job_postings")).toEqual([]);
+    expect(limitCalls("job_postings")).toEqual([500]);
+  });
+
+  // Convenience: the tsquery string passed to the single textSearch call.
+  async function tsqueryFor(q: string): Promise<string> {
+    for (const key of Object.keys(callLogs)) delete callLogs[key];
+    await getJobsListData({ searchQuery: q });
+    const calls = textSearchCalls("job_postings");
+    return calls.length ? (calls[0][1] as string) : "";
+  }
+
+  it("bare words AND-match as prefixes (type-ahead) and lift the cap to 1000", async () => {
+    await getJobsListData({ searchQuery: "staff engineer" });
+    const calls = textSearchCalls("job_postings");
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toBe("search_tsv");
+    expect(calls[0][1]).toBe("staff:* & engineer:*");
+    expect(calls[0][2]).toEqual({ config: "english" });
+    expect(limitCalls("job_postings")).toEqual([1000]);
+  });
+
+  it("supports short terms — tsvector prefix has no 3-char floor", async () => {
+    expect(await tsqueryFor("ai")).toBe("ai:*");
+  });
+
+  it("a closed quoted phrase becomes an exact adjacency match (no prefix)", async () => {
+    expect(await tsqueryFor('"staff engineer"')).toBe("(staff <-> engineer)");
+  });
+
+  it("a single quoted word matches exactly (no prefix marker)", async () => {
+    expect(await tsqueryFor('"engineer"')).toBe("engineer");
+  });
+
+  it("an unterminated quote (mid-type) keeps the last word as a prefix", async () => {
+    expect(await tsqueryFor('"staff eng')).toBe("(staff <-> eng:*)");
+  });
+
+  it("a leading - excludes a term", async () => {
+    expect(await tsqueryFor("engineer -contract")).toBe("engineer:* & !contract:*");
+  });
+
+  it("excludes a quoted phrase", async () => {
+    expect(await tsqueryFor('-"data entry"')).toBe("!(data <-> entry)");
+  });
+
+  it("combines phrase, prefix words and exclusion", async () => {
+    expect(await tsqueryFor('python "machine learning" -senior')).toBe(
+      "python:* & (machine <-> learning) & !senior:*"
+    );
+  });
+
+  it("a hyphenated bare token expands to AND-ed prefix words", async () => {
+    expect(await tsqueryFor("full-stack")).toBe("full:* & stack:*");
+  });
+
+  it("strips tsquery-operator characters so users cannot inject syntax", async () => {
+    // Colons, ampersands, pipes, parens, stars, backslashes outside a quoted
+    // run never survive — only sanitized alnum lexemes plus the operators we
+    // emit ourselves remain.
+    expect(await tsqueryFor("foo, bar; baz) &|:*\\")).toBe("foo:* & bar:* & baz:*");
+  });
+
+  it("returns the {rows, truncated} shape with truncated=false on empty data", async () => {
+    const result = await getJobsListData({ searchQuery: "engineer" });
+    expect(result).toEqual({ rows: [], truncated: false });
   });
 });
 

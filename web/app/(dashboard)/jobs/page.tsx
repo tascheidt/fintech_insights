@@ -150,14 +150,21 @@ export default async function JobsPage({
     digestJobIds = Array.from(ids);
   }
 
+  const initialQ = (params.q ?? "").trim();
+
   // The jobs list honors the `?tier=` toggle. The right rail (function heat /
   // cross-company themes) deliberately stays fintech-only regardless of the
   // toggle — those are fintech-pivot surfaces, not tier-scoped.
-  const [rows, heat, themes] = await Promise.all([
-    getJobsListData({ jobIds: digestJobIds, tiers }),
+  const [jobsResult, heat, themes] = await Promise.all([
+    getJobsListData({
+      jobIds: digestJobIds,
+      tiers,
+      searchQuery: initialQ || null,
+    }),
     getFunctionHeatData(30),
     getCrossCompanyThemes(),
   ]);
+  const { rows, truncated } = jobsResult;
 
   // Apply server-side date bounds (digest deep-link only). The interactive
   // "recency" filter lives on the client and overlays this baseline.
@@ -210,7 +217,6 @@ export default async function JobsPage({
     params.function && Object.keys(CATEGORY_GROUPS).includes(params.function)
       ? params.function
       : "all";
-  const initialQ = (params.q ?? "").trim();
   const initialRecency = parseRecency(params.recency, params.time, params.date);
 
   // Total companies covered (for the sub-headline copy).
@@ -243,6 +249,7 @@ export default async function JobsPage({
       newCount={newCount}
       companyCount={companyCount ?? companies.length}
       tierFilter={tierFilter}
+      searchTruncated={truncated}
     />
   );
 }
