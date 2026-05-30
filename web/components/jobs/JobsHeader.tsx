@@ -365,7 +365,11 @@ export function JobsHeader({
         {/* Search-mode toggle. Keyword = lexical full-text (matches as you
             type). Semantic = vector similarity ("find roles like this"),
             embedded on submit. */}
-        <div className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]">
+        <div
+          role="group"
+          aria-label="Search mode"
+          className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]"
+        >
           {([
             ["keyword", "Keyword"],
             ["semantic", "Semantic"],
@@ -375,6 +379,7 @@ export function JobsHeader({
               <button
                 key={k}
                 type="button"
+                aria-pressed={active}
                 onClick={() => onModeChange(k)}
                 className={cn(
                   "rounded px-2.5 py-1.5 text-[11.5px] font-medium transition-colors",

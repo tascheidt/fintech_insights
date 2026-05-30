@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.7.2",
+    "date": "2026-05-30",
+    "changes": [
+      { "type": "improvement", "description": "Jobs search polish: the Keyword / Semantic mode toggle now announces its pressed state to screen readers, the “?” syntax help is wired as a proper labelled disclosure, and the “new” posting pill uses the standard mono label type instead of the editorial display face — bringing it in line with the design system." }
+    ]
+  },
+  {
     "version": "2.7.1",
     "date": "2026-05-30",
     "changes": [

@@ -300,7 +300,7 @@ export function JobsListTable({ rows, relevanceOrder = false }: JobsListTablePro
                 </span>
                 {isNew && (
                   <span
-                    className="inline-flex shrink-0 items-center rounded-[4px] bg-sunset-100 font-display uppercase text-sunset-800"
+                    className="inline-flex shrink-0 items-center rounded-[4px] bg-sunset-100 font-mono uppercase text-sunset-800"
                     style={{
                       fontSize: 10,
                       padding: "3px 6px",
