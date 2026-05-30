@@ -13,13 +13,54 @@ import { createHash } from "crypto";
 import { log } from "@/lib/log";
 
 /**
- * SHA-1 hex digest of a job description. Used as a cheap content fingerprint
- * so the ingestion pipeline can skip `extractAndUpdateStructure` when a
- * scraped description matches what we already stored. Matches the SQL
- * `encode(digest(description_text, 'sha1'), 'hex')` used by the backfill
- * migration so hashes produced here and in-database are interchangeable.
+ * Normalize a job description before fingerprinting so the change-detection
+ * hash flips on substance, not on volatile boilerplate. Incumbent ATS pages
+ * (Workday / Phenom) re-render with churning posting dates, applicant counts,
+ * requisition IDs and whitespace that flipped a raw SHA-1 on every scrape and
+ * forced a needless Gemini re-extraction — ~88% of daily extractions in the
+ * 2026-05 cost audit. Pure + deterministic. Only the *hash input* is
+ * normalized; the raw `description_text` is still stored and fed to extraction
+ * unchanged, so extracted field quality is unaffected.
+ */
+export function normalizeDescriptionForHash(description: string): string {
+  return description
+    .toLowerCase()
+    // Posting dates: "posted 3 days ago", "posted today", "updated yesterday",
+    // "posted on 2026-05-21", and bare ISO dates.
+    .replace(/(?:posted|updated)(?:\s+on)?\s+(?:[0-9]+\+?\s+days?\s+ago|today|yesterday)/g, " ")
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
+    // Applicant counters: "27 applicants", "over 200 applicants", "be an early applicant".
+    .replace(/(?:over\s+)?[0-9,]+\+?\s+applicants?/g, " ")
+    .replace(/be an early applicant/g, " ")
+    // Requisition / job IDs: "R-12345", "JR0012345", "req id: 558231", "requisition #4471".
+    .replace(/\b(?:r-|jr-?|req(?:uisition)?[\s#:]*(?:id|no\.?)?[\s#:]*)[0-9]{3,}\b/g, " ")
+    // URL tracking params that re-roll per render.
+    .replace(/[?&](?:utm_[a-z]+|gh_src|src|ref|trackid)=[^\s&]*/g, " ")
+    // Collapse whitespace last so the removals above don't leave ragged gaps.
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Normalized SHA-1 content fingerprint for the `description_hash` gate: it
+ * changes only when the substance of a description changes (see
+ * `normalizeDescriptionForHash`), so unchanged postings skip the Gemini
+ * extraction call. Legacy rows hold a RAW (un-normalized) SHA-1 from the
+ * earlier gate / SQL backfill; the gate bridges them on the next scrape via
+ * `rawDescriptionHash` without re-extracting, so no migration or re-extraction
+ * sweep is needed.
  */
 function hashDescription(description: string): string {
+  return createHash("sha1").update(normalizeDescriptionForHash(description)).digest("hex");
+}
+
+/**
+ * Raw (un-normalized) SHA-1 — the pre-normalization fingerprint. Used only to
+ * recognize a legacy stored hash during the one-time transition to normalized
+ * fingerprints: if the current text is byte-identical to what produced the
+ * stored hash, its raw digest still matches and we treat the row as unchanged.
+ */
+function rawDescriptionHash(description: string): string {
   return createHash("sha1").update(description).digest("hex");
 }
 
@@ -317,15 +358,25 @@ export async function runIngestStage(
       };
 
       const existingEntry = existingByCompany.get(targetCompanyId)?.get(job.external_id);
-      // Content fingerprint for the description_hash gate (Phase 2). A null
+      // Normalized content fingerprint for the description_hash gate. A null
       // stored hash is treated as "changed" so the first scrape after deploy
-      // still populates everything, matching the intent of the SQL backfill.
+      // still populates everything. `rawHash` is the pre-normalization digest,
+      // used only as the legacy-row transition bridge below.
       const newDescriptionHash = row.description_text ? hashDescription(row.description_text) : null;
+      const rawHash = row.description_text ? rawDescriptionHash(row.description_text) : null;
 
       if (existingEntry) {
         const existingId = existingEntry.id;
+        // Skip extraction unless the *normalized* content changed. The third
+        // clause is the one-time transition bridge: a legacy row stores a RAW
+        // SHA-1, so when the current text is byte-identical to what we last
+        // saw, its raw digest still matches the stored value — treat that as
+        // unchanged and let the write below migrate the row to the normalized
+        // hash. No re-extraction sweep, no SQL/TS-parity migration needed.
         const descriptionChanged =
-          newDescriptionHash !== null && newDescriptionHash !== existingEntry.descriptionHash;
+          newDescriptionHash !== null &&
+          newDescriptionHash !== existingEntry.descriptionHash &&
+          rawHash !== existingEntry.descriptionHash;
         // Update existing job
         // Note: location will be updated by extractAndUpdateStructure with validated/AI-extracted value
         // For now, validate scraper location and set to null if invalid (will be replaced by AI extraction)

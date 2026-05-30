@@ -77,15 +77,24 @@ interface ExtractJobStructureOptions {
   retryCount?: number;
   /** Optional observer for token/cost usage. Production default is undefined (no-op). */
   onUsage?: OnUsage;
+  /**
+   * Disable Gemini 2.5 reasoning ("thinking") tokens for this extraction.
+   * Defaults to true — silver-layer extraction is a mechanical JSON task, so
+   * reasoning tokens (~75% of per-call cost, billed at the output rate) are pure
+   * waste. Flipped to false only by the internal one-shot degrade when the active
+   * model alias rejects `thinkingBudget: 0`.
+   */
+  disableThinking?: boolean;
 }
 
 function resolveExtractOptions(
   options?: number | ExtractJobStructureOptions
-): { config: JobStructureAiConfig; retryCount: number; onUsage?: OnUsage } {
+): { config: JobStructureAiConfig; retryCount: number; onUsage?: OnUsage; disableThinking: boolean } {
   if (typeof options === "number") {
     return {
       config: DEFAULT_JOB_STRUCTURE_AI_CONFIG,
       retryCount: options,
+      disableThinking: true,
     };
   }
 
@@ -93,6 +102,7 @@ function resolveExtractOptions(
     config: options?.config ?? DEFAULT_JOB_STRUCTURE_AI_CONFIG,
     retryCount: options?.retryCount ?? 0,
     onUsage: options?.onUsage,
+    disableThinking: options?.disableThinking ?? true,
   };
 }
 
@@ -127,7 +137,7 @@ export async function extractJobStructure(
   rawDepartment?: string | null,
   options?: number | ExtractJobStructureOptions
 ): Promise<JobStructureForDB | null> {
-  const { config, retryCount, onUsage } = resolveExtractOptions(options);
+  const { config, retryCount, onUsage, disableThinking } = resolveExtractOptions(options);
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     log.error("GEMINI_API_KEY not configured");
@@ -151,15 +161,27 @@ export async function extractJobStructure(
     const genAI = new GoogleGenerativeAI(key);
 
     // Use Gemini Flash with JSON mode for guaranteed structured output
+    const generationConfig: NonNullable<
+      Parameters<typeof genAI.getGenerativeModel>[0]["generationConfig"]
+    > = {
+      temperature: config.temperature,
+      // Stage 1 should return a compact JSON payload. Cap output size to reduce
+      // malformed/truncated responses even if the saved runtime config is overly generous.
+      maxOutputTokens: effectiveMaxOutputTokens,
+      responseMimeType: "application/json",
+    };
+    // thinkingBudget:0 disables Gemini 2.5 reasoning tokens. Extraction is a
+    // mechanical JSON task; reasoning was ~75% of per-call cost (billed at the
+    // output rate) for zero quality gain. The field is runtime-supported but
+    // missing from @google/generative-ai@0.24.1's GenerationConfig type, so we
+    // attach it past the typing gap (same approach as lib/ai/embeddings.ts).
+    if (disableThinking) {
+      (generationConfig as Record<string, unknown>).thinkingConfig = { thinkingBudget: 0 };
+    }
+
     const model = genAI.getGenerativeModel({
       model: config.model,
-      generationConfig: {
-        temperature: config.temperature,
-        // Stage 1 should return a compact JSON payload. Cap output size to reduce
-        // malformed/truncated responses even if the saved runtime config is overly generous.
-        maxOutputTokens: effectiveMaxOutputTokens,
-        responseMimeType: "application/json",
-      },
+      generationConfig,
     });
 
     const _startMs = Date.now();
@@ -370,7 +392,32 @@ export async function extractJobStructure(
 
     // Handle other errors (API errors, etc.)
     log.error({ err: error }, `Job structure extraction error for "${jobTitle}":`);
-    
+
+    // One-shot degrade: if the active model alias rejects `thinkingBudget: 0`
+    // (e.g. a future floating-alias rotation to a thinking-only variant), retry
+    // once WITHOUT the thinking override. Independent of the transient retry
+    // budget below, so the blast radius is one paid-thoughts call instead of
+    // returning null for every job until someone notices.
+    if (disableThinking && error instanceof Error) {
+      const m = error.message.toLowerCase();
+      if (
+        m.includes("thinking") ||
+        m.includes("budget") ||
+        m.includes("invalid_argument") ||
+        m.includes("invalid argument")
+      ) {
+        log.warn(
+          `thinkingBudget:0 rejected for "${jobTitle}" — retrying once without it. Error: ${error.message}`
+        );
+        return extractJobStructure(jobTitle, description, rawDepartment, {
+          config,
+          retryCount,
+          onUsage,
+          disableThinking: false,
+        });
+      }
+    }
+
     // Retry logic for API errors (rate limits, network issues, etc.)
     if (retryCount < 2 && error instanceof Error) {
       const errorMessage = error.message.toLowerCase();

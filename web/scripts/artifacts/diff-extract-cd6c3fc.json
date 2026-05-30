@@ -1,0 +1,600 @@
+{
+  "baseline": {
+    "path": "scripts/artifacts/baseline-extract-structure-cd6c3fc.json",
+    "model": "gemini-flash-latest",
+    "totals": {
+      "calls": 24,
+      "inputTokens": 55700,
+      "outputTokens": 6083,
+      "cachedTokens": 0,
+      "totalTokens": 61783,
+      "estimatedUsd": 0.031918,
+      "avgLatencyMs": 1839
+    },
+    "processedCount": 24
+  },
+  "candidate": {
+    "path": "scripts/artifacts/baseline-extract-structure-gemini-flash-lite-latest-cd6c3fc.json",
+    "model": "gemini-flash-lite-latest",
+    "totals": {
+      "calls": 24,
+      "inputTokens": 55700,
+      "outputTokens": 5880,
+      "cachedTokens": 0,
+      "totalTokens": 61580,
+      "estimatedUsd": 0.007922,
+      "avgLatencyMs": 1415
+    },
+    "processedCount": 24
+  },
+  "commonJobs": 24,
+  "stats": {
+    "function_category": {
+      "match": 20,
+      "total": 24
+    },
+    "seniority_level": {
+      "match": 23,
+      "total": 24
+    },
+    "standardized_department": {
+      "match": 23,
+      "total": 24
+    },
+    "tech_stack_jaccard_sum": 21.19029793735676,
+    "tech_stack_pairs": 24,
+    "keywords_jaccard_sum": 10.17556731624069,
+    "keywords_pairs": 24
+  },
+  "partial": {
+    "baselineNullOutputs": 0,
+    "candidateNullOutputs": 0,
+    "baselineRetries": 0,
+    "candidateRetries": 0,
+    "baselineMissingCategory": 0,
+    "candidateMissingCategory": 0
+  },
+  "cost": {
+    "deltaUsd": -0.023996,
+    "percentChange": -75.18
+  },
+  "latency": {
+    "deltaMs": -424,
+    "percentChange": -23.1
+  },
+  "acceptance": {
+    "l1AgreementGte95": false,
+    "partialExtractionNotWorse": true,
+    "overall": false
+  },
+  "perJobDiffs": [
+    {
+      "jobId": "645839c0-151d-4404-8d8f-940ea48f368a",
+      "title": "ServiceNow Engineer",
+      "companySlug": "eq-bank",
+      "function_category": {
+        "baseline": "it-internal-systems",
+        "candidate": "engineering-platform-sre-devops",
+        "match": false
+      },
+      "seniority_level": {
+        "baseline": "mid",
+        "candidate": "mid",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Engineering",
+        "candidate": "Engineering",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.19
+    },
+    {
+      "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d",
+      "title": "Senior Estates and Trust Coordinator",
+      "companySlug": "eq-bank",
+      "function_category": {
+        "baseline": "business-operations",
+        "candidate": "customer-operations",
+        "match": false
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Operations",
+        "candidate": "Operations",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.6
+    },
+    {
+      "jobId": "9af5a8d4-c15e-490c-b2a6-6f34d804e1b9",
+      "title": "Senior Backend Engineer (CARE Pod)",
+      "companySlug": "eq-bank",
+      "function_category": {
+        "baseline": "engineering-backend",
+        "candidate": "engineering-backend",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Engineering",
+        "candidate": "Engineering",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.28
+    },
+    {
+      "jobId": "5add9237-0247-4579-ba5f-38199b5dad8c",
+      "title": "Senior People Partner",
+      "companySlug": "koho",
+      "function_category": {
+        "baseline": "people-ops-hr",
+        "candidate": "people-ops-hr",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "HR",
+        "candidate": "HR",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.29
+    },
+    {
+      "jobId": "a67a3e67-354b-40dc-abfc-c10b6318bfe5",
+      "title": "Senior Manager, Financial Risk",
+      "companySlug": "koho",
+      "function_category": {
+        "baseline": "risk-management",
+        "candidate": "risk-management",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Finance",
+        "candidate": "Finance",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.44
+    },
+    {
+      "jobId": "e64cce30-4b02-42c6-83a3-a22cc989f667",
+      "title": "Director, Financial Risk",
+      "companySlug": "koho",
+      "function_category": {
+        "baseline": "risk-management",
+        "candidate": "risk-management",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "executive",
+        "candidate": "executive",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Finance",
+        "candidate": "Finance",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.5
+    },
+    {
+      "jobId": "025a033e-94e6-4dd5-97c2-d800ce743bb8",
+      "title": "Banking Advisor",
+      "companySlug": "bnc",
+      "function_category": {
+        "baseline": "sales-account-executives",
+        "candidate": "account-management-customer-success",
+        "match": false
+      },
+      "seniority_level": {
+        "baseline": "mid",
+        "candidate": "mid",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Sales",
+        "candidate": "Sales",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.47
+    },
+    {
+      "jobId": "763200a2-89d6-4a37-83e8-eaa028abf273",
+      "title": "Banking Advisor Jobs for Indigenous People",
+      "companySlug": "bnc",
+      "function_category": {
+        "baseline": "customer-support-cx",
+        "candidate": "customer-support-cx",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "junior",
+        "candidate": "junior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Support",
+        "candidate": "Customer Success",
+        "match": false
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.57
+    },
+    {
+      "jobId": "0dd79afa-9afa-47cd-90fb-fc0fc2c6a665",
+      "title": "Banking Advisor",
+      "companySlug": "bnc",
+      "function_category": {
+        "baseline": "customer-support-cx",
+        "candidate": "customer-support",
+        "match": false
+      },
+      "seniority_level": {
+        "baseline": "junior",
+        "candidate": "junior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Support",
+        "candidate": "Support",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.5
+    },
+    {
+      "jobId": "9a297c56-b3ba-47fa-9393-01a4f3b1d951",
+      "title": "Sales Representative - Southgate Mall",
+      "companySlug": "neo-financial",
+      "function_category": {
+        "baseline": "sales-account-executives",
+        "candidate": "sales-account-executives",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "junior",
+        "candidate": "junior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Sales",
+        "candidate": "Sales",
+        "match": true
+      },
+      "tech_stack_jaccard": 0,
+      "keywords_jaccard": 0.27
+    },
+    {
+      "jobId": "96a9b880-5540-42a4-b7ec-388280623af6",
+      "title": "Director, Marketing Analytics",
+      "companySlug": "neo-financial",
+      "function_category": {
+        "baseline": "marketing-growth-performance",
+        "candidate": "marketing-growth-performance",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "executive",
+        "candidate": "senior",
+        "match": false
+      },
+      "standardized_department": {
+        "baseline": "Marketing",
+        "candidate": "Marketing",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.55
+    },
+    {
+      "jobId": "eb3e9b33-7ca4-4ed7-9b6d-3e46494280d0",
+      "title": " Représentant des ventes - Laval ",
+      "companySlug": "neo-financial",
+      "function_category": {
+        "baseline": "sales-account-executives",
+        "candidate": "sales-account-executives",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "junior",
+        "candidate": "junior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Sales",
+        "candidate": "Sales",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.56
+    },
+    {
+      "jobId": "492f71bc-ab2d-447e-a076-5affe0038756",
+      "title": "Third Party Risk and Vendor Management Officer",
+      "companySlug": "questrade",
+      "function_category": {
+        "baseline": "risk-management",
+        "candidate": "risk-management",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "mid",
+        "candidate": "mid",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Operations",
+        "candidate": "Operations",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.43
+    },
+    {
+      "jobId": "afb62032-c97d-492f-a9f2-fbbcd65dc103",
+      "title": "Analyst, Mutual Fund, Security Master and Physical Securities (Contract)",
+      "companySlug": "questrade",
+      "function_category": {
+        "baseline": "customer-operations",
+        "candidate": "customer-operations",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "mid",
+        "candidate": "mid",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Operations",
+        "candidate": "Operations",
+        "match": true
+      },
+      "tech_stack_jaccard": 0.4,
+      "keywords_jaccard": 0.42
+    },
+    {
+      "jobId": "7ddca5ee-2708-4120-a8b9-fa703115d899",
+      "title": "Head of Marketing - Questbank",
+      "companySlug": "questrade",
+      "function_category": {
+        "baseline": "marketing-product-brand",
+        "candidate": "marketing-product-brand",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "executive",
+        "candidate": "executive",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Marketing",
+        "candidate": "Marketing",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.2
+    },
+    {
+      "jobId": "70658554-12d3-4e79-884d-b98cec3fa40a",
+      "title": "Clearing & Custody Wealth Management Banker",
+      "companySlug": "rbc",
+      "function_category": {
+        "baseline": "business-development-partnerships",
+        "candidate": "business-development-partnerships",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Sales",
+        "candidate": "Sales",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.35
+    },
+    {
+      "jobId": "f6357a87-6877-4a5e-8371-4a95d507693c",
+      "title": "Senior Network Analyst",
+      "companySlug": "rbc",
+      "function_category": {
+        "baseline": "engineering-platform-sre-devops",
+        "candidate": "engineering-platform-sre-devops",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Engineering",
+        "candidate": "Engineering",
+        "match": true
+      },
+      "tech_stack_jaccard": 0.71,
+      "keywords_jaccard": 0.39
+    },
+    {
+      "jobId": "2c0ddecd-ae50-4e65-8a43-6e2c585416e3",
+      "title": "2026 CFO, Data Governance Summer Analyst (4 Months)",
+      "companySlug": "rbc",
+      "function_category": {
+        "baseline": "data-analytics-bi",
+        "candidate": "data-analytics-bi",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "intern",
+        "candidate": "intern",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Finance",
+        "candidate": "Finance",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.58
+    },
+    {
+      "jobId": "4a410d00-c43c-49c8-95b1-407cdfad1cee",
+      "title": "Senior Manager, External Communications &amp; Community Investment - 18-month contract - Tangerine",
+      "companySlug": "tangerine",
+      "function_category": {
+        "baseline": "marketing-product-brand",
+        "candidate": "marketing-product-brand",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Marketing",
+        "candidate": "Marketing",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.57
+    },
+    {
+      "jobId": "ecdfc114-788a-45ca-a90e-3b1631c33fb4",
+      "title": "Senior Database Administrator",
+      "companySlug": "tangerine",
+      "function_category": {
+        "baseline": "engineering-platform-sre-devops",
+        "candidate": "engineering-platform-sre-devops",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Engineering",
+        "candidate": "Engineering",
+        "match": true
+      },
+      "tech_stack_jaccard": 0.73,
+      "keywords_jaccard": 0.35
+    },
+    {
+      "jobId": "6a5cba55-4879-4046-b5e8-4bc97d73e198",
+      "title": "Sr DevOps Specialist, Tools and Administration - Tangerine",
+      "companySlug": "tangerine",
+      "function_category": {
+        "baseline": "engineering-platform-sre-devops",
+        "candidate": "engineering-platform-sre-devops",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Engineering",
+        "candidate": "Engineering",
+        "match": true
+      },
+      "tech_stack_jaccard": 0.67,
+      "keywords_jaccard": 0.47
+    },
+    {
+      "jobId": "a9ad7dc0-9fe1-483e-bb62-712bc980ca5c",
+      "title": "Specialist, Derivatives Risk Remediation",
+      "companySlug": "wealthsimple",
+      "function_category": {
+        "baseline": "risk-management",
+        "candidate": "risk-management",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "mid",
+        "candidate": "mid",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Operations",
+        "candidate": "Operations",
+        "match": true
+      },
+      "tech_stack_jaccard": 0.86,
+      "keywords_jaccard": 0.22
+    },
+    {
+      "jobId": "c1f15941-82a8-426c-933a-d2c7c42f2d9b",
+      "title": "Senior Analyst, Quantitative Research",
+      "companySlug": "wealthsimple",
+      "function_category": {
+        "baseline": "data-science",
+        "candidate": "data-science",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Product",
+        "candidate": "Product",
+        "match": true
+      },
+      "tech_stack_jaccard": 1,
+      "keywords_jaccard": 0.57
+    },
+    {
+      "jobId": "286a62b4-5991-4eb8-897d-819faae319e2",
+      "title": "Senior Software Developer, Ledger",
+      "companySlug": "wealthsimple",
+      "function_category": {
+        "baseline": "engineering-backend",
+        "candidate": "engineering-backend",
+        "match": true
+      },
+      "seniority_level": {
+        "baseline": "senior",
+        "candidate": "senior",
+        "match": true
+      },
+      "standardized_department": {
+        "baseline": "Engineering",
+        "candidate": "Engineering",
+        "match": true
+      },
+      "tech_stack_jaccard": 0.83,
+      "keywords_jaccard": 0.41
+    }
+  ]
+}

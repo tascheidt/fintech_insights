@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.9.0",
+    "date": "2026-05-30",
+    "changes": [
+      { "type": "improvement", "description": "Lower-cost, fresher job analysis. The AI extraction step that structures each posting no longer spends unnecessary reasoning tokens (a mechanical task that didn't need them), cutting its per-job cost ~70% with no change to the fields you see. Ingestion also stops re-analyzing postings whose content hasn't meaningfully changed — it now ignores volatile boilerplate like posting dates, applicant counts and requisition IDs when deciding whether a description actually changed." },
+      { "type": "fix", "description": "The daily AI-spend alarm is no longer blind to the spikes that matter. It now trips on grounded-search volume and token throughput in addition to the estimated dollar amount, so an unusual cost day pages us even when the dollar estimate under-counts it." }
+    ]
+  },
+  {
     "version": "2.8.0",
     "date": "2026-05-30",
     "changes": [

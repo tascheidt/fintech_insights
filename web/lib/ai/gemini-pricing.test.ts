@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { estimateUsd, GROUNDING_PER_REQUEST_USD } from "./gemini-pricing";
+import { estimateUsd, GROUNDING_PER_REQUEST_USD, GROUNDING_CALIBRATION } from "./gemini-pricing";
 
 describe("estimateUsd — thinking tokens (Gemini 2.5)", () => {
   it("bills thinking tokens at the output rate for Pro", () => {
@@ -57,5 +57,17 @@ describe("estimateUsd — thinking tokens (Gemini 2.5)", () => {
       groundingEnabled: true,
     });
     expect(usd).toBe(0);
+  });
+
+  it("grounding calibration defaults to a no-op (=1) so existing estimates are unchanged", () => {
+    // If this fails, someone changed the active multiplier without updating the
+    // assertions above — make that deliberate, not accidental.
+    expect(GROUNDING_CALIBRATION).toBe(1);
+    const usd = estimateUsd("gemini-pro-latest", {
+      inputTokens: 0,
+      outputTokens: 0,
+      groundingEnabled: true,
+    });
+    expect(usd).toBeCloseTo(GROUNDING_PER_REQUEST_USD * GROUNDING_CALIBRATION, 6);
   });
 });

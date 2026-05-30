@@ -21,7 +21,8 @@ If your call is wrapped by an existing helper that already meters, do not meter 
 
 ## Pricing & cost math
 
-- **`gemini-pricing.ts`** — Per-model token pricing used by the meter and the comparison harness. Update when Google's price list changes. **`estimateUsd` bills reasoning tokens at the output rate** — don't add a separate "thoughts" price column unless Google starts charging differently.
+- **`gemini-pricing.ts`** — Per-model token pricing used by the meter and the comparison harness. Update when Google's price list changes. **`estimateUsd` bills reasoning tokens at the output rate** — don't add a separate "thoughts" price column unless Google starts charging differently. `GROUNDING_CALIBRATION` (default 1, no-op) scales the grounded portion to reconcile against the GCP invoice (telemetry under-counts grounding ~2.7x); set it from a SKU export. See [`docs/AI_HYGIENE.md`](../../../docs/AI_HYGIENE.md) → "Cost reconciliation".
+- **`cost-alarm-eval.ts`** — pure tripwire math for `/api/admin/cost-alarm` (calibrated USD / grounded-call count / token volume). I/O-free + unit-tested; the route does the query + Sentry.
 
 ## Voice directive
 

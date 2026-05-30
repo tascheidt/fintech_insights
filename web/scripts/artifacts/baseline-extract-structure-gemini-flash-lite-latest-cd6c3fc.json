@@ -1,0 +1,1392 @@
+{
+  "scenario": "extract-structure",
+  "mode": "baseline",
+  "variant": "default",
+  "gitSha": "cd6c3fc",
+  "generatedAt": "2026-05-30T22:09:40.672Z",
+  "fixtureFile": "/Users/tscheidt/fintech_insights/fintech_insights/web/scripts/fixtures/gemini-sample-jobs.json",
+  "fixtureCount": 24,
+  "processedCount": 24,
+  "totals": {
+    "calls": 24,
+    "inputTokens": 55700,
+    "outputTokens": 5880,
+    "cachedTokens": 0,
+    "totalTokens": 61580,
+    "estimatedUsd": 0.007922,
+    "avgLatencyMs": 1415
+  },
+  "byCallSite": {
+    "extractJobStructure": {
+      "calls": 24,
+      "inputTokens": 55700,
+      "outputTokens": 5880,
+      "totalTokens": 61580,
+      "estimatedUsd": 0.007922000000000002,
+      "avgLatencyMs": 1415,
+      "modelsServed": [
+        "gemini-flash-lite-latest"
+      ]
+    }
+  },
+  "perJob": [
+    {
+      "jobId": "645839c0-151d-4404-8d8f-940ea48f368a",
+      "title": "ServiceNow Engineer",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2430,
+          "outputTokens": 254,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2684,
+          "estimatedUsd": 0.00034460000000000003,
+          "latencyMs": 1535,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "ServiceNow Engineer",
+            "jobId": "645839c0-151d-4404-8d8f-940ea48f368a"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Equitable Bank is seeking a ServiceNow Engineer to join their Centre of Excellence. You will be responsible for designing, developing, and maintaining ServiceNow applications, workflows, and integrations to support the bank's digital banking operations.",
+        "seniority_level": "mid",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "ServiceNow",
+          "JavaScript",
+          "HTML",
+          "CSS",
+          "REST",
+          "SOAP",
+          "XML",
+          "JSON"
+        ],
+        "keywords": [
+          "ServiceNow Development",
+          "Workflow Automation",
+          "System Integration",
+          "Application Design",
+          "Technical Support",
+          "Quality Assurance",
+          "Release Management",
+          "Business Requirements",
+          "Banking"
+        ],
+        "standardized_department": "Engineering",
+        "function_category": "engineering-platform-sre-devops",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "Canada"
+        }
+      }
+    },
+    {
+      "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d",
+      "title": "Senior Estates and Trust Coordinator",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2206,
+          "outputTokens": 208,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2414,
+          "estimatedUsd": 0.0003038,
+          "latencyMs": 1217,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Estates and Trust Coordinator",
+            "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Senior Estates and Trust Coordinator will oversee the administration of trust files, manage new business onboarding, and perform data analysis within CRM platforms. This role ensures compliance with service standards and supports internal leadership through quarterly and annual reporting.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "Trust and Estates",
+          "CRM",
+          "Data Analysis",
+          "Compliance",
+          "Client Onboarding",
+          "Financial Services",
+          "Reporting",
+          "Administration",
+          "STEP Certificate"
+        ],
+        "standardized_department": "Operations",
+        "function_category": "customer-operations",
+        "location_structured": {
+          "city": "Toronto",
+          "state": "Ontario",
+          "country": "Canada",
+          "formatted": "Toronto, Ontario, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "9af5a8d4-c15e-490c-b2a6-6f34d804e1b9",
+      "title": "Senior Backend Engineer (CARE Pod)",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2327,
+          "outputTokens": 236,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2563,
+          "estimatedUsd": 0.00032710000000000004,
+          "latencyMs": 1534,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Backend Engineer (CARE Pod)",
+            "jobId": "9af5a8d4-c15e-490c-b2a6-6f34d804e1b9"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Senior Backend Engineer will join the CARE Pod to build and productionize agentic workflows and back-office automation systems. The role focuses on creating observable, deterministic AI integrations and robust service contracts to support digital banking operations at Equitable Bank.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "agentic workflows",
+          "backend engineering",
+          "distributed systems",
+          "observability",
+          "API contracts",
+          "workflow orchestration",
+          "back-office automation",
+          "data privacy",
+          "service design",
+          "event-driven architecture",
+          "digital banking",
+          "regression testing"
+        ],
+        "standardized_department": "Engineering",
+        "function_category": "engineering-backend",
+        "location_structured": {
+          "city": "Toronto",
+          "state": "Ontario",
+          "country": "Canada",
+          "formatted": "Toronto, Ontario, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "5add9237-0247-4579-ba5f-38199b5dad8c",
+      "title": "Senior People Partner",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2444,
+          "outputTokens": 218,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2662,
+          "estimatedUsd": 0.00033160000000000004,
+          "latencyMs": 1333,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior People Partner",
+            "jobId": "5add9237-0247-4579-ba5f-38199b5dad8c"
+          }
+        }
+      ],
+      "output": {
+        "summary": "KOHO is seeking a Senior People Partner to drive their People Enablement strategy. This role focuses on organizational design, performance management, and scaling HR operations using AI-integrated workflows within a remote-first, high-autonomy environment.",
+        "seniority_level": "senior",
+        "salary_min": 110000,
+        "salary_max": 160000,
+        "salary_currency": "CAD",
+        "tech_stack": [
+          "BambooHR"
+        ],
+        "keywords": [
+          "People Enablement",
+          "HR Operations",
+          "Organizational Design",
+          "Performance Management",
+          "Compensation Strategy",
+          "Employee Lifecycle",
+          "Compliance",
+          "AI-integrated workflows"
+        ],
+        "standardized_department": "HR",
+        "function_category": "people-ops-hr",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "a67a3e67-354b-40dc-abfc-c10b6318bfe5",
+      "title": "Senior Manager, Financial Risk",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2338,
+          "outputTokens": 253,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2591,
+          "estimatedUsd": 0.000335,
+          "latencyMs": 1324,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Manager, Financial Risk",
+            "jobId": "a67a3e67-354b-40dc-abfc-c10b6318bfe5"
+          }
+        }
+      ],
+      "output": {
+        "summary": "KOHO is seeking a Senior Manager, Financial Risk Strategy & Analytics to lead credit risk modeling, stress testing, and liquidity risk management. This role bridges technical analytics with strategic leadership to ensure portfolio resilience and regulatory compliance.",
+        "seniority_level": "senior",
+        "salary_min": 150000,
+        "salary_max": 190000,
+        "salary_currency": "CAD",
+        "tech_stack": [
+          "SQL",
+          "Python",
+          "SAS"
+        ],
+        "keywords": [
+          "Financial Risk Management",
+          "Retail Credit Risk",
+          "Loss Forecasting",
+          "IFRS 9",
+          "ECL",
+          "Stress Testing",
+          "Liquidity Risk",
+          "Market Risk",
+          "ALM",
+          "Capital Planning",
+          "Portfolio Monitoring",
+          "Anomaly Detection",
+          "Data Strategy"
+        ],
+        "standardized_department": "Finance",
+        "function_category": "risk-management",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "e64cce30-4b02-42c6-83a3-a22cc989f667",
+      "title": "Director, Financial Risk",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2313,
+          "outputTokens": 210,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2523,
+          "estimatedUsd": 0.0003153,
+          "latencyMs": 1205,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Director, Financial Risk",
+            "jobId": "e64cce30-4b02-42c6-83a3-a22cc989f667"
+          }
+        }
+      ],
+      "output": {
+        "summary": "KOHO is seeking a Director of Financial Risk to lead strategy, analytics, and governance for credit, market, and liquidity risk. This role involves managing cross-functional teams to oversee IFRS 9 provisioning, stress testing, and risk appetite frameworks.",
+        "seniority_level": "executive",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "Financial Risk",
+          "Credit Risk",
+          "Market Risk",
+          "Liquidity Risk",
+          "IFRS 9",
+          "Stress Testing",
+          "Risk Appetite",
+          "Model Risk Management",
+          "Provisioning",
+          "Portfolio Monitoring",
+          "Data Stewardship",
+          "Capital Planning",
+          "Anomaly Detection",
+          "Governance"
+        ],
+        "standardized_department": "Finance",
+        "function_category": "risk-management",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "025a033e-94e6-4dd5-97c2-d800ce743bb8",
+      "title": "Banking Advisor",
+      "companySlug": "bnc",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2066,
+          "outputTokens": 230,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2296,
+          "estimatedUsd": 0.00029860000000000005,
+          "latencyMs": 1466,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Banking Advisor",
+            "jobId": "025a033e-94e6-4dd5-97c2-d800ce743bb8"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Banking Advisor will provide personalized financial advice to personal and small business clients at National Bank. The role focuses on investment, mortgage, and insurance solutions while ensuring compliance and high client satisfaction in a branch-based environment.",
+        "seniority_level": "mid",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "Personal Banking",
+          "Small Business Banking",
+          "Mutual Funds",
+          "Mortgage Lending",
+          "Insurance",
+          "Estate Planning",
+          "Financial Advisory",
+          "Compliance",
+          "Risk Management",
+          "Client Relations",
+          "Investment Services"
+        ],
+        "standardized_department": "Sales",
+        "function_category": "account-management-customer-success",
+        "location_structured": {
+          "city": "Longueuil",
+          "state": "Quebec",
+          "country": "Canada",
+          "formatted": "Longueuil, Quebec, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "763200a2-89d6-4a37-83e8-eaa028abf273",
+      "title": "Banking Advisor Jobs for Indigenous People",
+      "companySlug": "bnc",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2279,
+          "outputTokens": 264,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2543,
+          "estimatedUsd": 0.00033350000000000003,
+          "latencyMs": 1384,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Banking Advisor Jobs for Indigenous People",
+            "jobId": "763200a2-89d6-4a37-83e8-eaa028abf273"
+          }
+        }
+      ],
+      "output": {
+        "summary": "National Bank is seeking a Banking Advisor to provide personalized financial services, including investment and credit solutions, to clients. This role focuses on building lasting client relationships and requires a commitment to diversity and inclusion.",
+        "seniority_level": "junior",
+        "salary_min": 19,
+        "salary_max": 19,
+        "salary_currency": "CAD",
+        "tech_stack": [],
+        "keywords": [
+          "Personal Banking",
+          "Investments",
+          "Mutual Fund Representative",
+          "Credit",
+          "Mortgage Financing",
+          "Customer Relationship Management",
+          "Compliance",
+          "Risk Management",
+          "Advisory Services",
+          "Cash Management",
+          "Client Education",
+          "Diversity & Inclusion"
+        ],
+        "standardized_department": "Customer Success",
+        "function_category": "customer-support-cx",
+        "location_structured": {
+          "city": "Montreal",
+          "state": "Quebec",
+          "country": "Canada",
+          "formatted": "Montreal, Quebec, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "0dd79afa-9afa-47cd-90fb-fc0fc2c6a665",
+      "title": "Banking Advisor",
+      "companySlug": "bnc",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2003,
+          "outputTokens": 205,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2208,
+          "estimatedUsd": 0.00028230000000000003,
+          "latencyMs": 1283,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Banking Advisor",
+            "jobId": "0dd79afa-9afa-47cd-90fb-fc0fc2c6a665"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Banking Advisor provides personalized financial services and transaction support to branch clients. This role focuses on building lasting relationships, resolving complex client needs, and ensuring adherence to compliance and risk management standards.",
+        "seniority_level": "junior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "Personal Banking",
+          "Customer Service",
+          "Advisory Services",
+          "Compliance",
+          "Risk Management",
+          "Relationship Management",
+          "Financial Services",
+          "Digital Literacy"
+        ],
+        "standardized_department": "Support",
+        "function_category": "customer-support",
+        "location_structured": {
+          "city": "Sorel-Tracy",
+          "state": "Quebec",
+          "country": "Canada",
+          "formatted": "Sorel-Tracy, Quebec, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "9a297c56-b3ba-47fa-9393-01a4f3b1d951",
+      "title": "Sales Representative - Southgate Mall",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2386,
+          "outputTokens": 257,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2643,
+          "estimatedUsd": 0.00034140000000000006,
+          "latencyMs": 1419,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Sales Representative - Southgate Mall",
+            "jobId": "9a297c56-b3ba-47fa-9393-01a4f3b1d951"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Neo Financial is seeking a Sales Representative to drive customer acquisition for credit and money products at various retail and community activation events. This role involves direct consumer engagement, real-time performance tracking via the Neo App, and an uncapped commission-based compensation model.",
+        "seniority_level": "junior",
+        "salary_min": 74880,
+        "salary_max": 74880,
+        "salary_currency": "CAD",
+        "tech_stack": [
+          "Neo App"
+        ],
+        "keywords": [
+          "Direct Sales",
+          "Customer Acquisition",
+          "Retail Sales",
+          "Financial Products",
+          "Field Marketing",
+          "Lead Generation",
+          "Consumer Banking"
+        ],
+        "standardized_department": "Sales",
+        "function_category": "sales-account-executives",
+        "location_structured": {
+          "city": "Southgate Mall",
+          "state": "Alberta",
+          "country": "Canada",
+          "formatted": "Southgate Mall, Edmonton, Alberta, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "96a9b880-5540-42a4-b7ec-388280623af6",
+      "title": "Director, Marketing Analytics",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2345,
+          "outputTokens": 221,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2566,
+          "estimatedUsd": 0.0003229,
+          "latencyMs": 1475,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Director, Marketing Analytics",
+            "jobId": "96a9b880-5540-42a4-b7ec-388280623af6"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Neo Financial is seeking a Director of Marketing Analytics to build and lead their marketing analytics function. This role focuses on optimizing marketing spend through data-driven insights, attribution modeling, and cross-functional collaboration in a high-growth B2C fintech environment.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "SQL",
+          "Snowflake"
+        ],
+        "keywords": [
+          "Marketing Analytics",
+          "Growth Analytics",
+          "B2C",
+          "Attribution",
+          "Customer Acquisition",
+          "Budget Allocation",
+          "Data Strategy",
+          "Consumer Tech"
+        ],
+        "standardized_department": "Marketing",
+        "function_category": "marketing-growth-performance",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "Canada"
+        }
+      }
+    },
+    {
+      "jobId": "eb3e9b33-7ca4-4ed7-9b6d-3e46494280d0",
+      "title": " Représentant des ventes - Laval ",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2363,
+          "outputTokens": 245,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2608,
+          "estimatedUsd": 0.00033430000000000005,
+          "latencyMs": 1389,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": " Représentant des ventes - Laval ",
+            "jobId": "eb3e9b33-7ca4-4ed7-9b6d-3e46494280d0"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Neo Financial is seeking a motivated Sales Representative in Laval to drive customer acquisition for their credit card and Neo Money products. This role involves field-based promotional activities with a performance-based compensation structure including hourly pay and uncapped commissions.",
+        "seniority_level": "junior",
+        "salary_min": 20,
+        "salary_max": 36,
+        "salary_currency": "CAD",
+        "tech_stack": [],
+        "keywords": [
+          "Direct Sales",
+          "Customer Acquisition",
+          "Field Sales",
+          "Financial Products",
+          "Retail Sales",
+          "Promotional Events",
+          "Credit Cards",
+          "Neo Money"
+        ],
+        "standardized_department": "Sales",
+        "function_category": "sales-account-executives",
+        "location_structured": {
+          "city": "Laval",
+          "state": "Quebec",
+          "country": "Canada",
+          "formatted": "Laval, Quebec, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "492f71bc-ab2d-447e-a076-5affe0038756",
+      "title": "Third Party Risk and Vendor Management Officer",
+      "companySlug": "questrade",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2336,
+          "outputTokens": 264,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2600,
+          "estimatedUsd": 0.0003392,
+          "latencyMs": 1366,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Third Party Risk and Vendor Management Officer",
+            "jobId": "492f71bc-ab2d-447e-a076-5affe0038756"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Questrade Financial Group is seeking a Third Party Risk and Vendor Management Officer to support the development and execution of a centralized TPRM framework. This role involves managing vendor risk assessments, ensuring regulatory compliance with OSFI B-10, and bridging business needs with technical platform requirements.",
+        "seniority_level": "mid",
+        "salary_min": 70000,
+        "salary_max": 95000,
+        "salary_currency": "CAD",
+        "tech_stack": [],
+        "keywords": [
+          "Third Party Risk Management",
+          "Vendor Management",
+          "OSFI B-10",
+          "Risk Frameworks",
+          "Regulatory Compliance",
+          "Due Diligence",
+          "Risk Assessment",
+          "Vendor Review",
+          "Business Analysis",
+          "Stakeholder Management"
+        ],
+        "standardized_department": "Operations",
+        "function_category": "risk-management",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "Canada"
+        }
+      }
+    },
+    {
+      "jobId": "afb62032-c97d-492f-a9f2-fbbcd65dc103",
+      "title": "Analyst, Mutual Fund, Security Master and Physical Securities (Contract)",
+      "companySlug": "questrade",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2399,
+          "outputTokens": 297,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2696,
+          "estimatedUsd": 0.00035870000000000005,
+          "latencyMs": 1704,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Analyst, Mutual Fund, Security Master and Physical Securities (Contract)",
+            "jobId": "afb62032-c97d-492f-a9f2-fbbcd65dc103"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Questrade is seeking a contract Analyst to manage mutual fund clearing, security master maintenance, and physical securities processing. The role involves reconciling trade breaks, managing precious metals administration, and coordinating with third-party depositories like CDS and DTC.",
+        "seniority_level": "mid",
+        "salary_min": 60000,
+        "salary_max": 65000,
+        "salary_currency": "CAD",
+        "tech_stack": [
+          "Broadridge",
+          "Fundserv"
+        ],
+        "keywords": [
+          "Mutual Funds",
+          "Security Master",
+          "Clearing and Settlement",
+          "Reconciliation",
+          "Physical Securities",
+          "Precious Metals",
+          "GIC",
+          "Exempt Market Products",
+          "CDS",
+          "DTC",
+          "APEX",
+          "DRS",
+          "DWAC",
+          "Back Office Operations"
+        ],
+        "standardized_department": "Operations",
+        "function_category": "customer-operations",
+        "location_structured": {
+          "city": "Toronto",
+          "state": "Ontario",
+          "country": "Canada",
+          "formatted": "Toronto, Ontario, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "7ddca5ee-2708-4120-a8b9-fa703115d899",
+      "title": "Head of Marketing - Questbank",
+      "companySlug": "questrade",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2290,
+          "outputTokens": 216,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2506,
+          "estimatedUsd": 0.0003154,
+          "latencyMs": 1281,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Head of Marketing - Questbank",
+            "jobId": "7ddca5ee-2708-4120-a8b9-fa703115d899"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Questbank is seeking a Head of Marketing to lead B2B growth strategies, focusing on third-party distribution channels and intermediary networks. This strategic role involves managing marketing budgets, driving customer acquisition, and overseeing the rollout of B2B digital platforms.",
+        "seniority_level": "executive",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "B2B marketing",
+          "go-to-market strategy",
+          "growth marketing",
+          "customer acquisition",
+          "lifecycle marketing",
+          "marketing automation",
+          "financial services",
+          "mortgage industry",
+          "banking",
+          "brand positioning",
+          "ROI analysis",
+          "regulatory compliance",
+          "stakeholder management",
+          "partner management"
+        ],
+        "standardized_department": "Marketing",
+        "function_category": "marketing-product-brand",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "70658554-12d3-4e79-884d-b98cec3fa40a",
+      "title": "Clearing & Custody Wealth Management Banker",
+      "companySlug": "rbc",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2347,
+          "outputTokens": 293,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2640,
+          "estimatedUsd": 0.00035190000000000004,
+          "latencyMs": 1480,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Clearing & Custody Wealth Management Banker",
+            "jobId": "70658554-12d3-4e79-884d-b98cec3fa40a"
+          }
+        }
+      ],
+      "output": {
+        "summary": "RBC is seeking a sales professional to drive banking and lending solutions within the Clearing & Custody channel. The role focuses on business development with Broker-Dealers and RIAs, managing product adoption, and ensuring compliance in cash management and securities-based lending.",
+        "seniority_level": "senior",
+        "salary_min": 90000,
+        "salary_max": 200000,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "Wealth Management",
+          "Clearing & Custody",
+          "Broker-Dealer",
+          "Registered Investment Advisor",
+          "Securities-Based Lending",
+          "Cash Management",
+          "Business Development",
+          "Series 7",
+          "Series 63",
+          "SIE",
+          "Risk Management",
+          "Compliance"
+        ],
+        "standardized_department": "Sales",
+        "function_category": "business-development-partnerships",
+        "location_structured": {
+          "city": "New York",
+          "state": "New York",
+          "country": "United States of America",
+          "formatted": "New York, New York, United States of America"
+        }
+      }
+    },
+    {
+      "jobId": "f6357a87-6877-4a5e-8371-4a95d507693c",
+      "title": "Senior Network Analyst",
+      "companySlug": "rbc",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2430,
+          "outputTokens": 331,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2761,
+          "estimatedUsd": 0.0003754,
+          "latencyMs": 1490,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Network Analyst",
+            "jobId": "f6357a87-6877-4a5e-8371-4a95d507693c"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Senior Network Analyst will join the SRE Network Operations team to support, triage, and maintain enterprise wired and wireless network infrastructure. The role involves incident management, implementation planning, and troubleshooting for a large-scale financial services environment.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "Cisco",
+          "Aruba",
+          "Silver Peak",
+          "ServiceNow",
+          "CA Spectrum",
+          "NetMRI",
+          "Infoblox",
+          "NetScout nGenius",
+          "Wireshark",
+          "Python",
+          "Ansible",
+          "Cisco DNAC",
+          "Cisco Viptela"
+        ],
+        "keywords": [
+          "Network Operations",
+          "SRE",
+          "SD-WAN",
+          "Incident Management",
+          "Routing",
+          "Switching",
+          "Wireless",
+          "BGP",
+          "OSPF",
+          "MPLS",
+          "VPLS",
+          "Automation",
+          "Production Support"
+        ],
+        "standardized_department": "Engineering",
+        "function_category": "engineering-platform-sre-devops",
+        "location_structured": {
+          "city": "Toronto",
+          "state": "Ontario",
+          "country": "Canada",
+          "formatted": "Toronto, Ontario, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "2c0ddecd-ae50-4e65-8a43-6e2c585416e3",
+      "title": "2026 CFO, Data Governance Summer Analyst (4 Months)",
+      "companySlug": "rbc",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2341,
+          "outputTokens": 225,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2566,
+          "estimatedUsd": 0.0003241,
+          "latencyMs": 1377,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "2026 CFO, Data Governance Summer Analyst (4 Months)",
+            "jobId": "2c0ddecd-ae50-4e65-8a43-6e2c585416e3"
+          }
+        }
+      ],
+      "output": {
+        "summary": "RBC is seeking a Data Governance Summer Analyst to support data management, quality, and governance initiatives. The role involves maintaining data dictionaries, mapping data flows, and collaborating with technical teams to ensure financial data accuracy.",
+        "seniority_level": "intern",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "SQL",
+          "Tableau"
+        ],
+        "keywords": [
+          "Data Governance",
+          "Data Management",
+          "Data Quality",
+          "Metadata",
+          "Data Stewardship",
+          "Financial Statement Analysis",
+          "Data Dictionaries",
+          "Data Flows",
+          "Requirements Analysis"
+        ],
+        "standardized_department": "Finance",
+        "function_category": "data-analytics-bi",
+        "location_structured": {
+          "city": "Toronto",
+          "state": "Ontario",
+          "country": "Canada",
+          "formatted": "Toronto, Ontario, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "4a410d00-c43c-49c8-95b1-407cdfad1cee",
+      "title": "Senior Manager, External Communications &amp; Community Investment - 18-month contract - Tangerine",
+      "companySlug": "tangerine",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2296,
+          "outputTokens": 200,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2496,
+          "estimatedUsd": 0.0003096,
+          "latencyMs": 1331,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Manager, External Communications &amp; Community Investment - 18-month contract - Tangerine",
+            "jobId": "4a410d00-c43c-49c8-95b1-407cdfad1cee"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Tangerine is seeking a Senior Manager for an 18-month contract to lead external communications and community investment. This role focuses on driving brand reputation, media relations, crisis management, and CSR initiatives aligned with the bank's Project Forward mandate.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [],
+        "keywords": [
+          "external communications",
+          "corporate social responsibility",
+          "media relations",
+          "reputation management",
+          "crisis communications",
+          "community investment",
+          "stakeholder management",
+          "brand strategy",
+          "thought leadership",
+          "project management",
+          "CSR",
+          "public relations"
+        ],
+        "standardized_department": "Marketing",
+        "function_category": "marketing-product-brand",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "ecdfc114-788a-45ca-a90e-3b1631c33fb4",
+      "title": "Senior Database Administrator",
+      "companySlug": "tangerine",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2286,
+          "outputTokens": 255,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2541,
+          "estimatedUsd": 0.0003306,
+          "latencyMs": 1753,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Database Administrator",
+            "jobId": "ecdfc114-788a-45ca-a90e-3b1631c33fb4"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Senior Database Administrator will design, maintain, and optimize database systems to ensure high availability and performance. This role focuses on Oracle database administration, disaster recovery, and supporting infrastructure projects within a collaborative IT environment.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "Oracle",
+          "Redis",
+          "GCP",
+          "AlloyDB",
+          "Cloud SQL",
+          "Qlik Replicate",
+          "Terraform",
+          "Linux",
+          "Unix"
+        ],
+        "keywords": [
+          "Database Administration",
+          "Disaster Recovery",
+          "Performance Tuning",
+          "High Availability",
+          "Data Migration",
+          "Capacity Management",
+          "SQL",
+          "Database Architecture",
+          "Encryption",
+          "TDE",
+          "RMAN",
+          "Data Guard",
+          "Multi-tenant Architecture"
+        ],
+        "standardized_department": "Engineering",
+        "function_category": "engineering-platform-sre-devops",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "6a5cba55-4879-4046-b5e8-4bc97d73e198",
+      "title": "Sr DevOps Specialist, Tools and Administration - Tangerine",
+      "companySlug": "tangerine",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2287,
+          "outputTokens": 294,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2581,
+          "estimatedUsd": 0.0003463,
+          "latencyMs": 1526,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Sr DevOps Specialist, Tools and Administration - Tangerine",
+            "jobId": "6a5cba55-4879-4046-b5e8-4bc97d73e198"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Tangerine is seeking a Senior DevOps Specialist to lead cloud migration and CI/CD pipeline optimization for Java-based enterprise applications. The role focuses on managing DevOps tooling, Kubernetes infrastructure, and automating deployment processes within a Google Cloud environment.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "Google Cloud",
+          "Kubernetes",
+          "Jenkins",
+          "Terraform",
+          "GitHub",
+          "GitHub Actions",
+          "SonarQube",
+          "Artifactory",
+          "Groovy",
+          "JavaScript",
+          "Bash"
+        ],
+        "keywords": [
+          "DevOps",
+          "CI/CD",
+          "Cloud Migration",
+          "Application Modernization",
+          "Infrastructure as Code",
+          "High Availability",
+          "Disaster Recovery",
+          "Java",
+          "Automation",
+          "Platform Engineering"
+        ],
+        "standardized_department": "Engineering",
+        "function_category": "engineering-platform-sre-devops",
+        "location_structured": {
+          "city": "Toronto",
+          "state": "Ontario",
+          "country": "Canada",
+          "formatted": "Toronto, Ontario, Canada"
+        }
+      }
+    },
+    {
+      "jobId": "a9ad7dc0-9fe1-483e-bb62-712bc980ca5c",
+      "title": "Specialist, Derivatives Risk Remediation",
+      "companySlug": "wealthsimple",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2427,
+          "outputTokens": 221,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2648,
+          "estimatedUsd": 0.00033109999999999997,
+          "latencyMs": 1254,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Specialist, Derivatives Risk Remediation",
+            "jobId": "a9ad7dc0-9fe1-483e-bb62-712bc980ca5c"
+          }
+        }
+      ],
+      "output": {
+        "summary": "The Derivative Risk Remediation Specialist will monitor and remediate retail derivative exposures, manage option liquidations, and maintain risk-tracking tools. This role requires deep knowledge of CIRO margin rules and the ability to build automated monitoring solutions using SQL and Python.",
+        "seniority_level": "mid",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "SQL",
+          "Python",
+          "Oracle DB",
+          "Apache Superset",
+          "FactSet",
+          "ICE"
+        ],
+        "keywords": [
+          "derivatives",
+          "risk management",
+          "margin operations",
+          "CIRO",
+          "option strategies",
+          "regulatory compliance",
+          "reconciliation",
+          "trading support",
+          "collateral management",
+          "data visualization"
+        ],
+        "standardized_department": "Operations",
+        "function_category": "risk-management",
+        "location_structured": null
+      }
+    },
+    {
+      "jobId": "c1f15941-82a8-426c-933a-d2c7c42f2d9b",
+      "title": "Senior Analyst, Quantitative Research",
+      "companySlug": "wealthsimple",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2336,
+          "outputTokens": 250,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2586,
+          "estimatedUsd": 0.00033360000000000003,
+          "latencyMs": 1406,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Analyst, Quantitative Research",
+            "jobId": "c1f15941-82a8-426c-933a-d2c7c42f2d9b"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Wealthsimple is seeking a Senior Quantitative Research Analyst to design and validate portfolio optimization models and risk analytics. You will bridge the gap between academic research and production, collaborating with engineering to manage retail client portfolios at scale.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "Python",
+          "pandas",
+          "NumPy",
+          "statsmodels"
+        ],
+        "keywords": [
+          "portfolio optimization",
+          "factor investing",
+          "risk analytics",
+          "financial time series",
+          "asset allocation",
+          "quantitative finance",
+          "backtesting",
+          "stress testing",
+          "linear algebra",
+          "statistics",
+          "wealth management",
+          "retail investment"
+        ],
+        "standardized_department": "Product",
+        "function_category": "data-science",
+        "location_structured": {
+          "city": null,
+          "state": null,
+          "country": "Canada",
+          "formatted": "North America (Remote/Hybrid)"
+        }
+      }
+    },
+    {
+      "jobId": "286a62b4-5991-4eb8-897d-819faae319e2",
+      "title": "Senior Software Developer, Ledger",
+      "companySlug": "wealthsimple",
+      "calls": [
+        {
+          "callSite": "extractJobStructure",
+          "modelRequested": "gemini-flash-lite-latest",
+          "modelServed": "gemini-flash-lite-latest",
+          "groundingEnabled": false,
+          "inputTokens": 2425,
+          "outputTokens": 233,
+          "cachedTokens": 0,
+          "thoughtsTokens": 0,
+          "totalTokens": 2658,
+          "estimatedUsd": 0.00033570000000000003,
+          "latencyMs": 1435,
+          "status": "ok",
+          "extra": {
+            "retryCount": 0,
+            "jobTitle": "Senior Software Developer, Ledger",
+            "jobId": "286a62b4-5991-4eb8-897d-819faae319e2"
+          }
+        }
+      ],
+      "output": {
+        "summary": "Wealthsimple is seeking a Senior Software Developer to own and evolve core ledger infrastructure. The role focuses on building high-correctness, auditable financial systems using Java/Kotlin and microservices to ensure strong consistency in transaction processing.",
+        "seniority_level": "senior",
+        "salary_min": null,
+        "salary_max": null,
+        "salary_currency": "USD",
+        "tech_stack": [
+          "Java",
+          "Kotlin",
+          "SQL",
+          "React",
+          "Kafka",
+          "Oracle EBS"
+        ],
+        "keywords": [
+          "ledger",
+          "double-entry accounting",
+          "financial infrastructure",
+          "transaction processing",
+          "distributed systems",
+          "compliance",
+          "audit trails",
+          "reconciliation",
+          "event-driven architecture",
+          "stream processing",
+          "agentic workflows",
+          "intelligent automation",
+          "regulatory reporting"
+        ],
+        "standardized_department": "Engineering",
+        "function_category": "engineering-backend",
+        "location_structured": null
+      }
+    }
+  ]
+}

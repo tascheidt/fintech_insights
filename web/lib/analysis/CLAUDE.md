@@ -6,7 +6,7 @@ This directory holds the AI-driven analysis modules. Some are on the live ingest
 
 These run for every new job posting after `collect`:
 
-- **`structure.ts`** — `extractJobStructure` (Flash). Pulls structured fields out of the raw description. Called from `web/lib/jobs/processor.ts` via `extractAndUpdateStructure`, gated by `description_hash` to skip unchanged descriptions.
+- **`structure.ts`** — `extractJobStructure` (Flash, `thinkingBudget: 0` — reasoning tokens are pure waste on mechanical JSON extraction; ~72% per-call cost cut). Pulls structured fields out of the raw description. Called from `web/lib/jobs/processor.ts` via `extractAndUpdateStructure`, gated by a **normalized** `description_hash` (`normalizeDescriptionForHash` strips volatile boilerplate so unchanged postings skip the call). Evaluated against Flash-Lite in 2026-05 and **kept on Flash** (failed the ≥95% L1 gate).
 - **`advanced-strategic.ts`** — `analyzeJobAdvanced` (Pro + grounded). The single grounded call per job. Phase 3 dropped the duplicate `performWebSearch` pre-fetch; the main call already has `googleSearch` enabled. Callers that want shared grounding pass `webSearchContext` explicitly.
 
 ## Backfill / off-path (do not wire into ingestion)
