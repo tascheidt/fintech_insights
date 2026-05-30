@@ -43,22 +43,43 @@ const redactPaths = [
   "*.CRON_SECRET",
 ];
 
-export const log: Logger = pino({
-  level: process.env.LOG_LEVEL ?? (isProd ? "info" : "debug"),
-  redact: {
-    paths: redactPaths,
-    censor: "[redacted]",
-  },
-  ...(isProd
-    ? {}
-    : {
-        transport: {
-          target: "pino-pretty",
-          options: {
-            colorize: true,
-            translateTime: "SYS:HH:MM:ss",
-            ignore: "pid,hostname",
+function createLogger(): Logger {
+  return pino({
+    level: process.env.LOG_LEVEL ?? (isProd ? "info" : "debug"),
+    redact: {
+      paths: redactPaths,
+      censor: "[redacted]",
+    },
+    ...(isProd
+      ? {}
+      : {
+          transport: {
+            target: "pino-pretty",
+            options: {
+              colorize: true,
+              translateTime: "SYS:HH:MM:ss",
+              ignore: "pid,hostname",
+            },
           },
-        },
-      }),
-});
+        }),
+  });
+}
+
+/**
+ * Cache the logger on `globalThis` so it is instantiated exactly once per
+ * process. In Next.js dev the module is re-evaluated across route/RSC bundles
+ * and on every HMR reload; without this, each evaluation spins up a new
+ * `pino-pretty` transport worker that pipes into `process.stdout` and adds a
+ * fresh set of `unpipe`/`error`/`close`/`finish` listeners to that shared
+ * WriteStream — which is what triggers `MaxListenersExceededWarning`. Reusing
+ * the singleton keeps a single transport worker and a single set of listeners.
+ */
+const globalForLog = globalThis as typeof globalThis & {
+  __fintechLogger?: Logger;
+};
+
+export const log: Logger = globalForLog.__fintechLogger ?? createLogger();
+
+if (!isProd) {
+  globalForLog.__fintechLogger = log;
+}
