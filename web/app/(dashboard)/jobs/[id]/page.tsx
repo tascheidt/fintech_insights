@@ -46,10 +46,10 @@ export default async function JobDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ source?: string }>;
+  searchParams: Promise<{ source?: string; back?: string }>;
 }) {
   const { id } = await params;
-  const { source } = await searchParams;
+  const { source, back } = await searchParams;
   const supabase = await createClient();
 
   const { data: job, error } = await supabase
@@ -82,7 +82,9 @@ export default async function JobDetailPage({
           <Link
             href={
               source === "jobs"
-                ? "/jobs"
+                ? back
+                  ? `/jobs?${back}`
+                  : "/jobs"
                 : company?.slug
                   ? `/companies/${company.slug}`
                   : "/companies"

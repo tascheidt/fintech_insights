@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.7.3",
+    "date": "2026-05-30",
+    "changes": [
+      { "type": "improvement", "description": "“← Back to Jobs” now returns you to the exact search you came from. Opening a posting from the Jobs page and clicking back restores your search text, mode, company / function / recency filters, and tier scope instead of resetting to the full list." }
+    ]
+  },
+  {
     "version": "2.7.2",
     "date": "2026-05-30",
     "changes": [

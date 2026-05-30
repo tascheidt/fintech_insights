@@ -138,6 +138,23 @@ const HIDE_BELOW_LG_INLINE = "hidden lg:inline-flex";
 export function JobsListTable({ rows, relevanceOrder = false }: JobsListTableProps) {
   const router = useRouter();
   const { toggle, isSelected } = useJobSelection();
+
+  // Open a posting, carrying the current list filters (search, company,
+  // function, recency, mode, tier — all URL-encoded) into the detail page as a
+  // `back` param so its "← Back to Jobs" link restores the exact search the
+  // user came from. Read at click time to capture the latest debounced URL.
+  const openJob = React.useCallback(
+    (id: string) => {
+      const qs =
+        typeof window !== "undefined"
+          ? window.location.search.replace(/^\?/, "")
+          : "";
+      const params = new URLSearchParams({ source: "jobs" });
+      if (qs) params.set("back", qs);
+      router.push(`/jobs/${id}?${params.toString()}`);
+    },
+    [router]
+  );
   const [sort, setSort] = React.useState<{ key: SortKey; dir: SortDir }>(
     relevanceOrder ? { key: "relevance", dir: "asc" } : { key: "posted", dir: "asc" }
   );
@@ -241,9 +258,9 @@ export function JobsListTable({ rows, relevanceOrder = false }: JobsListTablePro
             key={row.id}
             role="link"
             tabIndex={0}
-            onClick={() => router.push(`/jobs/${row.id}?source=jobs`)}
+            onClick={() => openJob(row.id)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") router.push(`/jobs/${row.id}?source=jobs`);
+              if (e.key === "Enter") openJob(row.id);
             }}
             className={cn(
               GRID_COLS,
