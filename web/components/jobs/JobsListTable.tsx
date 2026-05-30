@@ -28,11 +28,15 @@ import { TierBadge } from "@/components/ui/TierBadge";
 import type { JobsListRow } from "@/lib/dashboard-queries";
 import { useJobSelection } from "@/components/jobs/JobSelectionContext";
 
-type SortKey = "title" | "company" | "function" | "location" | "posted";
+type SortKey = "relevance" | "title" | "company" | "function" | "location" | "posted";
 type SortDir = "asc" | "desc";
 
 export interface JobsListTableProps {
   rows: JobsListRow[];
+  /** When true, `rows` arrive pre-ranked by semantic relevance; default to a
+   *  no-op "relevance" sort so the server's order is preserved until the user
+   *  clicks a column header. */
+  relevanceOrder?: boolean;
 }
 
 /** Bucketed remote-ness derived from structured location or string heuristic. */
@@ -131,13 +135,22 @@ const GRID_COLS =
 const HIDE_BELOW_LG = "hidden lg:flex";
 const HIDE_BELOW_LG_INLINE = "hidden lg:inline-flex";
 
-export function JobsListTable({ rows }: JobsListTableProps) {
+export function JobsListTable({ rows, relevanceOrder = false }: JobsListTableProps) {
   const router = useRouter();
   const { toggle, isSelected } = useJobSelection();
-  const [sort, setSort] = React.useState<{ key: SortKey; dir: SortDir }>({
-    key: "posted",
-    dir: "asc",
-  });
+  const [sort, setSort] = React.useState<{ key: SortKey; dir: SortDir }>(
+    relevanceOrder ? { key: "relevance", dir: "asc" } : { key: "posted", dir: "asc" }
+  );
+
+  // When the result set switches into / out of relevance ranking (e.g. the
+  // user flips the Semantic toggle), reset the default sort to match.
+  const prevRelevance = React.useRef(relevanceOrder);
+  React.useEffect(() => {
+    if (prevRelevance.current !== relevanceOrder) {
+      prevRelevance.current = relevanceOrder;
+      setSort(relevanceOrder ? { key: "relevance", dir: "asc" } : { key: "posted", dir: "asc" });
+    }
+  }, [relevanceOrder]);
 
   const onSortClick = React.useCallback((key: SortKey) => {
     setSort((s) =>
@@ -148,6 +161,8 @@ export function JobsListTable({ rows }: JobsListTableProps) {
   }, []);
 
   const sorted = React.useMemo(() => {
+    // Relevance is the server's incoming order — keep it as-is (no client sort).
+    if (sort.key === "relevance") return rows;
     const arr = [...rows];
     arr.sort((a, b) => {
       let v = 0;

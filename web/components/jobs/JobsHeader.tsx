@@ -17,7 +17,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { Search, Bell, Check, Download } from "lucide-react";
+import { Search, Bell, Check, Download, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,12 +32,15 @@ import { SearchHelpPopover } from "@/components/jobs/SearchHelpPopover";
 import { getThemeLabel } from "@/lib/analysis/role-themes";
 
 export type RecencyFilter = "any" | "7" | "30";
+export type SearchMode = "keyword" | "semantic";
 
 export interface JobsFilterState {
   q: string;
   company: string; // company slug or "all"
   fn: string; // function group or "all"
   recency: RecencyFilter;
+  /** Lexical full-text vs. vector-similarity ("find roles like this"). */
+  mode: SearchMode;
 }
 
 export interface JobsHeaderProps {
@@ -143,13 +146,31 @@ export function JobsHeader({
   const [company, setCompany] = React.useState(initial.company);
   const [fn, setFn] = React.useState(initial.fn);
   const [recency, setRecency] = React.useState<RecencyFilter>(initial.recency);
+  const [mode, setMode] = React.useState<SearchMode>(initial.mode);
+  // Semantic search embeds the query (a Gemini call), so we fire it on submit
+  // (Enter / toggle), NOT on every keystroke. `submittedQ` holds the last
+  // committed semantic query; keyword mode keeps using the debounced value.
+  const [submittedQ, setSubmittedQ] = React.useState(initial.q);
 
   const debouncedQ = useDebounced(q, 180);
+  const effectiveQ = mode === "semantic" ? submittedQ : debouncedQ;
+
+  const submitSemantic = React.useCallback(() => setSubmittedQ(q), [q]);
+
+  // Switching mode commits the current text so results update immediately:
+  // into semantic → run it now; back to keyword → debounced value resumes.
+  const onModeChange = React.useCallback(
+    (next: SearchMode) => {
+      setMode(next);
+      if (next === "semantic") setSubmittedQ(q);
+    },
+    [q]
+  );
 
   // Publish filter state up.
   React.useEffect(() => {
-    onChange({ q: debouncedQ, company, fn, recency });
-  }, [debouncedQ, company, fn, recency, onChange]);
+    onChange({ q: effectiveQ, company, fn, recency, mode });
+  }, [effectiveQ, company, fn, recency, mode, onChange]);
 
   // Sync filter state into the URL so deep-links + back/forward keep state.
   // We avoid clobbering digest deep-link params (theme, inDigest, from, to)
@@ -168,6 +189,9 @@ export function JobsHeader({
       setOrDel("company", next.company);
       setOrDel("function", next.fn);
       setOrDel("recency", next.recency);
+      // `keyword` is the default → drop the param so a plain /jobs URL stays
+      // canonical. Only persist `mode` when a query is actually present.
+      setOrDel("mode", next.mode === "semantic" && next.q ? "semantic" : null);
       const qs = params.toString();
       const target = qs
         ? `${window.location.pathname}?${qs}`
@@ -182,10 +206,11 @@ export function JobsHeader({
     [router]
   );
 
-  // Push URL on state changes (debounced for q via debouncedQ above).
+  // Push URL on state changes. In keyword mode q is the debounced value; in
+  // semantic mode it's the submitted value (so typing doesn't fire embeds).
   React.useEffect(() => {
-    syncUrl({ q: debouncedQ, company, fn, recency });
-  }, [debouncedQ, company, fn, recency, syncUrl]);
+    syncUrl({ q: effectiveQ, company, fn, recency, mode });
+  }, [effectiveQ, company, fn, recency, mode, syncUrl]);
 
   // The tier control re-queries on the server, so it pushes the `?tier=`
   // param directly (preserving the other live filter params) instead of
@@ -318,12 +343,50 @@ export function JobsHeader({
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-sand-400" />
           <Input
             type="search"
-            placeholder="Search roles, skills, descriptions…"
+            placeholder={
+              mode === "semantic"
+                ? "Describe the role… then press Enter"
+                : "Search roles, skills, descriptions…"
+            }
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && mode === "semantic") submitSemantic();
+            }}
             className="pl-9 pr-9"
           />
-          <SearchHelpPopover className="absolute right-2.5 top-1/2 -translate-y-1/2" />
+          {mode === "keyword" ? (
+            <SearchHelpPopover className="absolute right-2.5 top-1/2 -translate-y-1/2" />
+          ) : (
+            <Sparkles className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-pacific-500" />
+          )}
+        </div>
+
+        {/* Search-mode toggle. Keyword = lexical full-text (matches as you
+            type). Semantic = vector similarity ("find roles like this"),
+            embedded on submit. */}
+        <div className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]">
+          {([
+            ["keyword", "Keyword"],
+            ["semantic", "Semantic"],
+          ] as const).map(([k, label]) => {
+            const active = mode === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => onModeChange(k)}
+                className={cn(
+                  "rounded px-2.5 py-1.5 text-[11.5px] font-medium transition-colors",
+                  active
+                    ? "bg-sand-50 text-sand-900 ring-1 ring-sand-200"
+                    : "text-sand-500 hover:text-sand-700"
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
         <Select value={company} onValueChange={setCompany}>

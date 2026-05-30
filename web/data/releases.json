@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.7.0",
+    "date": "2026-05-29",
+    "changes": [
+      { "type": "feature", "description": "Search by meaning, not just words. A new Keyword / Semantic toggle on the Jobs search box lets you describe what you're after — “roles preventing fraud and money laundering” surfaces Financial Crime, AML and KYC roles even when they never use those exact words. Semantic search ranks the closest matches first; keyword search keeps the fast type-as-you-go phrase/exclude syntax. Built on Gemini embeddings + pgvector, refreshed daily so new postings join automatically." }
+    ]
+  },
+  {
     "version": "2.6.0",
     "date": "2026-05-29",
     "changes": [

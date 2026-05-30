@@ -30,6 +30,24 @@ export const AI_MODEL_VALUES = AI_MODEL_OPTIONS.map((option) => option.value) as
   ...(typeof AI_MODEL_OPTIONS)[number]["value"][],
 ];
 
+/**
+ * Embedding model for Jobs semantic search. Kept separate from
+ * `AI_MODEL_OPTIONS` (those are user-selectable text-gen tiers) but still the
+ * single source of truth — resolve every embedding model string through here,
+ * never hardcode it elsewhere.
+ *
+ * Unlike the text-gen tiers, Google does NOT publish a floating `-latest`
+ * alias for embeddings; they are versioned explicitly. We therefore pin the
+ * version deliberately and stamp it onto every embedded row
+ * (`job_postings.embedding_model` / `embedding_dims`). Comparing vectors
+ * produced by different models or dimensionalities is silently wrong, so a
+ * change here MUST be paired with a re-embed backfill (the backfill detects
+ * the mismatch and re-embeds). 768 dims is a Matryoshka truncation of the
+ * native 3072 — a good size/quality trade for ~10k rows.
+ */
+export const EMBEDDING_MODEL = "gemini-embedding-001";
+export const EMBEDDING_DIMS = 768;
+
 export type AllowedAiModel = (typeof AI_MODEL_OPTIONS)[number]["value"];
 
 const BaseAiConfigSchema = z.object({
