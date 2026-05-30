@@ -70,6 +70,19 @@ function parseTierFilter(
   return "fintech";
 }
 
+/**
+ * Resolve the `?status=` param to the activity scope. Default / absent /
+ * unrecognized → `active` (the Jobs board shows only live roles unless the
+ * user opts into closed ones). Drives a server re-query, like the tier toggle.
+ */
+function parseStatusScope(
+  value: string | undefined
+): "active" | "inactive" | "all" {
+  if (value === "inactive") return "inactive";
+  if (value === "all") return "all";
+  return "active";
+}
+
 type DigestCompanyRow = {
   company_id: string;
   job_ids: unknown;
@@ -115,6 +128,12 @@ export default async function JobsPage({
   const toParam = parseIsoDateParam(params.to);
   const tiers = parseTierParam(params.tier);
   const tierFilter = parseTierFilter(params.tier);
+  // A digest deep-link is a historical snapshot — many of its roles have since
+  // closed, so it forces `all` to keep the snapshot whole regardless of the
+  // active-only default.
+  const statusFilter = params.inDigest?.trim()
+    ? "all"
+    : parseStatusScope(params.status);
 
   // Resolve digest snapshot scope — when inDigest is set, the relevant
   // job IDs are pulled from weekly_digest_companies.job_ids and act as
@@ -166,6 +185,7 @@ export default async function JobsPage({
       tiers,
       searchQuery: initialQ || null,
       searchMode,
+      status: statusFilter,
     }),
     getFunctionHeatData(30),
     getCrossCompanyThemes(),
@@ -256,6 +276,7 @@ export default async function JobsPage({
       newCount={newCount}
       companyCount={companyCount ?? companies.length}
       tierFilter={tierFilter}
+      statusFilter={statusFilter}
       searchTruncated={truncated}
       relevanceOrder={relevanceOrder}
     />

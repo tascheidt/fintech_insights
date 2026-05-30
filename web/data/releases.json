@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.8.0",
+    "date": "2026-05-30",
+    "changes": [
+      { "type": "feature", "description": "The Jobs board now shows only active roles by default. A new Active / Inactive / All control next to the tier toggle lets you bring closed postings back when you want them, and any role that has since closed is clearly marked with a “Closed” tag and dimmed in the list — so you’re never quietly looking at filled jobs." },
+      { "type": "feature", "description": "Long result sets are now paged. The Jobs table shows the first 25 matches with a “Load 25 more” button instead of rendering everything at once, the counter reads a meaningful “N matches,” and a “Showing 1–25 of N” line tracks where you are. Filtering, searching, or re-sorting jumps you back to the top." },
+      { "type": "improvement", "description": "Accessibility polish on the Jobs filter bar: the Recency, Tier, and Status controls now announce their selected state to screen readers." }
+    ]
+  },
+  {
     "version": "2.7.3",
     "date": "2026-05-30",
     "changes": [

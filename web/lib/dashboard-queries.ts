@@ -1135,6 +1135,12 @@ export const JOBS_SEMANTIC_MAX_ROWS = 200;
  *  similarity ("find roles like this"). */
 export type JobsSearchMode = "keyword" | "semantic";
 
+/** Which postings the Jobs list shows by activity. `active` (the default) is
+ *  the live board — only currently-open roles; `inactive` is closed/removed
+ *  roles; `all` is both. Server-side scope (like the tier toggle) so the row
+ *  budget is spent on the chosen set rather than loaded-then-hidden. */
+export type JobsStatusScope = "active" | "inactive" | "all";
+
 export interface JobsListResult {
   rows: JobsListRow[];
   /** True when the search hit its row cap — older / less-relevant matches were
@@ -1144,6 +1150,15 @@ export interface JobsListResult {
 
 const JOBS_LIST_SELECT =
   "id, title, standardized_department, function_category, location, location_structured, is_active, first_seen_date, keywords, company_id, companies!inner(id, name, slug, tier)";
+
+/** Map the activity scope to the `is_active` value to pin, or `null` for `all`
+ *  (no predicate). Callers apply it inline — a generic builder wrapper blows
+ *  past TS's instantiation-depth limit on PostgREST's recursive types. */
+function statusScopePredicate(status: JobsStatusScope): boolean | null {
+  if (status === "active") return true;
+  if (status === "inactive") return false;
+  return null;
+}
 
 /** Map one raw join row to the shape the Jobs table renders. */
 function mapJobRow(j: JobsListRawRow, now: number): JobsListRow {
@@ -1186,7 +1201,8 @@ async function runSemanticJobSearch(
   supabase: SupabaseLike,
   rawQuery: string,
   tierList: CompanyTier[],
-  jobIds: string[] | null
+  jobIds: string[] | null,
+  status: JobsStatusScope
 ): Promise<JobsListResult | null> {
   const startedAt = performance.now();
   const embedded = await embedText(rawQuery, { callSite: "jobs.search.semantic" });
@@ -1224,11 +1240,14 @@ async function runSemanticJobSearch(
     return { rows: [], truncated: false };
   }
 
-  const { data, error } = await supabase
+  let hydrate = supabase
     .from("job_postings")
     .select(JOBS_LIST_SELECT)
     .in("companies.tier", tierList)
     .in("id", orderedIds);
+  const statusValue = statusScopePredicate(status);
+  if (statusValue !== null) hydrate = hydrate.eq("is_active", statusValue);
+  const { data, error } = await hydrate;
   if (error || !data) return { rows: [], truncated: false };
 
   const now = Date.now();
@@ -1340,6 +1359,9 @@ export async function getJobsListData(
      *  "semantic", embeds the query and ranks by vector similarity; falls
      *  back to keyword if embedding is unavailable. */
     searchMode?: JobsSearchMode;
+    /** Activity scope. Default "active" — the Jobs board only shows live roles
+     *  unless the user opts into "inactive" / "all" via the status toggle. */
+    status?: JobsStatusScope;
   } = {}
 ): Promise<JobsListResult> {
   const supabase = await createClient();
@@ -1351,6 +1373,7 @@ export async function getJobsListData(
 
   const tierList = [...(options.tiers ?? DEFAULT_TIERS)];
   const rawQuery = options.searchQuery?.trim() ?? "";
+  const status: JobsStatusScope = options.status ?? "active";
 
   // Semantic mode embeds the query and ranks by vector similarity. On any
   // embedding/RPC failure runSemanticJobSearch returns null and we fall
@@ -1360,7 +1383,8 @@ export async function getJobsListData(
       supabase,
       rawQuery,
       tierList,
-      options.jobIds ?? null
+      options.jobIds ?? null,
+      status
     );
     if (semantic) return semantic;
   }
@@ -1375,6 +1399,9 @@ export async function getJobsListData(
     .in("companies.tier", tierList)
     .order("first_seen_date", { ascending: false })
     .limit(limit);
+
+  const statusValue = statusScopePredicate(status);
+  if (statusValue !== null) query = query.eq("is_active", statusValue);
 
   if (hasSearch) {
     // Full-text match on the GIN-indexed search_tsv column. Default fts type

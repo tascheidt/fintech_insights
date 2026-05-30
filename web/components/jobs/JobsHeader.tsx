@@ -78,6 +78,13 @@ export interface JobsHeaderProps {
    */
   tierFilter: "fintech" | "incumbent" | "all";
 
+  /**
+   * Activity scope (URL-seeded). Like the tier control this drives a server
+   * re-query — changing it pushes the `?status=` param. `active` is the
+   * default (the board only shows live roles) so that value drops the param.
+   */
+  statusFilter: "active" | "inactive" | "all";
+
   /** Notify parent of filter changes (debounced search inside). */
   onChange: (next: JobsFilterState) => void;
 
@@ -106,6 +113,7 @@ export function JobsHeader({
   initial,
   digestContext,
   tierFilter,
+  statusFilter,
   onChange,
   onExportCsv,
 }: JobsHeaderProps) {
@@ -231,6 +239,24 @@ export function JobsHeader({
     [router]
   );
 
+  // The status (activity) control also re-queries on the server, so it pushes
+  // the `?status=` param directly. `active` is the default → drop the param so
+  // a plain /jobs URL stays canonical and shows only live roles.
+  const setStatus = React.useCallback(
+    (next: "active" | "inactive" | "all") => {
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
+      if (next === "active") params.delete("status");
+      else params.set("status", next);
+      const qs = params.toString();
+      router.push(
+        qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+        { scroll: false }
+      );
+    },
+    [router]
+  );
+
   const hasDigestContext =
     Boolean(digestContext.themeId) ||
     Boolean(digestContext.inDigest) ||
@@ -282,7 +308,7 @@ export function JobsHeader({
             Jobs
           </h1>
           <p className="max-w-[66ch] text-[13.5px] leading-[1.55] text-sand-700">
-            Every active role across the {companyCount} fintechs we cover.
+            Every active role across the {companyCount} companies we cover.
             Filter by company, function, and recency.
           </p>
         </div>
@@ -423,7 +449,11 @@ export function JobsHeader({
         </Select>
 
         {/* Recency segmented control */}
-        <div className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]">
+        <div
+          role="group"
+          aria-label="Posted within"
+          className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]"
+        >
           {([
             ["any", "Any time"],
             ["7", "Last 7d"],
@@ -434,6 +464,7 @@ export function JobsHeader({
               <button
                 key={k}
                 type="button"
+                aria-pressed={active}
                 onClick={() => setRecency(k)}
                 className={cn(
                   "rounded px-2.5 py-1.5 text-[11.5px] font-medium transition-colors",
@@ -451,7 +482,11 @@ export function JobsHeader({
         {/* Tier segmented control — scopes which company tiers the list
             shows. Drives the `?tier=` URL param (server re-query). Kept
             understated: same segmented styling as the recency control. */}
-        <div className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]">
+        <div
+          role="group"
+          aria-label="Company tier"
+          className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]"
+        >
           {([
             ["fintech", "Fintech"],
             ["incumbent", "Incumbent"],
@@ -462,6 +497,7 @@ export function JobsHeader({
               <button
                 key={k}
                 type="button"
+                aria-pressed={active}
                 onClick={() => setTier(k)}
                 className={cn(
                   "rounded px-2.5 py-1.5 text-[11.5px] font-medium transition-colors",
@@ -476,8 +512,42 @@ export function JobsHeader({
           })}
         </div>
 
+        {/* Status (activity) segmented control — scopes the board to live,
+            closed, or all roles. Drives the `?status=` URL param (server
+            re-query). Default `Active` keeps closed postings out of the way. */}
+        <div
+          role="group"
+          aria-label="Posting status"
+          className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]"
+        >
+          {([
+            ["active", "Active"],
+            ["inactive", "Inactive"],
+            ["all", "All"],
+          ] as const).map(([k, label]) => {
+            const active = statusFilter === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setStatus(k)}
+                className={cn(
+                  "rounded px-2.5 py-1.5 text-[11.5px] font-medium transition-colors",
+                  active
+                    ? "bg-sand-50 text-sand-900 ring-1 ring-sand-200"
+                    : "text-sand-500 hover:text-sand-700"
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
         <span className="ml-auto font-mono text-[12px] tabular-nums text-sand-500">
-          {filteredCount.toLocaleString()} of {totalCount.toLocaleString()}
+          {filteredCount.toLocaleString()}{" "}
+          {filteredCount === 1 ? "match" : "matches"}
         </span>
       </div>
     </div>
