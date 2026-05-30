@@ -80,7 +80,7 @@ Currently offloaded:
 |-----------------|------------------------------------------------|---------------------------------|
 | `phenom`        | RBC, BMO, National Bank                        | Phenom is client-rendered → Puppeteer |
 | `workday-td`    | TD                                             | API-based but a ~1,500-job cold scrape exceeds Vercel's 300s |
-| `workday-cibc`  | CIBC (+ Simplii classifier log-only)           | Same                            |
+| `workday-cibc`  | CIBC (+ live Simplii classifier)               | Same                            |
 | `dayforce`      | (none currently active)                        | Browser scrape                  |
 | `successfactors`| Tangerine                                      | Browser scrape (Scotia portal)  |
 
