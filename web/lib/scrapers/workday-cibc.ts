@@ -3,12 +3,18 @@
  *
  * Tenant: `cibc`. Instance: `wd3`. Site: `search`.
  *
- * **Simplii classifier is live.** Each listing row is inspected for a
- * Simplii brand marker (in title, bulletFields, or any tenant-emitted
- * brand/business-unit field). When matched, the job is tagged with
+ * **Simplii classifier is live.** After description enrichment (Step 2),
+ * every job is tested by `isSimpliiPosting` using its title and
+ * description_text. When matched, the job is tagged with
  * `companySlugOverride: 'simplii'` and the processor routes it to the
  * Simplii companies row (tier=fintech, parent_company_id=cibc.id)
- * instead of CIBC. Sub-brand split is per-row only — there is no
+ * instead of CIBC. Sub-brand split runs post-enrichment so the body is
+ * available; classification on title alone handles enrichment failures.
+ *
+ * Rule: Simplii iff title matches `/\bsimplii\b/i` OR description
+ * contains >=2 occurrences of `/\bsimplii\b/i`. A single passing
+ * mention (e.g. a CIBC infra role citing "Simplii & CBFAT") does NOT
+ * route to Simplii. Sub-brand split is per-row only — there is no
  * separate Simplii URL or listing endpoint.
  *
  * Cost knob: `WORKDAY_CIBC_MAX_JOBS` env caps the run. Unset → full
@@ -24,7 +30,6 @@ import {
   parseWorkdayListingRow,
   parseWorkdayJobDetail,
   resolveWorkdayJobCap,
-  type WorkdayListingRow,
   type WorkdayListingResponse,
   type WorkdayJobDetailResponse,
 } from "./workday-utils";
@@ -39,46 +44,43 @@ const FETCH_TIMEOUT_MS = 15_000;
 /**
  * Simplii brand classifier. Pure, exported for unit testing.
  *
- * Inspects every string-valued field of the raw listing row (title,
- * bulletFields, and any tenant-emitted brand/business-unit metadata)
- * for a case-insensitive "simplii" token surrounded by word boundaries.
+ * A job is Simplii if and only if:
+ *   (a) its title matches `/\bsimplii\b/i`, OR
+ *   (b) its description contains >=2 occurrences of `/\bsimplii\b/i`.
  *
- * Returns `{ isMatch: true, marker }` where `marker` names the field
- * the match was found in (for log readability), or `{ isMatch: false }`.
+ * A single passing mention in the body (e.g. a CIBC infra role that
+ * supports "Simplii & CBFAT" systems) does NOT route to Simplii — only
+ * >=2 body occurrences are treated as a strong signal.
+ *
+ * The previous implementation did a blind `Object.entries` walk over
+ * every string field of the raw listing row plus a `bulletFields` scan.
+ * That caused a mass-mis-tagging incident (504 CIBC jobs tagged Simplii
+ * in one run) and has been REMOVED. Classification now runs
+ * post-enrichment so the description is available.
+ *
+ * Returns `{ isMatch: true, marker }` where `marker` is `"title"` or
+ * `"description"`, or `{ isMatch: false }`.
  *
  * "Simply" or "simplistic" must NOT match — the word boundary regex
  * (`\bsimplii\b`, case-insensitive) handles this.
  */
-export function isSimpliiPosting(raw: WorkdayListingRow): {
-  isMatch: boolean;
-  marker?: string;
-} {
+export function isSimpliiPosting(input: {
+  title?: string | null;
+  description?: string | null;
+}): { isMatch: boolean; marker?: string } {
   const pattern = /\bsimplii\b/i;
-
-  // Highest-signal candidates first so the returned `marker` is the most
-  // useful descriptor.
-  if (typeof raw.title === "string" && pattern.test(raw.title)) {
+  const title = input.title ?? "";
+  if (pattern.test(title)) {
     return { isMatch: true, marker: "title" };
   }
-
-  if (Array.isArray(raw.bulletFields)) {
-    for (const b of raw.bulletFields) {
-      if (typeof b === "string" && pattern.test(b)) {
-        return { isMatch: true, marker: "bulletFields" };
-      }
-    }
+  const description = input.description ?? "";
+  // A single passing mention (e.g. a CIBC infra role that supports the
+  // "Simplii & CBFAT" systems) must NOT route to Simplii. Require >=2
+  // occurrences in the body as the "strong signal" threshold.
+  const matches = description.match(/\bsimplii\b/gi);
+  if (matches && matches.length >= 2) {
+    return { isMatch: true, marker: "description" };
   }
-
-  // Walk every other string-valued top-level field. Workday tenants
-  // sometimes surface brand/business-unit metadata under varying keys,
-  // and we don't want a missing key to silently drop the signal.
-  for (const [key, value] of Object.entries(raw)) {
-    if (key === "title" || key === "bulletFields") continue;
-    if (typeof value === "string" && pattern.test(value)) {
-      return { isMatch: true, marker: key };
-    }
-  }
-
   return { isMatch: false };
 }
 
@@ -90,7 +92,6 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
   const jobs: JobData[] = [];
   let offset = 0;
   let total: number | null = null;
-  let simpliiSeen = 0;
   let cookieJar = "";
 
   // Step 1: paginate the listing.
@@ -127,24 +128,6 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
     for (const row of rows) {
       const job = parseWorkdayListingRow(row, urls.jobPublicUrl);
       if (!job) continue;
-
-      // Simplii classifier. When matched, tag the job with the override
-      // slug; the processor reads `companySlugOverride` and writes the
-      // job under the Simplii companies row (parent_company_id=cibc).
-      const simplii = isSimpliiPosting(row);
-      if (simplii.isMatch) {
-        simpliiSeen++;
-        job.companySlugOverride = "simplii";
-        log.info(
-          {
-            jobReqId: job.external_id,
-            title: job.title,
-            marker: simplii.marker,
-          },
-          "[workday-cibc] routing to simplii"
-        );
-      }
-
       jobs.push(job);
     }
 
@@ -160,7 +143,6 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
       fetched: jobs.length,
       total,
       cap: cap ?? "uncapped",
-      simpliiSeen,
     },
     "[workday-cibc] listings complete; enriching descriptions"
   );
@@ -207,6 +189,29 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
   log.info(
     { enriched, failed, total: jobs.length },
     "[workday-cibc] description enrichment complete"
+  );
+
+  // Brand split: route Simplii postings to the Simplii sub-brand. Runs AFTER
+  // enrichment so the description is available (the rule needs the body).
+  // Even if enrichment failed for a job, we still classify on title alone.
+  let simpliiSeen = 0;
+  for (const job of jobs) {
+    const simplii = isSimpliiPosting({
+      title: job.title,
+      description: job.description_text,
+    });
+    if (simplii.isMatch) {
+      simpliiSeen++;
+      job.companySlugOverride = "simplii";
+      log.info(
+        { jobReqId: job.external_id, title: job.title, marker: simplii.marker },
+        "[workday-cibc] routing to simplii"
+      );
+    }
+  }
+  log.info(
+    { simpliiSeen, total: jobs.length },
+    "[workday-cibc] brand split complete"
   );
 
   return jobs;
