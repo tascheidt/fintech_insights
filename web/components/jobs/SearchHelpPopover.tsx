@@ -51,6 +51,7 @@ export function SearchHelpPopover({ className }: { className?: string }) {
         type="button"
         aria-label="Search syntax help"
         aria-expanded={open}
+        aria-controls="search-syntax-help"
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "flex h-5 w-5 items-center justify-center rounded-full text-sand-400 transition-colors hover:text-sand-600",
@@ -62,7 +63,7 @@ export function SearchHelpPopover({ className }: { className?: string }) {
 
       {open && (
         <div
-          role="dialog"
+          id="search-syntax-help"
           aria-label="Search syntax"
           className="absolute right-0 top-7 z-50 w-[300px] rounded-lg border border-sand-200 bg-white p-3 shadow-lg"
         >
