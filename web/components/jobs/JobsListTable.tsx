@@ -13,6 +13,11 @@
  * pushes the `?q=` term into Postgres full-text search over the `search_tsv`
  * column (title + location + description body). Row data here is already the
  * filtered set; this component does not re-search.
+ *
+ * Rendering is paged client-side: only the first `PAGE_SIZE` sorted rows show,
+ * with a "Load more" footer that appends the next chunk in place (the ranked
+ * list's top is what matters, so append beats a numbered pager). Paging resets
+ * whenever the result set or its sort order changes.
  */
 
 import * as React from "react";
@@ -24,6 +29,7 @@ import {
   FunctionDot,
   SignalTag,
 } from "@/components/design";
+import { Button } from "@/components/ui/button";
 import { TierBadge } from "@/components/ui/TierBadge";
 import type { JobsListRow } from "@/lib/dashboard-queries";
 import { useJobSelection } from "@/components/jobs/JobSelectionContext";
@@ -135,6 +141,10 @@ const GRID_COLS =
 const HIDE_BELOW_LG = "hidden lg:flex";
 const HIDE_BELOW_LG_INLINE = "hidden lg:inline-flex";
 
+/** Rows revealed per page / per "Load more" press. 25 fills a tall viewport
+ *  without drowning the eye or bloating the DOM. */
+const PAGE_SIZE = 25;
+
 export function JobsListTable({ rows, relevanceOrder = false }: JobsListTableProps) {
   const router = useRouter();
   const { toggle, isSelected } = useJobSelection();
@@ -168,6 +178,17 @@ export function JobsListTable({ rows, relevanceOrder = false }: JobsListTablePro
       setSort(relevanceOrder ? { key: "relevance", dir: "asc" } : { key: "posted", dir: "asc" });
     }
   }, [relevanceOrder]);
+
+  // Client-side paging: reveal PAGE_SIZE rows at a time. Reset to the first
+  // page whenever the result set (`rows` identity changes when a filter /
+  // search / scope changes) or the sort order changes — a stale "page 3" of a
+  // freshly-ranked list is meaningless. Deliberately NOT keyed on selection,
+  // so toggling a checkbox (or returning from a posting) keeps the user's
+  // expanded list intact.
+  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
+  React.useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [rows, sort.key, sort.dir]);
 
   const onSortClick = React.useCallback((key: SortKey) => {
     setSort((s) =>
@@ -206,6 +227,10 @@ export function JobsListTable({ rows, relevanceOrder = false }: JobsListTablePro
     });
     return arr;
   }, [rows, sort]);
+
+  const visible = sorted.slice(0, visibleCount);
+  const hasMore = visibleCount < sorted.length;
+  const remaining = sorted.length - visibleCount;
 
   if (sorted.length === 0) {
     return (
@@ -248,7 +273,7 @@ export function JobsListTable({ rows, relevanceOrder = false }: JobsListTablePro
       </div>
 
       {/* Body rows */}
-      {sorted.map((row, idx) => {
+      {visible.map((row, idx) => {
         const isNew = row.ageDays !== null && row.ageDays <= 7;
         const remote = deriveRemote(row);
         const sigs = row.keywords.slice(0, 3);
@@ -266,7 +291,10 @@ export function JobsListTable({ rows, relevanceOrder = false }: JobsListTablePro
               GRID_COLS,
               "cursor-pointer py-[11px] transition-colors hover:bg-sand-100",
               checked && "bg-pacific-50",
-              idx !== sorted.length - 1 && "border-b border-sand-100"
+              // Closed roles read as background: dimmed at rest, full on hover
+              // so they're still scannable when the user opts to show them.
+              !row.isActive && "opacity-60 hover:opacity-100",
+              idx !== visible.length - 1 && "border-b border-sand-100"
             )}
           >
             {/* Selection checkbox */}
@@ -326,6 +354,22 @@ export function JobsListTable({ rows, relevanceOrder = false }: JobsListTablePro
                     }}
                   >
                     new
+                  </span>
+                )}
+                {/* Closed = the posting went inactive. Neutral sand chip (the
+                    inverse of the warm NEW pill) — a state cue, not an alarm.
+                    A role can be both NEW and Closed: NEW first, then Closed. */}
+                {!row.isActive && (
+                  <span
+                    className="inline-flex shrink-0 items-center rounded-[4px] bg-sand-100 font-mono uppercase text-sand-600"
+                    style={{
+                      fontSize: 10,
+                      padding: "3px 6px",
+                      lineHeight: 1,
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    closed
                   </span>
                 )}
               </div>
@@ -446,6 +490,38 @@ export function JobsListTable({ rows, relevanceOrder = false }: JobsListTablePro
           </div>
         );
       })}
+
+      {/* Pagination footer — only when there's more than one page to show.
+          Append-style "Load more": the range label announces the new count to
+          AT via aria-live; focus stays on the button across presses. */}
+      {sorted.length > PAGE_SIZE && (
+        <nav
+          aria-label="Job results pagination"
+          className="flex flex-col items-center gap-2.5 border-t border-sand-200 px-4 py-3 sm:flex-row sm:justify-between"
+        >
+          <span
+            role="status"
+            aria-live="polite"
+            className="font-mono text-[12px] tabular-nums text-sand-600"
+          >
+            {hasMore
+              ? `Showing 1–${visible.length.toLocaleString()} of ${sorted.length.toLocaleString()}`
+              : `Showing all ${sorted.length.toLocaleString()}`}
+          </span>
+          {hasMore && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            >
+              {remaining >= PAGE_SIZE
+                ? `Load ${PAGE_SIZE} more`
+                : `Load last ${remaining.toLocaleString()}`}
+            </Button>
+          )}
+        </nav>
+      )}
     </div>
   );
 }

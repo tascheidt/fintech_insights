@@ -44,6 +44,9 @@ export interface JobsPageClientProps {
   companyCount: number;
   /** Active tier scope, URL-seeded — drives the JobsHeader tier control. */
   tierFilter: "fintech" | "incumbent" | "all";
+  /** Active activity scope, URL-seeded — drives the JobsHeader status control.
+   *  Server-filtered, so `rows` already contains only the chosen set. */
+  statusFilter: "active" | "inactive" | "all";
   /** True when the server-side search hit its row cap and older / less-
    *  relevant matches were trimmed. The banner only renders when a query is
    *  actually active — a stale `truncated` from a prior URL has no effect. */
@@ -73,6 +76,7 @@ function JobsPageClientInner({
   newCount,
   companyCount,
   tierFilter,
+  statusFilter,
   searchTruncated,
   relevanceOrder,
 }: JobsPageClientProps) {
@@ -126,6 +130,7 @@ function JobsPageClientInner({
         initial={initial}
         digestContext={digestContext}
         tierFilter={tierFilter}
+        statusFilter={statusFilter}
         onChange={onChange}
         onExportCsv={() => {
           const stem =

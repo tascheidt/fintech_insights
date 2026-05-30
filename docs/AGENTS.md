@@ -56,6 +56,10 @@ We construct every tsquery operator (`:*`, `&`, `<->`, `!`) ourselves and feed `
 
 When a search is active the row cap lifts from 500 → 1000; if the cap is hit the function returns `truncated: true` and JobsPageClient renders a banner inviting the user to refine. Every search emits a `jobs.search` log event with `ts_query`, `result_count`, `truncated`, `duration_ms` — the canary for graduating to keyset pagination / `ts_rank` relevance ordering later.
 
+**Activity scope (`?status=`).** The board defaults to **active-only** — `getJobsListData` pins `.eq("is_active", true)` unless told otherwise (`status: "active" | "inactive" | "all"`, default `active`). This is a server-side scope like the tier toggle (a `JobsHeader` segmented control pushes the `?status=` param and re-queries), so the row budget is spent on the chosen set rather than loaded-then-hidden — the old behavior loaded the 500 most-recent *regardless* of `is_active`, so closed roles padded the list. `active` drops the param so a plain `/jobs` URL stays canonical. A digest deep-link (`?inDigest=`) forces `all` because its snapshot is historical and many of its roles have since closed. Inactive rows render dimmed with a neutral mono "Closed" chip; the eyebrow "N ACTIVE ROLES" stat is unchanged (it always counted `is_active` within the loaded set).
+
+**Client paging.** The table reveals `PAGE_SIZE` (25) rows at a time with an append-style "Load more" footer (`JobsListTable`), not a numbered pager — the list is ranked (newest / most-relevant first), so the top is what matters and appending preserves cross-page selection. Paging is purely client-side over the already-loaded, already-filtered set; it resets to the first page whenever the result set or sort order changes. The header counter reads "N matches" (the full filtered count, independent of how many rows are revealed); the footer reads "Showing 1–N of M".
+
 ## Verifying before deletion
 
 When code *looks* unused, verify before you delete it:

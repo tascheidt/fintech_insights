@@ -72,6 +72,15 @@ function tierFilterArgs(table: string): unknown[][] {
     .map((c) => c.args as unknown[]);
 }
 
+/** `.eq("is_active", …)` calls recorded against a table — drives the
+ *  activity-scope assertions for the Jobs list. */
+function isActiveEqArgs(table: string): unknown[][] {
+  const log = callLogs[table] ?? [];
+  return log
+    .filter((c) => c.method === "eq" && c.args[0] === "is_active")
+    .map((c) => c.args as unknown[]);
+}
+
 beforeEach(() => {
   for (const key of Object.keys(callLogs)) delete callLogs[key];
 });
@@ -176,6 +185,28 @@ describe("getJobsListData tier filter (Phase 2 Step 1 — leak G4)", () => {
     const result = await getJobsListData({ jobIds: [] });
     expect(result).toEqual({ rows: [], truncated: false });
     expect(tierFilterArgs("job_postings")).toEqual([]);
+  });
+});
+
+describe("getJobsListData activity scope (active-only default)", () => {
+  it("defaults to active-only so closed roles don't pad the board", async () => {
+    await getJobsListData();
+    expect(isActiveEqArgs("job_postings")).toEqual([["is_active", true]]);
+  });
+
+  it("scopes to closed roles when status is 'inactive'", async () => {
+    await getJobsListData({ status: "inactive" });
+    expect(isActiveEqArgs("job_postings")).toEqual([["is_active", false]]);
+  });
+
+  it("applies no is_active predicate when status is 'all'", async () => {
+    await getJobsListData({ status: "all" });
+    expect(isActiveEqArgs("job_postings")).toEqual([]);
+  });
+
+  it("still scopes active-only alongside a full-text search", async () => {
+    await getJobsListData({ searchQuery: "engineer", status: "active" });
+    expect(isActiveEqArgs("job_postings")).toEqual([["is_active", true]]);
   });
 });
 
