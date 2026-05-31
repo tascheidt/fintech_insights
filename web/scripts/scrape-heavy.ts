@@ -24,16 +24,79 @@ import { triggerAnalysisForJobs } from "@/lib/jobs/runner";
 import type { Company } from "@/lib/jobs/types";
 
 /**
- * Run a supabase write with bounded retries. The failure-path writes that
- * mark a task `failed` MUST be resilient to transient DB outages — if
- * those silently fail, the task stays `running` until the next morning's
- * heartbeat sweep marks it `Timed out`, hiding the real error from the
- * GH Actions logs (May 28 2026 TD incident).
+ * Classify an error as a transient Supabase outage worth waiting out, rather
+ * than a permanent failure. A Supabase Postgres restart takes the DB offline
+ * for a few seconds, then PostgREST rebuilds its schema cache — during that
+ * ~20-40s window every query returns PGRST002 ("Could not query the database
+ * for the schema cache") or PGRST001, and raw transport errors surface as
+ * "fetch failed" / connection resets. The May 31 2026 TD ingest failure caught
+ * exactly this window: a restart at ~06:52 UTC killed the ingest write seconds
+ * later. updateTaskProgress rethrows these wrapped in an Error whose message
+ * still carries the "schema cache" / "PGRST002" text, so we match on both the
+ * structured `.code` and the message string.
+ */
+function isTransientDbError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { code?: unknown; message?: unknown };
+  const code = typeof e.code === "string" ? e.code : "";
+  const msg = (typeof e.message === "string" ? e.message : "").toLowerCase();
+  if (code === "PGRST002" || code === "PGRST001") return true;
+  return (
+    msg.includes("schema cache") ||
+    msg.includes("pgrst002") ||
+    msg.includes("pgrst001") ||
+    msg.includes("not accepting connections") ||
+    msg.includes("the database system is starting up") ||
+    msg.includes("fetch failed") ||
+    msg.includes("connection reset")
+  );
+}
+
+/**
+ * Run an async DB operation, retrying ONLY on transient outages (see
+ * isTransientDbError). The budget is ~63s (6 attempts, 1→32s capped) so a
+ * single Supabase restart + schema-cache reload is ridden out instead of
+ * discarding a scrape whose work is already done — the 7s failure-path budget
+ * below could not (May 28 & May 31 2026 TD ingest incidents). A non-transient
+ * error throws immediately; the caller is responsible for the operation being
+ * idempotent on retry (runIngestStage upserts by external id).
+ */
+async function withTransientRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  attempts = 6
+): Promise<T> {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (!isTransientDbError(e) || i === attempts) throw e;
+      const backoffMs = Math.min(1000 * 2 ** (i - 1), 32000); // 1,2,4,8,16,32
+      console.error(
+        `⏳ ${label} hit a transient DB outage (attempt ${i}/${attempts}); retrying in ${backoffMs}ms: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
+      await new Promise((r) => setTimeout(r, backoffMs));
+    }
+  }
+  // Unreachable: the loop either returns or throws on the final attempt.
+  throw new Error(`${label} exhausted transient retries`);
+}
+
+/**
+ * Run a supabase write with bounded retries, retrying on ANY error (not just
+ * transient ones). The failure-path writes that mark a task `failed` MUST be
+ * resilient to transient DB outages — if those silently fail, the task stays
+ * `running` until the next morning's heartbeat sweep marks it `Timed out`,
+ * hiding the real error from the GH Actions logs (May 28 2026 TD incident).
+ * Budget is ~63s (6 attempts, 1→32s capped) so the mark-failed write can itself
+ * outlast a Supabase restart — the old 7s budget could not (May 31 2026).
  */
 async function withRetry(
   label: string,
   fn: () => PromiseLike<{ error: { message?: string } | null }>,
-  attempts = 3
+  attempts = 6
 ): Promise<void> {
   for (let i = 1; i <= attempts; i++) {
     try {
@@ -48,7 +111,7 @@ async function withRetry(
       );
     }
     if (i < attempts) {
-      const backoffMs = 1000 * 2 ** (i - 1); // 1s, 2s, 4s
+      const backoffMs = Math.min(1000 * 2 ** (i - 1), 32000); // 1,2,4,8,16,32
       await new Promise((r) => setTimeout(r, backoffMs));
     }
   }
@@ -291,25 +354,37 @@ async function main() {
     );
     console.log(`✅ Fetched ${jobs.length} jobs`);
 
-    // Step 7: Store scraped data in task
-    await supabase
-      .from("job_run_tasks")
-      .update({
-        scraped_data: jobs,
-        jobs_fetched: jobs.length,
-        stage_progress: {
-          scrape: {
-            status: "completed",
-            completedAt: new Date().toISOString(),
-            jobs_fetched: jobs.length,
+    // Step 7: Store scraped data in task. This is the durable snapshot of the
+    // fetched corpus; if it silently fails a later ingest failure has nothing to
+    // fall back on. The May 31 2026 TD run lost all 1370 fetched jobs because
+    // this write swallowed a PGRST002 during a Supabase restart — so retry
+    // transient outages and surface a hard failure instead of dropping it.
+    await withTransientRetry("save scraped_data", async () => {
+      const { error } = await supabase
+        .from("job_run_tasks")
+        .update({
+          scraped_data: jobs,
+          jobs_fetched: jobs.length,
+          stage_progress: {
+            scrape: {
+              status: "completed",
+              completedAt: new Date().toISOString(),
+              jobs_fetched: jobs.length,
+            },
           },
-        },
-      })
-      .eq("id", task.id);
+        })
+        .eq("id", task.id);
+      if (error) throw error;
+    });
 
-    // Step 8: Call runIngestStage to save results
+    // Step 8: Call runIngestStage to save results. Wrapped so a Supabase restart
+    // mid-ingest (PostgREST schema-cache reload → PGRST002) is ridden out rather
+    // than discarding a completed scrape. runIngestStage is idempotent — it
+    // upserts by external id — so a full retry from the top is safe.
     console.log("💾 Ingesting jobs into database...");
-    const ingestResult = await runIngestStage(task.id, company as Company, jobs);
+    const ingestResult = await withTransientRetry("ingest jobs", () =>
+      runIngestStage(task.id, company as Company, jobs)
+    );
     console.log(`✅ Ingest complete:`);
     console.log(`   - New jobs: ${ingestResult.newJobIds.length}`);
     console.log(`   - Updated jobs: ${ingestResult.updated}`);

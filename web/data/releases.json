@@ -4,6 +4,12 @@
     "date": "2026-05-31",
     "changes": [
       { "type": "fix", "description": "Corrected internal Gemini cost accounting after Google's model aliases rolled to the Gemini 3.x generation. Our spend telemetry had been reading the older 2.x per-token prices and under-reporting actual usage ~2.7×; rates are now reconciled to the cloud invoice (to ~1%), so the daily cost alarm trips at the right thresholds. No change to the product." }
+     },
+  {
+     "version": "2.9.1",
+    "date": "2026-05-31",
+    "changes": [
+      { "type": "fix", "description": "Heavy job scrapes now survive a momentary database restart. When our database briefly cycles mid-run, a large browser-based scrape (like TD's ~1,400 postings) no longer throws away a completed fetch the instant a write fails — it waits out the ~30-second reconnection and finishes saving, instead of silently skipping that company for the day. A TD run was lost to exactly this on May 31." }
     ]
   },
   {
