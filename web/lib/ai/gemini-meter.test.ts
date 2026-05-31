@@ -18,11 +18,11 @@ describe("recordUsage — thinking token inference", () => {
       status: "ok",
     });
     expect(r.thoughtsTokens).toBe(5000);
-    // 1000 input + 200 output + 5000 thoughts at Pro rates:
-    //   input: 1000 * 1.25/M = 0.00125
-    //   output: 200 * 10/M = 0.002
-    //   thoughts: 5000 * 10/M = 0.05
-    expect(r.estimatedUsd).toBeCloseTo(0.00125 + 0.002 + 0.05, 6);
+    // 1000 input + 200 output + 5000 thoughts at Pro rates (Gemini 3 Pro, 2026-05):
+    //   input: 1000 * 2.0/M = 0.002
+    //   output: 200 * 12.0/M = 0.0024
+    //   thoughts: 5000 * 12.0/M = 0.06
+    expect(r.estimatedUsd).toBeCloseTo(0.002 + 0.0024 + 0.06, 6);
   });
 
   it("infers thoughtsTokens from total residual when SDK omits the named field", () => {

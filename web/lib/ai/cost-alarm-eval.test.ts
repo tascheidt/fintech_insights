@@ -73,7 +73,7 @@ describe("evaluateGeminiUsage — tripwires", () => {
     expect(metrics.eventCount).toBe(2);
   });
 
-  it("calibratedUsd equals totalUsd while the multiplier is the default no-op", () => {
+  it("calibratedUsd equals totalUsd (estimated_usd is calibrated at write time)", () => {
     const rows = [
       row({ estimated_usd: 5, grounding_enabled: true }),
       row({ estimated_usd: 7, grounding_enabled: false }),

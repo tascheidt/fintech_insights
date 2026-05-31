@@ -21,7 +21,7 @@ If your call is wrapped by an existing helper that already meters, do not meter 
 
 ## Pricing & cost math
 
-- **`gemini-pricing.ts`** — Per-model token pricing used by the meter and the comparison harness. Update when Google's price list changes. **`estimateUsd` bills reasoning tokens at the output rate** — don't add a separate "thoughts" price column unless Google starts charging differently. `GROUNDING_CALIBRATION` (default 1, no-op) scales the grounded portion to reconcile against the GCP invoice (telemetry under-counts grounding ~2.7x); set it from a SKU export. See [`docs/AI_HYGIENE.md`](../../../docs/AI_HYGIENE.md) → "Cost reconciliation".
+- **`gemini-pricing.ts`** — Per-model token rates, **reconciled to the GCP SKU export (2026-05): the aliases resolve to Gemini 3.x** (e.g. `gemini-flash-latest` → Gemini 3.5 Flash at $1.50/$9.00 per 1M). Re-derive `SKU $ ÷ SKU token count` from a fresh export whenever `estimated_usd` drifts from billing — a silent alias rotation to a pricier model is the failure mode. **`estimateUsd` bills reasoning tokens at the output rate** — don't add a separate "thoughts" price column unless Google starts charging differently. `GROUNDING_CALIBRATION` is `0` while Google Search grounding stays free-tier. See [`docs/AI_HYGIENE.md`](../../../docs/AI_HYGIENE.md) → "Cost reconciliation".
 - **`cost-alarm-eval.ts`** — pure tripwire math for `/api/admin/cost-alarm` (calibrated USD / grounded-call count / token volume). I/O-free + unit-tested; the route does the query + Sentry.
 
 ## Voice directive

@@ -68,7 +68,7 @@ A GitHub Actions workflow ([`gemini-cost-alarm.yml`](../.github/workflows/gemini
 
 The route reads the last 24h of `gemini_usage_events` and fires on **any of three independent tripwires** (pure math in [`web/lib/ai/cost-alarm-eval.ts`](../web/lib/ai/cost-alarm-eval.ts), unit-tested):
 
-1. **Calibrated USD** — `SUM(estimated_usd)` with the grounded portion scaled by `GROUNDING_CALIBRATION`, vs `GEMINI_DAILY_USD_THRESHOLD` (default **$50**).
+1. **Calibrated USD** — `SUM(estimated_usd)` (already calibrated at write time by `estimateUsd` — reconciled token rates + `GROUNDING_CALIBRATION`), vs `GEMINI_DAILY_USD_THRESHOLD` (default **$50**).
 2. **Grounded-call count** — count of `grounding_enabled` events, vs `GEMINI_DAILY_GROUNDED_CALL_THRESHOLD` (default **500**).
 3. **Token volume** — `SUM(total_tokens)`, vs `GEMINI_DAILY_TOKEN_THRESHOLD` (default **15,000,000**).
 
