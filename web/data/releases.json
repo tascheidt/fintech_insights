@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.9.1",
+    "date": "2026-05-31",
+    "changes": [
+      { "type": "fix", "description": "Heavy job scrapes now survive a momentary database restart. When our database briefly cycles mid-run, a large browser-based scrape (like TD's ~1,400 postings) no longer throws away a completed fetch the instant a write fails — it waits out the ~30-second reconnection and finishes saving, instead of silently skipping that company for the day. A TD run was lost to exactly this on May 31." }
+    ]
+  },
+  {
     "version": "2.9.0",
     "date": "2026-05-30",
     "changes": [
