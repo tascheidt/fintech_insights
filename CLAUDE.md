@@ -59,7 +59,7 @@ Two AI calls per job. `analyzeJob` (in `web/lib/analysis/strategic.ts`) and `cat
 - Vercel weekly Mon 5 AM UTC: `/api/cron/report` — generates the weekly digest.
 - GitHub Actions weekly Mon 9 AM UTC: `company-insights-cron.yml` — scheduled company-insight regeneration.
 - GitHub Actions weekly Mon 11 AM UTC: `editorial-cron.yml` — runs `web/scripts/regenerate-editorial.ts` against stale companies (`companies.thesis / interpretation / bets`) and refreshes cross-company theme labels.
-- GitHub Actions daily 14:00 UTC: `gemini-cost-alarm.yml` — sums last 24h `gemini_usage_events.estimated_usd` and fires `Sentry.captureMessage` over threshold.
+- GitHub Actions daily 14:00 UTC: `gemini-cost-alarm.yml` — reads last 24h `gemini_usage_events` and fires `Sentry.captureMessage` on any of three tripwires (calibrated USD / grounded-call count / token volume; `estimated_usd` alone under-counts grounding ~2.7x). Tripwire math in `web/lib/ai/cost-alarm-eval.ts`.
 - GitHub Actions daily 07:30 UTC: `embeddings-backfill-cron.yml` — runs `web/scripts/backfill-job-embeddings.ts` to (re-)embed job rows with a null/stale `embedding` for Jobs semantic search. Decoupled from the ingest hot path on purpose.
 
 Heavy browser scraping is offloaded to GitHub Actions on demand via `triggerScrapeWorkflow` in `web/lib/github.ts` (`scrape-heavy.yml`). Full topology, secrets, and decision tree in [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md).

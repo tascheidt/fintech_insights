@@ -73,7 +73,7 @@ Single source of truth lives in `web/lib/ai/prompt-config.ts` (`AI_MODEL_OPTIONS
 
 - `gemini-pro-latest` — advanced analysis with web search/grounding; deeper reasoning and narrative quality.
 - `gemini-flash-latest` — fast, cost-effective; default for extraction, classification, digest, chat.
-- `gemini-flash-lite-latest` — cheapest tier for high-volume, low-stakes calls. Use only where the comparison report confirms ≥95% L1 field agreement.
+- `gemini-flash-lite-latest` — cheapest tier for high-volume, low-stakes calls. Use only where the comparison report confirms ≥95% L1 field agreement. (Extraction was evaluated against it in 2026-05 and **kept on Flash** — it failed the gate. See "Cheaper extraction" below.)
 
 ## Editorial pipeline call sites
 
@@ -87,6 +87,30 @@ The v2 editorial fields (working thesis, interpretation, strategic bets, last me
 Both are refreshable via `web/scripts/regenerate-editorial.ts` (per company or `--all`) and the `editorial-cron.yml` GH Actions workflow (Mondays 11:00 UTC). The bet auto-suggestions surfaced in the editorial form are rule-based (`web/lib/analysis/bet-suggester.ts`) — no AI calls.
 
 **Never pin a versioned or preview model ID** (e.g. `gemini-3-flash-preview`, `gemini-2.0-flash`, `gemini-1.5-pro`). Always the `-latest` alias. The comparison harness and production telemetry are how we catch a bad alias rotation; pinning bypasses that signal.
+
+## Cost reconciliation & the daily alarm
+
+`estimateUsd` (`web/lib/ai/gemini-pricing.ts`) is a **cost model, not the invoice**. A 2026-05 audit found telemetry (`SUM(estimated_usd)`) under-counted the GCP bill ~2.7x ($66 telemetry vs $178.75 billed for May), the gap concentrated on the **grounded Pro path** (`analyzeJobAdvanced`, `performDeepResearch`): grounding is billed as search-query fan-out plus search-injected context tokens that `input_tokens` under-reports, while the model charges a flat `$0.035`/request.
+
+- **Calibration knob:** `GROUNDING_CALIBRATION` (default **1**, a no-op) scales the grounded portion of `estimateUsd`. Set it from a clean GCP SKU export: `invoice grounding $ ÷ telemetry grounding $` over the same window. `COST_CALIBRATION_NOTE` records the audit numbers in code. Re-reconcile quarterly — this is a model, not parity.
+- **The daily alarm is multi-signal.** `/api/admin/cost-alarm` no longer trusts one dollar number (that's why the May spike never paged — telemetry saw $27 < $50 on a ~$90 day). It trips on ANY of: calibrated USD (`GEMINI_DAILY_USD_THRESHOLD`, $50), grounded-call **count** (`GEMINI_DAILY_GROUNDED_CALL_THRESHOLD`, 500), or **token volume** (`GEMINI_DAILY_TOKEN_THRESHOLD`, 15M). The count + token wires read un-priced SDK fields, so a fan-out spike pages even when the dollar estimate is wrong. Pure tripwire math is in `web/lib/ai/cost-alarm-eval.ts` (unit-tested).
+- **Go-forward attribution** — the query that drives the monthly review:
+  ```sql
+  SELECT date_trunc('day',created_at)::date AS day, call_site, model_served,
+         COUNT(*) calls, ROUND(SUM(estimated_usd)::numeric,2) usd,
+         SUM((grounding_enabled)::int) grounded
+  FROM gemini_usage_events WHERE created_at >= now() - interval '30 days'
+  GROUP BY 1,2,3 ORDER BY 1 DESC, usd DESC;
+  ```
+
+## Cheaper extraction: thinking budget, Flash-Lite, open-source
+
+Silver-layer extraction (`extractJobStructure`) is the highest-volume call site (~66% of measured spend in the 2026-05 audit). Levers, in the order we adopted them:
+
+1. **Disable reasoning tokens (adopted).** Extraction is mechanical JSON — no reasoning budget needed. It sets `thinkingConfig: { thinkingBudget: 0 }`; the harness confirms thoughts→0 and per-call cost fell ~72% ($0.0044 → $0.00133) with identical fields (same model). A one-shot degrade retries without the override if a future `gemini-flash-latest` alias rotation rejects budget 0.
+2. **Don't re-extract unchanged jobs (adopted).** The `description_hash` gate fingerprints `normalizeDescriptionForHash(text)` (strips posting dates, applicant counts, requisition IDs, whitespace) so volatile boilerplate no longer flips the hash — ~88% of daily extractions were such re-runs. Legacy raw hashes are bridged in-code on the next scrape (no migration, no re-extraction sweep). Measure with `web/scripts/measure-hash-thrash.ts` (read-only).
+3. **Flash-Lite for extraction (REJECTED 2026-05).** `gemini-flash-lite-latest` is ~4x cheaper but **failed the ≥95% L1 gate**: it disagreed with Flash on `function_category` (e.g. `it-internal-systems`→`engineering-platform-sre-devops`, `sales-account-executives`→`account-management-customer-success`) and `seniority`, and degraded `tech_stack` Jaccard (which powers the company tech panels). Artifacts under `web/scripts/artifacts/`. With (1)+(2) already cutting extraction ~90%, the extra ~$2/mo wasn't worth misclassifying roles. Re-evaluate only if the prompt is hardened for the cheaper tier.
+4. **Open-source / non-Gemini providers (NOT NOW).** At ~20k calls/mo the spread between Flash-Lite (~$6/mo) and the cheapest open-weight option (DeepInfra Gemma-3-4B ~$2/mo) is ~$2–4/mo — against ~0.5–1.5 eng-days to add a second SDK, a telemetry provider field, a pricing entry, and a second vendor in the ingest hot path. Break-even is ~150k–300k calls/mo (8–15x today), and even there the first lever is **Gemini batch mode (−50%, zero new vendor)** for backfills. A non-Gemini provider only earns its keep past ~400k–700k calls/mo (20–40x). Two zero-integration Gemini fallbacks if extraction ever needs to get cheaper: **Gemma-3 on the free tier** of the existing Gemini API (~1k req/day cap; free-tier inputs may train Google — fine for public JD text) and **batch mode**.
 
 ## Quota errors
 

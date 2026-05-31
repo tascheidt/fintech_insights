@@ -49,6 +49,39 @@ export const GEMINI_PRICING: Record<string, ModelRates> = {
 export const GROUNDING_PER_REQUEST_USD = 0.035;
 
 /**
+ * Grounding calibration multiplier.
+ *
+ * `GROUNDING_PER_REQUEST_USD` models grounding as a flat per-request surcharge,
+ * but Google bills grounding-search fan-out (one grounded request can issue
+ * several search queries) plus search-injected context tokens that our
+ * `input_tokens` under-reports. A 2026-05 reconciliation found telemetry
+ * (`SUM(estimated_usd)`) under-counted the GCP invoice ~2.7x, concentrated on
+ * the grounded Pro path (`analyzeJobAdvanced`, `performDeepResearch`).
+ *
+ * This defaults to 1 (no-op — keeps `estimateUsd` totals and existing tests
+ * unchanged). Set it from a clean GCP SKU export:
+ *   GROUNDING_CALIBRATION ≈ (invoice grounding $) / (telemetry grounding $)
+ * over the same window. The cost-alarm route also tripwires on grounded-call
+ * COUNT independently of this estimate, so a fan-out spike pages even at 1.
+ *
+ * See docs/AI_HYGIENE.md → "Cost reconciliation".
+ */
+export const GROUNDING_CALIBRATION = 1;
+
+/**
+ * Provenance for the calibration above — the audit that motivated it, recorded
+ * in code so the number isn't tribal memory. The active multiplier stays 1
+ * until a SKU-level export isolates the grounding component of the gap.
+ */
+export const COST_CALIBRATION_NOTE = {
+  observedOn: "2026-05-30",
+  window: "2026-05-01..2026-05-30",
+  gcpUsd: 178.75,
+  telemetryUsd: 66.09,
+  ratio: 2.71,
+} as const;
+
+/**
  * Rough USD estimate for a single Gemini call. Returns 0 for unknown models
  * (callers should detect this via `isPricedModel`).
  *
@@ -72,7 +105,9 @@ export function estimateUsd(
   const inputCost = (opts.inputTokens / 1_000_000) * rates.inputPerM;
   const outputCost = (opts.outputTokens / 1_000_000) * rates.outputPerM;
   const thoughtsCost = ((opts.thoughtsTokens ?? 0) / 1_000_000) * rates.outputPerM;
-  const groundingCost = opts.groundingEnabled ? GROUNDING_PER_REQUEST_USD : 0;
+  const groundingCost = opts.groundingEnabled
+    ? GROUNDING_PER_REQUEST_USD * GROUNDING_CALIBRATION
+    : 0;
   return inputCost + outputCost + thoughtsCost + groundingCost;
 }
 

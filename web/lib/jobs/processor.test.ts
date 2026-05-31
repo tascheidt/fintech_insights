@@ -222,6 +222,93 @@ describe("runIngestStage description_hash gate", () => {
 
     expect(extractJobStructureMock).toHaveBeenCalledTimes(1);
   });
+
+  it("skips extraction when only volatile boilerplate (posting date) changed", async () => {
+    // Same substance, different posting date — normalizes identically, so the
+    // normalized hash matches and the Gemini call is skipped (the thrash fix).
+    const { runIngestStage, normalizeDescriptionForHash } = await import("./processor");
+    const baseWithDate = `${DESCRIPTION} Posted 3 days ago.`;
+    const churnedDate = `${DESCRIPTION} Posted 19 days ago.`;
+    expect(normalizeDescriptionForHash(baseWithDate)).toBe(
+      normalizeDescriptionForHash(churnedDate)
+    );
+    const normalizedHash = createHash("sha1")
+      .update(normalizeDescriptionForHash(baseWithDate))
+      .digest("hex");
+    existingRows = [
+      {
+        id: "existing-job-1",
+        external_id: FIXTURE_JOB.external_id,
+        description_hash: normalizedHash,
+        company_id: FIXTURE_COMPANY.id,
+      },
+    ];
+
+    const churnedJob = { ...FIXTURE_JOB, description_text: churnedDate };
+    await runIngestStage("task-churn", FIXTURE_COMPANY as never, [churnedJob] as never);
+
+    expect(extractJobStructureMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("runs extraction when the substance of the description changes", async () => {
+    const { runIngestStage, normalizeDescriptionForHash } = await import("./processor");
+    const normalizedHash = createHash("sha1")
+      .update(normalizeDescriptionForHash(`${DESCRIPTION} Posted 3 days ago.`))
+      .digest("hex");
+    existingRows = [
+      {
+        id: "existing-job-1",
+        external_id: FIXTURE_JOB.external_id,
+        description_hash: normalizedHash,
+        company_id: FIXTURE_COMPANY.id,
+      },
+    ];
+
+    const changedJob = {
+      ...FIXTURE_JOB,
+      description_text: "We now seek a Staff Data Scientist for fraud modeling. Posted 3 days ago.",
+    };
+    await runIngestStage("task-substance", FIXTURE_COMPANY as never, [changedJob] as never);
+
+    expect(extractJobStructureMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("normalizeDescriptionForHash", () => {
+  it("collapses whitespace and case so re-rendered text fingerprints identically", async () => {
+    const { normalizeDescriptionForHash } = await import("./processor");
+    expect(normalizeDescriptionForHash("Hello   World\n\nFoo")).toBe(
+      normalizeDescriptionForHash("hello world foo")
+    );
+  });
+
+  it("ignores churning posting dates", async () => {
+    const { normalizeDescriptionForHash } = await import("./processor");
+    expect(normalizeDescriptionForHash("Build payments infra. Posted 3 days ago.")).toBe(
+      normalizeDescriptionForHash("Build payments infra. Posted 47 days ago.")
+    );
+  });
+
+  it("ignores churning applicant counts", async () => {
+    const { normalizeDescriptionForHash } = await import("./processor");
+    expect(normalizeDescriptionForHash("Join the risk team. 5 applicants.")).toBe(
+      normalizeDescriptionForHash("Join the risk team. 250 applicants.")
+    );
+  });
+
+  it("ignores churning requisition IDs", async () => {
+    const { normalizeDescriptionForHash } = await import("./processor");
+    expect(normalizeDescriptionForHash("Senior role JR-0012345 in Toronto.")).toBe(
+      normalizeDescriptionForHash("Senior role JR-0067890 in Toronto.")
+    );
+  });
+
+  it("still flips when the substance changes", async () => {
+    const { normalizeDescriptionForHash } = await import("./processor");
+    expect(normalizeDescriptionForHash("Senior Backend Engineer")).not.toBe(
+      normalizeDescriptionForHash("Staff Data Scientist")
+    );
+  });
 });
 
 describe("runIngestStage companySlugOverride routing", () => {

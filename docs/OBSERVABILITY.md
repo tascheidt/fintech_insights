@@ -66,11 +66,15 @@ The pure threshold rule is `evaluateCanary({today, rolling}) → { fire, reason 
 
 A GitHub Actions workflow ([`gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml)) runs daily at 14:00 UTC and `curl`s `/api/admin/cost-alarm` with `Authorization: Bearer ${CRON_SECRET}`.
 
-The route:
+The route reads the last 24h of `gemini_usage_events` and fires on **any of three independent tripwires** (pure math in [`web/lib/ai/cost-alarm-eval.ts`](../web/lib/ai/cost-alarm-eval.ts), unit-tested):
 
-1. Sums `estimated_usd` from `gemini_usage_events` over the last 24h.
-2. Compares against `GEMINI_DAILY_USD_THRESHOLD` (default **$50**).
-3. If over threshold, calls `Sentry.captureMessage("[cost-alarm] Daily Gemini spend exceeded $X")` with a `tags: { alarm: "gemini-cost" }` so Sentry alert rules can target it specifically.
+1. **Calibrated USD** — `SUM(estimated_usd)` with the grounded portion scaled by `GROUNDING_CALIBRATION`, vs `GEMINI_DAILY_USD_THRESHOLD` (default **$50**).
+2. **Grounded-call count** — count of `grounding_enabled` events, vs `GEMINI_DAILY_GROUNDED_CALL_THRESHOLD` (default **500**).
+3. **Token volume** — `SUM(total_tokens)`, vs `GEMINI_DAILY_TOKEN_THRESHOLD` (default **15,000,000**).
+
+If any trips, it calls `Sentry.captureMessage("[cost-alarm] Daily Gemini usage tripwire(s): …")` with `tags: { alarm: "gemini-cost", tripwire: "usd+grounded-calls+…" }` so Sentry rules can target it.
+
+**Why three signals:** `estimated_usd` is a model that under-counts the GCP invoice ~2.7x — and most on the grounded calls that drive spikes (the 2026-05 spike never paged: telemetry saw $27 < $50 on a ~$90 day). Grounded-call count and raw token volume come from un-priced SDK fields, so a fan-out spike pages even when the dollar estimate is wrong. See [`AI_HYGIENE.md`](./AI_HYGIENE.md) → "Cost reconciliation".
 
 **Auth note:** the route lives under `/api/admin/**` but is gated by `requireCronSecret`, not `requireAdmin`, because the GH Actions runner has no Supabase session. This is the only intentional exception in the `/api/admin/**` namespace and is called out in [`web/lib/auth/CLAUDE.md`](../web/lib/auth/CLAUDE.md).
 
