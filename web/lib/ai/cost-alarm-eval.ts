@@ -6,8 +6,6 @@
  * the query + Sentry side effects; this module does the math.
  */
 
-import { GROUNDING_CALIBRATION } from "@/lib/ai/gemini-pricing";
-
 export interface GeminiUsageRow {
   estimated_usd: number | string | null;
   call_site: string;
@@ -42,7 +40,7 @@ export interface GeminiUsageEvaluation {
  * Compute the three independent cost signals over a 24h `gemini_usage_events`
  * row set and report which tripwires (if any) exceeded their threshold:
  *
- *   1. Calibrated USD — grounded portion scaled by `GROUNDING_CALIBRATION`.
+ *   1. Calibrated USD — `SUM(estimated_usd)` (already calibrated at write time).
  *   2. Grounded calls — count of `grounding_enabled` rows.
  *   3. Token volume   — `SUM(total_tokens)`.
  *
@@ -54,7 +52,10 @@ export function evaluateGeminiUsage(
   thresholds: GeminiUsageThresholds
 ): GeminiUsageEvaluation {
   let totalUsd = 0; // raw, as recorded
-  let calibratedUsd = 0; // grounded portion scaled by GROUNDING_CALIBRATION
+  // `estimated_usd` is already calibrated at write time (estimateUsd applies the
+  // reconciled token rates + GROUNDING_CALIBRATION), so the alarm just sums it.
+  // Kept as a distinct field for response stability; currently == totalUsd.
+  let calibratedUsd = 0;
   let groundedCalls = 0;
   let totalTokens = 0;
   const byCallSite = new Map<string, number>();
@@ -66,7 +67,7 @@ export function evaluateGeminiUsage(
       : (row.estimated_usd ?? 0);
     if (Number.isFinite(usd)) {
       totalUsd += usd;
-      calibratedUsd += row.grounding_enabled ? usd * GROUNDING_CALIBRATION : usd;
+      calibratedUsd += usd;
       byCallSite.set(row.call_site, (byCallSite.get(row.call_site) ?? 0) + usd);
       byModel.set(row.model_served, (byModel.get(row.model_served) ?? 0) + usd);
     }
