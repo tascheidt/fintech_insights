@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.9.3",
+    "date": "2026-06-01",
+    "changes": [
+      { "type": "fix", "description": "The Jobs board no longer surfaces roles from companies we've deactivated. Search was matching on each posting's own open/closed status but ignoring whether we still cover the company, so a deactivated employer like Monzo could appear with dozens of \"active\" listings. Both semantic and keyword search now scope to active companies only, matching the \"companies we cover\" count." }
+    ]
+  },
+  {
     "version": "2.9.2",
     "date": "2026-05-31",
     "changes": [

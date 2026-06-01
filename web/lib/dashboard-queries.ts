@@ -1244,6 +1244,7 @@ async function runSemanticJobSearch(
     .from("job_postings")
     .select(JOBS_LIST_SELECT)
     .in("companies.tier", tierList)
+    .eq("companies.is_active", true)
     .in("id", orderedIds);
   const statusValue = statusScopePredicate(status);
   if (statusValue !== null) hydrate = hydrate.eq("is_active", statusValue);
@@ -1397,6 +1398,7 @@ export async function getJobsListData(
     .from("job_postings")
     .select(JOBS_LIST_SELECT)
     .in("companies.tier", tierList)
+    .eq("companies.is_active", true)
     .order("first_seen_date", { ascending: false })
     .limit(limit);
 
