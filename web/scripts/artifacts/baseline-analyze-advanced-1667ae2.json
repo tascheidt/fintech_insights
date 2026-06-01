@@ -1,0 +1,269 @@
+{
+  "scenario": "analyze-advanced",
+  "mode": "baseline",
+  "variant": "default",
+  "gitSha": "1667ae2",
+  "generatedAt": "2026-06-01T10:33:54.588Z",
+  "fixtureFile": "/Users/tscheidt/fintech_insights/fintech_insights/web/scripts/fixtures/gemini-sample-jobs.json",
+  "fixtureCount": 24,
+  "processedCount": 5,
+  "totals": {
+    "calls": 5,
+    "inputTokens": 14289,
+    "outputTokens": 2274,
+    "cachedTokens": 0,
+    "totalTokens": 23640,
+    "estimatedUsd": 0.14079,
+    "avgLatencyMs": 17080
+  },
+  "byCallSite": {
+    "analyzeJobAdvanced+grounding": {
+      "calls": 5,
+      "inputTokens": 14289,
+      "outputTokens": 2274,
+      "totalTokens": 23640,
+      "estimatedUsd": 0.14079,
+      "avgLatencyMs": 17080,
+      "modelsServed": [
+        "gemini-pro-latest"
+      ]
+    }
+  },
+  "perJob": [
+    {
+      "jobId": "645839c0-151d-4404-8d8f-940ea48f368a",
+      "title": "ServiceNow Engineer",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 2918,
+          "outputTokens": 440,
+          "cachedTokens": 0,
+          "thoughtsTokens": 1167,
+          "totalTokens": 4525,
+          "estimatedUsd": 0.025120000000000003,
+          "latencyMs": 15417,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "ServiceNow Engineer",
+            "fellBackToFlash": false,
+            "jobId": "645839c0-151d-4404-8d8f-940ea48f368a"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank adds ServiceNow Engineer to internal Centre of Excellence",
+        "category": "technology",
+        "insight_summary": "EQ Bank is hiring a ServiceNow Engineer for its Infrastructure & Operations department. The role focuses on developing and maintaining applications, workflows, and integrations within the bank's ServiceNow Centre of Excellence. This indicates ongoing investment in internal IT service management and operational automation.",
+        "what_it_means": "The addition of a dedicated ServiceNow Engineer suggests EQ Bank is formalizing its internal IT service management and automation capabilities.",
+        "strategic_signals": [
+          "Role sits within a dedicated ServiceNow Centre of Excellence",
+          "Focuses on application design, custom workflows, and system integrations",
+          "Requires automation and scripting using JavaScript and ServiceNow-specific tools",
+          "Engineering department hiring remains stable with 26 postings over the past 180 days"
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "Hiring for ServiceNow development is standard for mid-to-large financial institutions, aligning with the bank's stable historical hiring in Operations and Engineering.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "EQ Bank is likely centralizing its IT service management and internal workflow automation. The mention of a ServiceNow Centre of Excellence indicates the bank uses the platform as a primary system for internal operations and requires dedicated engineering resources to maintain and scale it.",
+        "web_corroboration": "No recent web news was found to corroborate this specific internal IT hiring move, which is typical for backend infrastructure roles.",
+        "model_reasoning": "The assessment is based on the specific responsibilities outlined in the job description, such as workflow customization and integration development. The confidence is high because the role's function is clearly defined and aligns with standard enterprise IT practices, supported by the historical data showing consistent hiring in Operations and Engineering."
+      }
+    },
+    {
+      "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d",
+      "title": "Senior Estates and Trust Coordinator",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 2253,
+          "outputTokens": 437,
+          "cachedTokens": 0,
+          "thoughtsTokens": 1053,
+          "totalTokens": 3743,
+          "estimatedUsd": 0.022385999999999996,
+          "latencyMs": 13257,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "Senior Estates and Trust Coordinator",
+            "fellBackToFlash": false,
+            "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank hires senior coordinator to support estates and trust administration",
+        "category": "operational",
+        "insight_summary": "EQ Bank is hiring a Senior Estates and Trust Coordinator to manage CRM data, oversee new business processes, and coordinate with trust officers. The role indicates ongoing operational support for personal trust and estate administration, likely tied to its Concentra Bank subsidiary. This aligns with the company's stable hiring volume in operations and finance departments.",
+        "what_it_means": "EQ Bank continues to build out its operational capacity for trust and estate services to support client onboarding and administration.",
+        "strategic_signals": [
+          "Role focuses on CRM data evaluation and reporting for trust administration.",
+          "Requires coordination with trust officers and back-office staff for file transitions.",
+          "Supports new business processes and client onboarding for personal estates.",
+          "Requires enrollment in the STEP Certificate program in Trust and Estates."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "The role represents standard operational and administrative support for an existing business line, aligning with the company's high volume of operations hiring.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "This hiring suggests EQ Bank is standardizing and scaling its trust and estate administration processes, likely leveraging capabilities acquired through Concentra Bank. The emphasis on CRM metrics and reporting indicates a focus on operational efficiency.",
+        "web_corroboration": "The job description explicitly mentions Concentra Bank, which Equitable Bank acquired to expand its services, including trust capabilities. No recent web news contradicts this operational focus.",
+        "model_reasoning": "Confidence is high because the job description clearly outlines standard administrative and operational duties for trust and estate services. The historical data confirms operations is the company's most active hiring area, making this a continuation of established patterns rather than a strategic pivot."
+      }
+    },
+    {
+      "jobId": "9af5a8d4-c15e-490c-b2a6-6f34d804e1b9",
+      "title": "Senior Backend Engineer (CARE Pod)",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 2374,
+          "outputTokens": 436,
+          "cachedTokens": 0,
+          "thoughtsTokens": 1640,
+          "totalTokens": 4450,
+          "estimatedUsd": 0.02966,
+          "latencyMs": 18720,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "Senior Backend Engineer (CARE Pod)",
+            "fellBackToFlash": false,
+            "jobId": "9af5a8d4-c15e-490c-b2a6-6f34d804e1b9"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank adds backend engineer for agentic customer support workflows",
+        "category": "technology",
+        "insight_summary": "EQ Bank is developing AI-driven agentic workflows to automate back-office operations and customer support integrations. The CARE Pod focuses on deploying non-deterministic AI systems with human-in-the-loop oversight. This engineering role builds the evaluation frameworks and observability pipelines required to ensure these systems remain auditable.",
+        "what_it_means": "EQ Bank is transitioning customer support and back-office investigations toward AI-orchestrated automation while maintaining human oversight.",
+        "strategic_signals": [
+          "Developing agentic task flows for back-office automation",
+          "Implementing evaluation harnesses for non-deterministic AI behavior",
+          "Building knowledge ingestion pipelines for searchable indexes",
+          "Integrating chat and contact center systems with internal workflows"
+        ],
+        "is_new_direction": true,
+        "confidence": "high",
+        "novelty_score": 7,
+        "novelty_reasoning": "While overall engineering hiring remains stable, the explicit focus on productionizing agentic AI workflows and evaluating non-deterministic systems indicates a distinct technical capability addition for the customer support function.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "EQ Bank is likely aiming to reduce operational costs and accelerate customer issue resolution by deploying AI agents to handle routine investigations. The emphasis on observability and human-owned final decisions suggests a cautious, compliance-aware approach to AI adoption.",
+        "web_corroboration": "No recent news found, but the job description explicitly details a strategy to integrate AI workflows into the CARE Pod for customer support and operational efficiency.",
+        "model_reasoning": "The job description provides clear, specific evidence of EQ Bank's technology strategy regarding AI. The detailed requirements for agent orchestration, evaluation frameworks, and human-in-the-loop automation allow for high confidence in assessing their operational AI initiatives."
+      }
+    },
+    {
+      "jobId": "5add9237-0247-4579-ba5f-38199b5dad8c",
+      "title": "Senior People Partner",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 2876,
+          "outputTokens": 487,
+          "cachedTokens": 0,
+          "thoughtsTokens": 1790,
+          "totalTokens": 5153,
+          "estimatedUsd": 0.033076,
+          "latencyMs": 20840,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Senior People Partner",
+            "fellBackToFlash": false,
+            "jobId": "5add9237-0247-4579-ba5f-38199b5dad8c"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Koho adds Senior People Partner to support AI-integrated HR strategy",
+        "category": "operational",
+        "insight_summary": "Koho is recruiting a Senior People Partner to transition its human resources function toward an AI-integrated 'People Enablement' model. The role requires experience in both Canadian and US markets, indicating potential cross-border workforce management. This aligns with recent hiring data showing new activity in the HR department amidst broader declines in engineering and product roles.",
+        "what_it_means": "The posting indicates Koho is restructuring its internal operations to focus on automation and cross-border workforce management.",
+        "strategic_signals": [
+          "Requires 5+ years of experience in both Canadian and US markets.",
+          "Explicitly mandates comfort with AI and automation to streamline HR workflows.",
+          "Signals an internal shift from traditional HR to a 'People Enablement' model.",
+          "Corresponds with recent tracking showing HR as a newly active hiring department."
+        ],
+        "is_new_direction": true,
+        "confidence": "high",
+        "novelty_score": 7,
+        "novelty_reasoning": "HR is identified as a newly active department in the 90-day tracking, and the job description explicitly notes a structural shift to a new HR model alongside US market requirements.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "Koho is likely optimizing its organizational structure and reducing manual HR overhead through AI integration. The requirement for US market experience suggests the company is managing a cross-border workforce, despite its core product focus on Canadians.",
+        "web_corroboration": "No recent news was found via web research to corroborate specific US expansion or HR restructuring, making this an inference based solely on the job description.",
+        "model_reasoning": "The job description explicitly details a transition to a leaner, AI-integrated HR model and requires US and Canadian market experience. Combined with historical data showing HR as a newly active department while engineering and product decline, this indicates a period of internal restructuring and operational optimization rather than aggressive product expansion. Confidence is high as the claims are directly supported by the job description text and provided hiring data."
+      }
+    },
+    {
+      "jobId": "a67a3e67-354b-40dc-abfc-c10b6318bfe5",
+      "title": "Senior Manager, Financial Risk",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-pro-latest",
+          "modelServed": "gemini-pro-latest",
+          "groundingEnabled": true,
+          "inputTokens": 3868,
+          "outputTokens": 474,
+          "cachedTokens": 0,
+          "thoughtsTokens": 1427,
+          "totalTokens": 5769,
+          "estimatedUsd": 0.030548,
+          "latencyMs": 17164,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Senior Manager, Financial Risk",
+            "fellBackToFlash": false,
+            "jobId": "a67a3e67-354b-40dc-abfc-c10b6318bfe5"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Koho hires senior manager to lead financial risk and credit forecasting",
+        "category": "compliance",
+        "insight_summary": "Koho is recruiting a Senior Manager of Financial Risk to oversee credit loss forecasting, stress testing, and portfolio monitoring. This follows recent leadership additions in credit risk and financial risk earlier in 2026. The role emphasizes IFRS 9 compliance and requires technical proficiency in SQL or Python for model risk management.",
+        "what_it_means": "Koho continues to build its internal risk and compliance infrastructure to support its retail credit portfolio.",
+        "strategic_signals": [
+          "Requires 6-8 years of experience in retail credit risk analytics and loss forecasting",
+          "Focuses on Expected Credit Loss calculations and IFRS 9 standards compliance",
+          "Involves stress testing for liquidity and capital buffers under adverse macroeconomic conditions",
+          "Follows recent leadership hires in financial risk, credit risk, and compliance"
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 3,
+        "novelty_reasoning": "The role aligns with a sustained pattern of hiring within the finance and risk departments, specifically following the recent appointments of a Director of Financial Risk and a VP of Credit Risk.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The addition of this role suggests Koho is maturing its credit risk modeling and provisioning capabilities, likely to manage an expanding retail credit portfolio and ensure regulatory compliance under IFRS 9.",
+        "web_corroboration": "No recent company news was found via web research, but the job description's focus on IFRS 9 and stress testing aligns with standard regulatory requirements for maturing financial institutions.",
+        "model_reasoning": "The assessment relies on the explicit responsibilities in the job description, such as IFRS 9 compliance and ECL calculations, combined with the historical hiring data showing a recent cluster of senior risk and compliance appointments. Confidence is high due to the clear alignment between the role's requirements and the company's recent structural investments in risk management."
+      }
+    }
+  ]
+}

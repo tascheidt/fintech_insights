@@ -43,3 +43,4 @@ These run for every new job posting after `collect`:
 - Don't add a third grounded call per job. The hot path is **two** AI calls (Flash extract + Pro analyze).
 - PRs touching this directory MUST run `gemini-compare.ts` and attach the markdown report to the PR description.
 - User-facing surfaces (digest, company insight) get the voice directive from `web/lib/ai/voice.ts`. Internal extraction (`structure.ts`, `categorizer.ts`) does not.
+- Read `companies` / `job_postings` through the `active_companies` / `active_job_postings` views, never the base tables — a deactivated company must not feed analysis or surface to users. Two independent `is_active` axes (company vs req); don't conflate them. Enforced by `design-system/active-company-scope`. See root CLAUDE.md §7.

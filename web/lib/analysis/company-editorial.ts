@@ -134,14 +134,14 @@ async function buildEditorialContext(
 
   // Company metadata
   const { data: company } = await supabase
-    .from("companies")
+    .from("active_companies")
     .select("id, name, slug, country, ats_type")
     .eq("id", companyId)
     .maybeSingle();
 
   // Recent jobs (titles, function, keywords, location, recency)
   const { data: jobs } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(
       "title, function_category, location, first_seen_date, keywords, is_active"
     )
@@ -647,7 +647,7 @@ export async function getCompaniesNeedingEditorial(
   const cutoff = subDays(new Date(), maxAgeDays).toISOString();
 
   const { data } = await supabase
-    .from("companies")
+    .from("active_companies")
     .select("id, name, slug, editorial_generated_at, is_active")
     .eq("is_active", true);
 

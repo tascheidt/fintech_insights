@@ -61,13 +61,13 @@ async function buildContext(companyId: string): Promise<SuggestionContext> {
 
   const [{ data: recentJobs }, { data: baselineJobs }] = await Promise.all([
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("function_category, keywords")
       .eq("company_id", companyId)
       .gte("first_seen_date", recent30)
       .not("function_category", "is", null),
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("function_category, keywords")
       .eq("company_id", companyId)
       .gte("first_seen_date", baseline90)

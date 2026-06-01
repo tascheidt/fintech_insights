@@ -142,7 +142,7 @@ export interface DonutDataPoint {
 export async function getCompanyBackfillCutoffs(): Promise<Map<string, Date>> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from("companies")
+    .from("active_companies")
     .select("id, created_at")
     .eq("is_active", true);
 
@@ -185,7 +185,7 @@ export async function getPostingTrends(
   const startDate = subDays(new Date(), days).toISOString();
 
   const { data: jobs, error } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select("company_id, first_seen_date, companies!inner(tier)")
     .in("companies.tier", [...tiers])
     .gte("first_seen_date", startDate)
@@ -229,7 +229,7 @@ export async function getRawFunctionData(
   const startDate = subDays(new Date(), days).toISOString();
 
   const { data: jobs, error } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select("company_id, function_category, first_seen_date, companies!inner(tier)")
     .in("companies.tier", [...tiers])
     .gte("first_seen_date", startDate)
@@ -260,13 +260,13 @@ export async function getNetHiringFlow(
 
   const [{ data: newJobs }, { data: closedJobs }] = await Promise.all([
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("company_id, first_seen_date, companies!inner(tier)")
       .in("companies.tier", tierList)
       .gte("first_seen_date", startDate)
       .not("first_seen_date", "is", null),
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("company_id, first_seen_date, closed_date, companies!inner(tier)")
       .in("companies.tier", tierList)
       .gte("closed_date", startDate)
@@ -338,7 +338,7 @@ export async function getCompetitiveMatrixData(
   // shows every fintech (or every incumbent in a tier-incumbent view), not
   // just those with jobs in the window.
   const { data: allCompanies } = await supabase
-    .from("companies")
+    .from("active_companies")
     .select("id, name, slug")
     .eq("is_active", true)
     .in("tier", tierList);
@@ -346,7 +346,7 @@ export async function getCompetitiveMatrixData(
   // Build jobs query based on mode. Inner-join companies and filter on tier
   // so a future incumbent row cannot leak into the fintech matrix.
   let jobsQuery = supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(
       "company_id, function_category, first_seen_date, is_active, companies!inner(id, name, slug, is_active, tier)"
     )
@@ -434,7 +434,7 @@ export async function getCompetitiveMatrixData(
 
   if (!isHistorical) {
     const { data: closedThisWeek } = await supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("company_id, function_category, companies!inner(tier)")
       .in("companies.tier", tierList)
       .gte("closed_date", rollingWeekStart);
@@ -552,7 +552,7 @@ export async function getHotRoles(
   const supabase = await createClient();
 
   const { data: jobs } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(
       "id, title, company_id, first_seen_date, function_category, companies!inner(name, slug, is_active, tier)"
     )
@@ -600,12 +600,12 @@ export async function getNetThisWeek(
 
   const [{ data: newJobs }, { count: closedCount }] = await Promise.all([
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("company_id, first_seen_date, companies!inner(tier)")
       .in("companies.tier", tierList)
       .gte("first_seen_date", rollingWeekStart),
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("*, companies!inner(tier)", { count: "exact", head: true })
       .in("companies.tier", tierList)
       .gte("closed_date", rollingWeekStart),
@@ -646,7 +646,7 @@ export async function getCompanyHiringSparkline(
   const startDate = subDays(new Date(), weeks * 7).toISOString();
 
   const { data: jobs } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select("first_seen_date")
     .eq("company_id", companyId)
     .gte("first_seen_date", startDate)
@@ -687,12 +687,12 @@ export async function getCompanyHiringDelta(
 
   const [{ count: newCount }, { count: closedCount }] = await Promise.all([
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("*", { count: "exact", head: true })
       .eq("company_id", companyId)
       .gte("first_seen_date", startDate),
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("*", { count: "exact", head: true })
       .eq("company_id", companyId)
       .gte("closed_date", startDate),
@@ -722,7 +722,7 @@ export async function classifyCompanyPivot(
   const recent12wStart = subDays(new Date(), 84);
 
   const { data: jobs } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select("function_category, first_seen_date")
     .eq("company_id", companyId)
     .gte("first_seen_date", longWindowStart)
@@ -793,7 +793,7 @@ export async function getCompanyLastChange(
 
   // Editor-curated
   const { data: company } = await supabase
-    .from("companies")
+    .from("active_companies")
     .select("last_change, last_change_at")
     .eq("id", companyId)
     .maybeSingle();
@@ -830,7 +830,7 @@ export async function getCompanyLastChange(
 
   // Fallback: most recent job_postings.first_seen_date
   const { data: latestJob } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select("first_seen_date")
     .eq("company_id", companyId)
     .not("first_seen_date", "is", null)
@@ -884,13 +884,13 @@ export async function getFunctionHeatData(
 
   const [{ data: recentJobs }, { data: longRangeJobs }] = await Promise.all([
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("function_category, first_seen_date, companies!inner(tier)")
       .in("companies.tier", tierList)
       .gte("first_seen_date", recent)
       .not("function_category", "is", null),
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("function_category, first_seen_date, companies!inner(tier)")
       .in("companies.tier", tierList)
       .gte("first_seen_date", longWindowStart)
@@ -973,7 +973,7 @@ export async function getCrossCompanyThemes(
   const supabase = await createClient();
 
   const { data: jobs } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(
       "company_id, function_category, is_active, companies!inner(is_active, tier)"
     )
@@ -1241,7 +1241,7 @@ async function runSemanticJobSearch(
   }
 
   let hydrate = supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(JOBS_LIST_SELECT)
     .in("companies.tier", tierList)
     .eq("companies.is_active", true)
@@ -1395,7 +1395,7 @@ export async function getJobsListData(
   const limit = hasSearch ? JOBS_LIST_SEARCH_MAX_ROWS : JOBS_LIST_MAX_ROWS;
 
   let query = supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(JOBS_LIST_SELECT)
     .in("companies.tier", tierList)
     .eq("companies.is_active", true)
@@ -1514,7 +1514,7 @@ export async function getIncumbentBets(options?: {
   const signalJobs: SignalRow[] = [];
   for (let offset = 0; ; offset += PAGE) {
     let q = supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select(
         "id, title, seniority_level, function_category, location, company_id, companies!inner(id, name, slug, is_active, tier)"
       )
@@ -1537,7 +1537,7 @@ export async function getIncumbentBets(options?: {
   // Only the 6 incumbents are eligible, so this is at most ~6 round-trips.
   const totalOpenByCompany = new Map<string, number>();
   const { data: incumbentCompanies } = await supabase
-    .from("companies")
+    .from("active_companies")
     .select("id")
     .eq("is_active", true)
     .eq("tier", "incumbent");
@@ -1547,7 +1547,7 @@ export async function getIncumbentBets(options?: {
   await Promise.all(
     eligibleIds.map(async (cid) => {
       const { count } = await supabase
-        .from("job_postings")
+        .from("active_job_postings")
         .select("id", { count: "exact", head: true })
         .eq("company_id", cid)
         .eq("is_active", true);
@@ -1886,7 +1886,7 @@ export async function getJobsForBet(
   if (!jobFilter || (!jobFilter.function && !jobFilter.theme)) return [];
   const supabase = await createClient();
   const { data } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(
       "id, title, function_category, standardized_department, location, is_active, first_seen_date, keywords, url"
     )
@@ -1931,7 +1931,7 @@ export async function getCompanyDrillDownData(
 ): Promise<CompanyDrillDownData | null> {
   const supabase = await createClient();
   const { data: company } = await supabase
-    .from("companies")
+    .from("active_companies")
     .select(
       "id, name, slug, country, ats_type, ats_identifier, careers_url, thesis, thesis_sub, interpretation, bets, last_change, last_change_at, is_active, created_at, tech_stack, tech_stack_generated_at"
     )
@@ -1945,7 +1945,7 @@ export async function getCompanyDrillDownData(
   const bets = coerceBets(co.bets);
 
   const { data: jobsRaw } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(
       "id, title, function_category, standardized_department, location, is_active, first_seen_date, keywords, url"
     )
@@ -2012,7 +2012,7 @@ export async function getAllCompanyJobsWithBets(companyId: string): Promise<
 > {
   const supabase = await createClient();
   const { data: company } = await supabase
-    .from("companies")
+    .from("active_companies")
     .select("bets")
     .eq("id", companyId)
     .maybeSingle();
@@ -2020,7 +2020,7 @@ export async function getAllCompanyJobsWithBets(companyId: string): Promise<
   const bets = coerceBets((company as { bets?: unknown } | null)?.bets);
 
   const { data: jobsRaw } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(
       "id, title, function_category, standardized_department, location, is_active, first_seen_date, keywords, url"
     )

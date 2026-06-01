@@ -439,13 +439,13 @@ async function getHistoricalPatternContext(
 
   const [ytdResponse, activeResponse] = await Promise.all([
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("company_id, title, standardized_department, is_active, first_seen_date")
       .in("company_id", companyIds)
       .gte("first_seen_date", yearStart.toISOString())
       .lt("first_seen_date", weekStart.toISOString()),
     supabase
-      .from("job_postings")
+      .from("active_job_postings")
       .select("company_id, title, standardized_department, is_active, first_seen_date")
       .in("company_id", companyIds)
       .eq("is_active", true),
@@ -535,7 +535,7 @@ export async function getWeeklyData(
   // Tier filter (default fintech-only) keeps the digest's cross-company
   // themes from being skewed by big-bank volume.
   const query = supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(`
       id,
       title,
@@ -727,7 +727,7 @@ async function getIncumbentWatchJobs(
   const supabase = createAdminClient();
 
   const { data: jobs, error } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(
       `id, title, seniority_level, function_category, company_id,
        companies!inner ( id, name, slug, is_active, tier )`

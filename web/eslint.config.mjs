@@ -2,6 +2,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import noRawColor from "./eslint-rules/no-raw-color.js";
+import activeCompanyScope from "./eslint-rules/active-company-scope.js";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -9,7 +10,10 @@ const eslintConfig = defineConfig([
   {
     plugins: {
       "design-system": {
-        rules: { "no-raw-color": noRawColor },
+        rules: {
+          "no-raw-color": noRawColor,
+          "active-company-scope": activeCompanyScope,
+        },
       },
     },
     rules: {
@@ -17,6 +21,22 @@ const eslintConfig = defineConfig([
       // Promote to "error" once all Tailwind chart files and email templates
       // have been migrated to tokens.
       "design-system/no-raw-color": "warn",
+    },
+  },
+  // Read-layer: any read of the base companies / job_postings tables must go
+  // through the active_* views so deactivated companies never leak (the Monzo
+  // incident). Writes are allowed (the rule lets `.insert/.update/.upsert/
+  // .delete` through). Scoped to the surfaces that build user-facing reads;
+  // admin / labs / ops / route code stays on the base tables by design. See
+  // migration 20260601130000 and CLAUDE.md §"Company-active read scoping".
+  {
+    files: [
+      "lib/dashboard-queries.ts",
+      "lib/analysis/**/*.{ts,tsx}",
+      "lib/ai/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "design-system/active-company-scope": "error",
     },
   },
   // Operational scripts, email templates, and the canonical email color map
