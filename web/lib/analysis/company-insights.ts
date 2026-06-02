@@ -828,7 +828,7 @@ export async function getNextCompanyForInsight(): Promise<{
   // but the workflow loops one-company-per-firing so a backfill spreads the
   // work across separate HTTP requests rather than one long-running one.
   const { data: companies } = await supabase
-    .from("companies")
+    .from("active_companies")
     .select("id, name")
     .eq("is_active", true);
 

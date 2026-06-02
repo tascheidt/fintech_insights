@@ -332,7 +332,7 @@ export async function refreshAllThemeLabels(
   // Tier filter (default fintech-only) keeps incumbent keyword bags out of
   // the cross-company labeler — otherwise bank hiring dwarfs every theme.
   const { data: jobs } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select(
       "function_category, keywords, title, company_id, is_active, companies!inner(tier)"
     )

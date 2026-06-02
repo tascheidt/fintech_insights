@@ -5,6 +5,11 @@
  * via `.in("companies.tier", tiers)` with a fintech-only default. These
  * tests fail if the filter is dropped from any aggregator we know skews
  * volume views.
+ *
+ * Note: the read-layer goes through the `active_companies` / `active_job_postings`
+ * views (company-active scoping, migration 20260601130000), so the chain mock is
+ * keyed on those relation names — a revert to the base `companies` / `job_postings`
+ * tables makes these logs empty and fails the suite, which is the regression guard.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -108,12 +113,12 @@ describe("volume aggregators apply the default fintech-only tier filter", () => 
     await getCompetitiveMatrixData(cutoffs);
     // The function fires three queries: companies seed, main jobs join,
     // and a closed-this-week pull. All three must be tier-filtered.
-    expect(tierFilterArgs("job_postings")).toEqual([
+    expect(tierFilterArgs("active_job_postings")).toEqual([
       ["companies.tier", ["fintech"]],
       ["companies.tier", ["fintech"]],
     ]);
     expect(
-      (callLogs["companies"] ?? []).some(
+      (callLogs["active_companies"] ?? []).some(
         (c) =>
           c.method === "in" &&
           c.args[0] === "tier" &&
@@ -124,12 +129,12 @@ describe("volume aggregators apply the default fintech-only tier filter", () => 
 
   it("getHotRoles defaults to fintech-only", async () => {
     await getHotRoles(cutoffs);
-    expect(tierFilterArgs("job_postings")).toEqual([["companies.tier", ["fintech"]]]);
+    expect(tierFilterArgs("active_job_postings")).toEqual([["companies.tier", ["fintech"]]]);
   });
 
   it("getNetThisWeek filters BOTH the new- and closed-job pulls", async () => {
     await getNetThisWeek(cutoffs);
-    const filters = tierFilterArgs("job_postings");
+    const filters = tierFilterArgs("active_job_postings");
     expect(filters).toEqual([
       ["companies.tier", ["fintech"]],
       ["companies.tier", ["fintech"]],
@@ -138,17 +143,17 @@ describe("volume aggregators apply the default fintech-only tier filter", () => 
 
   it("getPostingTrends filters on tier=fintech", async () => {
     await getPostingTrends(30, cutoffs);
-    expect(tierFilterArgs("job_postings")).toEqual([["companies.tier", ["fintech"]]]);
+    expect(tierFilterArgs("active_job_postings")).toEqual([["companies.tier", ["fintech"]]]);
   });
 
   it("getRawFunctionData filters on tier=fintech", async () => {
     await getRawFunctionData(30, cutoffs);
-    expect(tierFilterArgs("job_postings")).toEqual([["companies.tier", ["fintech"]]]);
+    expect(tierFilterArgs("active_job_postings")).toEqual([["companies.tier", ["fintech"]]]);
   });
 
   it("getNetHiringFlow filters on tier=fintech for BOTH new and closed pulls", async () => {
     await getNetHiringFlow(30, cutoffs);
-    expect(tierFilterArgs("job_postings")).toEqual([
+    expect(tierFilterArgs("active_job_postings")).toEqual([
       ["companies.tier", ["fintech"]],
       ["companies.tier", ["fintech"]],
     ]);
@@ -156,7 +161,7 @@ describe("volume aggregators apply the default fintech-only tier filter", () => 
 
   it("getFunctionHeatData filters on tier=fintech for both recent and long-range pulls", async () => {
     await getFunctionHeatData();
-    expect(tierFilterArgs("job_postings")).toEqual([
+    expect(tierFilterArgs("active_job_postings")).toEqual([
       ["companies.tier", ["fintech"]],
       ["companies.tier", ["fintech"]],
     ]);
@@ -164,19 +169,19 @@ describe("volume aggregators apply the default fintech-only tier filter", () => 
 
   it("getCrossCompanyThemes filters on tier=fintech", async () => {
     await getCrossCompanyThemes();
-    expect(tierFilterArgs("job_postings")).toEqual([["companies.tier", ["fintech"]]]);
+    expect(tierFilterArgs("active_job_postings")).toEqual([["companies.tier", ["fintech"]]]);
   });
 });
 
 describe("getJobsListData tier filter (Phase 2 Step 1 — leak G4)", () => {
   it("defaults to fintech-only so RBC's ~1,500 jobs don't flood the /jobs list", async () => {
     await getJobsListData();
-    expect(tierFilterArgs("job_postings")).toEqual([["companies.tier", ["fintech"]]]);
+    expect(tierFilterArgs("active_job_postings")).toEqual([["companies.tier", ["fintech"]]]);
   });
 
   it("accepts an explicit tiers override (the Jobs-page Tier toggle opting into incumbents)", async () => {
     await getJobsListData({ tiers: ["fintech", "incumbent"] });
-    expect(tierFilterArgs("job_postings")).toEqual([
+    expect(tierFilterArgs("active_job_postings")).toEqual([
       ["companies.tier", ["fintech", "incumbent"]],
     ]);
   });
@@ -184,29 +189,29 @@ describe("getJobsListData tier filter (Phase 2 Step 1 — leak G4)", () => {
   it("short-circuits an empty jobIds snapshot without issuing a query", async () => {
     const result = await getJobsListData({ jobIds: [] });
     expect(result).toEqual({ rows: [], truncated: false });
-    expect(tierFilterArgs("job_postings")).toEqual([]);
+    expect(tierFilterArgs("active_job_postings")).toEqual([]);
   });
 });
 
 describe("getJobsListData activity scope (active-only default)", () => {
   it("defaults to active-only so closed roles don't pad the board", async () => {
     await getJobsListData();
-    expect(isActiveEqArgs("job_postings")).toEqual([["is_active", true]]);
+    expect(isActiveEqArgs("active_job_postings")).toEqual([["is_active", true]]);
   });
 
   it("scopes to closed roles when status is 'inactive'", async () => {
     await getJobsListData({ status: "inactive" });
-    expect(isActiveEqArgs("job_postings")).toEqual([["is_active", false]]);
+    expect(isActiveEqArgs("active_job_postings")).toEqual([["is_active", false]]);
   });
 
   it("applies no is_active predicate when status is 'all'", async () => {
     await getJobsListData({ status: "all" });
-    expect(isActiveEqArgs("job_postings")).toEqual([]);
+    expect(isActiveEqArgs("active_job_postings")).toEqual([]);
   });
 
   it("still scopes active-only alongside a full-text search", async () => {
     await getJobsListData({ searchQuery: "engineer", status: "active" });
-    expect(isActiveEqArgs("job_postings")).toEqual([["is_active", true]]);
+    expect(isActiveEqArgs("active_job_postings")).toEqual([["is_active", true]]);
   });
 });
 
@@ -222,32 +227,32 @@ describe("getJobsListData full-text search (description match)", () => {
 
   it("issues no full-text search when searchQuery is null", async () => {
     await getJobsListData({ searchQuery: null });
-    expect(textSearchCalls("job_postings")).toEqual([]);
-    expect(limitCalls("job_postings")).toEqual([500]);
+    expect(textSearchCalls("active_job_postings")).toEqual([]);
+    expect(limitCalls("active_job_postings")).toEqual([500]);
   });
 
   it("issues no full-text search for whitespace-only searchQuery", async () => {
     await getJobsListData({ searchQuery: "   " });
-    expect(textSearchCalls("job_postings")).toEqual([]);
-    expect(limitCalls("job_postings")).toEqual([500]);
+    expect(textSearchCalls("active_job_postings")).toEqual([]);
+    expect(limitCalls("active_job_postings")).toEqual([500]);
   });
 
   // Convenience: the tsquery string passed to the single textSearch call.
   async function tsqueryFor(q: string): Promise<string> {
     for (const key of Object.keys(callLogs)) delete callLogs[key];
     await getJobsListData({ searchQuery: q });
-    const calls = textSearchCalls("job_postings");
+    const calls = textSearchCalls("active_job_postings");
     return calls.length ? (calls[0][1] as string) : "";
   }
 
   it("bare words AND-match as prefixes (type-ahead) and lift the cap to 1000", async () => {
     await getJobsListData({ searchQuery: "staff engineer" });
-    const calls = textSearchCalls("job_postings");
+    const calls = textSearchCalls("active_job_postings");
     expect(calls).toHaveLength(1);
     expect(calls[0][0]).toBe("search_tsv");
     expect(calls[0][1]).toBe("staff:* & engineer:*");
     expect(calls[0][2]).toEqual({ config: "english" });
-    expect(limitCalls("job_postings")).toEqual([1000]);
+    expect(limitCalls("active_job_postings")).toEqual([1000]);
   });
 
   it("supports short terms — tsvector prefix has no 3-char floor", async () => {
@@ -301,7 +306,7 @@ describe("getJobsListData full-text search (description match)", () => {
     // semantic branch returns null → keyword full-text path runs instead.
     // Search must degrade, never break.
     await getJobsListData({ searchQuery: "staff engineer", searchMode: "semantic" });
-    const calls = textSearchCalls("job_postings");
+    const calls = textSearchCalls("active_job_postings");
     expect(calls).toHaveLength(1);
     expect(calls[0][1]).toBe("staff:* & engineer:*");
   });
@@ -315,7 +320,7 @@ describe("getIncumbentBets (Phase 2 — Incumbent Bets rail / company panel)", (
 
   it("scopes strictly to tier='incumbent' — the inverse of the volume aggregators", async () => {
     await getIncumbentBets();
-    const eqs = eqArgs("job_postings");
+    const eqs = eqArgs("active_job_postings");
     expect(eqs).toContainEqual(["companies.tier", "incumbent"]);
     // It must never fintech-scope — this surface is incumbent-only.
     expect(eqs).not.toContainEqual(["companies.tier", "fintech"]);
@@ -328,7 +333,7 @@ describe("getIncumbentBets (Phase 2 — Incumbent Bets rail / company panel)", (
 
   it("accepts a companyId scope for the per-company 'Senior hiring signal' panel", async () => {
     await getIncumbentBets({ companyId: "rbc-uuid" });
-    const eqs = eqArgs("job_postings");
+    const eqs = eqArgs("active_job_postings");
     expect(eqs).toContainEqual(["company_id", "rbc-uuid"]);
   });
 });
@@ -339,12 +344,12 @@ describe("volume aggregators accept an explicit tiers argument", () => {
   it("getHotRoles can be scoped to incumbents only (Phase 2 'Incumbent Bets' rail)", async () => {
     const tiers: CompanyTier[] = ["incumbent"];
     await getHotRoles(cutoffs, 15, tiers);
-    expect(tierFilterArgs("job_postings")).toEqual([["companies.tier", ["incumbent"]]]);
+    expect(tierFilterArgs("active_job_postings")).toEqual([["companies.tier", ["incumbent"]]]);
   });
 
   it("getCompetitiveMatrixData can include both tiers via the 'include incumbents' toggle", async () => {
     await getCompetitiveMatrixData(cutoffs, { tiers: ["fintech", "incumbent"] });
-    expect(tierFilterArgs("job_postings")).toEqual([
+    expect(tierFilterArgs("active_job_postings")).toEqual([
       ["companies.tier", ["fintech", "incumbent"]],
       ["companies.tier", ["fintech", "incumbent"]],
     ]);

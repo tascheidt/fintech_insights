@@ -45,3 +45,4 @@ When you change voice tone, update `docs/voice.md` and `voice.ts` in the same PR
 4. **Cache keys include `prompt_config_version`** — otherwise prompt tweaks silently serve stale outputs.
 5. **Voice directive is user-facing only** — never on extraction/classification.
 6. **PRs touching this directory MUST run `gemini-compare.ts`** and attach the markdown report. Commit the JSON under `web/scripts/artifacts/`.
+7. **Read `companies` / `job_postings` through the `active_companies` / `active_job_postings` views**, not the base tables — a deactivated company must never feed a user-facing surface. Enforced by `design-system/active-company-scope`. See root CLAUDE.md §7 "Company-active read scoping."

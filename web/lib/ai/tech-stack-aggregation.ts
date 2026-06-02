@@ -44,7 +44,7 @@ export async function aggregateTechStackFromJobs(
   const supabase = createAdminClient();
 
   const { data: jobs, error } = await supabase
-    .from("job_postings")
+    .from("active_job_postings")
     .select("id, tech_stack, first_seen_date, is_active")
     .eq("company_id", companyId)
     .not("tech_stack", "is", null)

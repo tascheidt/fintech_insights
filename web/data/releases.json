@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.9.4",
+    "date": "2026-06-01",
+    "changes": [
+      { "type": "fix", "description": "Deactivated companies are now excluded everywhere, not just in Jobs search. The dashboard's hiring trends, net-flow, function mix, and cross-company themes were still counting roles from companies we've stopped covering, slightly inflating fintech totals. All of these now scope to active companies, so the numbers match the set of companies on your dashboard." }
+    ]
+  },
+  {
     "version": "2.9.3",
     "date": "2026-06-01",
     "changes": [
