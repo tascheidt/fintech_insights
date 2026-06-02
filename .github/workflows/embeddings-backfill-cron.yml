@@ -29,6 +29,12 @@ jobs:
       run:
         working-directory: ./web
     steps:
+      # Checkout MUST come first: the job-level `working-directory: ./web`
+      # default applies to every `run:` step, and ./web doesn't exist until the
+      # repo is checked out. A `run:` step before this fails with "No such file
+      # or directory" trying to start bash in ./web.
+      - uses: actions/checkout@v5
+
       - name: Validate required secrets
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -42,8 +48,6 @@ jobs:
               exit 1
             fi
           done
-
-      - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v5
         with:
