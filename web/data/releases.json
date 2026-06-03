@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.9.5",
+    "date": "2026-06-03",
+    "changes": [
+      { "type": "fix", "description": "Large daily scrapes no longer get thrown away when the database is briefly busy. If a write during a big employer's ingest (e.g. Scotiabank's ~1,900 roles) is cancelled because another job is momentarily holding the same rows, the scraper now waits a moment and retries instead of discarding the whole run — the same resilience we already had for database restarts. A Scotiabank scrape was lost to exactly this on June 3." }
+    ]
+  },
+  {
     "version": "2.9.4",
     "date": "2026-06-01",
     "changes": [

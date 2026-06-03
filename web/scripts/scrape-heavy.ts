@@ -34,6 +34,18 @@ import type { Company } from "@/lib/jobs/types";
  * later. updateTaskProgress rethrows these wrapped in an Error whose message
  * still carries the "schema cache" / "PGRST002" text, so we match on both the
  * structured `.code` and the message string.
+ *
+ * We also treat Postgres statement/lock timeouts as transient. Supabase pins
+ * statement_timeout=8s (and lock_timeout=8s) on the API roles. During a heavy
+ * ingest the per-row writes run while a sibling writer — the 06:00 collect /
+ * analysis pass still touching the same company's rows — can hold a lock; a
+ * single write then blocks past 8s and is cancelled mid-flight (57014, or
+ * 55P03 if lock_timeout fires first). That killed the June 3 2026 Scotiabank
+ * ingest (1,859 jobs scraped + enriched, then discarded). The ingest is
+ * idempotent (upserts/updates by external id), so we ride out the contention
+ * window with backoff exactly like a restart, rather than throwing away the
+ * finished scrape. If a company times out every run, that's a systematic
+ * signal to batch the per-row writes — not something a retry should hide.
  */
 function isTransientDbError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
@@ -41,6 +53,7 @@ function isTransientDbError(err: unknown): boolean {
   const code = typeof e.code === "string" ? e.code : "";
   const msg = (typeof e.message === "string" ? e.message : "").toLowerCase();
   if (code === "PGRST002" || code === "PGRST001") return true;
+  if (code === "57014" || code === "55P03") return true; // statement_timeout / lock_not_available
   return (
     msg.includes("schema cache") ||
     msg.includes("pgrst002") ||
@@ -48,7 +61,10 @@ function isTransientDbError(err: unknown): boolean {
     msg.includes("not accepting connections") ||
     msg.includes("the database system is starting up") ||
     msg.includes("fetch failed") ||
-    msg.includes("connection reset")
+    msg.includes("connection reset") ||
+    msg.includes("statement timeout") ||
+    msg.includes("canceling statement due to") ||
+    msg.includes("lock timeout")
   );
 }
 
