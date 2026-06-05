@@ -24,6 +24,38 @@ import { triggerAnalysisForJobs } from "@/lib/jobs/runner";
 import type { Company } from "@/lib/jobs/types";
 
 /**
+ * Render an unknown thrown value as a human-readable string for logs and the
+ * `job_run_tasks.error_message` column. supabase-js / PostgREST reject with a
+ * PLAIN object (`{ code, message, details, hint }`) that is NOT an Error
+ * instance, so the old `error instanceof Error ? error.message : String(error)`
+ * collapsed every DB rejection to the literal "[object Object]". That is
+ * exactly what masked the real failures for days — Scotiabank's `57014`
+ * (statement timeout on the oversized snapshot write) and TD's Supabase-origin
+ * Cloudflare 520/521 both surfaced only as "[object Object]" in the task row.
+ * Prefer a structured `[code] message`; fall back to JSON so we never store
+ * "[object Object]" again.
+ */
+function describeError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object") {
+    const e = err as { message?: unknown; code?: unknown; details?: unknown };
+    const parts: string[] = [];
+    if (typeof e.code === "string" && e.code) parts.push(`[${e.code}]`);
+    if (typeof e.message === "string" && e.message) parts.push(e.message);
+    if (parts.length === 0 && typeof e.details === "string" && e.details) {
+      parts.push(e.details);
+    }
+    if (parts.length > 0) return parts.join(" ");
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err);
+}
+
+/**
  * Classify an error as a transient Supabase outage worth waiting out, rather
  * than a permanent failure. A Supabase Postgres restart takes the DB offline
  * for a few seconds, then PostgREST rebuilds its schema cache — during that
@@ -46,6 +78,12 @@ import type { Company } from "@/lib/jobs/types";
  * window with backoff exactly like a restart, rather than throwing away the
  * finished scrape. If a company times out every run, that's a systematic
  * signal to batch the per-row writes — not something a retry should hide.
+ *
+ * Finally, a Supabase origin hiccup can surface as a Cloudflare gateway 5xx
+ * (520 "web server is returning an unknown error" / 521 / 522 / 523 / 524)
+ * whose body is an HTML error page rather than a structured PGRST error — the
+ * June 4 2026 TD ingest died on a bare 520. Those are transient platform
+ * blips, so match the Cloudflare error-code/banner text too.
  */
 function isTransientDbError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
@@ -64,7 +102,19 @@ function isTransientDbError(err: unknown): boolean {
     msg.includes("connection reset") ||
     msg.includes("statement timeout") ||
     msg.includes("canceling statement due to") ||
-    msg.includes("lock timeout")
+    msg.includes("lock timeout") ||
+    // Cloudflare gateway 5xx in front of the Supabase origin (HTML body).
+    msg.includes("web server is returning an unknown error") || // 520
+    msg.includes("web server is down") || // 521
+    msg.includes("error code 520") ||
+    msg.includes("error code 521") ||
+    msg.includes("error code 522") ||
+    msg.includes("error code 523") ||
+    msg.includes("error code 524") ||
+    msg.includes("bad gateway") ||
+    msg.includes("gateway time-out") ||
+    msg.includes("gateway timeout") ||
+    msg.includes("service unavailable")
   );
 }
 
@@ -370,16 +420,27 @@ async function main() {
     );
     console.log(`✅ Fetched ${jobs.length} jobs`);
 
-    // Step 7: Store scraped data in task. This is the durable snapshot of the
-    // fetched corpus; if it silently fails a later ingest failure has nothing to
-    // fall back on. The May 31 2026 TD run lost all 1370 fetched jobs because
-    // this write swallowed a PGRST002 during a Supabase restart — so retry
-    // transient outages and surface a hard failure instead of dropping it.
-    await withTransientRetry("save scraped_data", async () => {
+    // Step 7: Record scrape completion. Split into two writes that used to be
+    // one, because they have very different failure profiles:
+    //
+    //   (a) progress fields (jobs_fetched + stage_progress.scrape) — a handful
+    //       of bytes; must succeed, so retry transient outages.
+    //   (b) scraped_data — the FULL enriched corpus as a single JSONB value.
+    //       For the big incumbent banks (RBC/Scotia/TD, 1.4-1.9k jobs) that is
+    //       a 12-17MB write that deterministically blows Supabase's 8s
+    //       statement_timeout (57014) and sometimes trips a gateway 520/521.
+    //       The old combined write THREW on that failure, aborting the whole
+    //       run AFTER a clean fetch+enrich and stranding the bank with a stale
+    //       corpus for days (Scotia & TD, June 2026). The snapshot is only ever
+    //       read back by the rare `startFromStage:'ingest'` resume; the ingest
+    //       below (Step 8) uses the in-memory `jobs`, so a missing snapshot
+    //       must NOT abort the run. Write it best-effort, OUTSIDE the transient
+    //       retry (a 57014 here is deterministic for these payloads — retrying
+    //       just burns ~63s before the same failure), and continue on error.
+    await withTransientRetry("save scrape progress", async () => {
       const { error } = await supabase
         .from("job_run_tasks")
         .update({
-          scraped_data: jobs,
           jobs_fetched: jobs.length,
           stage_progress: {
             scrape: {
@@ -392,6 +453,20 @@ async function main() {
         .eq("id", task.id);
       if (error) throw error;
     });
+
+    try {
+      const { error } = await supabase
+        .from("job_run_tasks")
+        .update({ scraped_data: jobs })
+        .eq("id", task.id);
+      if (error) throw error;
+    } catch (snapshotErr) {
+      console.warn(
+        `⚠️  Skipping scraped_data snapshot for task ${task.id} (${jobs.length} jobs): ${describeError(
+          snapshotErr
+        )}. Ingest continues from the in-memory corpus.`
+      );
+    }
 
     // Step 8: Call runIngestStage to save results. Wrapped so a Supabase restart
     // mid-ingest (PostgREST schema-cache reload → PGRST002) is ridden out rather
@@ -464,7 +539,7 @@ async function main() {
       console.log("ℹ️  No new jobs — skipping analysis stage.");
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = describeError(error);
     console.error(`❌ Error during scraping: ${errorMessage}`);
 
     // Mark task + job_run as failed with retry. If the underlying cause

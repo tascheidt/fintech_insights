@@ -122,6 +122,7 @@ export async function checkAndAlertScraperHealth(
 
     // Detect issues
     const issues: ScraperIssue[] = [];
+    const issueCompanyIds = new Set<string>();
 
     for (const task of tasks) {
       const company = companyMap.get(task.company_id);
@@ -139,6 +140,7 @@ export async function checkAndAlertScraperHealth(
           activeJobCount,
           closedThisRun,
         });
+        issueCompanyIds.add(task.company_id);
       } else if (activeJobCount === 0 && closedThisRun > 0) {
         // Scraper returned nothing, wiped all existing jobs
         issues.push({
@@ -148,14 +150,41 @@ export async function checkAndAlertScraperHealth(
           activeJobCount: 0,
           closedThisRun,
         });
+        issueCompanyIds.add(task.company_id);
       }
     }
+
+    // The canary's "0 new postings today" signal is only meaningful once a
+    // company's scrape for THIS run has actually LANDED. Every incumbent is a
+    // heavy browser scraper offloaded to GitHub Actions (processor.ts), so its
+    // task sits in 'running' — and today's rows are absent — until the async
+    // scrape finishes, which is minutes-to-an-hour AFTER the collect run is
+    // marked complete (runner.ts treats offloaded 'running' tasks as
+    // non-blocking). Evaluating the canary against a still-'running' incumbent
+    // is a guaranteed false "0 new today" — that race is exactly what fired a
+    // "6 incumbent scrapers" alert while three of them had simply not ingested
+    // yet (June 2026). Restrict the canary to incumbents whose task in this run
+    // is terminal, and drop any already surfaced above as a failed/empty issue
+    // so a broken bank isn't double-reported in both sections.
+    const evaluableCompanyIds = new Set(
+      tasks
+        .filter(
+          (t) =>
+            (t.status === "completed" ||
+              t.status === "failed" ||
+              t.status === "cancelled") &&
+            !issueCompanyIds.has(t.company_id)
+        )
+        .map((t) => t.company_id)
+    );
 
     // Independent fragility check: partial-corpus drop for incumbent
     // (big-bank) scrapers. A scraper that returns SOME but not all jobs
     // can silently rot the dataset for days; the canary fires when today's
     // new-postings count is well below the 7-day baseline.
-    const canaries = await detectIncumbentCanaries(supabase);
+    const canaries = await detectIncumbentCanaries(supabase, {
+      evaluableCompanyIds,
+    });
 
     if (issues.length === 0 && canaries.length === 0) {
       log.info("Scraper health check passed — no issues detected.");
@@ -241,11 +270,20 @@ export async function checkAndAlertScraperHealth(
  * Fires the canary when `evaluateCanary` returns true. Read-only; safe to
  * call on every collect run. Errors are swallowed and logged — a failed
  * canary check must never block the existing scraper-health email.
+ *
+ * `opts.evaluableCompanyIds` (when provided) restricts evaluation to companies
+ * whose scrape for the current run has LANDED — i.e. the task is terminal and
+ * not already flagged as a failed/empty issue. Incumbents are heavy scrapers
+ * offloaded to GitHub Actions, so a still-'running' task means today's rows
+ * haven't ingested yet and a "0 new today" reading would be a false positive.
+ * Omitting the set (e.g. a manual/standalone invocation) evaluates every
+ * active incumbent, preserving the original behaviour.
  */
 type SupabaseAdminClient = ReturnType<typeof createAdminClient>;
 
 export async function detectIncumbentCanaries(
-  supabase: SupabaseAdminClient
+  supabase: SupabaseAdminClient,
+  opts?: { evaluableCompanyIds?: Set<string> }
 ): Promise<ScraperCanary[]> {
   try {
     const { data: companies, error: companiesError } = await supabase
@@ -263,6 +301,15 @@ export async function detectIncumbentCanaries(
     }
 
     if (!companies || companies.length === 0) return [];
+
+    // Only judge incumbents whose scrape for this run has actually landed.
+    // Without this gate the canary races the offloaded GitHub Actions scrapes
+    // and reports every incumbent as "0 new today" before its rows ingest.
+    const evaluable = opts?.evaluableCompanyIds
+      ? companies.filter((c) => opts.evaluableCompanyIds!.has(c.id))
+      : companies;
+
+    if (evaluable.length === 0) return [];
 
     // UTC day boundaries. "Today" = postings with first_seen_date in the
     // 24h window starting at 00:00 UTC of the current calendar day.
@@ -291,7 +338,7 @@ export async function detectIncumbentCanaries(
     // for ~7 days after every new incumbent comes online and keep this
     // canary firing daily.
     const counts = await Promise.all(
-      companies.map(async (company) => {
+      evaluable.map(async (company) => {
         const backfillCutoffIso = company.created_at
           ? new Date(
               new Date(company.created_at as string).getTime() + 48 * 60 * 60 * 1000

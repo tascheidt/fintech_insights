@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.9.6",
+    "date": "2026-06-04",
+    "changes": [
+      { "type": "fix", "description": "The big-bank scrapers (RBC, Scotiabank, TD) no longer fail silently on the database write after a clean scrape. Each was fetching its full ~1,400–1,900-role corpus, then dying while saving a large debug snapshot — an error that showed up only as \"[object Object]\", hiding the real cause (a write timeout for Scotiabank, a brief Supabase outage for TD) for days. The snapshot write is now best-effort and never aborts the actual job ingest, write errors are recorded legibly, and short Supabase gateway blips are ridden out." },
+      { "type": "fix", "description": "The daily \"scraper-break\" health alert no longer cries wolf. Because the bank scrapers run asynchronously and land their jobs minutes after the morning collection finishes, the alert was checking them too early and reporting every bank as \"0 new today\" — a noisy false alarm that also buried the genuinely-broken ones. It now only judges a scraper once that morning's run has actually landed, so the alert reflects real outages." }
+    ]
+  },
+  {
     "version": "2.9.5",
     "date": "2026-06-03",
     "changes": [

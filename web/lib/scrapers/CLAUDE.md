@@ -45,6 +45,14 @@ Workday returns `externalPath` already prefixed with `/job/...`. The detail URL 
 
 Resist the urge to refactor `browser.ts` before launch. It works. The complexity is load-bearing — selector heuristics, retry logic, and per-site quirks are baked in. Post-launch, split it by site and add tests; before launch, do not.
 
+### Heavy-scrape write resilience (`web/scripts/scrape-heavy.ts`)
+
+The offloaded runner fetches the whole corpus in memory, then writes. Two write hazards have repeatedly stranded the big banks (1.4–1.9k jobs) *after* a clean fetch+enrich:
+
+- **The `scraped_data` snapshot is a 12–17MB single JSONB write.** It deterministically blows Supabase's 8s `statement_timeout` (`57014`) for RBC/Scotia/TD and sometimes trips a gateway `520/521`. It is **best-effort only** — written outside the transient-retry and wrapped in try/catch — because the only reader is the rare `startFromStage:'ingest'` resume; Step 8 ingests from the in-memory corpus regardless. **Never make this write fatal again** (it aborted Scotia & TD for days, June 2026). The per-row ingest writes, by contrast, are small and *are* retried.
+- **Error serialization:** supabase-js rejects with a plain `{code,message}` object, not an `Error`. Use `describeError()` (never `String(err)`) when writing `error_message` — `String({...})` is `"[object Object]"`, which masked the real `57014`/`520` causes in the task row for days.
+- **`isTransientDbError` is the allow-list of retry-worthy failures**: PGRST002/001 (schema-cache reload), `57014`/`55P03` (statement/lock timeout under contention), raw transport errors, and Cloudflare gateway 5xx (`520`–`524`) in front of the Supabase origin. A deterministic timeout (the oversized snapshot write) is *not* something retry should hide — it's fixed by not doing the oversized write, not by retrying it.
+
 ## Revolut (offloaded to GitHub Actions)
 
 Revolut's careers page is a custom-built Next.js SPA behind Cloudflare anti-bot. Not on any third-party ATS (probed Smartrecruiters / Lever / Greenhouse / Workable — all return 404 or empty for any Revolut slug variant). The generic `scrapeGenericJobBoard` drops every job because Revolut URLs are slug+UUID (`/careers/position/head-of-risk-257ab149-12e7-4a84-bda0-1ab1a1d36760/`), not `/jobs/<digits>` as the generic ID-extraction regex requires.
