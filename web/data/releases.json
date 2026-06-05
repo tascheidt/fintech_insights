@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.9.7",
+    "date": "2026-06-05",
+    "changes": [
+      { "type": "fix", "description": "RBC jobs are flowing again. For a week, no new RBC roles had landed — not because the scraper was blocked, but because it was being cut off partway through. RBC is our largest single-employer scrape (~1,400 roles, each fetched individually), and a 30-minute ceiling added on May 28 was killing the run at the half-way mark before any of its jobs could be saved. We made the scrape ~3× faster (it reads RBC's pages directly instead of waiting on unnecessary in-browser loading) so a full run now finishes in ~12–15 minutes, and raised the ceiling to 45 minutes for genuine headroom." }
+    ]
+  },
+  {
     "version": "2.9.6",
     "date": "2026-06-04",
     "changes": [
