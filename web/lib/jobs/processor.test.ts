@@ -311,6 +311,46 @@ describe("normalizeDescriptionForHash", () => {
   });
 });
 
+describe("exceedsClosureFloor (mass-closure sanity floor)", () => {
+  it("trips when a large corpus would shed more than the default 30%", async () => {
+    const { exceedsClosureFloor } = await import("./processor");
+    // The May 2026 Workday truncation shape: ~50 of ~1,500 fetched, so the
+    // closure loop wants to close ~1,450/1,500.
+    expect(exceedsClosureFloor(1500, 1450)).toBe(true);
+  });
+
+  it("does not trip on a normal daily churn (a handful of a big corpus)", async () => {
+    const { exceedsClosureFloor } = await import("./processor");
+    expect(exceedsClosureFloor(1500, 30)).toBe(false);
+  });
+
+  it("never trips below the minimum-corpus guard, even at 100% closure", async () => {
+    const { exceedsClosureFloor } = await import("./processor");
+    // A small board legitimately closing most of its few reqs must not be
+    // mistaken for a truncated scrape.
+    expect(exceedsClosureFloor(6, 6)).toBe(false);
+    expect(exceedsClosureFloor(19, 19)).toBe(false);
+  });
+
+  it("does not trip when nothing would close", async () => {
+    const { exceedsClosureFloor } = await import("./processor");
+    expect(exceedsClosureFloor(1500, 0)).toBe(false);
+  });
+
+  it("treats exactly the floor as not-tripped (strictly greater-than)", async () => {
+    const { exceedsClosureFloor } = await import("./processor");
+    expect(exceedsClosureFloor(100, 30)).toBe(false); // 30% == floor, allowed
+    expect(exceedsClosureFloor(100, 31)).toBe(true); // 31% > floor, tripped
+  });
+
+  it("honors custom ratio + minimum-corpus overrides", async () => {
+    const { exceedsClosureFloor } = await import("./processor");
+    expect(exceedsClosureFloor(50, 30, 0.5, 10)).toBe(true); // 60% > 50%
+    expect(exceedsClosureFloor(50, 20, 0.5, 10)).toBe(false); // 40% < 50%
+    expect(exceedsClosureFloor(8, 8, 0.5, 10)).toBe(false); // below custom min
+  });
+});
+
 describe("runIngestStage companySlugOverride routing", () => {
   beforeEach(() => {
     extractJobStructureMock.mockClear();

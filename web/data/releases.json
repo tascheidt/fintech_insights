@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.9.8",
+    "date": "2026-06-05",
+    "changes": [
+      { "type": "fix", "description": "A bad scrape can no longer wipe a company's open roles off the board. We detect closed postings by noticing which roles stopped appearing in the daily scrape — but if a scrape returns only part of an employer's jobs (a pagination glitch, or a run cut short), that logic would wrongly mark all the missing roles as closed. There's now a safety floor: if a single run would close more than 30% of a large employer's open roles, we treat the scrape as incomplete, skip the closures, and raise an alert instead — so a glitchy scrape leaves a few stale entries to reconcile next run rather than silently emptying a company." }
+    ]
+  },
+  {
     "version": "2.9.6",
     "date": "2026-06-04",
     "changes": [
