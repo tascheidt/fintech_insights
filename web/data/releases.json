@@ -4,6 +4,20 @@
     "date": "2026-06-06",
     "changes": [
       { "type": "fix", "description": "The CIBC and TD scrapers now recover automatically when a bank's bot-protection (Akamai) temporarily blocks the run server's network address. Some mornings the careers site answered the very first request with a challenge page instead of job data, and the whole scrape gave up before fetching anything — even though the exact same request worked fine seconds later from a different address. The scrape now detects that block clearly (instead of crashing on an unreadable error) and retries once on a fresh run server, which lands the full corpus. CIBC and TD both recovered this way after a June 6 outage." }
+          ]
+  },
+  {
+    "version": "2.9.8",
+    "date": "2026-06-05",
+    "changes": [
+      { "type": "fix", "description": "A bad scrape can no longer wipe a company's open roles off the board. We detect closed postings by noticing which roles stopped appearing in the daily scrape — but if a scrape returns only part of an employer's jobs (a pagination glitch, or a run cut short), that logic would wrongly mark all the missing roles as closed. There's now a safety floor: if a single run would close more than 30% of a large employer's open roles, we treat the scrape as incomplete, skip the closures, and raise an alert instead — so a glitchy scrape leaves a few stale entries to reconcile next run rather than silently emptying a company." }
+    ]
+  },
+  {
+    "version": "2.9.7",
+    "date": "2026-06-05",
+    "changes": [
+      { "type": "fix", "description": "RBC jobs are flowing again. For a week, no new RBC roles had landed — not because the scraper was blocked, but because it was being cut off partway through. RBC is our largest single-employer scrape (~1,400 roles, each fetched individually), and a 30-minute ceiling added on May 28 was killing the run at the half-way mark before any of its jobs could be saved. We made the scrape ~3× faster (it reads RBC's pages directly instead of waiting on unnecessary in-browser loading) so a full run now finishes in ~12–15 minutes, and raised the ceiling to 45 minutes for genuine headroom." }
     ]
   },
   {

@@ -31,9 +31,13 @@
  * Cost knob: `PHENOM_RBC_MAX_JOBS` env var is an OPTIONAL cap. Unset (the
  * production default) means "process the entire RBC corpus" — pagination
  * runs until totalHits is exhausted. Set it for smoke tests or to impose
- * a cost ceiling. Full RBC is ~1,500 jobs; at 4-concurrent description
- * fetches × ~5s each that's ~30min on cold-start (fine for GitHub
- * Actions). The processor's `description_hash` gate makes subsequent
+ * a cost ceiling. Full RBC is ~1,400 jobs; listing + detail pages are both
+ * read from server-rendered HTML (`domcontentloaded`, no client-hydration
+ * wait), so a full run lands in ~12–15 min at concurrency=4 — comfortably
+ * inside the GitHub Actions ceiling. (Before June 2026 the navigation waited
+ * on `networkidle2` + multi-second settles and ran ~50 min, which the 30-min
+ * `scrape-heavy.yml` timeout then killed mid-enrichment.) The processor's
+ * `description_hash` gate makes subsequent
  * runs cheap (no Gemini re-extraction on unchanged jobs), but the
  * per-page Puppeteer load is still incurred — that's the next
  * optimization frontier if cost becomes real.
@@ -311,18 +315,26 @@ async function fetchListingPage(
   from: number
 ): Promise<PhenomSearchPayload | null> {
   const url = from === 0 ? RBC_LISTING_URL : `${RBC_LISTING_URL}?from=${from}`;
-  await page.goto(url, { waitUntil: "networkidle2", timeout: 45_000 });
-  // Phenom hydrates after initial paint — small wait gives the SSR blob
-  // time to settle on slow connections.
-  await new Promise((r) => setTimeout(r, 2_000));
+  // `eagerLoadRefineSearch` is server-rendered into the initial HTML (verified
+  // by curl), so we read it straight from the parsed document — no need to wait
+  // for client hydration. `domcontentloaded` + a short safety settle is enough;
+  // `networkidle2` here was pure overhead and, multiplied across ~140 listing
+  // pages, was the bulk of RBC's ~50-min runtime (June 2026 timeout incident).
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+  await new Promise((r) => setTimeout(r, 400));
   const html = await page.content();
   return extractEagerLoadPayload(html);
 }
 
 async function enrichOne(page: Page, job: JobData): Promise<void> {
   if (!job.url) return;
-  await page.goto(job.url, { waitUntil: "networkidle2", timeout: 45_000 });
-  await new Promise((r) => setTimeout(r, 2_500));
+  // The JSON-LD JobPosting (our primary description source) is server-rendered
+  // into the detail HTML (verified by curl: a full description arrives in the
+  // initial response). `domcontentloaded` is therefore sufficient — waiting for
+  // `networkidle2` plus a 2.5s settle on every one of ~1,400 detail pages is
+  // what pushed the full run past the 30-min GHA ceiling.
+  await page.goto(job.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+  await new Promise((r) => setTimeout(r, 400));
   const result = (await page.evaluate(PHENOM_DETAIL_EXTRACTOR_SRC)) as
     | { html: string; source: string }
     | null;

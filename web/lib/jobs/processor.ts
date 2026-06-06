@@ -65,6 +65,33 @@ function rawDescriptionHash(description: string): string {
 }
 
 /**
+ * Mass-closure sanity floor (pure, unit-tested). Closure detection trusts that
+ * the scraped corpus is COMPLETE; a truncated scrape (the May 2026 Workday
+ * pagination bug returned ~50 of ~1,500 jobs; a heavy scrape killed part-way)
+ * is indistinguishable from "the rest of the reqs closed." Returns true when
+ * the share of a company's active corpus that would close in a single run is
+ * implausibly large, so the caller can SKIP closure rather than mass-close the
+ * live corpus on a bad scrape.
+ *
+ * The floor only applies above `minActiveCorpus` — a small board can legitimately
+ * shed most of its handful of reqs in a day, and 30% of 6 is noise; the guard is
+ * for the big incumbent corpora where a sudden >30% drop is a scrape artifact,
+ * not a hiring event. Failing open here (skip-closure) is the safe bias: a
+ * stale-open req is cheap to reconcile next run; a false mass-close corrupts
+ * every dashboard aggregate until a human notices.
+ */
+export function exceedsClosureFloor(
+  activeCorpus: number,
+  wouldClose: number,
+  ratioFloor = 0.3,
+  minActiveCorpus = 20
+): boolean {
+  if (activeCorpus < minActiveCorpus) return false;
+  if (wouldClose <= 0) return false;
+  return wouldClose / activeCorpus > ratioFloor;
+}
+
+/**
  * Stage 1: Scrape - Fetch raw data from ATS
  * Updates task: scraped_data, jobs_fetched, stage_progress.scrape
  */
@@ -292,11 +319,12 @@ export async function runIngestStage(
       external_id: string;
       description_hash: string | null;
       company_id: string;
+      is_active: boolean;
     }> = [];
     for (let offset = 0; ; offset += PAGE) {
       const { data: page, error: pageError } = await supabase
         .from('job_postings')
-        .select('id, external_id, description_hash, company_id')
+        .select('id, external_id, description_hash, company_id, is_active')
         .in('company_id', ingestCompanyIds)
         .order('id', { ascending: true })
         .range(offset, offset + PAGE - 1);
@@ -310,7 +338,7 @@ export async function runIngestStage(
 
     const existingByCompany = new Map<
       string,
-      Map<string, { id: string; descriptionHash: string | null }>
+      Map<string, { id: string; descriptionHash: string | null; isActive: boolean }>
     >();
     for (const cid of ingestCompanyIds) existingByCompany.set(cid, new Map());
     for (const e of existing ?? []) {
@@ -319,6 +347,7 @@ export async function runIngestStage(
       m.set(e.external_id as string, {
         id: e.id as string,
         descriptionHash: (e.description_hash ?? null) as string | null,
+        isActive: (e.is_active ?? false) as boolean,
       });
     }
 
@@ -489,23 +518,71 @@ export async function runIngestStage(
     // was last seen under CIBC but is now classified as Simplii would
     // otherwise be flagged "closed" forever under CIBC. Each company
     // closes only those of its own rows that didn't show up in this run.
+    //
+    // Mass-closure sanity floor: closure trusts that `jobs` is the COMPLETE
+    // corpus, but a truncated scrape (the May 2026 Workday pagination bug
+    // returned ~50 of ~1,500 jobs; a heavy scrape killed part-way) looks
+    // identical to "everything else closed." When the share of a company's
+    // active corpus that would close in a single run exceeds this floor on a
+    // non-trivial corpus, we treat the scrape as suspect and SKIP closure for
+    // that company — leaving the rows active and surfacing it loudly. The bias
+    // is deliberate: a stale-open req is cheap to reconcile on the next clean
+    // scrape, whereas a false mass-close corrupts the dashboard and every
+    // aggregate until a human notices. A genuine large drop will keep tripping
+    // the floor (logged every run), which is the signal to confirm + intervene.
+    const closureSkipped: Array<{
+      companyId: string;
+      activeCorpus: number;
+      wouldClose: number;
+      fetched: number;
+    }> = [];
     for (const cid of ingestCompanyIds) {
       const existingMap = existingByCompany.get(cid);
       const fetchedIds = fetchedByCompany.get(cid);
       if (!existingMap || !fetchedIds) continue;
+
+      // Only currently-active rows are closure candidates; already-closed
+      // rows can't transition again, so they don't belong in the ratio.
+      let activeCorpus = 0;
+      const toClose: string[] = [];
       for (const [extId, entry] of existingMap) {
-        if (!fetchedIds.has(extId)) {
-          const { count } = await supabase
-            .from('job_postings')
-            .update({
-              is_active: false,
-              closed_date: new Date().toISOString(),
-            })
-            .eq('id', entry.id)
-            .eq('is_active', true);
-          if (count && count > 0) {
-            closedJobs++;
-          }
+        if (!entry.isActive) continue;
+        activeCorpus++;
+        if (!fetchedIds.has(extId)) toClose.push(entry.id);
+      }
+
+      if (exceedsClosureFloor(activeCorpus, toClose.length)) {
+        closureSkipped.push({
+          companyId: cid,
+          activeCorpus,
+          wouldClose: toClose.length,
+          fetched: fetchedIds.size,
+        });
+        log.error(
+          {
+            company: company.name,
+            companyId: cid,
+            activeCorpus,
+            wouldClose: toClose.length,
+            fetched: fetchedIds.size,
+            ratio: Number((toClose.length / activeCorpus).toFixed(2)),
+          },
+          '[ingest] mass-closure floor tripped — scrape looks truncated; SKIPPING closure to avoid a false mass-close'
+        );
+        continue;
+      }
+
+      for (const id of toClose) {
+        const { count } = await supabase
+          .from('job_postings')
+          .update({
+            is_active: false,
+            closed_date: new Date().toISOString(),
+          })
+          .eq('id', id)
+          .eq('is_active', true);
+        if (count && count > 0) {
+          closedJobs++;
         }
       }
     }
@@ -543,6 +620,10 @@ export async function runIngestStage(
             // Phase 2: surface the hash-gate saving in job_run_tasks so it's
             // queryable alongside new/updated/closed counts without a new column.
             extractionsSkippedByHash,
+            // Surface any company whose closure was skipped by the mass-closure
+            // floor (truncated-scrape guard) so it's queryable and the health
+            // signal can flag a corpus that's silently not being reconciled.
+            ...(closureSkipped.length > 0 ? { closureSkipped } : {}),
           },
         },
       })
