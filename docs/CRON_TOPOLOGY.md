@@ -91,6 +91,19 @@ GH Actions like the Puppeteer scrapers. Daily-incremental runs (≤ ~100
 new postings) would fit inline, but the offload path is simpler and
 isolates Workday's rate-limit posture from the live cron tick.
 
+**Fresh-runner retry.** `scrape-heavy.yml` has two jobs: `scrape`, and a
+`scrape-retry` (`needs: scrape`, `if: failure()`) that re-runs the scrape
+once on a **new runner** when the first attempt fails. This exists because
+Akamai (in front of the Workday tenants) intermittently greylists a runner's
+datacenter egress IP and returns a `200` + HTML challenge page on the first
+listing POST — a per-IP block that clears on a different runner. The retry
+reuses the dispatched `task_id`, so both attempts write the **same**
+`job_run_tasks` row (no forked task). It retries on any failure, not just the
+Akamai block, because that's cheap and the block is the dominant mode; a
+second consecutive greylist is rare and the daily cron is the backstop. See
+[`web/lib/scrapers/CLAUDE.md`](../web/lib/scrapers/CLAUDE.md) → "Two different
+Workday failures."
+
 ## Sentry alerts
 
 Every cron route is wrapped in `Sentry.withMonitor(...)` (slug + `crontab`

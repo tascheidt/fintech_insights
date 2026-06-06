@@ -4,7 +4,14 @@
     "date": "2026-06-06",
     "changes": [
       { "type": "fix", "description": "Revolut's Canadian roles now flow into the platform. The Revolut scraper had been quietly returning nothing — Revolut tweaked the web address of each job posting (adding a region prefix like \"/en-US/\"), and the scraper was still looking for the old address, so it matched zero jobs even when roles were live. It now matches regardless of region prefix and is picking up Revolut Canada's open positions. We also closed the blind spot that hid this for weeks: if a future run comes back empty while Revolut's own page says roles exist, the run now fails loudly and retries on a fresh machine instead of silently reporting \"no jobs.\"" }
-    ]
+        ]
+  },
+  {
+    "version": "2.9.9",
+    "date": "2026-06-06",
+    "changes": [
+      { "type": "fix", "description": "The CIBC and TD scrapers now recover automatically when a bank's bot-protection (Akamai) temporarily blocks the run server's network address. Some mornings the careers site answered the very first request with a challenge page instead of job data, and the whole scrape gave up before fetching anything — even though the exact same request worked fine seconds later from a different address. The scrape now detects that block clearly (instead of crashing on an unreadable error) and retries once on a fresh run server, which lands the full corpus. CIBC and TD both recovered this way after a June 6 outage." }
+          ]
   },
   {
     "version": "2.9.8",

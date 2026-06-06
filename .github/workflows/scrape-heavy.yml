@@ -48,3 +48,47 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: npx tsx scripts/scrape-heavy.ts
+
+  # Fresh-runner retry. Workday tenants (CIBC, TD) sit behind Akamai, which
+  # intermittently greylists GitHub Actions runner egress IPs and answers the
+  # cold listing POST with a 200 + HTML challenge page — the scrape then fails
+  # before fetching anything (June 2026 CIBC/TD incident). The block is
+  # per-runner-IP and clears on a new runner: a manual re-trigger landed the
+  # full CIBC (511) + TD (1,437) corpus minutes after the morning failure.
+  # This job re-runs the scrape ONCE on a fresh runner (hence a fresh egress
+  # IP) when the first attempt fails. Because the dispatcher passes a stable
+  # task_id (web/lib/github.ts), the retry updates the SAME job_run_tasks row
+  # rather than forking a second one. Retrying on any failure — not just the
+  # Akamai block — is intentional: it is cheap and the block is the dominant
+  # failure mode. A second consecutive greylist is rare; the daily cron is the
+  # backstop.
+  scrape-retry:
+    needs: scrape
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Run heavy scraper (fresh-runner retry)
+        working-directory: web
+        env:
+          COMPANY_ID: ${{ inputs.company_id }}
+          TASK_ID: ${{ inputs.task_id }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npx tsx scripts/scrape-heavy.ts
