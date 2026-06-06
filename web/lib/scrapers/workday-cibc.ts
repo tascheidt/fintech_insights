@@ -29,6 +29,7 @@ import {
   extractCookieJar,
   parseWorkdayListingRow,
   parseWorkdayJobDetail,
+  parseWorkdayJson,
   resolveWorkdayJobCap,
   type WorkdayListingResponse,
   type WorkdayJobDetailResponse,
@@ -115,7 +116,10 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
       throw new Error(`Workday CIBC listing error: ${res.status}`);
     }
     if (!cookieJar) cookieJar = extractCookieJar(res);
-    const data = (await res.json()) as WorkdayListingResponse;
+    // Akamai can return HTTP 200 with an HTML challenge body (greylisted
+    // runner IP) — parseWorkdayJson throws a typed WorkdayBlockedError so the
+    // failure is legible and the scrape-heavy.yml retry re-runs on a fresh IP.
+    const data = await parseWorkdayJson<WorkdayListingResponse>(res, TENANT);
     const rows = data.jobPostings ?? [];
     if (rows.length === 0) break;
     // Workday returns the real `total` only on the first page; subsequent
@@ -165,7 +169,10 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
       if (!detailRes.ok) {
         throw new Error(`status ${detailRes.status}`);
       }
-      const detail = (await detailRes.json()) as WorkdayJobDetailResponse;
+      const detail = await parseWorkdayJson<WorkdayJobDetailResponse>(
+        detailRes,
+        TENANT
+      );
       const parsed = parseWorkdayJobDetail(detail);
       if (parsed.description_html) {
         job.description_html = parsed.description_html;

@@ -269,6 +269,73 @@ export function extractCookieJar(response: Response): string {
 }
 
 // ---------------------------------------------------------------------------
+// Response parsing — Akamai HTML-block detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when a Workday endpoint hands back an HTML body where JSON was
+ * expected.
+ *
+ * Workday tenants sit behind Akamai. When Akamai flags the client — most
+ * often a greylisted datacenter egress IP, e.g. a GitHub Actions runner —
+ * it serves its challenge/block page as **HTTP 200 with an HTML body**, not
+ * a 4xx/5xx. A naive `await res.json()` then throws an opaque
+ * `SyntaxError: Unexpected token '<'`, which masked the real cause for days
+ * (the June 2026 CIBC/TD incident: both died on the first listing POST while
+ * the same request returned clean JSON from a residential IP).
+ *
+ * This typed error makes the block legible at the failure site and in the
+ * `job_run_tasks` row. The remedy for a *sustained* block is a fresh runner
+ * IP (the daily cron, or the `scrape-heavy.yml` `scrape-retry` job), NOT
+ * in-process retry on the same IP — the greylist holds for the whole run.
+ *
+ * This is a different failure from the May 2026 Workday `406`: that was a
+ * URL-doubling bug fixed by correcting the URL (`curl` first), and it
+ * returned a 4xx, not a 200-with-HTML. Don't conflate them.
+ */
+export class WorkdayBlockedError extends Error {
+  constructor(
+    public readonly tenant: string,
+    public readonly bodySnippet: string
+  ) {
+    super(
+      `Workday ${tenant}: Akamai returned an HTML challenge page (HTTP 200, non-JSON body) — runner IP is likely greylisted. Body starts: ${bodySnippet}`
+    );
+    this.name = "WorkdayBlockedError";
+  }
+}
+
+/**
+ * True when a response body is the Akamai HTML block page rather than JSON.
+ * Pure — exported for unit testing.
+ *
+ * Detection is a leading-`<` body sniff rather than a `Content-Type` check:
+ * Akamai's block page is reliably HTML-bodied but its `Content-Type` is not
+ * dependable, while a genuine Workday JSON response always opens with `{` or
+ * `[` (after any leading whitespace).
+ */
+export function isAkamaiHtmlBlock(body: string): boolean {
+  return body.trimStart().startsWith("<");
+}
+
+/**
+ * Read a Workday `Response` as JSON, detecting the Akamai HTML-block page
+ * first. Throws `WorkdayBlockedError` on a block (so the failure is typed and
+ * legible) and re-throws any other JSON parse error verbatim. Consumes the
+ * response body.
+ */
+export async function parseWorkdayJson<T>(
+  res: Response,
+  tenant: string
+): Promise<T> {
+  const body = await res.text();
+  if (isAkamaiHtmlBlock(body)) {
+    throw new WorkdayBlockedError(tenant, body.trimStart().slice(0, 100));
+  }
+  return JSON.parse(body) as T;
+}
+
+// ---------------------------------------------------------------------------
 // Job cap
 // ---------------------------------------------------------------------------
 
