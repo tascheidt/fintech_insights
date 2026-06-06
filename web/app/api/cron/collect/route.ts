@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies } from "@/lib/jobs";
+import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refreshNewsCacheForActiveCompanies, pruneJobRunRetention } from "@/lib/jobs";
 import { requireCronSecret } from "@/lib/auth/guards";
 import { checkAndAlertScraperHealth } from "@/lib/email/scraper-health";
 import { STALE_JOB_THRESHOLD_MS } from "@/lib/jobs/constants";
@@ -57,6 +57,14 @@ async function runCollect(req: NextRequest) {
       }
       log.info({ staleTaskCount: staleTasks.length }, "Cleaned up stale tasks before collection run");
     }
+
+    // Retention: keep job_run_tasks bounded. scraped_data snapshots are only
+    // read back by a same-run `startFromStage:'ingest'` resume (25-min window);
+    // after that they are dead weight — letting them accumulate put the DB at
+    // 224% of the free-tier quota (June 2026). Null them past the resume window
+    // and prune ancient run metadata. Best-effort: never aborts collection.
+    const retention = await pruneJobRunRetention(supabase);
+    log.info(retention, "Retention sweep complete");
 
     // Get all active companies. Skip sub-brands that piggy-back on a
     // parent's scrape (parent_company_id IS NOT NULL) — their jobs land

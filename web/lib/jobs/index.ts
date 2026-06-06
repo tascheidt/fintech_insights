@@ -3,3 +3,4 @@ export * from "./processor";
 export * from "./analyzer";
 export * from "./runner";
 export * from "./progress";
+export * from "./retention";

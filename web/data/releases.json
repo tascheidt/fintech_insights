@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.9.11",
+    "date": "2026-06-06",
+    "changes": [
+      { "type": "improvement", "description": "Database storage now stays within its limits automatically. Every scrape run was keeping a full raw snapshot of its results forever — useful for a few minutes to resume an interrupted run, but dead weight afterwards — and those snapshots had quietly grown to dominate the database and push it past its storage quota. The platform now clears each snapshot a couple of days after the run and prunes old run records after 90 days, keeping storage bounded with no change to the jobs, insights, or history you see." }
+    ]
+  },
+  {
     "version": "2.9.10",
     "date": "2026-06-06",
     "changes": [

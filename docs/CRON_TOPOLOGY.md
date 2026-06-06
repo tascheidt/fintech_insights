@@ -33,6 +33,16 @@ and a 60-minute job timeout. Both fintech and incumbent tiers are eligible —
 incumbents used to be skipped, but the workflow now covers every active
 company so newly added banks don't sit insight-less for weeks.
 
+The `collect` cron also does inline housekeeping before it starts scraping:
+(1) it marks tasks stuck in `running` past `STALE_JOB_THRESHOLD_MS` as failed,
+and (2) it runs a storage-retention sweep (`pruneJobRunRetention` in
+[`web/lib/jobs/retention.ts`](../web/lib/jobs/retention.ts)) that nulls
+`job_run_tasks.scraped_data` snapshots older than 2 days and deletes `job_runs`
+older than 90 days. The `scraped_data` snapshot (the full enriched ATS corpus,
+12–17 MB per big-bank run) is only read back by a same-run `startFromStage:'ingest'`
+resume; left unbounded it grew to 673 MB and pushed the DB to 224% of the
+free-tier quota (June 2026). The sweep is best-effort and never aborts a collect.
+
 ## Required secrets
 
 `CRON_SECRET` is shared between Vercel and GH Actions. The route validates it via
