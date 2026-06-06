@@ -11,6 +11,9 @@ import {
   buildWorkdayUrls,
   parseWorkdayListingRow,
   parseWorkdayJobDetail,
+  parseWorkdayJson,
+  isAkamaiHtmlBlock,
+  WorkdayBlockedError,
   resolveWorkdayJobCap,
   type WorkdayListingRow,
 } from "./workday-utils";
@@ -186,6 +189,56 @@ describe("parseWorkdayJobDetail", () => {
       jobPostingInfo: { jobDescription: "<p>x</p>", postedOn: "2026-05-12" },
     });
     expect(out.posted_date?.toISOString()).toBe("2026-05-12T00:00:00.000Z");
+  });
+});
+
+describe("isAkamaiHtmlBlock (200-with-HTML detection)", () => {
+  it("flags a DOCTYPE block page", () => {
+    expect(isAkamaiHtmlBlock('<!DOCTYPE html><html><body>blocked</body></html>')).toBe(true);
+  });
+
+  it("flags a bare <html> body and tolerates leading whitespace/newlines", () => {
+    expect(isAkamaiHtmlBlock("<html>")).toBe(true);
+    expect(isAkamaiHtmlBlock("\n\n  <!doctype html>")).toBe(true);
+  });
+
+  it("does NOT flag genuine JSON (object or array), even with leading whitespace", () => {
+    expect(isAkamaiHtmlBlock('{"total":511,"jobPostings":[]}')).toBe(false);
+    expect(isAkamaiHtmlBlock("  [1,2,3]")).toBe(false);
+    expect(isAkamaiHtmlBlock('\n{"jobPostingInfo":{}}')).toBe(false);
+  });
+
+  it("does NOT flag an empty body (that is a different failure, not a block)", () => {
+    expect(isAkamaiHtmlBlock("")).toBe(false);
+  });
+});
+
+describe("parseWorkdayJson", () => {
+  it("parses a valid JSON response into the typed shape", async () => {
+    const res = new Response('{"total":2,"jobPostings":[{"title":"X"}]}');
+    const data = await parseWorkdayJson<{ total: number; jobPostings: unknown[] }>(
+      res,
+      "td"
+    );
+    expect(data.total).toBe(2);
+    expect(data.jobPostings).toHaveLength(1);
+  });
+
+  it("throws a typed WorkdayBlockedError on a 200-with-HTML Akamai block", async () => {
+    const res = new Response("<!DOCTYPE html><html><head><title>Blocked</title>");
+    await expect(parseWorkdayJson(res, "cibc")).rejects.toBeInstanceOf(
+      WorkdayBlockedError
+    );
+  });
+
+  it("carries the tenant and a body snippet on the block error (legible task-row message)", async () => {
+    const res = new Response("<!DOCTYPE html><html>go away</html>");
+    const err = await parseWorkdayJson(res, "cibc").catch((e) => e);
+    expect(err).toBeInstanceOf(WorkdayBlockedError);
+    expect((err as WorkdayBlockedError).tenant).toBe("cibc");
+    expect((err as WorkdayBlockedError).message).toContain("Akamai");
+    expect((err as WorkdayBlockedError).message).toContain("cibc");
+    expect((err as WorkdayBlockedError).bodySnippet).toContain("<!DOCTYPE");
   });
 });
 
