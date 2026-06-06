@@ -36,11 +36,18 @@
  * An UNRECOGNISED `?city=` value is IGNORED by Revolut (it returns the full
  * board, not an empty state), so don't treat a bogus filter as "0 results".
  *
- * Description enrichment is deferred. Detail pages need a separate parser
- * pass and the production hot path tolerates null descriptions (the
- * description_hash gate in `processor.ts` simply skips Flash extraction for
- * that row, and the Pro analyzer grounds against the URL anyway). Add
- * enrichment in a follow-up once the listing pipeline is proven green.
+ * Description enrichment: after the listing parse, each job's detail page is
+ * visited (sequentially, reusing the Cloudflare-cleared page so we don't
+ * re-trigger the challenge) and its description extracted — JSON-LD
+ * `JobPosting` first (server-rendered for Google Jobs), then the Next.js
+ * `__NEXT_DATA__` blob, then a main-content fallback. This matters beyond the
+ * description field itself: with a description present, the hot-path Flash
+ * extractor (`processor.ts` → `extractAndUpdateStructure`, gated on a non-empty
+ * description) runs and populates `function_category` / `seniority_level` /
+ * `standardized_department` — without it the jobs ingest uncategorised and
+ * fall out of the Competitive Matrix's function-group breakdown. Enrichment is
+ * best-effort (per-job try/catch); a detail-page miss leaves that row's
+ * description null but never fails the run.
  *
  * Cloudflare: a plain curl hits a "Just a quick security check" challenge
  * page (~873KB of Cloudflare-injected Inter font data). Puppeteer in a GH
@@ -60,7 +67,7 @@
 
 import type { JobData } from "./types";
 import type { Browser, Page } from "puppeteer-core";
-import { detectLocationType } from "./utils";
+import { detectLocationType, htmlToText, decodeHtmlEntities } from "./utils";
 import { log } from "@/lib/log";
 
 const REVOLUT_ORIGIN = "https://www.revolut.com";
@@ -344,6 +351,132 @@ async function fetchListing(page: Page, careersUrl: string): Promise<string> {
   return page.content();
 }
 
+// ---------------------------------------------------------------------------
+// Description enrichment (per-job detail pages)
+// ---------------------------------------------------------------------------
+
+/**
+ * Browser-side description extractor. String-sourced (like phenom-rbc) so
+ * tsx's `__name` helper can't leak into the page context. Tries, in order of
+ * stability:
+ *   1. JSON-LD `JobPosting.description` — server-rendered for Google Jobs.
+ *   2. The Next.js `__NEXT_DATA__` blob — first long `description`-like string.
+ *   3. The largest `<main>`/`<article>` block as a fallback.
+ * Returns `{ html, source }` or, on a miss, `{ source: "none", diag }` so the
+ * failure is debuggable from the run log without a second instrumented pass.
+ */
+export const REVOLUT_DETAIL_EXTRACTOR_SRC = `(function () {
+  // Strategy 1: JSON-LD JobPosting.
+  var ld = document.querySelectorAll('script[type="application/ld+json"]');
+  for (var i = 0; i < ld.length; i++) {
+    var raw = ld[i].textContent || "";
+    if (!raw) continue;
+    try {
+      var parsed = JSON.parse(raw);
+      var arr = Array.isArray(parsed) ? parsed : [parsed];
+      for (var c = 0; c < arr.length; c++) {
+        var e = arr[c];
+        if (e && e["@type"] === "JobPosting" && typeof e.description === "string" && e.description.length > 120) {
+          return { html: e.description, source: "json-ld-JobPosting" };
+        }
+      }
+    } catch (err) {}
+  }
+
+  // Strategy 2: __NEXT_DATA__ — recursively find the longest description-like
+  // string. Revolut is Next.js, so the description ships in the page payload.
+  var nd = document.getElementById("__NEXT_DATA__");
+  var hasNextData = !!nd;
+  if (nd && nd.textContent) {
+    try {
+      var data = JSON.parse(nd.textContent);
+      var best = "";
+      var stack = [data];
+      var KEY = /description|jobDescription|body|content/i;
+      while (stack.length) {
+        var node = stack.pop();
+        if (!node || typeof node !== "object") continue;
+        for (var k in node) {
+          var v = node[k];
+          if (typeof v === "string") {
+            if (KEY.test(k) && v.length > best.length && v.length > 200) best = v;
+          } else if (v && typeof v === "object") {
+            stack.push(v);
+          }
+        }
+      }
+      if (best) return { html: best, source: "next-data" };
+    } catch (err2) {}
+  }
+
+  // Strategy 3: largest main/article block.
+  var blocks = document.querySelectorAll("main, article, [role='main']");
+  var bestHtml = "";
+  for (var b = 0; b < blocks.length; b++) {
+    var h = blocks[b].innerHTML || "";
+    if (h.length > bestHtml.length) bestHtml = h;
+  }
+  if (bestHtml && bestHtml.length > 400) return { html: bestHtml, source: "main-fallback" };
+
+  return {
+    source: "none",
+    diag: { jsonLd: ld.length, hasNextData: hasNextData, mainBlocks: blocks.length, bestMainLen: bestHtml.length },
+  };
+})()`;
+
+type DetailExtractResult =
+  | { html: string; source: string }
+  | { source: "none"; diag: Record<string, unknown> };
+
+/**
+ * Visit one job's detail page on the (already Cloudflare-cleared) page and
+ * attach `description_html` / `description_text`. Best-effort: the caller
+ * try/catches so a single failure never aborts the run.
+ */
+async function enrichOne(page: Page, job: JobData): Promise<void> {
+  if (!job.url) return;
+  await page.goto(job.url, { waitUntil: "networkidle2", timeout: 45_000 });
+  // Small settle for the SPA to paint the JSON-LD / content after hydration.
+  await new Promise((r) => setTimeout(r, 600));
+  const result = (await page.evaluate(REVOLUT_DETAIL_EXTRACTOR_SRC)) as DetailExtractResult;
+  if ("html" in result && result.html) {
+    const decoded = decodeHtmlEntities(result.html);
+    job.description_html = decoded;
+    job.description_text = htmlToText(decoded);
+    log.info(
+      { externalId: job.external_id, source: result.source, chars: job.description_text.length },
+      "[revolut] enriched description"
+    );
+    return;
+  }
+  log.warn(
+    { externalId: job.external_id, url: job.url, diag: (result as { diag?: unknown }).diag },
+    "[revolut] no description found on detail page"
+  );
+}
+
+/**
+ * Enrich every job sequentially on the reused page. Revolut Canada is a tiny
+ * corpus (single-digit roles), so the phenom/avature batch+concurrency machine
+ * is overkill — and sequential reuse of the cleared session is the lowest
+ * Cloudflare footprint. Each job is isolated in try/catch.
+ */
+async function enrichDescriptions(page: Page, jobs: JobData[]): Promise<void> {
+  let enriched = 0;
+  for (const job of jobs) {
+    try {
+      await enrichOne(page, job);
+      if (job.description_text) enriched++;
+    } catch (e) {
+      log.warn(
+        { externalId: job.external_id, err: e instanceof Error ? e.message : String(e) },
+        "[revolut] description enrichment threw"
+      );
+    }
+  }
+  log.info({ enriched, total: jobs.length }, "[revolut] description enrichment complete");
+}
+
 export async function fetchRevolutJobs(
   atsIdentifier: string,
   careersUrl: string | undefined,
@@ -397,7 +530,12 @@ export async function fetchRevolutJobs(
       }
 
       log.info({ careersUrl, count: raw.length, counts }, "[revolut] listing parsed");
-      return raw.map(mapRevolutJob);
+      const jobs = raw.map(mapRevolutJob);
+      // Enrich descriptions from each detail page so the hot-path Flash
+      // extractor can categorise the role (function_category / seniority /
+      // department). Reuses the cleared page; best-effort per job.
+      await enrichDescriptions(page, jobs);
+      return jobs;
     } finally {
       await page.close();
     }
