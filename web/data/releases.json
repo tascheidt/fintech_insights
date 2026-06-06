@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.9.12",
+    "date": "2026-06-06",
+    "changes": [
+      { "type": "improvement", "description": "Revolut roles now show up fully categorized in the competitive matrix and company views. The Revolut scraper had been saving only the job title and location, with no description — so the system couldn't tell whether a role was Risk, Finance, Engineering, etc., and Revolut's openings counted toward its total but landed in none of the function columns. The scraper now also pulls each role's full description from its detail page, which lets the usual analysis fill in the function group, seniority, and department. Revolut Canada's three current openings now read correctly as Finance and Risk leadership roles." }
+    ]
+  },
+  {
     "version": "2.9.11",
     "date": "2026-06-06",
     "changes": [
