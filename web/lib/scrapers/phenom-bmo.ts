@@ -1,22 +1,38 @@
 /**
- * BMO (Bank of Montreal) — Phenom CareerConnect scraper.
+ * BMO (Bank of Montreal) — Phenom CareerConnect listing + Workday enrichment.
  *
- * Mirrors the proven RBC scraper (`./phenom-rbc.ts`) exactly — BMO runs on
- * the same Phenom CareerConnect platform, so the two data surfaces are
- * identical:
+ * BMO uses Phenom CareerConnect as its careers *frontend* (the search results
+ * at jobs.bmo.com), but its actual job content lives in a **Workday** tenant
+ * (`bmo.wd3.myworkdayjobs.com`) — every Phenom listing row's `applyUrl` routes
+ * there. This is the load-bearing difference from RBC, which this scraper
+ * originally mirrored: RBC server-renders the full JSON-LD `JobPosting` into
+ * the Phenom detail HTML, so RBC enriches straight off that surface. BMO does
+ * NOT reliably render that surface — the detail page mostly carries only a
+ * ~290-char `descriptionTeaser`, so the JSON-LD/`jobDetail` extractor returned
+ * null for ~99% of BMO postings and `description_html` was left empty corpus-
+ * wide (June 2026 incident). Waiting longer (`networkidle2`) didn't help: the
+ * description isn't on that surface to wait for.
  *
- *   1. Listing pages embed `phApp.eagerLoadRefineSearch.data.jobs[]` with
- *      ~40 fields per posting (title, reqId, city/state/country,
- *      multi_category → department, subCategory → team, postedDate,
- *      descriptionTeaser). Pagination via `?from=<offset>` at 10/page;
- *      `totalHits` indicates corpus size.
+ * So BMO is enriched in two passes:
  *
- *   2. Detail pages embed a `<script type="application/ld+json">`
- *      JobPosting (schema.org) block with the full HTML description as
- *      `description` (HTML-entity-encoded). schema.org is the most stable
- *      surface; `phApp.ddo.jobDetail.data.job.description` is the fallback.
+ *   1. LISTING — Phenom `phApp.eagerLoadRefineSearch.data.jobs[]` (server-
+ *      rendered into the initial HTML): ~40 fields per posting (title, reqId,
+ *      city/state/country, multi_category → department, subCategory → team,
+ *      postedDate, descriptionTeaser, AND `applyUrl` into Workday). Pagination
+ *      via `?from=<offset>` at 10/page; `totalHits` is the corpus size. We
+ *      keep Phenom for the listing because it carries richer taxonomy
+ *      (department/team) than Workday's listing does.
  *
- * Lives in scrape-heavy.yml's offload set (browser-based via puppeteer).
+ *   2. DESCRIPTION ENRICHMENT — primary source is BMO's Workday CXS JSON
+ *      endpoint (derived per-job from `applyUrl`; reliable HTTP fetch, no
+ *      browser), the same surface that gives TD/CIBC 0 null descriptions. The
+ *      Phenom JSON-LD detail page is kept as a per-job FALLBACK for anything
+ *      Workday can't fill (missing apply URL, an Akamai block, or an empty
+ *      body), navigated with a hydration-aware wait. See the scrapers
+ *      CLAUDE.md for the BMO/Workday note.
+ *
+ * Lives in scrape-heavy.yml's offload set (browser-based via puppeteer for the
+ * listing pass).
  *
  * Cost knob: `PHENOM_BMO_MAX_JOBS` env var is an OPTIONAL cap. Unset (the
  * production default) means "process the entire BMO corpus." Set it for
@@ -26,6 +42,14 @@
 import type { JobData } from "./types";
 import type { Browser, Page } from "puppeteer-core";
 import { decodeHtmlEntities, detectLocationType, htmlToText } from "./utils";
+import {
+  buildWorkdayHeaders,
+  extractCookieJar,
+  parseWorkdayJson,
+  parseWorkdayJobDetail,
+  WorkdayBlockedError,
+  type WorkdayJobDetailResponse,
+} from "./workday-utils";
 import { log } from "@/lib/log";
 
 const BMO_LISTING_URL = "https://jobs.bmo.com/ca/en/search-results";
@@ -33,6 +57,16 @@ const DESCRIPTION_CONCURRENCY = 4;
 const ENRICH_BATCH_SIZE = 50;
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+// BMO's apply flow routes into a Workday tenant. Workday's CXS JSON endpoint
+// (`/wday/cxs/<tenant>/<site>/job<externalPath>`) returns the full HTML job
+// description reliably, so it is the PRIMARY description source for BMO. The
+// listing applyUrl gives us the tenant/site/path per job; these constants are
+// only used for the one warm-up POST that seeds the Akamai cookie.
+const BMO_WORKDAY = { tenant: "bmo", instance: "wd3", site: "External" } as const;
+const BMO_WORKDAY_LISTING_URL = `https://${BMO_WORKDAY.tenant}.${BMO_WORKDAY.instance}.myworkdayjobs.com/wday/cxs/${BMO_WORKDAY.tenant}/${BMO_WORKDAY.site}/jobs`;
+const WORKDAY_FETCH_TIMEOUT_MS = 15_000;
+const WORKDAY_ENRICH_CONCURRENCY = 6;
 
 // ---------------------------------------------------------------------------
 // Phenom listing JSON shape (subset)
@@ -190,6 +224,47 @@ export function mapBmoJob(raw: PhenomRawJob): JobData {
   };
 }
 
+/**
+ * Derive the Workday CXS detail endpoint from a Phenom listing row's
+ * `applyUrl`. BMO's Phenom listing routes every apply link into its Workday
+ * tenant — e.g.
+ *   https://bmo.wd3.myworkdayjobs.com/External/job/Toronto-Ontario-Canada/Senior-Machine-Learning-Engineer_R-2400512/apply
+ * The Workday JSON detail endpoint for that posting is
+ *   https://bmo.wd3.myworkdayjobs.com/wday/cxs/bmo/External/job/Toronto-Ontario-Canada/Senior-Machine-Learning-Engineer_R-2400512
+ * i.e. inject `/wday/cxs/<tenant>` before the site segment and drop a trailing
+ * `/apply`. The tenant and site are read from the URL (not hardcoded) so a
+ * site rename (`External` → something else) still resolves. Returns null for
+ * anything that isn't a Workday apply URL.
+ *
+ * Pure + exported for unit testing — the per-tenant Workday URL shape is
+ * exactly the class of bug the scrapers CLAUDE.md says to pin in a test (the
+ * May 2026 Workday `/job/job/` doubling shipped because no test covered it).
+ */
+export function deriveBmoWorkdayDetailUrl(
+  applyUrl?: string | null
+): string | null {
+  if (!applyUrl) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(applyUrl);
+  } catch {
+    return null;
+  }
+  if (!/\.myworkdayjobs\.com$/i.test(parsed.hostname)) return null;
+  const tenant = parsed.hostname.split(".")[0];
+  if (!tenant) return null;
+  const segments = parsed.pathname.split("/").filter(Boolean);
+  // Drop a trailing "apply" — the listing applyUrl ends in .../apply.
+  if (segments[segments.length - 1]?.toLowerCase() === "apply") segments.pop();
+  // Expect at least [site, "job", ...]; the path after the site is the
+  // Workday `externalPath`, which must start with /job/.
+  if (segments.length < 2) return null;
+  const site = segments[0];
+  const externalPath = "/" + segments.slice(1).join("/");
+  if (!externalPath.startsWith("/job/")) return null;
+  return `https://${parsed.hostname}/wday/cxs/${tenant}/${site}${externalPath}`;
+}
+
 // Re-exported for the existing test + any external imports.
 export { decodeHtmlEntities } from "./utils";
 
@@ -207,10 +282,25 @@ export const PHENOM_DETAIL_EXTRACTOR_SRC = `(function () {
     if (!raw) continue;
     try {
       var parsed = JSON.parse(raw);
-      var candidates = Array.isArray(parsed) ? parsed : [parsed];
+      // JSON-LD arrives in three shapes: a bare object, a top-level array, or a
+      // single object wrapping its nodes in @graph. Flatten all three before
+      // looking for the JobPosting node. @type may itself be an array.
+      var candidates = [];
+      var roots = Array.isArray(parsed) ? parsed : [parsed];
+      for (var r = 0; r < roots.length; r++) {
+        var root = roots[r];
+        if (!root) continue;
+        candidates.push(root);
+        if (root["@graph"] && Array.isArray(root["@graph"])) {
+          for (var g = 0; g < root["@graph"].length; g++) candidates.push(root["@graph"][g]);
+        }
+      }
       for (var c = 0; c < candidates.length; c++) {
         var entry = candidates[c];
-        if (entry && entry["@type"] === "JobPosting" && typeof entry.description === "string" && entry.description.length > 200) {
+        if (!entry) continue;
+        var t = entry["@type"];
+        var isJobPosting = t === "JobPosting" || (Array.isArray(t) && t.indexOf("JobPosting") !== -1);
+        if (isJobPosting && typeof entry.description === "string" && entry.description.length > 200) {
           return { html: entry.description, source: "json-ld-JobPosting" };
         }
       }
@@ -294,10 +384,24 @@ async function fetchListingPage(
   return extractEagerLoadPayload(html);
 }
 
-async function enrichOne(page: Page, job: JobData): Promise<void> {
+async function enrichOnePhenom(page: Page, job: JobData): Promise<void> {
   if (!job.url) return;
-  await page.goto(job.url, { waitUntil: "networkidle2", timeout: 45_000 });
-  await new Promise((r) => setTimeout(r, 2_500));
+  // Phenom is the FALLBACK source (Workday is primary). Unlike RBC, BMO does
+  // not reliably server-render the JSON-LD JobPosting into the initial HTML, so
+  // we navigate with `domcontentloaded` and then POLL the extractor until the
+  // description surface has hydrated (or an 8s budget elapses) rather than
+  // waiting a fixed settle. On RBC-shaped pages where the surface is already
+  // present this resolves immediately; on BMO pages that never expose it the
+  // poll times out cheaply and we record a fallback miss.
+  await page.goto(job.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+  try {
+    await page.waitForFunction(`${PHENOM_DETAIL_EXTRACTOR_SRC} !== null`, {
+      timeout: 8_000,
+      polling: 500,
+    });
+  } catch {
+    // Surface never appeared within budget — the evaluate below returns null.
+  }
   const result = (await page.evaluate(PHENOM_DETAIL_EXTRACTOR_SRC)) as
     | { html: string; source: string }
     | null;
@@ -330,7 +434,7 @@ async function enrichBatch(
           const job = queue.shift();
           if (!job) break;
           try {
-            await enrichOne(page, job);
+            await enrichOnePhenom(page, job);
             enriched++;
           } catch (e) {
             failed++;
@@ -339,7 +443,7 @@ async function enrichBatch(
                 reqId: job.external_id,
                 err: e instanceof Error ? e.message : String(e),
               },
-              "[phenom-bmo] description enrichment failed"
+              "[phenom-bmo] phenom fallback enrichment failed"
             );
           }
         }
@@ -381,13 +485,140 @@ async function enrichDescriptions(
         enrichedSoFar: totalEnriched,
         failedSoFar: totalFailed,
       },
-      "[phenom-bmo] enrichment batch complete"
+      "[phenom-bmo] phenom fallback batch complete"
     );
   }
   log.info(
     { enriched: totalEnriched, failed: totalFailed, total: jobs.length },
-    "[phenom-bmo] description enrichment complete"
+    "[phenom-bmo] phenom fallback enrichment complete"
   );
+}
+
+// ---------------------------------------------------------------------------
+// Workday enrichment (primary description source)
+// ---------------------------------------------------------------------------
+
+/** One job paired with the Workday detail URL derived from its applyUrl. */
+interface BmoEnrichTarget {
+  job: JobData;
+  workdayUrl: string | null;
+}
+
+/**
+ * Best-effort warm-up: POST once to BMO's Workday listing endpoint to capture
+ * the Akamai `_abck` cookie, which the per-job detail GETs then replay so they
+ * look like the same browser session (mirrors the cookie continuity in the
+ * workday-cibc / workday-td scrapers). Returns "" — and the detail GETs proceed
+ * cookie-less — if the warm-up is blocked or errors; we never fail the run
+ * here, because the Phenom JSON-LD fallback can still try.
+ */
+async function seedWorkdayCookie(
+  headers: Record<string, string>
+): Promise<string> {
+  try {
+    const res = await fetch(BMO_WORKDAY_LISTING_URL, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        limit: 1,
+        offset: 0,
+        searchText: "",
+        appliedFacets: {},
+      }),
+      signal: AbortSignal.timeout(WORKDAY_FETCH_TIMEOUT_MS),
+    });
+    const jar = extractCookieJar(res);
+    await res.text().catch(() => {}); // drain the body so the socket frees
+    return jar;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Enrich descriptions from BMO's Workday tenant — the PRIMARY source. For every
+ * target with a derived Workday URL, GET the CXS detail JSON and fill
+ * description_html/text (and location/posted_date if the listing lacked them).
+ * Returns the targets it could NOT fill (no Workday URL, an Akamai block, a
+ * non-2xx, or an empty body) so the caller can fall back to the Phenom detail
+ * page. Never throws — a total Workday block degrades to the Phenom fallback
+ * rather than discarding the already-fetched listing corpus.
+ */
+async function enrichViaWorkday(
+  targets: BmoEnrichTarget[]
+): Promise<{ enriched: number; remaining: BmoEnrichTarget[] }> {
+  const headers = buildWorkdayHeaders(
+    BMO_WORKDAY.tenant,
+    BMO_WORKDAY.instance,
+    BMO_WORKDAY.site
+  );
+  const cookieJar = await seedWorkdayCookie(headers);
+
+  const queue = targets.filter((t) => t.workdayUrl);
+  const withWorkdayUrl = queue.length;
+  const remaining: BmoEnrichTarget[] = targets.filter((t) => !t.workdayUrl);
+  let enriched = 0;
+  let blocked = 0;
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(WORKDAY_ENRICH_CONCURRENCY, queue.length) },
+      async () => {
+        while (queue.length > 0) {
+          const target = queue.shift();
+          if (!target?.workdayUrl) break;
+          try {
+            const res = await fetch(target.workdayUrl, {
+              headers: {
+                ...headers,
+                ...(cookieJar ? { Cookie: cookieJar } : {}),
+              },
+              signal: AbortSignal.timeout(WORKDAY_FETCH_TIMEOUT_MS),
+            });
+            if (!res.ok) throw new Error(`status ${res.status}`);
+            // Akamai can answer HTTP 200 with an HTML challenge body
+            // (greylisted runner IP); parseWorkdayJson throws a typed
+            // WorkdayBlockedError so the miss is legible in the logs.
+            const detail = await parseWorkdayJson<WorkdayJobDetailResponse>(
+              res,
+              BMO_WORKDAY.tenant
+            );
+            const parsed = parseWorkdayJobDetail(detail);
+            if (parsed.description_html && parsed.description_html.length > 200) {
+              target.job.description_html = parsed.description_html;
+              target.job.description_text =
+                parsed.description_text || target.job.description_text;
+              if (parsed.location && !target.job.location) {
+                target.job.location = parsed.location;
+              }
+              if (parsed.posted_date && !target.job.posted_date) {
+                target.job.posted_date = parsed.posted_date;
+              }
+              enriched++;
+            } else {
+              remaining.push(target);
+            }
+          } catch (e) {
+            if (e instanceof WorkdayBlockedError) blocked++;
+            remaining.push(target);
+            log.warn(
+              {
+                reqId: target.job.external_id,
+                err: e instanceof Error ? e.message : String(e),
+              },
+              "[phenom-bmo] workday description enrichment failed"
+            );
+          }
+        }
+      }
+    )
+  );
+
+  log.info(
+    { enriched, remaining: remaining.length, blocked, withWorkdayUrl },
+    "[phenom-bmo] workday enrichment pass complete"
+  );
+  return { enriched, remaining };
 }
 
 // ---------------------------------------------------------------------------
@@ -426,46 +657,63 @@ export async function fetchPhenomBmoJobs(
     const listingPage = await browserInstance.newPage();
     await listingPage.setUserAgent(USER_AGENT);
 
-    const jobs: JobData[] = [];
+    const targets: BmoEnrichTarget[] = [];
     let totalHits: number | null = null;
     let from = 0;
 
     // Paginate the FULL listing. Phenom serves 10 per page. Stop when the
     // corpus is exhausted, a page comes back empty, or the optional cap
-    // is reached.
+    // is reached. Each row is paired with the Workday detail URL derived from
+    // its applyUrl so the enrichment pass can hit Workday directly.
     while (true) {
       const payload = await fetchListingPage(listingPage, from);
       if (!payload?.data?.jobs?.length) break;
       totalHits = payload.totalHits ?? totalHits;
-      jobs.push(...payload.data.jobs.map(mapBmoJob));
+      for (const raw of payload.data.jobs) {
+        targets.push({
+          job: mapBmoJob(raw),
+          workdayUrl: deriveBmoWorkdayDetailUrl(raw.applyUrl),
+        });
+      }
       from += payload.data.jobs.length;
-      if (cap != null && jobs.length >= cap) break;
+      if (cap != null && targets.length >= cap) break;
       if (totalHits != null && from >= totalHits) break;
     }
 
-    if (cap != null && jobs.length > cap) jobs.length = cap;
+    if (cap != null && targets.length > cap) targets.length = cap;
     await listingPage.close();
 
     log.info(
       {
-        fetched: jobs.length,
+        fetched: targets.length,
         totalHits,
+        withWorkdayUrl: targets.filter((t) => t.workdayUrl).length,
         cap: cap ?? "uncapped",
-        batchSize: ENRICH_BATCH_SIZE,
       },
-      "[phenom-bmo] listings complete; enriching descriptions in batches"
+      "[phenom-bmo] listings complete; enriching via Workday (Phenom fallback)"
     );
 
-    if (jobs.length > 0) {
-      await enrichDescriptions(
-        browserInstance,
-        jobs,
-        DESCRIPTION_CONCURRENCY,
-        ENRICH_BATCH_SIZE
-      );
+    if (targets.length > 0) {
+      // Pass 1 — Workday CXS JSON (primary): reliable, HTTP, no browser.
+      const { enriched, remaining } = await enrichViaWorkday(targets);
+
+      // Pass 2 — Phenom JSON-LD detail page (fallback) for anything Workday
+      // could not fill (no apply URL, an Akamai block, or an empty body).
+      if (remaining.length > 0) {
+        log.info(
+          { workdayEnriched: enriched, fallbackCount: remaining.length },
+          "[phenom-bmo] running Phenom JSON-LD fallback for residual jobs"
+        );
+        await enrichDescriptions(
+          browserInstance,
+          remaining.map((t) => t.job),
+          DESCRIPTION_CONCURRENCY,
+          ENRICH_BATCH_SIZE
+        );
+      }
     }
 
-    return jobs;
+    return targets.map((t) => t.job);
   } finally {
     if (owned) await browserInstance.close();
   }

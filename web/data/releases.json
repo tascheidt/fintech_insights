@@ -1,482 +1,924 @@
 [
   {
+    "version": "2.9.13",
+    "date": "2026-06-07",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "BMO job descriptions are now complete. Almost every BMO posting (over 1,000 of them) had been showing only a one- or two-sentence teaser instead of the full description — responsibilities, qualifications, and the rest were missing. The cause: BMO presents its jobs on one platform but stores the actual job content on another (Workday), and our scraper had been reading only the summary the first platform shows. The BMO scraper now pulls each description straight from the authoritative source, the same reliable feed we already use for TD and CIBC, so full descriptions flow through to the dashboard, search, and AI analysis. Descriptions backfill automatically on the next BMO scrape."
+      }
+    ]
+  },
+  {
     "version": "2.9.12",
     "date": "2026-06-06",
     "changes": [
-      { "type": "improvement", "description": "Revolut roles now show up fully categorized in the competitive matrix and company views. The Revolut scraper had been saving only the job title and location, with no description — so the system couldn't tell whether a role was Risk, Finance, Engineering, etc., and Revolut's openings counted toward its total but landed in none of the function columns. The scraper now also pulls each role's full description from its detail page, which lets the usual analysis fill in the function group, seniority, and department. Revolut Canada's three current openings now read correctly as Finance and Risk leadership roles." }
+      {
+        "type": "improvement",
+        "description": "Revolut roles now show up fully categorized in the competitive matrix and company views. The Revolut scraper had been saving only the job title and location, with no description — so the system couldn't tell whether a role was Risk, Finance, Engineering, etc., and Revolut's openings counted toward its total but landed in none of the function columns. The scraper now also pulls each role's full description from its detail page, which lets the usual analysis fill in the function group, seniority, and department. Revolut Canada's three current openings now read correctly as Finance and Risk leadership roles."
+      }
     ]
   },
   {
     "version": "2.9.11",
     "date": "2026-06-06",
     "changes": [
-      { "type": "improvement", "description": "Database storage now stays within its limits automatically. Every scrape run was keeping a full raw snapshot of its results forever — useful for a few minutes to resume an interrupted run, but dead weight afterwards — and those snapshots had quietly grown to dominate the database and push it past its storage quota. The platform now clears each snapshot a couple of days after the run and prunes old run records after 90 days, keeping storage bounded with no change to the jobs, insights, or history you see." }
+      {
+        "type": "improvement",
+        "description": "Database storage now stays within its limits automatically. Every scrape run was keeping a full raw snapshot of its results forever — useful for a few minutes to resume an interrupted run, but dead weight afterwards — and those snapshots had quietly grown to dominate the database and push it past its storage quota. The platform now clears each snapshot a couple of days after the run and prunes old run records after 90 days, keeping storage bounded with no change to the jobs, insights, or history you see."
+      }
     ]
   },
   {
     "version": "2.9.10",
     "date": "2026-06-06",
     "changes": [
-      { "type": "fix", "description": "Revolut's Canadian roles now flow into the platform. The Revolut scraper had been quietly returning nothing — Revolut tweaked the web address of each job posting (adding a region prefix like \"/en-US/\"), and the scraper was still looking for the old address, so it matched zero jobs even when roles were live. It now matches regardless of region prefix and is picking up Revolut Canada's open positions. We also closed the blind spot that hid this for weeks: if a future run comes back empty while Revolut's own page says roles exist, the run now fails loudly and retries on a fresh machine instead of silently reporting \"no jobs.\"" }
-        ]
+      {
+        "type": "fix",
+        "description": "Revolut's Canadian roles now flow into the platform. The Revolut scraper had been quietly returning nothing — Revolut tweaked the web address of each job posting (adding a region prefix like \"/en-US/\"), and the scraper was still looking for the old address, so it matched zero jobs even when roles were live. It now matches regardless of region prefix and is picking up Revolut Canada's open positions. We also closed the blind spot that hid this for weeks: if a future run comes back empty while Revolut's own page says roles exist, the run now fails loudly and retries on a fresh machine instead of silently reporting \"no jobs.\""
+      }
+    ]
   },
   {
     "version": "2.9.9",
     "date": "2026-06-06",
     "changes": [
-      { "type": "fix", "description": "The CIBC and TD scrapers now recover automatically when a bank's bot-protection (Akamai) temporarily blocks the run server's network address. Some mornings the careers site answered the very first request with a challenge page instead of job data, and the whole scrape gave up before fetching anything — even though the exact same request worked fine seconds later from a different address. The scrape now detects that block clearly (instead of crashing on an unreadable error) and retries once on a fresh run server, which lands the full corpus. CIBC and TD both recovered this way after a June 6 outage." }
-          ]
+      {
+        "type": "fix",
+        "description": "The CIBC and TD scrapers now recover automatically when a bank's bot-protection (Akamai) temporarily blocks the run server's network address. Some mornings the careers site answered the very first request with a challenge page instead of job data, and the whole scrape gave up before fetching anything — even though the exact same request worked fine seconds later from a different address. The scrape now detects that block clearly (instead of crashing on an unreadable error) and retries once on a fresh run server, which lands the full corpus. CIBC and TD both recovered this way after a June 6 outage."
+      }
+    ]
   },
   {
     "version": "2.9.8",
     "date": "2026-06-05",
     "changes": [
-      { "type": "fix", "description": "A bad scrape can no longer wipe a company's open roles off the board. We detect closed postings by noticing which roles stopped appearing in the daily scrape — but if a scrape returns only part of an employer's jobs (a pagination glitch, or a run cut short), that logic would wrongly mark all the missing roles as closed. There's now a safety floor: if a single run would close more than 30% of a large employer's open roles, we treat the scrape as incomplete, skip the closures, and raise an alert instead — so a glitchy scrape leaves a few stale entries to reconcile next run rather than silently emptying a company." }
+      {
+        "type": "fix",
+        "description": "A bad scrape can no longer wipe a company's open roles off the board. We detect closed postings by noticing which roles stopped appearing in the daily scrape — but if a scrape returns only part of an employer's jobs (a pagination glitch, or a run cut short), that logic would wrongly mark all the missing roles as closed. There's now a safety floor: if a single run would close more than 30% of a large employer's open roles, we treat the scrape as incomplete, skip the closures, and raise an alert instead — so a glitchy scrape leaves a few stale entries to reconcile next run rather than silently emptying a company."
+      }
     ]
   },
   {
     "version": "2.9.7",
     "date": "2026-06-05",
     "changes": [
-      { "type": "fix", "description": "RBC jobs are flowing again. For a week, no new RBC roles had landed — not because the scraper was blocked, but because it was being cut off partway through. RBC is our largest single-employer scrape (~1,400 roles, each fetched individually), and a 30-minute ceiling added on May 28 was killing the run at the half-way mark before any of its jobs could be saved. We made the scrape ~3× faster (it reads RBC's pages directly instead of waiting on unnecessary in-browser loading) so a full run now finishes in ~12–15 minutes, and raised the ceiling to 45 minutes for genuine headroom." }
+      {
+        "type": "fix",
+        "description": "RBC jobs are flowing again. For a week, no new RBC roles had landed — not because the scraper was blocked, but because it was being cut off partway through. RBC is our largest single-employer scrape (~1,400 roles, each fetched individually), and a 30-minute ceiling added on May 28 was killing the run at the half-way mark before any of its jobs could be saved. We made the scrape ~3× faster (it reads RBC's pages directly instead of waiting on unnecessary in-browser loading) so a full run now finishes in ~12–15 minutes, and raised the ceiling to 45 minutes for genuine headroom."
+      }
     ]
   },
   {
     "version": "2.9.6",
     "date": "2026-06-04",
     "changes": [
-      { "type": "fix", "description": "The big-bank scrapers (RBC, Scotiabank, TD) no longer fail silently on the database write after a clean scrape. Each was fetching its full ~1,400–1,900-role corpus, then dying while saving a large debug snapshot — an error that showed up only as \"[object Object]\", hiding the real cause (a write timeout for Scotiabank, a brief Supabase outage for TD) for days. The snapshot write is now best-effort and never aborts the actual job ingest, write errors are recorded legibly, and short Supabase gateway blips are ridden out." },
-      { "type": "fix", "description": "The daily \"scraper-break\" health alert no longer cries wolf. Because the bank scrapers run asynchronously and land their jobs minutes after the morning collection finishes, the alert was checking them too early and reporting every bank as \"0 new today\" — a noisy false alarm that also buried the genuinely-broken ones. It now only judges a scraper once that morning's run has actually landed, so the alert reflects real outages." }
+      {
+        "type": "fix",
+        "description": "The big-bank scrapers (RBC, Scotiabank, TD) no longer fail silently on the database write after a clean scrape. Each was fetching its full ~1,400–1,900-role corpus, then dying while saving a large debug snapshot — an error that showed up only as \"[object Object]\", hiding the real cause (a write timeout for Scotiabank, a brief Supabase outage for TD) for days. The snapshot write is now best-effort and never aborts the actual job ingest, write errors are recorded legibly, and short Supabase gateway blips are ridden out."
+      },
+      {
+        "type": "fix",
+        "description": "The daily \"scraper-break\" health alert no longer cries wolf. Because the bank scrapers run asynchronously and land their jobs minutes after the morning collection finishes, the alert was checking them too early and reporting every bank as \"0 new today\" — a noisy false alarm that also buried the genuinely-broken ones. It now only judges a scraper once that morning's run has actually landed, so the alert reflects real outages."
+      }
     ]
   },
   {
     "version": "2.9.5",
     "date": "2026-06-03",
     "changes": [
-      { "type": "fix", "description": "Large daily scrapes no longer get thrown away when the database is briefly busy. If a write during a big employer's ingest (e.g. Scotiabank's ~1,900 roles) is cancelled because another job is momentarily holding the same rows, the scraper now waits a moment and retries instead of discarding the whole run — the same resilience we already had for database restarts. A Scotiabank scrape was lost to exactly this on June 3." }
+      {
+        "type": "fix",
+        "description": "Large daily scrapes no longer get thrown away when the database is briefly busy. If a write during a big employer's ingest (e.g. Scotiabank's ~1,900 roles) is cancelled because another job is momentarily holding the same rows, the scraper now waits a moment and retries instead of discarding the whole run — the same resilience we already had for database restarts. A Scotiabank scrape was lost to exactly this on June 3."
+      }
     ]
   },
   {
     "version": "2.9.4",
     "date": "2026-06-01",
     "changes": [
-      { "type": "fix", "description": "Deactivated companies are now excluded everywhere, not just in Jobs search. The dashboard's hiring trends, net-flow, function mix, and cross-company themes were still counting roles from companies we've stopped covering, slightly inflating fintech totals. All of these now scope to active companies, so the numbers match the set of companies on your dashboard." }
+      {
+        "type": "fix",
+        "description": "Deactivated companies are now excluded everywhere, not just in Jobs search. The dashboard's hiring trends, net-flow, function mix, and cross-company themes were still counting roles from companies we've stopped covering, slightly inflating fintech totals. All of these now scope to active companies, so the numbers match the set of companies on your dashboard."
+      }
     ]
   },
   {
     "version": "2.9.3",
     "date": "2026-06-01",
     "changes": [
-      { "type": "fix", "description": "The Jobs board no longer surfaces roles from companies we've deactivated. Search was matching on each posting's own open/closed status but ignoring whether we still cover the company, so a deactivated employer like Monzo could appear with dozens of \"active\" listings. Both semantic and keyword search now scope to active companies only, matching the \"companies we cover\" count." }
+      {
+        "type": "fix",
+        "description": "The Jobs board no longer surfaces roles from companies we've deactivated. Search was matching on each posting's own open/closed status but ignoring whether we still cover the company, so a deactivated employer like Monzo could appear with dozens of \"active\" listings. Both semantic and keyword search now scope to active companies only, matching the \"companies we cover\" count."
+      }
     ]
   },
   {
     "version": "2.9.2",
     "date": "2026-05-31",
     "changes": [
-      { "type": "fix", "description": "Corrected internal Gemini cost accounting after Google's model aliases rolled to the Gemini 3.x generation. Our spend telemetry had been reading the older 2.x per-token prices and under-reporting actual usage ~2.7×; rates are now reconciled to the cloud invoice (to ~1%), so the daily cost alarm trips at the right thresholds. No change to the product." }
+      {
+        "type": "fix",
+        "description": "Corrected internal Gemini cost accounting after Google's model aliases rolled to the Gemini 3.x generation. Our spend telemetry had been reading the older 2.x per-token prices and under-reporting actual usage ~2.7×; rates are now reconciled to the cloud invoice (to ~1%), so the daily cost alarm trips at the right thresholds. No change to the product."
+      }
     ]
   },
   {
     "version": "2.9.1",
     "date": "2026-05-31",
     "changes": [
-      { "type": "fix", "description": "Heavy job scrapes now survive a momentary database restart. When our database briefly cycles mid-run, a large browser-based scrape (like TD's ~1,400 postings) no longer throws away a completed fetch the instant a write fails — it waits out the ~30-second reconnection and finishes saving, instead of silently skipping that company for the day. A TD run was lost to exactly this on May 31." }
+      {
+        "type": "fix",
+        "description": "Heavy job scrapes now survive a momentary database restart. When our database briefly cycles mid-run, a large browser-based scrape (like TD's ~1,400 postings) no longer throws away a completed fetch the instant a write fails — it waits out the ~30-second reconnection and finishes saving, instead of silently skipping that company for the day. A TD run was lost to exactly this on May 31."
+      }
     ]
   },
   {
     "version": "2.9.0",
     "date": "2026-05-30",
     "changes": [
-      { "type": "improvement", "description": "Lower-cost, fresher job analysis. The AI extraction step that structures each posting no longer spends unnecessary reasoning tokens (a mechanical task that didn't need them), cutting its per-job cost ~70% with no change to the fields you see. Ingestion also stops re-analyzing postings whose content hasn't meaningfully changed — it now ignores volatile boilerplate like posting dates, applicant counts and requisition IDs when deciding whether a description actually changed." },
-      { "type": "fix", "description": "The daily AI-spend alarm is no longer blind to the spikes that matter. It now trips on grounded-search volume and token throughput in addition to the estimated dollar amount, so an unusual cost day pages us even when the dollar estimate under-counts it." }
+      {
+        "type": "improvement",
+        "description": "Lower-cost, fresher job analysis. The AI extraction step that structures each posting no longer spends unnecessary reasoning tokens (a mechanical task that didn't need them), cutting its per-job cost ~70% with no change to the fields you see. Ingestion also stops re-analyzing postings whose content hasn't meaningfully changed — it now ignores volatile boilerplate like posting dates, applicant counts and requisition IDs when deciding whether a description actually changed."
+      },
+      {
+        "type": "fix",
+        "description": "The daily AI-spend alarm is no longer blind to the spikes that matter. It now trips on grounded-search volume and token throughput in addition to the estimated dollar amount, so an unusual cost day pages us even when the dollar estimate under-counts it."
+      }
     ]
   },
   {
     "version": "2.8.0",
     "date": "2026-05-30",
     "changes": [
-      { "type": "feature", "description": "The Jobs board now shows only active roles by default. A new Active / Inactive / All control next to the tier toggle lets you bring closed postings back when you want them, and any role that has since closed is clearly marked with a “Closed” tag and dimmed in the list — so you’re never quietly looking at filled jobs." },
-      { "type": "feature", "description": "Long result sets are now paged. The Jobs table shows the first 25 matches with a “Load 25 more” button instead of rendering everything at once, the counter reads a meaningful “N matches,” and a “Showing 1–25 of N” line tracks where you are. Filtering, searching, or re-sorting jumps you back to the top." },
-      { "type": "improvement", "description": "Accessibility polish on the Jobs filter bar: the Recency, Tier, and Status controls now announce their selected state to screen readers." }
+      {
+        "type": "feature",
+        "description": "The Jobs board now shows only active roles by default. A new Active / Inactive / All control next to the tier toggle lets you bring closed postings back when you want them, and any role that has since closed is clearly marked with a “Closed” tag and dimmed in the list — so you’re never quietly looking at filled jobs."
+      },
+      {
+        "type": "feature",
+        "description": "Long result sets are now paged. The Jobs table shows the first 25 matches with a “Load 25 more” button instead of rendering everything at once, the counter reads a meaningful “N matches,” and a “Showing 1–25 of N” line tracks where you are. Filtering, searching, or re-sorting jumps you back to the top."
+      },
+      {
+        "type": "improvement",
+        "description": "Accessibility polish on the Jobs filter bar: the Recency, Tier, and Status controls now announce their selected state to screen readers."
+      }
     ]
   },
   {
     "version": "2.7.3",
     "date": "2026-05-30",
     "changes": [
-      { "type": "improvement", "description": "“← Back to Jobs” now returns you to the exact search you came from. Opening a posting from the Jobs page and clicking back restores your search text, mode, company / function / recency filters, and tier scope instead of resetting to the full list." }
+      {
+        "type": "improvement",
+        "description": "“← Back to Jobs” now returns you to the exact search you came from. Opening a posting from the Jobs page and clicking back restores your search text, mode, company / function / recency filters, and tier scope instead of resetting to the full list."
+      }
     ]
   },
   {
     "version": "2.7.2",
     "date": "2026-05-30",
     "changes": [
-      { "type": "improvement", "description": "Jobs search polish: the Keyword / Semantic mode toggle now announces its pressed state to screen readers, the “?” syntax help is wired as a proper labelled disclosure, and the “new” posting pill uses the standard mono label type instead of the editorial display face — bringing it in line with the design system." }
+      {
+        "type": "improvement",
+        "description": "Jobs search polish: the Keyword / Semantic mode toggle now announces its pressed state to screen readers, the “?” syntax help is wired as a proper labelled disclosure, and the “new” posting pill uses the standard mono label type instead of the editorial display face — bringing it in line with the design system."
+      }
     ]
   },
   {
     "version": "2.7.1",
     "date": "2026-05-30",
     "changes": [
-      { "type": "fix", "description": "Fix CIBC/Simplii job brand classification. Simplii postings are now identified by a Simplii mention in the job title or repeated mentions in the description, instead of an over-broad field scan that mis-tagged hundreds of CIBC roles as Simplii. Existing postings were re-classified." }
+      {
+        "type": "fix",
+        "description": "Fix CIBC/Simplii job brand classification. Simplii postings are now identified by a Simplii mention in the job title or repeated mentions in the description, instead of an over-broad field scan that mis-tagged hundreds of CIBC roles as Simplii. Existing postings were re-classified."
+      }
     ]
   },
   {
     "version": "2.7.0",
     "date": "2026-05-29",
     "changes": [
-      { "type": "feature", "description": "Search by meaning, not just words. A new Keyword / Semantic toggle on the Jobs search box lets you describe what you're after — “roles preventing fraud and money laundering” surfaces Financial Crime, AML and KYC roles even when they never use those exact words. Semantic search ranks the closest matches first; keyword search keeps the fast type-as-you-go phrase/exclude syntax. Built on Gemini embeddings + pgvector, refreshed daily so new postings join automatically." }
+      {
+        "type": "feature",
+        "description": "Search by meaning, not just words. A new Keyword / Semantic toggle on the Jobs search box lets you describe what you're after — “roles preventing fraud and money laundering” surfaces Financial Crime, AML and KYC roles even when they never use those exact words. Semantic search ranks the closest matches first; keyword search keeps the fast type-as-you-go phrase/exclude syntax. Built on Gemini embeddings + pgvector, refreshed daily so new postings join automatically."
+      }
     ]
   },
   {
     "version": "2.6.0",
     "date": "2026-05-29",
     "changes": [
-      { "type": "feature", "description": "Jobs search now reads the full job description, not just the title — and understands a simple query syntax. Plain words match every term as you type (`staff engineer`); wrap words in quotes for an exact phrase (`\"staff engineer\"`); prefix a word with a minus to exclude it (`engineer -contract`). A new “?” next to the search box explains the syntax. Matching runs across the whole active corpus (not just the 500 most-recent), with a notice when a search tops 1,000 results. Powered by Postgres full-text search (a GIN-indexed `tsvector`), so results stay fast as we add companies." }
+      {
+        "type": "feature",
+        "description": "Jobs search now reads the full job description, not just the title — and understands a simple query syntax. Plain words match every term as you type (`staff engineer`); wrap words in quotes for an exact phrase (`\"staff engineer\"`); prefix a word with a minus to exclude it (`engineer -contract`). A new “?” next to the search box explains the syntax. Matching runs across the whole active corpus (not just the 500 most-recent), with a notice when a search tops 1,000 results. Powered by Postgres full-text search (a GIN-indexed `tsvector`), so results stay fast as we add companies."
+      }
     ]
   },
   {
     "version": "2.5.2",
     "date": "2026-05-28",
     "changes": [
-      { "type": "improvement", "description": "TD heavy-scrape description enrichment runs concurrently (50-job batches, 4 workers) instead of sequentially. Cuts the TD run from ~18 min to ~4-5 min, shrinking the window where a transient Supabase or runner blip can kill an in-flight scrape. Tunable via the `WORKDAY_TD_CONCURRENCY` env." },
-      { "type": "fix", "description": "Heavy-scraper failure path now retries the `mark task failed` writes (3 attempts, exponential backoff) and installs SIGTERM / SIGINT handlers, so a Supabase recovery mid-ingest or a GH Actions workflow-cancel still marks the task `failed` with the underlying error instead of leaving it stuck in `running` until the next morning's heartbeat sweep relabels it `Timed out`." },
-      { "type": "fix", "description": "`updateTaskProgress` error message no longer collapses to `undefined (code=n/a)` when the underlying PostgREST error has empty `.message` / `.code` (e.g. during a Supabase Postgres recovery). Now formats every available field — `details`, `hint`, `name`, `cause`, plus a raw JSON fallback when every advertised field is empty — so the workflow log captures the real cause." },
-      { "type": "improvement", "description": "Heavy-scraper workflow now hard-caps at 30 min via `timeout-minutes`. A hung scrape fails the workflow cleanly within a deterministic budget instead of holding the task in `running` for hours." }
+      {
+        "type": "improvement",
+        "description": "TD heavy-scrape description enrichment runs concurrently (50-job batches, 4 workers) instead of sequentially. Cuts the TD run from ~18 min to ~4-5 min, shrinking the window where a transient Supabase or runner blip can kill an in-flight scrape. Tunable via the `WORKDAY_TD_CONCURRENCY` env."
+      },
+      {
+        "type": "fix",
+        "description": "Heavy-scraper failure path now retries the `mark task failed` writes (3 attempts, exponential backoff) and installs SIGTERM / SIGINT handlers, so a Supabase recovery mid-ingest or a GH Actions workflow-cancel still marks the task `failed` with the underlying error instead of leaving it stuck in `running` until the next morning's heartbeat sweep relabels it `Timed out`."
+      },
+      {
+        "type": "fix",
+        "description": "`updateTaskProgress` error message no longer collapses to `undefined (code=n/a)` when the underlying PostgREST error has empty `.message` / `.code` (e.g. during a Supabase Postgres recovery). Now formats every available field — `details`, `hint`, `name`, `cause`, plus a raw JSON fallback when every advertised field is empty — so the workflow log captures the real cause."
+      },
+      {
+        "type": "improvement",
+        "description": "Heavy-scraper workflow now hard-caps at 30 min via `timeout-minutes`. A hung scrape fails the workflow cleanly within a deterministic budget instead of holding the task in `running` for hours."
+      }
     ]
   },
   {
     "version": "2.5.1",
     "date": "2026-05-28",
     "changes": [
-      { "type": "fix", "description": "Scraper-break canary email no longer fires false alarms for incumbents. The canary's bulk `.select()` against the 8-day window silently hit PostgREST's 1000-row cap once the incumbent corpus exceeded that — today's freshly-inserted rows fell outside the returned window, so half the banks showed `0 new today` even when scrapers were ingesting normally. Rewritten as per-company `count(head:true)` pairs; no row materialization, no cap. The rolling-avg window also excludes the per-company backfill cutoff (created_at + 48h, same definition as the dashboard) so the one-shot onboarding ingest no longer poisons the average and keeps the canary firing daily for a week after every new incumbent comes online." },
-      { "type": "fix", "description": "Job-postings ingest dedup now loads the full existing corpus via paginated `.range()`. The previous unbounded `.select()` capped at 1000 rows, so for any company with >1000 active postings (RBC, TD, Scotia) the dedup map was incomplete and the next scrape re-INSERTed already-known rows. The incumbent-bets dashboard query had the same shape and is fixed the same way." },
-      { "type": "fix", "description": "`updateTaskProgress` now surfaces the underlying PostgREST error (code + message) when the task lookup fails, instead of the generic `Task X not found` that hid the real cause of the May 2026 TD ingest failure." }
+      {
+        "type": "fix",
+        "description": "Scraper-break canary email no longer fires false alarms for incumbents. The canary's bulk `.select()` against the 8-day window silently hit PostgREST's 1000-row cap once the incumbent corpus exceeded that — today's freshly-inserted rows fell outside the returned window, so half the banks showed `0 new today` even when scrapers were ingesting normally. Rewritten as per-company `count(head:true)` pairs; no row materialization, no cap. The rolling-avg window also excludes the per-company backfill cutoff (created_at + 48h, same definition as the dashboard) so the one-shot onboarding ingest no longer poisons the average and keeps the canary firing daily for a week after every new incumbent comes online."
+      },
+      {
+        "type": "fix",
+        "description": "Job-postings ingest dedup now loads the full existing corpus via paginated `.range()`. The previous unbounded `.select()` capped at 1000 rows, so for any company with >1000 active postings (RBC, TD, Scotia) the dedup map was incomplete and the next scrape re-INSERTed already-known rows. The incumbent-bets dashboard query had the same shape and is fixed the same way."
+      },
+      {
+        "type": "fix",
+        "description": "`updateTaskProgress` now surfaces the underlying PostgREST error (code + message) when the task lookup fails, instead of the generic `Task X not found` that hid the real cause of the May 2026 TD ingest failure."
+      }
     ]
   },
   {
     "version": "2.5.0",
     "date": "2026-05-27",
     "changes": [
-      { "type": "feature", "description": "Sign up and sign in with email and password, in addition to Google. The login page now has a Log in / Sign up toggle that shows both Google OAuth and an email-and-password form; a separate forgot-password flow sends a Supabase reset link that lands users on a new set-a-new-password page. The marketing CTA deep-links to the Sign up tab so new visitors start in the right mode." }
+      {
+        "type": "feature",
+        "description": "Sign up and sign in with email and password, in addition to Google. The login page now has a Log in / Sign up toggle that shows both Google OAuth and an email-and-password form; a separate forgot-password flow sends a Supabase reset link that lands users on a new set-a-new-password page. The marketing CTA deep-links to the Sign up tab so new visitors start in the right mode."
+      }
     ]
   },
   {
     "version": "2.4.1",
     "date": "2026-05-26",
     "changes": [
-      { "type": "fix", "description": "Job-postings ingest now re-opens jobs that reappear in a scrape. The update path bumped `last_seen_date` but never cleared `closed_date` or restored `is_active=true`, so any job wrongly marked closed by a partial scrape (e.g. the May 2026 Workday pagination bug that returned only the first 40 jobs) stayed closed forever even when subsequent scrapes saw it. Repaired the historical state in the same release: 860 TD, 467 CIBC, and 2 Simplii rows reopened where `last_seen_date > closed_date`. TD open count moves from 632 → 1,492 (site shows 1,531); CIBC from 90 → 557 (site shows 535)." }
+      {
+        "type": "fix",
+        "description": "Job-postings ingest now re-opens jobs that reappear in a scrape. The update path bumped `last_seen_date` but never cleared `closed_date` or restored `is_active=true`, so any job wrongly marked closed by a partial scrape (e.g. the May 2026 Workday pagination bug that returned only the first 40 jobs) stayed closed forever even when subsequent scrapes saw it. Repaired the historical state in the same release: 860 TD, 467 CIBC, and 2 Simplii rows reopened where `last_seen_date > closed_date`. TD open count moves from 632 → 1,492 (site shows 1,531); CIBC from 90 → 557 (site shows 535)."
+      }
     ]
   },
   {
     "version": "2.4.0",
     "date": "2026-05-24",
     "changes": [
-      { "type": "feature", "description": "Simplii Financial split out as a distinct fintech card. Simplii (CIBC's direct digital bank) has no separate careers portal — every Simplii role posts through CIBC's Workday. The Phase 3 classifier (previously log-only) now tags those rows with a sub-brand override; the ingestion processor routes them to a separate `simplii` companies row (tier=fintech, parent=cibc) so Simplii gets its own strategic-insight + tech-stack panel and is excluded from CIBC's totals." }
+      {
+        "type": "feature",
+        "description": "Simplii Financial split out as a distinct fintech card. Simplii (CIBC's direct digital bank) has no separate careers portal — every Simplii role posts through CIBC's Workday. The Phase 3 classifier (previously log-only) now tags those rows with a sub-brand override; the ingestion processor routes them to a separate `simplii` companies row (tier=fintech, parent=cibc) so Simplii gets its own strategic-insight + tech-stack panel and is excluded from CIBC's totals."
+      }
     ]
   },
   {
     "version": "2.3.1",
     "date": "2026-05-23",
     "changes": [
-      { "type": "fix", "description": "Incumbent insight generation no longer dies on truncated JSON. `maxOutputTokens` for `generateInsightWithLLM` raised from 4096 to 8192 — incumbent banks with rich grounded-research context routinely overran the old cap mid-string, producing \"Unterminated string in JSON\" parse failures that killed the call. Also added empty-response and parse-failure retries (up to 2 attempts each, with backoff) matching the pattern already used in `detectCompanyType`, so a single transient bad response no longer aborts the whole backfill." }
+      {
+        "type": "fix",
+        "description": "Incumbent insight generation no longer dies on truncated JSON. `maxOutputTokens` for `generateInsightWithLLM` raised from 4096 to 8192 — incumbent banks with rich grounded-research context routinely overran the old cap mid-string, producing \"Unterminated string in JSON\" parse failures that killed the call. Also added empty-response and parse-failure retries (up to 2 attempts each, with backoff) matching the pattern already used in `detectCompanyType`, so a single transient bad response no longer aborts the whole backfill."
+      }
     ]
   },
   {
     "version": "2.3.0",
     "date": "2026-05-23",
     "changes": [
-      { "type": "feature", "description": "Scotiabank — 5th and final Big-6 incumbent — joins the lens. The parent brand shares Scotia's `jobs.scotiabank.com` SuccessFactors portal with Tangerine (already tracked as a fintech subsidiary), so a single `scotiabank.ts` parser drives both: the brand-path prefix in job hrefs is matched as an optional regex group (Tangerine includes `/Tangerine/`, Scotia parent omits it). Wires the new `scotiabank` ATS through detect-ats, the GitHub-Actions offload list (1,900 jobs × per-detail enrichment doesn't fit in Vercel's 300s budget), and the Phase-3 seed. 19 unit tests cover total-count parsing (handles SuccessFactors's `<b>`-wrapped count), row parsing for both brand-path shapes, postal-code-strip, dedupe, entity decode, description extraction, and the new `SCOTIABANK_MAX_PAGES` env cap." },
-      { "type": "fix", "description": "Scotiabank scraper's hardcoded 20-page cap (~500 jobs) silently truncated any brand larger than ~500 — fine for Tangerine, broken for Scotia parent (~1,900). Default raised to 200 (5,000-job ceiling, ~2.5× headroom); `SCOTIABANK_MAX_PAGES` env overrides for smoke runs." }
+      {
+        "type": "feature",
+        "description": "Scotiabank — 5th and final Big-6 incumbent — joins the lens. The parent brand shares Scotia's `jobs.scotiabank.com` SuccessFactors portal with Tangerine (already tracked as a fintech subsidiary), so a single `scotiabank.ts` parser drives both: the brand-path prefix in job hrefs is matched as an optional regex group (Tangerine includes `/Tangerine/`, Scotia parent omits it). Wires the new `scotiabank` ATS through detect-ats, the GitHub-Actions offload list (1,900 jobs × per-detail enrichment doesn't fit in Vercel's 300s budget), and the Phase-3 seed. 19 unit tests cover total-count parsing (handles SuccessFactors's `<b>`-wrapped count), row parsing for both brand-path shapes, postal-code-strip, dedupe, entity decode, description extraction, and the new `SCOTIABANK_MAX_PAGES` env cap."
+      },
+      {
+        "type": "fix",
+        "description": "Scotiabank scraper's hardcoded 20-page cap (~500 jobs) silently truncated any brand larger than ~500 — fine for Tangerine, broken for Scotia parent (~1,900). Default raised to 200 (5,000-job ceiling, ~2.5× headroom); `SCOTIABANK_MAX_PAGES` env overrides for smoke runs."
+      }
     ]
   },
   {
     "version": "2.2.4",
     "date": "2026-05-23",
     "changes": [
-      { "type": "fix", "description": "TD and CIBC Workday scrapers were stopping at 40 jobs (2 pages × 20) instead of pulling the full corpus (~1,531 and ~535 respectively). Root cause: Workday returns the real `total` only on the first page; subsequent pages echo `total: 0` while still returning real `jobPostings`. The loop used `data.total ?? total`, which doesn't fall back on `0`, so `total` got clobbered to `0` and the next `offset >= total` check exited immediately. Now we only update `total` when the value is positive." }
+      {
+        "type": "fix",
+        "description": "TD and CIBC Workday scrapers were stopping at 40 jobs (2 pages × 20) instead of pulling the full corpus (~1,531 and ~535 respectively). Root cause: Workday returns the real `total` only on the first page; subsequent pages echo `total: 0` while still returning real `jobPostings`. The loop used `data.total ?? total`, which doesn't fall back on `0`, so `total` got clobbered to `0` and the next `offset >= total` check exited immediately. Now we only update `total` when the value is positive."
+      }
     ]
   },
   {
     "version": "2.2.3",
     "date": "2026-05-23",
     "changes": [
-      { "type": "fix", "description": "\"Generate Insight\" no longer 504s for incumbent banks. `performDeepResearch` was firing 8 grounded Gemini searches sequentially (~80–100s wall time for public companies like BMO), routinely overrunning Vercel's 120s function cap. Parallelized the searches and the strategy/financial extraction calls; also ran historical-context build and company-type detection concurrently. Total expected wall time drops from ~100s to ~15–20s." }
+      {
+        "type": "fix",
+        "description": "\"Generate Insight\" no longer 504s for incumbent banks. `performDeepResearch` was firing 8 grounded Gemini searches sequentially (~80–100s wall time for public companies like BMO), routinely overrunning Vercel's 120s function cap. Parallelized the searches and the strategy/financial extraction calls; also ran historical-context build and company-type detection concurrently. Total expected wall time drops from ~100s to ~15–20s."
+      }
     ]
   },
   {
     "version": "2.2.2",
     "date": "2026-05-23",
     "changes": [
-      { "type": "fix", "description": "Workday detail-page URLs were doubled (`/job/job/...`), causing every TD and CIBC detail enrichment to return 406. Root cause: Workday's `externalPath` already starts with `/job/...`, but `buildWorkdayUrls.jobGetUrl` was prepending another `/job`. Verified against the live API: corrected URLs return 200 even without browser-like headers. The browser-header machinery added earlier in v2.2.0 was a red herring caused by misdiagnosis." }
+      {
+        "type": "fix",
+        "description": "Workday detail-page URLs were doubled (`/job/job/...`), causing every TD and CIBC detail enrichment to return 406. Root cause: Workday's `externalPath` already starts with `/job/...`, but `buildWorkdayUrls.jobGetUrl` was prepending another `/job`. Verified against the live API: corrected URLs return 200 even without browser-like headers. The browser-header machinery added earlier in v2.2.0 was a red herring caused by misdiagnosis."
+      }
     ]
   },
   {
     "version": "2.2.1",
     "date": "2026-05-23",
     "changes": [
-      { "type": "fix", "description": "Gemini cost telemetry now bills reasoning (\"thinking\") tokens at the output rate. Gemini 2.5 (both Pro and Flash) returns thinking tokens in `totalTokenCount` without naming them; our formula previously dropped them entirely, undercounting Flash extraction spend by ~3x. Backfilled all 2,936 historical events; recovered $10.57 of previously-hidden cost." }
+      {
+        "type": "fix",
+        "description": "Gemini cost telemetry now bills reasoning (\"thinking\") tokens at the output rate. Gemini 2.5 (both Pro and Flash) returns thinking tokens in `totalTokenCount` without naming them; our formula previously dropped them entirely, undercounting Flash extraction spend by ~3x. Backfilled all 2,936 historical events; recovered $10.57 of previously-hidden cost."
+      }
     ]
   },
   {
     "version": "2.2.0",
     "date": "2026-05-22",
     "changes": [
-      { "type": "feature", "description": "Phase 3 — scaled the incumbent lens from RBC alone to all 5 Big-6 Canadian banks. BMO and National Bank join via Phenom CareerConnect (mirror of the RBC scraper); TD and CIBC join via dedicated Workday scrapers built on a shared `workday-utils.ts` (no base class — fork-per-tenant). Each bank seeded `is_active=false`; flip after smoke." },
-      { "type": "feature", "description": "Simplii Financial classifier — `workday-cibc.ts` exports `isSimpliiPosting` and runs in log-only mode for now. Once production logs confirm Simplii postings actually surface inside CIBC's Workday tenant, a follow-up adds the `simplii` companies row (tier=fintech) and routes via `companySlugOverride`." },
-      { "type": "feature", "description": "Cost-gate calibration script (`web/scripts/calibrate-incumbent-gate.ts`) — read-only Markdown + JSON report on the incumbent corpus: seniority distribution, function-category distribution, pass rate under the production whitelist, simulated pass rates under candidate whitelists (e.g. include `senior`, drop `aml-financial-crime`), and the top-20 near-miss `senior`-in-whitelisted-function titles. Run after each Phase-3 ramp." },
-      { "type": "improvement", "description": "Scraper-break canary — the scraper-health alert email now fires on partial-corpus drops, not only outages. For each tracked incumbent bank, if today's new-jobs count is below 50% of the 7-day rolling average AND that rolling average is above 5, a \"Scraper-break canary\" section appears in the next alert email." },
-      { "type": "improvement", "description": "Two partial indexes on the read-hot tables (`idx_job_postings_company_active_first_seen`, `idx_companies_tier_active`) for the per-company windowed queries and the cross-company tier joins. Pre-empts the query-plan degradation Luke's plan review flagged at 5× scale." },
-      { "type": "improvement", "description": "`/jobs` hard-capped at the 500 most-recent postings (`JOBS_LIST_MAX_ROWS`). Without it, a `?tier=incumbent` or `?tier=all` view would ship ~22 MB of JSON on every page render once the bank ramp finishes." },
-      { "type": "improvement", "description": "`decodeHtmlEntities` consolidated into `web/lib/scrapers/utils.ts` (was duplicated twice; scotiabank's copy decoded `&amp;` first — a subtle bug that collapsed doubly-encoded sequences like `&amp;lt;` to `<` instead of leaving them as `&lt;`)." }
+      {
+        "type": "feature",
+        "description": "Phase 3 — scaled the incumbent lens from RBC alone to all 5 Big-6 Canadian banks. BMO and National Bank join via Phenom CareerConnect (mirror of the RBC scraper); TD and CIBC join via dedicated Workday scrapers built on a shared `workday-utils.ts` (no base class — fork-per-tenant). Each bank seeded `is_active=false`; flip after smoke."
+      },
+      {
+        "type": "feature",
+        "description": "Simplii Financial classifier — `workday-cibc.ts` exports `isSimpliiPosting` and runs in log-only mode for now. Once production logs confirm Simplii postings actually surface inside CIBC's Workday tenant, a follow-up adds the `simplii` companies row (tier=fintech) and routes via `companySlugOverride`."
+      },
+      {
+        "type": "feature",
+        "description": "Cost-gate calibration script (`web/scripts/calibrate-incumbent-gate.ts`) — read-only Markdown + JSON report on the incumbent corpus: seniority distribution, function-category distribution, pass rate under the production whitelist, simulated pass rates under candidate whitelists (e.g. include `senior`, drop `aml-financial-crime`), and the top-20 near-miss `senior`-in-whitelisted-function titles. Run after each Phase-3 ramp."
+      },
+      {
+        "type": "improvement",
+        "description": "Scraper-break canary — the scraper-health alert email now fires on partial-corpus drops, not only outages. For each tracked incumbent bank, if today's new-jobs count is below 50% of the 7-day rolling average AND that rolling average is above 5, a \"Scraper-break canary\" section appears in the next alert email."
+      },
+      {
+        "type": "improvement",
+        "description": "Two partial indexes on the read-hot tables (`idx_job_postings_company_active_first_seen`, `idx_companies_tier_active`) for the per-company windowed queries and the cross-company tier joins. Pre-empts the query-plan degradation Luke's plan review flagged at 5× scale."
+      },
+      {
+        "type": "improvement",
+        "description": "`/jobs` hard-capped at the 500 most-recent postings (`JOBS_LIST_MAX_ROWS`). Without it, a `?tier=incumbent` or `?tier=all` view would ship ~22 MB of JSON on every page render once the bank ramp finishes."
+      },
+      {
+        "type": "improvement",
+        "description": "`decodeHtmlEntities` consolidated into `web/lib/scrapers/utils.ts` (was duplicated twice; scotiabank's copy decoded `&amp;` first — a subtle bug that collapsed doubly-encoded sequences like `&amp;lt;` to `<` instead of leaving them as `&lt;`)."
+      }
     ]
   },
   {
     "version": "2.1.0",
     "date": "2026-05-21",
     "changes": [
-      { "type": "feature", "description": "Incumbent intelligence — the Big-6 Canadian banks (starting with RBC) are now tracked as a curated signal lens. Their hiring never enters a dashboard metric, competitive-matrix row, or digest theme; instead it surfaces only in dedicated, clearly-labelled places so bank volume never overwhelms the fintech view." },
-      { "type": "feature", "description": "Incumbent Bets dashboard rail — a full-width module surfacing senior Big-6-bank hires (staff+ in AI/ML, Data and Risk-AI), grouped by bank, over the last 30 days. Reads structured fields only, carries an \"excluded from all dashboard metrics\" note, and is omitted entirely on weeks with no qualifying senior hire." },
-      { "type": "feature", "description": "Incumbent Watch — the weekly digest now closes its cross-company section with a clearly-bounded interlude on senior big-bank hiring. Each Big-6 bank gets one bullet (\"RBC · 3 senior AI/ML & Data roles\") with a one-line AI interpretation; the block is omitted on weeks with no qualifying senior bank hire, and bank volume stays excluded from the digest totals." },
-      { "type": "feature", "description": "Incumbents companies lens — a new tab on the Companies list shows the tracked Big-6 banks as a deliberate, separate view. Incumbent rows carry an \"Incumbent\" badge and a static \"Reference\" marker instead of the fintech pivot signals, and their job counts never mix into the fintech list's sort." },
-      { "type": "feature", "description": "Jobs list Tier filter — a Fintech / Incumbent / All control lets you opt into seeing big-bank postings; the list defaults to fintech-only and incumbent jobs carry an \"Incumbent\" badge." },
-      { "type": "improvement", "description": "Incumbent company pages — a bank's detail page now reads honestly: an \"Incumbent\" badge, a context note explaining why its counts don't appear on the dashboard, and a \"Senior hiring signal\" panel pairing total open postings with the senior-role signal count." }
+      {
+        "type": "feature",
+        "description": "Incumbent intelligence — the Big-6 Canadian banks (starting with RBC) are now tracked as a curated signal lens. Their hiring never enters a dashboard metric, competitive-matrix row, or digest theme; instead it surfaces only in dedicated, clearly-labelled places so bank volume never overwhelms the fintech view."
+      },
+      {
+        "type": "feature",
+        "description": "Incumbent Bets dashboard rail — a full-width module surfacing senior Big-6-bank hires (staff+ in AI/ML, Data and Risk-AI), grouped by bank, over the last 30 days. Reads structured fields only, carries an \"excluded from all dashboard metrics\" note, and is omitted entirely on weeks with no qualifying senior hire."
+      },
+      {
+        "type": "feature",
+        "description": "Incumbent Watch — the weekly digest now closes its cross-company section with a clearly-bounded interlude on senior big-bank hiring. Each Big-6 bank gets one bullet (\"RBC · 3 senior AI/ML & Data roles\") with a one-line AI interpretation; the block is omitted on weeks with no qualifying senior bank hire, and bank volume stays excluded from the digest totals."
+      },
+      {
+        "type": "feature",
+        "description": "Incumbents companies lens — a new tab on the Companies list shows the tracked Big-6 banks as a deliberate, separate view. Incumbent rows carry an \"Incumbent\" badge and a static \"Reference\" marker instead of the fintech pivot signals, and their job counts never mix into the fintech list's sort."
+      },
+      {
+        "type": "feature",
+        "description": "Jobs list Tier filter — a Fintech / Incumbent / All control lets you opt into seeing big-bank postings; the list defaults to fintech-only and incumbent jobs carry an \"Incumbent\" badge."
+      },
+      {
+        "type": "improvement",
+        "description": "Incumbent company pages — a bank's detail page now reads honestly: an \"Incumbent\" badge, a context note explaining why its counts don't appear on the dashboard, and a \"Senior hiring signal\" panel pairing total open postings with the senior-role signal count."
+      }
     ]
   },
   {
     "version": "2.0.2",
     "date": "2026-05-18",
     "changes": [
-      { "type": "fix", "description": "Closed-job detection: jobs that drop out of an ATS feed are once again marked closed. A regression in the Phase 2 description-hash gate left the closure loop passing an object where a job id was expected, so no posting had been marked closed since 2026-04-19 — the \"Closed\" series on the Net hiring flow chart and the \"closed\" half of 7-Day Net both flatlined at zero. Backfilled the 147 missed closures with closed_date set to each job's last_seen_date, so they land on the timeline when they actually happened rather than spiking on the fix date." }
+      {
+        "type": "fix",
+        "description": "Closed-job detection: jobs that drop out of an ATS feed are once again marked closed. A regression in the Phase 2 description-hash gate left the closure loop passing an object where a job id was expected, so no posting had been marked closed since 2026-04-19 — the \"Closed\" series on the Net hiring flow chart and the \"closed\" half of 7-Day Net both flatlined at zero. Backfilled the 147 missed closures with closed_date set to each job's last_seen_date, so they land on the timeline when they actually happened rather than spiking on the fix date."
+      }
     ]
   },
   {
     "version": "2.0.1",
     "date": "2026-04-28",
     "changes": [
-      { "type": "fix", "description": "Mobile rendering: every surface now fits the iPhone-13 viewport with zero horizontal overflow. Companies index toolbar (lens + view toggle) wraps to two rows on mobile and each control scroll-clips inside its own container; rows reflow as stacked cards instead of an unreadable 5-column grid." },
-      { "type": "fix", "description": "Dashboard Competitive Matrix and other multi-column rows no longer push the page wider than the viewport — the grid containers now apply min-w-0 so each card's overflow-x-auto can actually clip." },
-      { "type": "fix", "description": "Company drill-down header stacks its action buttons (Watch / Careers site / Generate Insight) under the company name on mobile instead of fighting the headline for horizontal space; the headline itself drops from 32px to 26px on small screens." },
-      { "type": "improvement", "description": "Mobile-audit Playwright spec ships under MOBILE_AUDIT=1 — captures full-page screenshots and overflow stats per route so future regressions on small screens get caught quickly. Mobile-nav regression spec asserts the hamburger menu opens and routes." }
+      {
+        "type": "fix",
+        "description": "Mobile rendering: every surface now fits the iPhone-13 viewport with zero horizontal overflow. Companies index toolbar (lens + view toggle) wraps to two rows on mobile and each control scroll-clips inside its own container; rows reflow as stacked cards instead of an unreadable 5-column grid."
+      },
+      {
+        "type": "fix",
+        "description": "Dashboard Competitive Matrix and other multi-column rows no longer push the page wider than the viewport — the grid containers now apply min-w-0 so each card's overflow-x-auto can actually clip."
+      },
+      {
+        "type": "fix",
+        "description": "Company drill-down header stacks its action buttons (Watch / Careers site / Generate Insight) under the company name on mobile instead of fighting the headline for horizontal space; the headline itself drops from 32px to 26px on small screens."
+      },
+      {
+        "type": "improvement",
+        "description": "Mobile-audit Playwright spec ships under MOBILE_AUDIT=1 — captures full-page screenshots and overflow stats per route so future regressions on small screens get caught quickly. Mobile-nav regression spec asserts the hamburger menu opens and routes."
+      }
     ]
   },
   {
     "version": "2.0.0",
     "date": "2026-04-28",
     "changes": [
-      { "type": "feature", "description": "Talent Brief v2 — substantial upgrade pairing the SoCal v1.15 visual rebuild with a working editorial pipeline. Every active company now has a working thesis, interpretation, last-change, and 3–6 strategic bets seeded against live hiring data, refreshable on demand or weekly." },
-      { "type": "feature", "description": "LLM editorial engine: Pro (ungrounded) call that generates each company's working thesis, interpretation paragraph, last meaningful change, and 3–6 strategic bets with evidence + forward signal. Reuses the most recent company_insights row as background context to avoid stacking a second grounded call. Refreshable via /api/admin/companies/[id]/regenerate-editorial, the regenerate-editorial.ts script, or a weekly GitHub Actions cron." },
-      { "type": "feature", "description": "Cross-company theme labels on the Jobs right rail are now author-quality (\"Retail credit card acquisition\", \"Credit and AML compliance\", \"Treasury and regulatory reporting\") rather than mechanical group keys. Cached in cross_company_themes; auto-refreshed when the keyword bag changes; rows link to /jobs?function=… for one-click drill-in." },
-      { "type": "feature", "description": "Company drill-down has working \"By bet\" / \"By function\" tabs. The function tab re-shards bets under their function group, with \"see all roles in {group}\" links opening a function-scoped Jobs drawer." },
-      { "type": "feature", "description": "Bet auto-suggestions on the editorial form: a \"Suggest from hiring data\" button proposes 1–4 candidate bets derived from the rule-based pivot classifier (acceleration, cold start, going quiet, keyword burst). Editors review, edit, and accept; the candidates are starting points, not finished editorial." },
-      { "type": "feature", "description": "Save view + Export CSV on the Jobs page. Save view copies the current filter URL to the clipboard; Export CSV downloads the visible rows as a dated file (count is shown on the button)." },
-      { "type": "improvement", "description": "Playwright e2e on every PR: the public visual smoke runs without secrets, and an authed visual smoke runs against real Supabase when the secrets are configured (skipped cleanly on forks). Reports upload as artifacts on every run. New regression spec guards the cross-company themes block." },
-      { "type": "improvement", "description": "Editorial pipeline is fully telemetered: every Gemini call writes to gemini_usage_events with a stable callSite + prompt version, and the Pro grounded research from company-insights is reused as context to avoid double-grounding." },
-      { "type": "fix", "description": "Jobs page no longer gets stuck in an infinite render loop when filters change. The URL-sync effect now reads window.location.search at call time instead of depending on the live useSearchParams() reference, breaking the router.replace → searchParams → effect → router.replace cycle." },
-      { "type": "fix", "description": "Login / marketing chrome shows the canonical 28px BrandMark instead of a generic Sparkles placeholder." }
+      {
+        "type": "feature",
+        "description": "Talent Brief v2 — substantial upgrade pairing the SoCal v1.15 visual rebuild with a working editorial pipeline. Every active company now has a working thesis, interpretation, last-change, and 3–6 strategic bets seeded against live hiring data, refreshable on demand or weekly."
+      },
+      {
+        "type": "feature",
+        "description": "LLM editorial engine: Pro (ungrounded) call that generates each company's working thesis, interpretation paragraph, last meaningful change, and 3–6 strategic bets with evidence + forward signal. Reuses the most recent company_insights row as background context to avoid stacking a second grounded call. Refreshable via /api/admin/companies/[id]/regenerate-editorial, the regenerate-editorial.ts script, or a weekly GitHub Actions cron."
+      },
+      {
+        "type": "feature",
+        "description": "Cross-company theme labels on the Jobs right rail are now author-quality (\"Retail credit card acquisition\", \"Credit and AML compliance\", \"Treasury and regulatory reporting\") rather than mechanical group keys. Cached in cross_company_themes; auto-refreshed when the keyword bag changes; rows link to /jobs?function=… for one-click drill-in."
+      },
+      {
+        "type": "feature",
+        "description": "Company drill-down has working \"By bet\" / \"By function\" tabs. The function tab re-shards bets under their function group, with \"see all roles in {group}\" links opening a function-scoped Jobs drawer."
+      },
+      {
+        "type": "feature",
+        "description": "Bet auto-suggestions on the editorial form: a \"Suggest from hiring data\" button proposes 1–4 candidate bets derived from the rule-based pivot classifier (acceleration, cold start, going quiet, keyword burst). Editors review, edit, and accept; the candidates are starting points, not finished editorial."
+      },
+      {
+        "type": "feature",
+        "description": "Save view + Export CSV on the Jobs page. Save view copies the current filter URL to the clipboard; Export CSV downloads the visible rows as a dated file (count is shown on the button)."
+      },
+      {
+        "type": "improvement",
+        "description": "Playwright e2e on every PR: the public visual smoke runs without secrets, and an authed visual smoke runs against real Supabase when the secrets are configured (skipped cleanly on forks). Reports upload as artifacts on every run. New regression spec guards the cross-company themes block."
+      },
+      {
+        "type": "improvement",
+        "description": "Editorial pipeline is fully telemetered: every Gemini call writes to gemini_usage_events with a stable callSite + prompt version, and the Pro grounded research from company-insights is reused as context to avoid double-grounding."
+      },
+      {
+        "type": "fix",
+        "description": "Jobs page no longer gets stuck in an infinite render loop when filters change. The URL-sync effect now reads window.location.search at call time instead of depending on the live useSearchParams() reference, breaking the router.replace → searchParams → effect → router.replace cycle."
+      },
+      {
+        "type": "fix",
+        "description": "Login / marketing chrome shows the canonical 28px BrandMark instead of a generic Sparkles placeholder."
+      }
     ]
   },
   {
     "version": "1.15.0",
     "date": "2026-04-25",
     "changes": [
-      { "type": "feature", "description": "Companies index rebuilt as a signal-rich editorial list. Each row carries a working thesis, hiring sparkline, pivot signals (new pattern / accelerating / going quiet / continuity), and the most recent meaningful change." },
-      { "type": "feature", "description": "Company drill-down rebuilt bets-first. Working thesis at the top, strategic bets ranked by hiring evidence, each bet bundling claim, evidence (internal hiring + external news), confidence, associated jobs, and a forward signal." },
-      { "type": "feature", "description": "Jobs page rebuilt as a list-first browsing surface — sortable table with company / function / location / posted columns, recency filters, plus a contextual right rail showing function heat (30-day net) and cross-company themes." },
-      { "type": "feature", "description": "New scoped Jobs drawer on the company drill-down lets you see jobs filtered to a specific bet without leaving the page, with a one-click 'expand to all companies' cross-link." },
-      { "type": "improvement", "description": "Marketing landing page is now the public root URL; signed-in users land on /dashboard. Old /welcome bookmarks redirect cleanly." },
-      { "type": "improvement", "description": "Admin and labs surfaces fully migrated to design-system tokens — no more raw Tailwind palette utilities. Email templates now share a centralized SoCal color map (web/lib/email/colors.ts)." },
-      { "type": "improvement", "description": "Editor-only fields on the company edit form: working thesis, sub-line, interpretation, last-change, and a strategic-bets repeater (with evidence sub-rows). Companies missing a thesis are surfaced in admin under 'Needs editorial'." }
+      {
+        "type": "feature",
+        "description": "Companies index rebuilt as a signal-rich editorial list. Each row carries a working thesis, hiring sparkline, pivot signals (new pattern / accelerating / going quiet / continuity), and the most recent meaningful change."
+      },
+      {
+        "type": "feature",
+        "description": "Company drill-down rebuilt bets-first. Working thesis at the top, strategic bets ranked by hiring evidence, each bet bundling claim, evidence (internal hiring + external news), confidence, associated jobs, and a forward signal."
+      },
+      {
+        "type": "feature",
+        "description": "Jobs page rebuilt as a list-first browsing surface — sortable table with company / function / location / posted columns, recency filters, plus a contextual right rail showing function heat (30-day net) and cross-company themes."
+      },
+      {
+        "type": "feature",
+        "description": "New scoped Jobs drawer on the company drill-down lets you see jobs filtered to a specific bet without leaving the page, with a one-click 'expand to all companies' cross-link."
+      },
+      {
+        "type": "improvement",
+        "description": "Marketing landing page is now the public root URL; signed-in users land on /dashboard. Old /welcome bookmarks redirect cleanly."
+      },
+      {
+        "type": "improvement",
+        "description": "Admin and labs surfaces fully migrated to design-system tokens — no more raw Tailwind palette utilities. Email templates now share a centralized SoCal color map (web/lib/email/colors.ts)."
+      },
+      {
+        "type": "improvement",
+        "description": "Editor-only fields on the company edit form: working thesis, sub-line, interpretation, last-change, and a strategic-bets repeater (with evidence sub-rows). Companies missing a thesis are surfaced in admin under 'Needs editorial'."
+      }
     ]
   },
   {
     "version": "1.14.0",
     "date": "2026-04-25",
     "changes": [
-      { "type": "improvement", "description": "Design system aligned with the canonical Talent Brief tokens. Pacific brand blue is now the deep ocean hue (oklch 0.575/0.150/236), Sun is the accent family for CTAs, and Sunset is the highlight family for change markers and alerts." },
-      { "type": "improvement", "description": "New brand mark and favicon: gradient sun + coast wave on the warm sand background. Replaces the placeholder check-square mark." },
-      { "type": "improvement", "description": "Net Hiring Flow chart rebuilt as bars (Pacific for new, Sun for closed) with a thin foreground net line — replaces the bright red/green soft area fills." },
-      { "type": "improvement", "description": "Jobs table redesigned: company avatars, function chips with hot/regular variants, location truncated to City + Country, mono first-seen with `2d ago` formatting, accent-soft active status chip. Whole row is the link target — no more blue-underlined titles." },
-      { "type": "improvement", "description": "Audited and replaced ad-hoc Tailwind palette utilities (`text-green-*`, `bg-red-*`, etc.) with design tokens across digests, releases, feedback, settings, jobs, companies, and dashboard surfaces." }
+      {
+        "type": "improvement",
+        "description": "Design system aligned with the canonical Talent Brief tokens. Pacific brand blue is now the deep ocean hue (oklch 0.575/0.150/236), Sun is the accent family for CTAs, and Sunset is the highlight family for change markers and alerts."
+      },
+      {
+        "type": "improvement",
+        "description": "New brand mark and favicon: gradient sun + coast wave on the warm sand background. Replaces the placeholder check-square mark."
+      },
+      {
+        "type": "improvement",
+        "description": "Net Hiring Flow chart rebuilt as bars (Pacific for new, Sun for closed) with a thin foreground net line — replaces the bright red/green soft area fills."
+      },
+      {
+        "type": "improvement",
+        "description": "Jobs table redesigned: company avatars, function chips with hot/regular variants, location truncated to City + Country, mono first-seen with `2d ago` formatting, accent-soft active status chip. Whole row is the link target — no more blue-underlined titles."
+      },
+      {
+        "type": "improvement",
+        "description": "Audited and replaced ad-hoc Tailwind palette utilities (`text-green-*`, `bg-red-*`, etc.) with design tokens across digests, releases, feedback, settings, jobs, companies, and dashboard surfaces."
+      }
     ]
   },
   {
     "version": "1.13.0",
     "date": "2026-04-25",
     "changes": [
-      { "type": "feature", "description": "New SoCal design system: warm sand surfaces, Pacific brand blue, Sunset/Sun accents, Fraunces editorial display font, and a token-driven color/type pipeline. Every visual value now references a single source of truth in `app/globals.css` so theme tweaks land in one line." },
-      { "type": "feature", "description": "Editorial moments — weekly digest banner, marketing welcome page, login hero, and company stated-strategy callout — now use the coast gradient and Fraunces display type for a clearer reader experience." },
-      { "type": "feature", "description": "New `/digests/archive` route lists every published digest with date, lede, signal density, and year filter." },
-      { "type": "feature", "description": "Settings reorganized into Notifications · Sources · Account · Team tabs, with an ATS source-health table." },
-      { "type": "feature", "description": "New marketing welcome surface at `/welcome` — gradient hero, live stats, sample digest pull-quote, coverage list." },
-      { "type": "improvement", "description": "Job detail page redesigned with a two-column editorial layout: posting body + signals sidebar." },
-      { "type": "improvement", "description": "Reusable `EmptyState` component now powers companies, digests, and settings empty states; new shared `SignalsTimeline` component for vertical/responsive signal lists." },
-      { "type": "improvement", "description": "ESLint rule `design-system/no-raw-color` warns on raw hex/rgb/oklch literals outside `globals.css` to prevent palette drift." }
+      {
+        "type": "feature",
+        "description": "New SoCal design system: warm sand surfaces, Pacific brand blue, Sunset/Sun accents, Fraunces editorial display font, and a token-driven color/type pipeline. Every visual value now references a single source of truth in `app/globals.css` so theme tweaks land in one line."
+      },
+      {
+        "type": "feature",
+        "description": "Editorial moments — weekly digest banner, marketing welcome page, login hero, and company stated-strategy callout — now use the coast gradient and Fraunces display type for a clearer reader experience."
+      },
+      {
+        "type": "feature",
+        "description": "New `/digests/archive` route lists every published digest with date, lede, signal density, and year filter."
+      },
+      {
+        "type": "feature",
+        "description": "Settings reorganized into Notifications · Sources · Account · Team tabs, with an ATS source-health table."
+      },
+      {
+        "type": "feature",
+        "description": "New marketing welcome surface at `/welcome` — gradient hero, live stats, sample digest pull-quote, coverage list."
+      },
+      {
+        "type": "improvement",
+        "description": "Job detail page redesigned with a two-column editorial layout: posting body + signals sidebar."
+      },
+      {
+        "type": "improvement",
+        "description": "Reusable `EmptyState` component now powers companies, digests, and settings empty states; new shared `SignalsTimeline` component for vertical/responsive signal lists."
+      },
+      {
+        "type": "improvement",
+        "description": "ESLint rule `design-system/no-raw-color` warns on raw hex/rgb/oklch literals outside `globals.css` to prevent palette drift."
+      }
     ]
   },
   {
     "version": "1.12.1",
     "date": "2026-04-21",
     "changes": [
-      { "type": "fix", "description": "Job structure extraction no longer truncates responses mid-JSON on long descriptions — raised the output token cap to match the runtime config, eliminating the wasted first-call retries that were firing on ~3 EQ Bank jobs per collection run." }
+      {
+        "type": "fix",
+        "description": "Job structure extraction no longer truncates responses mid-JSON on long descriptions — raised the output token cap to match the runtime config, eliminating the wasted first-call retries that were firing on ~3 EQ Bank jobs per collection run."
+      }
     ]
   },
   {
     "version": "1.12.0",
     "date": "2026-04-19",
     "changes": [
-      { "type": "improvement", "description": "Every production Gemini call now logs token usage, model served, grounding flag, latency, and a USD cost estimate to the new `gemini_usage_events` table — enabling per-feature spend visibility and drift detection without waiting for the Google Cloud billing dashboard." }
+      {
+        "type": "improvement",
+        "description": "Every production Gemini call now logs token usage, model served, grounding flag, latency, and a USD cost estimate to the new `gemini_usage_events` table — enabling per-feature spend visibility and drift detection without waiting for the Google Cloud billing dashboard."
+      }
     ]
   },
   {
     "version": "1.11.0",
     "date": "2026-04-19",
     "changes": [
-      { "type": "improvement", "description": "Advanced strategic analysis no longer pre-fetches a duplicate grounded web search call — the main analysis already grounds in-flight, cutting per-job Gemini spend roughly in half without regressing the hard signals (is_new_direction, is_executive_movement, confidence, novelty_score)." }
+      {
+        "type": "improvement",
+        "description": "Advanced strategic analysis no longer pre-fetches a duplicate grounded web search call — the main analysis already grounds in-flight, cutting per-job Gemini spend roughly in half without regressing the hard signals (is_new_direction, is_executive_movement, confidence, novelty_score)."
+      }
     ]
   },
   {
     "version": "1.10.0",
     "date": "2026-04-19",
     "changes": [
-      { "type": "improvement", "description": "Job ingestion now skips AI re-extraction when a scraped description matches the stored SHA-1 hash, eliminating the bulk of unchanged-description Gemini calls from the daily collection cron." }
+      {
+        "type": "improvement",
+        "description": "Job ingestion now skips AI re-extraction when a scraped description matches the stored SHA-1 hash, eliminating the bulk of unchanged-description Gemini calls from the daily collection cron."
+      }
     ]
   },
   {
     "version": "1.9.0",
     "date": "2026-04-19",
     "changes": [
-      { "type": "improvement", "description": "Switched all Gemini calls from the pinned `gemini-3-flash-preview` preview ID to the floating `gemini-flash-latest` alias, so model upgrades now roll through without code changes." },
-      { "type": "improvement", "description": "Refreshed CLAUDE.md `AI Model Requirements` to require `-latest` aliases across Flash, Flash-Lite, and Pro tiers, and updated Prompt Forge's approved-models list accordingly." }
+      {
+        "type": "improvement",
+        "description": "Switched all Gemini calls from the pinned `gemini-3-flash-preview` preview ID to the floating `gemini-flash-latest` alias, so model upgrades now roll through without code changes."
+      },
+      {
+        "type": "improvement",
+        "description": "Refreshed CLAUDE.md `AI Model Requirements` to require `-latest` aliases across Flash, Flash-Lite, and Pro tiers, and updated Prompt Forge's approved-models list accordingly."
+      }
     ]
   },
   {
     "version": "1.8.0",
     "date": "2026-04-14",
     "changes": [
-      { "type": "feature", "description": "Weekly digest emails are now interactive: every company name, role theme, and stat number links through to a matching pre-filtered view in the app, with a context banner on /jobs that explains which digest slice you are viewing." },
-      { "type": "improvement", "description": "Deep links from email now preserve the destination through login, so clicking a company or theme while signed out lands on the intended page after Google sign-in." },
-      { "type": "improvement", "description": "The in-app digest viewer at /digests/[id] mirrors the email's link affordances one-to-one, so the same theme, company, and stat tokens are clickable in both surfaces." }
+      {
+        "type": "feature",
+        "description": "Weekly digest emails are now interactive: every company name, role theme, and stat number links through to a matching pre-filtered view in the app, with a context banner on /jobs that explains which digest slice you are viewing."
+      },
+      {
+        "type": "improvement",
+        "description": "Deep links from email now preserve the destination through login, so clicking a company or theme while signed out lands on the intended page after Google sign-in."
+      },
+      {
+        "type": "improvement",
+        "description": "The in-app digest viewer at /digests/[id] mirrors the email's link affordances one-to-one, so the same theme, company, and stat tokens are clickable in both surfaces."
+      }
     ]
   },
   {
     "version": "1.7.3",
     "date": "2026-04-12",
     "changes": [
-      { "type": "improvement", "description": "Switched company news fetching and chat from Gemini Pro to Flash, significantly reducing daily AI costs while maintaining quality." },
-      { "type": "improvement", "description": "Tightened maxOutputTokens across all Gemini calls and reduced job description sizes sent for extraction to cut per-job token costs." }
+      {
+        "type": "improvement",
+        "description": "Switched company news fetching and chat from Gemini Pro to Flash, significantly reducing daily AI costs while maintaining quality."
+      },
+      {
+        "type": "improvement",
+        "description": "Tightened maxOutputTokens across all Gemini calls and reduced job description sizes sent for extraction to cut per-job token costs."
+      }
     ]
   },
   {
     "version": "1.7.2",
     "date": "2026-03-28",
     "changes": [
-      { "type": "fix", "description": "Weekly digest sends emails individually instead of batch so one Resend rejection (e.g. test-sender restriction) does not block all other recipients; checks SDK error responses and logs from/to before each send." },
-      { "type": "improvement", "description": "Supabase auth and REST calls from the server and proxy now retry on transient network errors (e.g. connection reset) to reduce random 401s and AuthRetryableFetchError noise on flaky networks." },
-      { "type": "improvement", "description": "Unified neutral editorial voice across AI copy: shared docs/voice.md, runtime voice injection, heuristic voice checks, and Prompt Forge Voice compliance for weekly digest." },
-      { "type": "improvement", "description": "Job-level and company-level strategic insights now use plain analytical headlines and summaries aligned with the weekly digest tone." }
+      {
+        "type": "fix",
+        "description": "Weekly digest sends emails individually instead of batch so one Resend rejection (e.g. test-sender restriction) does not block all other recipients; checks SDK error responses and logs from/to before each send."
+      },
+      {
+        "type": "improvement",
+        "description": "Supabase auth and REST calls from the server and proxy now retry on transient network errors (e.g. connection reset) to reduce random 401s and AuthRetryableFetchError noise on flaky networks."
+      },
+      {
+        "type": "improvement",
+        "description": "Unified neutral editorial voice across AI copy: shared docs/voice.md, runtime voice injection, heuristic voice checks, and Prompt Forge Voice compliance for weekly digest."
+      },
+      {
+        "type": "improvement",
+        "description": "Job-level and company-level strategic insights now use plain analytical headlines and summaries aligned with the weekly digest tone."
+      }
     ]
   },
   {
     "version": "1.7.1",
     "date": "2026-03-20",
     "changes": [
-      { "type": "fix", "description": "Admin dashboard stats now load correctly after migrating from the removed cron_logs table to job_runs." },
-      { "type": "fix", "description": "Cron endpoints now require a valid bearer token; User-Agent alone no longer grants access." },
-      { "type": "fix", "description": "Job collection and report triggers from the admin panel are now visible in the job log." }
+      {
+        "type": "fix",
+        "description": "Admin dashboard stats now load correctly after migrating from the removed cron_logs table to job_runs."
+      },
+      {
+        "type": "fix",
+        "description": "Cron endpoints now require a valid bearer token; User-Agent alone no longer grants access."
+      },
+      {
+        "type": "fix",
+        "description": "Job collection and report triggers from the admin panel are now visible in the job log."
+      }
     ]
   },
   {
     "version": "1.7.0",
     "date": "2026-03-18",
     "changes": [
-      { "type": "feature", "description": "Competitive matrix now supports historical comparison across 30/60/90/180/360 day windows with an option to include closed roles." },
-      { "type": "fix", "description": "All active tracked companies now always appear in the competitive matrix, even when they have zero current job postings." },
-      { "type": "fix", "description": "Dashboard weekly net-job metrics now use a consistent rolling 7-day window for closed-job counts, including the competitive matrix delta." },
-      { "type": "fix", "description": "Weekly digest company highlights and global summary no longer truncate mid-sentence; full AI-generated text is preserved." }
+      {
+        "type": "feature",
+        "description": "Competitive matrix now supports historical comparison across 30/60/90/180/360 day windows with an option to include closed roles."
+      },
+      {
+        "type": "fix",
+        "description": "All active tracked companies now always appear in the competitive matrix, even when they have zero current job postings."
+      },
+      {
+        "type": "fix",
+        "description": "Dashboard weekly net-job metrics now use a consistent rolling 7-day window for closed-job counts, including the competitive matrix delta."
+      },
+      {
+        "type": "fix",
+        "description": "Weekly digest company highlights and global summary no longer truncate mid-sentence; full AI-generated text is preserved."
+      }
     ]
   },
   {
     "version": "1.6.0",
     "date": "2026-03-06",
     "changes": [
-      { "type": "feature", "description": "Prompt Forge adds an admin-only Labs workflow for tuning AI prompts, comparing Gemini models, and shipping winning configs live." },
-      { "type": "feature", "description": "Admins can now save active AI prompt/model settings, replay evaluation runs, and promote approved prompt changes into GitHub implementation specs." },
-      { "type": "improvement", "description": "Tech stack extraction and synthesis now read validated runtime prompt settings so improved prompts apply immediately to new runs and backfills." },
-      { "type": "improvement", "description": "Stage 1 reprocessing is more resilient with better truncated-response recovery, tighter output budgeting, and clearer operational guidance." },
-      { "type": "improvement", "description": "Company insights and tech stack synthesis now preserve more named systems while filtering ambiguous or low-signal research sources more aggressively." },
-      { "type": "feature", "description": "Admins can now refresh strategic insights for all companies from the dashboard, and company insight generation degrades safely when lock infrastructure is unavailable." }
+      {
+        "type": "feature",
+        "description": "Prompt Forge adds an admin-only Labs workflow for tuning AI prompts, comparing Gemini models, and shipping winning configs live."
+      },
+      {
+        "type": "feature",
+        "description": "Admins can now save active AI prompt/model settings, replay evaluation runs, and promote approved prompt changes into GitHub implementation specs."
+      },
+      {
+        "type": "improvement",
+        "description": "Tech stack extraction and synthesis now read validated runtime prompt settings so improved prompts apply immediately to new runs and backfills."
+      },
+      {
+        "type": "improvement",
+        "description": "Stage 1 reprocessing is more resilient with better truncated-response recovery, tighter output budgeting, and clearer operational guidance."
+      },
+      {
+        "type": "improvement",
+        "description": "Company insights and tech stack synthesis now preserve more named systems while filtering ambiguous or low-signal research sources more aggressively."
+      },
+      {
+        "type": "feature",
+        "description": "Admins can now refresh strategic insights for all companies from the dashboard, and company insight generation degrades safely when lock infrastructure is unavailable."
+      }
     ]
   },
   {
     "version": "1.5.0",
     "date": "2026-03-06",
     "changes": [
-      { "type": "feature", "description": "Company Overview now shows the full strategic analysis inline — no separate insight detail page needed" },
-      { "type": "improvement", "description": "Tech stack section integrated natively into the analysis flow on the company Overview tab" },
-      { "type": "improvement", "description": "Generate Insight button moved to the company header for one-click access from the Overview" }
+      {
+        "type": "feature",
+        "description": "Company Overview now shows the full strategic analysis inline — no separate insight detail page needed"
+      },
+      {
+        "type": "improvement",
+        "description": "Tech stack section integrated natively into the analysis flow on the company Overview tab"
+      },
+      {
+        "type": "improvement",
+        "description": "Generate Insight button moved to the company header for one-click access from the Overview"
+      }
     ]
   },
   {
     "version": "1.4.0",
     "date": "2026-03-06",
     "changes": [
-      { "type": "feature", "description": "Tech stack analysis now auto-generates after job collection with AI-enriched summaries" },
-      { "type": "improvement", "description": "Redesigned company page with cleaner layout, streamlined navigation, and consistent styling" },
-      { "type": "fix", "description": "Fixed tech stack generation failing silently due to invalid AI model configuration" }
+      {
+        "type": "feature",
+        "description": "Tech stack analysis now auto-generates after job collection with AI-enriched summaries"
+      },
+      {
+        "type": "improvement",
+        "description": "Redesigned company page with cleaner layout, streamlined navigation, and consistent styling"
+      },
+      {
+        "type": "fix",
+        "description": "Fixed tech stack generation failing silently due to invalid AI model configuration"
+      }
     ]
   },
   {
     "version": "1.3.0",
     "date": "2026-03-05",
     "changes": [
-      { "type": "feature", "description": "Horizontal Gantt-style timeline showing initiative timeframes at a glance" },
-      { "type": "improvement", "description": "Summary stats row with roles mapped, ongoing count, top category, and confidence distribution" },
-      { "type": "improvement", "description": "Multi-phase loading with progress bar replaces plain spinner during analysis" },
-      { "type": "improvement", "description": "Structured AI assessment with bold headline and key risk callout" },
-      { "type": "feature", "description": "Category filter bar to show/hide initiative cards by type" },
-      { "type": "improvement", "description": "Role tags now link to job detail pages and show relevance" },
-      { "type": "feature", "description": "Copy Analysis button exports results as formatted Markdown" },
-      { "type": "improvement", "description": "Multi-expand initiative cards allow side-by-side comparison" }
+      {
+        "type": "feature",
+        "description": "Horizontal Gantt-style timeline showing initiative timeframes at a glance"
+      },
+      {
+        "type": "improvement",
+        "description": "Summary stats row with roles mapped, ongoing count, top category, and confidence distribution"
+      },
+      {
+        "type": "improvement",
+        "description": "Multi-phase loading with progress bar replaces plain spinner during analysis"
+      },
+      {
+        "type": "improvement",
+        "description": "Structured AI assessment with bold headline and key risk callout"
+      },
+      {
+        "type": "feature",
+        "description": "Category filter bar to show/hide initiative cards by type"
+      },
+      {
+        "type": "improvement",
+        "description": "Role tags now link to job detail pages and show relevance"
+      },
+      {
+        "type": "feature",
+        "description": "Copy Analysis button exports results as formatted Markdown"
+      },
+      {
+        "type": "improvement",
+        "description": "Multi-expand initiative cards allow side-by-side comparison"
+      }
     ]
   },
   {
     "version": "1.2.0",
     "date": "2026-02-23",
     "changes": [
-      { "type": "improvement", "description": "Hot Roles on the dashboard now link directly to the job details page instead of the company overview" },
-      { "type": "feature", "description": "Feedback-to-code pipeline: accepted feedback automatically creates GitHub Issues with AI-generated specs" },
-      { "type": "feature", "description": "Generate Code button in admin panel triggers Claude Opus 4.6 to implement issues on a feature branch and open a draft PR" },
-      { "type": "feature", "description": "Admin email notifications when new feedback is submitted" },
-      { "type": "feature", "description": "GitHub Issue status comments track implementation progress with links to workflow runs and draft PRs" },
-      { "type": "improvement", "description": "Add Company page now routes through the feedback dialog for agent-driven setup" },
-      { "type": "fix", "description": "Admin panel shows actions for all feedback states including accepted items missing a GitHub Issue" }
+      {
+        "type": "improvement",
+        "description": "Hot Roles on the dashboard now link directly to the job details page instead of the company overview"
+      },
+      {
+        "type": "feature",
+        "description": "Feedback-to-code pipeline: accepted feedback automatically creates GitHub Issues with AI-generated specs"
+      },
+      {
+        "type": "feature",
+        "description": "Generate Code button in admin panel triggers Claude Opus 4.6 to implement issues on a feature branch and open a draft PR"
+      },
+      {
+        "type": "feature",
+        "description": "Admin email notifications when new feedback is submitted"
+      },
+      {
+        "type": "feature",
+        "description": "GitHub Issue status comments track implementation progress with links to workflow runs and draft PRs"
+      },
+      {
+        "type": "improvement",
+        "description": "Add Company page now routes through the feedback dialog for agent-driven setup"
+      },
+      {
+        "type": "fix",
+        "description": "Admin panel shows actions for all feedback states including accepted items missing a GitHub Issue"
+      }
     ]
   },
   {
     "version": "1.1.1",
     "date": "2026-02-21",
     "changes": [
-      { "type": "improvement", "description": "Upgraded strategic analysis and insight chat to Gemini 3.1 Pro for deeper reasoning and more accurate web grounding" }
+      {
+        "type": "improvement",
+        "description": "Upgraded strategic analysis and insight chat to Gemini 3.1 Pro for deeper reasoning and more accurate web grounding"
+      }
     ]
   },
   {
     "version": "1.1.0",
     "date": "2026-02-17",
     "changes": [
-      { "type": "feature", "description": "Submit feedback directly from the app with AI-powered triage" },
-      { "type": "improvement", "description": "Contextual back navigation on job detail pages" }
+      {
+        "type": "feature",
+        "description": "Submit feedback directly from the app with AI-powered triage"
+      },
+      {
+        "type": "improvement",
+        "description": "Contextual back navigation on job detail pages"
+      }
     ]
   },
   {
     "version": "1.0.0",
     "date": "2026-02-16",
     "changes": [
-      { "type": "feature", "description": "Release history page and newsletter footer" },
-      { "type": "feature", "description": "Rebrand to The Fintech Talent Brief" },
-      { "type": "feature", "description": "Stratechery-style analyst briefing format for weekly digests" },
-      { "type": "feature", "description": "Intelligence-first dashboard redesign" }
+      {
+        "type": "feature",
+        "description": "Release history page and newsletter footer"
+      },
+      {
+        "type": "feature",
+        "description": "Rebrand to The Fintech Talent Brief"
+      },
+      {
+        "type": "feature",
+        "description": "Stratechery-style analyst briefing format for weekly digests"
+      },
+      {
+        "type": "feature",
+        "description": "Intelligence-first dashboard redesign"
+      }
     ]
   }
 ]

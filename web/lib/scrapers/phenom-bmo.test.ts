@@ -12,6 +12,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   decodeHtmlEntities,
+  deriveBmoWorkdayDetailUrl,
   extractEagerLoadPayload,
   mapBmoJob,
   resolveJobCap,
@@ -154,6 +155,64 @@ describe("mapBmoJob", () => {
     };
     const job = mapBmoJob(raw);
     expect(job.location).toBe("Toronto, Ontario, Canada");
+  });
+});
+
+describe("deriveBmoWorkdayDetailUrl", () => {
+  it("maps a BMO Workday applyUrl to its CXS detail endpoint (drops /apply)", () => {
+    expect(
+      deriveBmoWorkdayDetailUrl(
+        "https://bmo.wd3.myworkdayjobs.com/External/job/Toronto-Ontario-Canada/Senior-Machine-Learning-Engineer_R-2400512/apply"
+      )
+    ).toBe(
+      "https://bmo.wd3.myworkdayjobs.com/wday/cxs/bmo/External/job/Toronto-Ontario-Canada/Senior-Machine-Learning-Engineer_R-2400512"
+    );
+  });
+
+  it("handles an applyUrl that has no trailing /apply", () => {
+    expect(
+      deriveBmoWorkdayDetailUrl(
+        "https://bmo.wd3.myworkdayjobs.com/External/job/New-York-United-States/Vice-President-Equity-Research_R-2400771"
+      )
+    ).toBe(
+      "https://bmo.wd3.myworkdayjobs.com/wday/cxs/bmo/External/job/New-York-United-States/Vice-President-Equity-Research_R-2400771"
+    );
+  });
+
+  it("reads tenant + site from the URL so a site rename still resolves", () => {
+    expect(
+      deriveBmoWorkdayDetailUrl(
+        "https://bmo.wd3.myworkdayjobs.com/Campus/job/Toronto-Ontario-Canada/New-Grad-Analyst_R-9/apply"
+      )
+    ).toBe(
+      "https://bmo.wd3.myworkdayjobs.com/wday/cxs/bmo/Campus/job/Toronto-Ontario-Canada/New-Grad-Analyst_R-9"
+    );
+  });
+
+  it("returns null for empty, non-Workday, or unparseable input", () => {
+    expect(deriveBmoWorkdayDetailUrl(undefined)).toBeNull();
+    expect(deriveBmoWorkdayDetailUrl(null)).toBeNull();
+    expect(deriveBmoWorkdayDetailUrl("")).toBeNull();
+    // A canonical jobs.bmo.com URL is NOT a Workday endpoint.
+    expect(
+      deriveBmoWorkdayDetailUrl("https://jobs.bmo.com/ca/en/job/R-1/Title")
+    ).toBeNull();
+    expect(deriveBmoWorkdayDetailUrl("not a url")).toBeNull();
+    // Workday host but a non-/job path shape → null rather than a bad URL.
+    expect(
+      deriveBmoWorkdayDetailUrl("https://bmo.wd3.myworkdayjobs.com/External")
+    ).toBeNull();
+  });
+
+  it("derives the detail URL from every applyUrl in the listing fixture", () => {
+    for (const job of FIXTURE.data!.jobs!) {
+      const url = deriveBmoWorkdayDetailUrl(job.applyUrl);
+      expect(url).toMatch(
+        /^https:\/\/bmo\.wd3\.myworkdayjobs\.com\/wday\/cxs\/bmo\/External\/job\//
+      );
+      // The reqId survives into the CXS path.
+      expect(url).toContain(job.reqId!.replace(/^R-/, "R-"));
+    }
   });
 });
 
