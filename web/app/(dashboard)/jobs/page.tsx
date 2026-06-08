@@ -186,6 +186,10 @@ export default async function JobsPage({
       searchQuery: initialQ || null,
       searchMode,
       status: statusFilter,
+      // Scope server-side so semantic ranking happens WITHIN the company (not a
+      // client-narrow of the global top-N). The company control drives this via
+      // the `?company=` param, like the tier/status toggles.
+      companySlug: companyParam,
     }),
     getFunctionHeatData(30),
     getCrossCompanyThemes(),
@@ -268,7 +272,6 @@ export default async function JobsPage({
       functionGroups={functionGroups}
       initial={{
         q: initialQ,
-        company: initialCompany,
         fn: initialFn,
         recency: initialRecency,
         mode: searchMode,
@@ -283,6 +286,7 @@ export default async function JobsPage({
       activeCount={activeCount}
       newCount={newCount}
       companyCount={companyCount ?? companies.length}
+      companyFilter={initialCompany}
       tierFilter={tierFilter}
       statusFilter={statusFilter}
       searchTruncated={truncated}

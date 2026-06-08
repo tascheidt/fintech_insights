@@ -215,6 +215,35 @@ describe("getJobsListData activity scope (active-only default)", () => {
   });
 });
 
+describe("getJobsListData company scope (server-side, drives semantic-within-company)", () => {
+  function companySlugEqArgs(table: string): unknown[][] {
+    const log = callLogs[table] ?? [];
+    return log
+      .filter((c) => c.method === "eq" && c.args[0] === "companies.slug")
+      .map((c) => c.args as unknown[]);
+  }
+
+  it("applies no company predicate by default (whole tier)", async () => {
+    await getJobsListData();
+    expect(companySlugEqArgs("active_job_postings")).toEqual([]);
+  });
+
+  it("scopes the keyword/browse query to one company when companySlug is set", async () => {
+    await getJobsListData({ companySlug: "cibc" });
+    expect(companySlugEqArgs("active_job_postings")).toEqual([["companies.slug", "cibc"]]);
+  });
+
+  it("scopes alongside a full-text search", async () => {
+    await getJobsListData({ searchQuery: "engineer", companySlug: "cibc" });
+    expect(companySlugEqArgs("active_job_postings")).toEqual([["companies.slug", "cibc"]]);
+  });
+
+  it("ignores a whitespace-only companySlug", async () => {
+    await getJobsListData({ companySlug: "   " });
+    expect(companySlugEqArgs("active_job_postings")).toEqual([]);
+  });
+});
+
 describe("getJobsListData full-text search (description match)", () => {
   function textSearchCalls(table: string): unknown[][] {
     const log = callLogs[table] ?? [];
