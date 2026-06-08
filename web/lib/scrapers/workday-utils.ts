@@ -96,6 +96,72 @@ export function buildWorkdayUrls(
 }
 
 // ---------------------------------------------------------------------------
+// Apply-URL → CXS endpoint parser (Phenom → Workday bridge)
+// ---------------------------------------------------------------------------
+
+/** CXS endpoints + tenant coordinates parsed from a Workday "apply" URL. */
+export interface WorkdayApplyTarget {
+  /** CXS JSON detail GET (full job description). */
+  detailUrl: string;
+  /** CXS JSON listing POST — used only to warm up the Akamai cookie. */
+  listingUrl: string;
+  tenant: string;
+  instance: string; // e.g. "wd3"
+  site: string; // e.g. "External"
+}
+
+/**
+ * Parse a Workday "apply" URL — as surfaced by a Phenom listing row's
+ * `applyUrl` — into its CXS endpoints + tenant coordinates. Tenant, instance,
+ * and site are read from the URL (not hardcoded), so this resolves any
+ * `<tenant>.<instance>.myworkdayjobs.com` tenant.
+ *
+ *   https://bmo.wd3.myworkdayjobs.com/External/job/<loc>/<Title>_<reqId>/apply
+ *     → detailUrl:  https://bmo.wd3.myworkdayjobs.com/wday/cxs/bmo/External/job/<loc>/<Title>_<reqId>
+ *       listingUrl: https://bmo.wd3.myworkdayjobs.com/wday/cxs/bmo/External/jobs
+ *
+ * The `/wday/cxs/<tenant>/<site>` prefix is injected before the `externalPath`
+ * (the `/job/...` tail, with a trailing `/apply` dropped) — the same shape
+ * `buildWorkdayUrls` produces for the first-party Workday tenants. Returns null
+ * for anything that isn't a Workday apply URL. Pure — exported for unit testing
+ * (the per-tenant URL shape is exactly the bug class the scrapers CLAUDE.md
+ * says to pin in a test).
+ */
+export function parseWorkdayApplyUrl(
+  applyUrl?: string | null
+): WorkdayApplyTarget | null {
+  if (!applyUrl) return null;
+  let u: URL;
+  try {
+    u = new URL(applyUrl);
+  } catch {
+    return null;
+  }
+  const host = u.hostname;
+  const m = host.match(/^([^.]+)\.([^.]+)\.myworkdayjobs\.com$/i);
+  if (!m) return null;
+  const tenant = m[1];
+  const instance = m[2];
+  const segments = u.pathname.split("/").filter(Boolean);
+  // Drop a trailing "apply" — the listing applyUrl ends in .../apply.
+  if (segments[segments.length - 1]?.toLowerCase() === "apply") segments.pop();
+  // Expect at least [site, "job", ...]; the path after the site is the Workday
+  // externalPath, which must start with /job/.
+  if (segments.length < 2) return null;
+  const site = segments[0];
+  const externalPath = "/" + segments.slice(1).join("/");
+  if (!externalPath.startsWith("/job/")) return null;
+  const cxs = `https://${host}/wday/cxs/${tenant}/${site}`;
+  return {
+    detailUrl: `${cxs}${externalPath}`,
+    listingUrl: `${cxs}/jobs`,
+    tenant,
+    instance,
+    site,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Pure mappers
 // ---------------------------------------------------------------------------
 
