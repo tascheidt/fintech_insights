@@ -179,7 +179,7 @@ export default async function JobsPage({
   // The jobs list honors the `?tier=` toggle. The right rail (function heat /
   // cross-company themes) deliberately stays fintech-only regardless of the
   // toggle — those are fintech-pivot surfaces, not tier-scoped.
-  const [jobsResult, heat, themes] = await Promise.all([
+  const [jobsResult, heat, themes, companyOptions] = await Promise.all([
     getJobsListData({
       jobIds: digestJobIds,
       tiers,
@@ -189,6 +189,13 @@ export default async function JobsPage({
     }),
     getFunctionHeatData(30),
     getCrossCompanyThemes(),
+    // Company filter options — every active company in the selected tier(s),
+    // independent of the current search. Through `active_companies` so a
+    // deactivated company can't leak in (CLAUDE.md §7).
+    supabase
+      .from("active_companies")
+      .select("slug, name")
+      .in("tier", [...tiers]),
   ]);
   const { rows, truncated } = jobsResult;
 
@@ -214,19 +221,20 @@ export default async function JobsPage({
     (r) => r.ageDays !== null && r.ageDays <= 7
   ).length;
 
-  // Available companies for dropdown — distinct slugs from active visible rows.
-  const companyMap = new Map<string, { slug: string; name: string }>();
-  for (const r of baseRows) {
-    if (r.companySlug && r.companyName) {
-      companyMap.set(r.companySlug, {
-        slug: r.companySlug,
-        name: r.companyName,
-      });
-    }
-  }
-  const companies = Array.from(companyMap.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+  // Available companies for the dropdown — the full set of active companies in
+  // the selected tier(s), NOT just those present in the current result set. A
+  // filter control's options must represent the filterable universe; deriving
+  // them from the (search-/relevance-capped) rows silently drops any company
+  // whose postings fall outside the window — e.g. an incumbent whose roles miss
+  // the semantic top-200. Mirrors the function dropdown below, which uses the
+  // full taxonomy for the same reason.
+  const companies = (
+    (companyOptions.data ?? []) as Array<{ slug: string; name: string }>
+  )
+    .filter((c) => c.slug && c.name)
+    .map((c) => ({ slug: c.slug, name: c.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const companyMap = new Map(companies.map((c) => [c.slug, c]));
 
   // Function groups for dropdown — full taxonomy keeps the option set
   // stable across filter swings.
