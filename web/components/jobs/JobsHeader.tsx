@@ -36,7 +36,6 @@ export type SearchMode = "keyword" | "semantic";
 
 export interface JobsFilterState {
   q: string;
-  company: string; // company slug or "all"
   fn: string; // function group or "all"
   recency: RecencyFilter;
   /** Lexical full-text vs. vector-similarity ("find roles like this"). */
@@ -61,6 +60,15 @@ export interface JobsHeaderProps {
 
   /** Initial filter values (URL-seeded). */
   initial: JobsFilterState;
+
+  /**
+   * Active company scope (URL-seeded). Like the tier/status controls this
+   * drives a server re-query — selecting a company pushes the `?company=`
+   * param so semantic search re-ranks WITHIN that company instead of
+   * client-narrowing the (relevance-capped) result window. `all` is the
+   * default → drops the param.
+   */
+  companyFilter: string;
 
   /** Digest context (read-only — clearing routes back to /jobs). */
   digestContext: {
@@ -112,6 +120,7 @@ export function JobsHeader({
   totalCount,
   initial,
   digestContext,
+  companyFilter,
   tierFilter,
   statusFilter,
   onChange,
@@ -151,7 +160,6 @@ export function JobsHeader({
   }, []);
 
   const [q, setQ] = React.useState(initial.q);
-  const [company, setCompany] = React.useState(initial.company);
   const [fn, setFn] = React.useState(initial.fn);
   const [recency, setRecency] = React.useState<RecencyFilter>(initial.recency);
   const [mode, setMode] = React.useState<SearchMode>(initial.mode);
@@ -175,10 +183,11 @@ export function JobsHeader({
     [q]
   );
 
-  // Publish filter state up.
+  // Publish filter state up. Company is NOT here — it's server-driven (a
+  // `?company=` re-query), like tier/status, so it never lives in client state.
   React.useEffect(() => {
-    onChange({ q: effectiveQ, company, fn, recency, mode });
-  }, [effectiveQ, company, fn, recency, mode, onChange]);
+    onChange({ q: effectiveQ, fn, recency, mode });
+  }, [effectiveQ, fn, recency, mode, onChange]);
 
   // Sync filter state into the URL so deep-links + back/forward keep state.
   // We avoid clobbering digest deep-link params (theme, inDigest, from, to)
@@ -194,7 +203,6 @@ export function JobsHeader({
         else params.set(key, value);
       };
       setOrDel("q", next.q || null);
-      setOrDel("company", next.company);
       setOrDel("function", next.fn);
       setOrDel("recency", next.recency);
       // `keyword` is the default → drop the param so a plain /jobs URL stays
@@ -217,8 +225,28 @@ export function JobsHeader({
   // Push URL on state changes. In keyword mode q is the debounced value; in
   // semantic mode it's the submitted value (so typing doesn't fire embeds).
   React.useEffect(() => {
-    syncUrl({ q: effectiveQ, company, fn, recency, mode });
-  }, [effectiveQ, company, fn, recency, mode, syncUrl]);
+    syncUrl({ q: effectiveQ, fn, recency, mode });
+  }, [effectiveQ, fn, recency, mode, syncUrl]);
+
+  // The company control re-queries on the server (semantic ranks within the
+  // company; keyword filters server-side), so it pushes the `?company=` param
+  // directly — like the tier/status controls — rather than living in client
+  // filter state. `all` is the default → drop the param so a plain /jobs URL
+  // stays canonical.
+  const setCompanyServer = React.useCallback(
+    (next: string) => {
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
+      if (next === "all") params.delete("company");
+      else params.set("company", next);
+      const qs = params.toString();
+      router.push(
+        qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+        { scroll: false }
+      );
+    },
+    [router]
+  );
 
   // The tier control re-queries on the server, so it pushes the `?tier=`
   // param directly (preserving the other live filter params) instead of
@@ -265,9 +293,9 @@ export function JobsHeader({
     Boolean(digestContext.companyName);
 
   const clearDigestContext = () => {
-    // Reset everything to the bare /jobs path.
+    // Reset everything to the bare /jobs path. Company is URL-driven, so the
+    // bare path (no `?company=`) clears it; no client state to reset.
     setQ("");
-    setCompany("all");
     setFn("all");
     setRecency("any");
     router.push("/jobs");
@@ -420,7 +448,7 @@ export function JobsHeader({
           })}
         </div>
 
-        <Select value={company} onValueChange={setCompany}>
+        <Select value={companyFilter} onValueChange={setCompanyServer}>
           <SelectTrigger className="min-w-[160px]">
             <SelectValue placeholder="All companies" />
           </SelectTrigger>

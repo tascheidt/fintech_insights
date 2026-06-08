@@ -1202,7 +1202,8 @@ async function runSemanticJobSearch(
   rawQuery: string,
   tierList: CompanyTier[],
   jobIds: string[] | null,
-  status: JobsStatusScope
+  status: JobsStatusScope,
+  companySlug: string | null
 ): Promise<JobsListResult | null> {
   const startedAt = performance.now();
   const embedded = await embedText(rawQuery, { callSite: "jobs.search.semantic" });
@@ -1211,10 +1212,15 @@ async function runSemanticJobSearch(
     return null;
   }
 
+  // company_filter scopes the nearest-neighbour search to one company so the
+  // match_count budget is spent within it (rather than ranking the whole tier
+  // and dropping everything but the global top-N — which can exclude a company
+  // entirely). null = no scope.
   const { data: idRows, error: rpcError } = await supabase.rpc("match_job_ids_semantic", {
     query_embedding: JSON.stringify(embedded.embedding),
     tier_filter: tierList,
     match_count: JOBS_SEMANTIC_MAX_ROWS,
+    company_filter: companySlug ? [companySlug] : null,
   });
   if (rpcError || !idRows) {
     log.info(
@@ -1246,6 +1252,7 @@ async function runSemanticJobSearch(
     .in("companies.tier", tierList)
     .eq("companies.is_active", true)
     .in("id", orderedIds);
+  if (companySlug) hydrate = hydrate.eq("companies.slug", companySlug);
   const statusValue = statusScopePredicate(status);
   if (statusValue !== null) hydrate = hydrate.eq("is_active", statusValue);
   const { data, error } = await hydrate;
@@ -1363,6 +1370,10 @@ export async function getJobsListData(
     /** Activity scope. Default "active" — the Jobs board only shows live roles
      *  unless the user opts into "inactive" / "all" via the status toggle. */
     status?: JobsStatusScope;
+    /** Company-slug scope. When set, both keyword and semantic search are
+     *  filtered to this company server-side — so semantic ranking happens
+     *  WITHIN the company instead of client-narrowing the global top-N. */
+    companySlug?: string | null;
   } = {}
 ): Promise<JobsListResult> {
   const supabase = await createClient();
@@ -1375,6 +1386,7 @@ export async function getJobsListData(
   const tierList = [...(options.tiers ?? DEFAULT_TIERS)];
   const rawQuery = options.searchQuery?.trim() ?? "";
   const status: JobsStatusScope = options.status ?? "active";
+  const companySlug = options.companySlug?.trim() || null;
 
   // Semantic mode embeds the query and ranks by vector similarity. On any
   // embedding/RPC failure runSemanticJobSearch returns null and we fall
@@ -1385,7 +1397,8 @@ export async function getJobsListData(
       rawQuery,
       tierList,
       options.jobIds ?? null,
-      status
+      status,
+      companySlug
     );
     if (semantic) return semantic;
   }
@@ -1401,6 +1414,8 @@ export async function getJobsListData(
     .eq("companies.is_active", true)
     .order("first_seen_date", { ascending: false })
     .limit(limit);
+
+  if (companySlug) query = query.eq("companies.slug", companySlug);
 
   const statusValue = statusScopePredicate(status);
   if (statusValue !== null) query = query.eq("is_active", statusValue);

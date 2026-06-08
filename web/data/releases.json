@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.9.15",
+    "date": "2026-06-08",
+    "changes": [
+      {
+        "type": "improvement",
+        "description": "Filtering a semantic search to a single company now returns that company's most relevant roles. Semantic search ranks the most-relevant roles across the whole tier and keeps the top 200 — so when you searched something like \"AI\" across the banks and then picked CIBC, the narrowing happened only within those 200 already-chosen results, and a company that didn't crack the top 200 (even one with hundreds of open roles) would show nothing. Picking a company now re-runs the search scoped to it, ranking its own roles by relevance, so you always see that company's closest matches. Keyword search and the company picker behave the same way as before."
+      }
+    ]
+  },
+  {
     "version": "2.9.14",
     "date": "2026-06-08",
     "changes": [
