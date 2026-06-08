@@ -42,6 +42,10 @@ export interface JobsPageClientProps {
   activeCount: number;
   newCount: number;
   companyCount: number;
+  /** Active company scope, URL-seeded — drives the JobsHeader company control.
+   *  Server-filtered (`?company=`), so `rows` already contains only the chosen
+   *  company; this just seeds the dropdown's selected value. */
+  companyFilter: string;
   /** Active tier scope, URL-seeded — drives the JobsHeader tier control. */
   tierFilter: "fintech" | "incumbent" | "all";
   /** Active activity scope, URL-seeded — drives the JobsHeader status control.
@@ -75,6 +79,7 @@ function JobsPageClientInner({
   activeCount,
   newCount,
   companyCount,
+  companyFilter,
   tierFilter,
   statusFilter,
   searchTruncated,
@@ -88,15 +93,13 @@ function JobsPageClientInner({
     setFilters(next);
   }, []);
 
-  // Server-side ILIKE in `getJobsListData` already filtered on the search
-  // term (title / description_text / location / companies.name). The client
-  // applies the remaining axes — company, function, recency, theme — that
-  // can change without a re-fetch.
+  // The server already scoped `rows` by search term, tier, status, AND company
+  // (the company control drives a `?company=` re-query — so semantic ranking
+  // happens within the company rather than client-narrowing the capped result
+  // window). The client applies only the remaining axes — function, recency,
+  // theme — that can change without a re-fetch.
   const filtered = React.useMemo(() => {
     return rows.filter((r) => {
-      if (filters.company !== "all" && r.companySlug !== filters.company) {
-        return false;
-      }
       if (filters.fn !== "all" && r.functionGroup !== filters.fn) {
         return false;
       }
@@ -129,13 +132,14 @@ function JobsPageClientInner({
         totalCount={rows.length}
         initial={initial}
         digestContext={digestContext}
+        companyFilter={companyFilter}
         tierFilter={tierFilter}
         statusFilter={statusFilter}
         onChange={onChange}
         onExportCsv={() => {
           const stem =
-            filters.company !== "all"
-              ? `jobs-${filters.company}`
+            companyFilter !== "all"
+              ? `jobs-${companyFilter}`
               : filters.fn !== "all"
                 ? `jobs-${filters.fn.toLowerCase().replace(/\s+/g, "-")}`
                 : "jobs";
