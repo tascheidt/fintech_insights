@@ -46,10 +46,31 @@
 import type { JobData } from "./types";
 import type { Browser, Page } from "puppeteer-core";
 import { decodeHtmlEntities, detectLocationType, htmlToText } from "./utils";
+import {
+  buildWorkdayHeaders,
+  extractCookieJar,
+  parseWorkdayApplyUrl,
+  parseWorkdayJson,
+  parseWorkdayJobDetail,
+  WorkdayBlockedError,
+  type WorkdayApplyTarget,
+  type WorkdayJobDetailResponse,
+} from "./workday-utils";
 import { log } from "@/lib/log";
 
 const RBC_LISTING_URL = "https://jobs.rbc.com/ca/en/search-results";
 const DESCRIPTION_CONCURRENCY = 4;
+// Phenom detail-page hydration budget. RBC server-renders the JSON-LD
+// JobPosting for most reqs, but a consistent subset renders it slightly later
+// (or client-side); we poll the extractor up to this long instead of the old
+// fixed 400ms settle that missed them. Server-rendered pages resolve on the
+// first poll, so the 64% that already worked pay ~no extra time.
+const DETAIL_HYDRATION_TIMEOUT_MS = 3_000;
+// Workday-fallback knobs (RBC's apply links route into a Workday tenant; the
+// CXS JSON detail endpoint is the reliable source for any req whose Phenom
+// detail page never exposes the description). HTTP, no browser.
+const WORKDAY_FETCH_TIMEOUT_MS = 15_000;
+const WORKDAY_ENRICH_CONCURRENCY = 6;
 // Description enrichment is processed in batches of this size: fresh
 // puppeteer pages per batch, closed at batch end. Bounds page-memory
 // growth over a full ~1,500-job corpus and gives per-batch progress logs.
@@ -232,10 +253,25 @@ export const PHENOM_DETAIL_EXTRACTOR_SRC = `(function () {
     if (!raw) continue;
     try {
       var parsed = JSON.parse(raw);
-      var candidates = Array.isArray(parsed) ? parsed : [parsed];
+      // JSON-LD arrives in three shapes: a bare object, a top-level array, or a
+      // single object wrapping its nodes in @graph. Flatten all three before
+      // looking for the JobPosting node. @type may itself be an array.
+      var candidates = [];
+      var roots = Array.isArray(parsed) ? parsed : [parsed];
+      for (var r = 0; r < roots.length; r++) {
+        var root = roots[r];
+        if (!root) continue;
+        candidates.push(root);
+        if (root["@graph"] && Array.isArray(root["@graph"])) {
+          for (var g = 0; g < root["@graph"].length; g++) candidates.push(root["@graph"][g]);
+        }
+      }
       for (var c = 0; c < candidates.length; c++) {
         var entry = candidates[c];
-        if (entry && entry["@type"] === "JobPosting" && typeof entry.description === "string" && entry.description.length > 200) {
+        if (!entry) continue;
+        var t = entry["@type"];
+        var isJobPosting = t === "JobPosting" || (Array.isArray(t) && t.indexOf("JobPosting") !== -1);
+        if (isJobPosting && typeof entry.description === "string" && entry.description.length > 200) {
           return { html: entry.description, source: "json-ld-JobPosting" };
         }
       }
@@ -328,13 +364,26 @@ async function fetchListingPage(
 
 async function enrichOne(page: Page, job: JobData): Promise<void> {
   if (!job.url) return;
-  // The JSON-LD JobPosting (our primary description source) is server-rendered
-  // into the detail HTML (verified by curl: a full description arrives in the
-  // initial response). `domcontentloaded` is therefore sufficient — waiting for
-  // `networkidle2` plus a 2.5s settle on every one of ~1,400 detail pages is
-  // what pushed the full run past the 30-min GHA ceiling.
+  // The JSON-LD JobPosting is server-rendered into the detail HTML for most
+  // reqs (verified by curl), so `domcontentloaded` + reading the parsed
+  // document is enough — we do NOT reintroduce `networkidle2` (that ran ~50 min
+  // and blew the GHA ceiling for a week, June 2026). But a fixed 400ms settle
+  // missed a consistent ~36% of reqs whose JSON-LD lands slightly later (or
+  // client-side), leaving them teaser-only on every scrape. POLL the extractor
+  // until the description surface is present instead: already-rendered pages
+  // resolve on the first poll (no slowdown), late pages resolve as soon as
+  // they're ready, and genuinely-absent pages time out cheaply and fall through
+  // to the Workday fallback.
   await page.goto(job.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
-  await new Promise((r) => setTimeout(r, 400));
+  try {
+    await page.waitForFunction(`${PHENOM_DETAIL_EXTRACTOR_SRC} !== null`, {
+      timeout: DETAIL_HYDRATION_TIMEOUT_MS,
+      polling: 300,
+    });
+  } catch {
+    // Surface never appeared within budget — evaluate returns null and the
+    // job is left for the Workday fallback.
+  }
   const result = (await page.evaluate(PHENOM_DETAIL_EXTRACTOR_SRC)) as
     | { html: string; source: string }
     | null;
@@ -423,8 +472,117 @@ async function enrichDescriptions(
   }
   log.info(
     { enriched: totalEnriched, failed: totalFailed, total: jobs.length },
-    "[phenom-rbc] description enrichment complete"
+    "[phenom-rbc] phenom enrichment complete"
   );
+}
+
+// ---------------------------------------------------------------------------
+// Workday fallback (for reqs whose Phenom detail page never exposes the body)
+// ---------------------------------------------------------------------------
+
+/** One job paired with the Workday CXS target derived from its applyUrl. */
+interface RbcEnrichTarget {
+  job: JobData;
+  workday: WorkdayApplyTarget | null;
+}
+
+/**
+ * Best-effort warm-up: POST once to the tenant's Workday listing endpoint to
+ * capture the Akamai `_abck` cookie, which the per-job detail GETs replay (same
+ * cookie continuity as workday-cibc / workday-td). Returns "" on any failure —
+ * the detail GETs then proceed cookie-less; we never fail the run here.
+ */
+async function seedWorkdayCookie(
+  listingUrl: string,
+  headers: Record<string, string>
+): Promise<string> {
+  try {
+    const res = await fetch(listingUrl, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ limit: 1, offset: 0, searchText: "", appliedFacets: {} }),
+      signal: AbortSignal.timeout(WORKDAY_FETCH_TIMEOUT_MS),
+    });
+    const jar = extractCookieJar(res);
+    await res.text().catch(() => {}); // drain
+    return jar;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Fill descriptions from RBC's Workday tenant for any target the Phenom pass
+ * left empty AND that has a Workday apply URL. The CXS JSON detail endpoint is
+ * the reliable source (the same one TD/CIBC use). HTTP only — no browser. Never
+ * throws; a block degrades to leaving the job teaser-only (no worse than today)
+ * and is logged. Returns the number of jobs it filled.
+ */
+async function enrichResidualViaWorkday(
+  targets: RbcEnrichTarget[]
+): Promise<number> {
+  const residual = targets.filter((t) => !t.job.description_html && t.workday);
+  if (residual.length === 0) return 0;
+
+  // Every RBC apply URL resolves to the same Workday tenant; use the first to
+  // build the shared headers + cookie warm-up.
+  const sample = residual[0].workday as WorkdayApplyTarget;
+  const headers = buildWorkdayHeaders(sample.tenant, sample.instance, sample.site);
+  const cookieJar = await seedWorkdayCookie(sample.listingUrl, headers);
+
+  const queue = [...residual];
+  let enriched = 0;
+  let blocked = 0;
+  await Promise.all(
+    Array.from(
+      { length: Math.min(WORKDAY_ENRICH_CONCURRENCY, queue.length) },
+      async () => {
+        while (queue.length > 0) {
+          const target = queue.shift();
+          if (!target?.workday) break;
+          try {
+            const res = await fetch(target.workday.detailUrl, {
+              headers: { ...headers, ...(cookieJar ? { Cookie: cookieJar } : {}) },
+              signal: AbortSignal.timeout(WORKDAY_FETCH_TIMEOUT_MS),
+            });
+            if (!res.ok) throw new Error(`status ${res.status}`);
+            const detail = await parseWorkdayJson<WorkdayJobDetailResponse>(
+              res,
+              target.workday.tenant
+            );
+            const parsed = parseWorkdayJobDetail(detail);
+            if (parsed.description_html && parsed.description_html.length > 200) {
+              target.job.description_html = parsed.description_html;
+              target.job.description_text =
+                parsed.description_text || target.job.description_text;
+              if (parsed.location && !target.job.location) {
+                target.job.location = parsed.location;
+              }
+              if (parsed.posted_date && !target.job.posted_date) {
+                target.job.posted_date = parsed.posted_date;
+              }
+              enriched++;
+            }
+          } catch (e) {
+            if (e instanceof WorkdayBlockedError) blocked++;
+            log.warn(
+              {
+                reqId: target.job.external_id,
+                err: e instanceof Error ? e.message : String(e),
+              },
+              "[phenom-rbc] workday fallback enrichment failed"
+            );
+          }
+        }
+      }
+    )
+  );
+
+  log.info(
+    { enriched, blocked, residual: residual.length },
+    "[phenom-rbc] workday fallback pass complete"
+  );
+  return enriched;
 }
 
 // ---------------------------------------------------------------------------
@@ -463,46 +621,66 @@ export async function fetchPhenomRbcJobs(
     const listingPage = await browserInstance.newPage();
     await listingPage.setUserAgent(USER_AGENT);
 
-    const jobs: JobData[] = [];
+    const targets: RbcEnrichTarget[] = [];
     let totalHits: number | null = null;
     let from = 0;
 
     // Paginate the FULL listing. Phenom serves 10 per page. Stop when the
     // corpus is exhausted, a page comes back empty, or the optional cap
-    // is reached.
+    // is reached. Each row is paired with the Workday detail target derived
+    // from its applyUrl so the fallback pass can hit Workday directly.
     while (true) {
       const payload = await fetchListingPage(listingPage, from);
       if (!payload?.data?.jobs?.length) break;
       totalHits = payload.totalHits ?? totalHits;
-      jobs.push(...payload.data.jobs.map(mapPhenomJob));
+      for (const raw of payload.data.jobs) {
+        targets.push({
+          job: mapPhenomJob(raw),
+          workday: parseWorkdayApplyUrl(raw.applyUrl),
+        });
+      }
       from += payload.data.jobs.length;
-      if (cap != null && jobs.length >= cap) break;
+      if (cap != null && targets.length >= cap) break;
       if (totalHits != null && from >= totalHits) break;
     }
 
-    if (cap != null && jobs.length > cap) jobs.length = cap;
+    if (cap != null && targets.length > cap) targets.length = cap;
     await listingPage.close();
 
     log.info(
       {
-        fetched: jobs.length,
+        fetched: targets.length,
         totalHits,
+        withWorkdayUrl: targets.filter((t) => t.workday).length,
         cap: cap ?? "uncapped",
         batchSize: ENRICH_BATCH_SIZE,
       },
-      "[phenom-rbc] listings complete; enriching descriptions in batches"
+      "[phenom-rbc] listings complete; enriching descriptions (Phenom + Workday fallback)"
     );
 
-    if (jobs.length > 0) {
+    if (targets.length > 0) {
+      // Pass 1 — Phenom JSON-LD detail page (primary): server-rendered for most
+      // reqs, read via Puppeteer with a hydration-aware wait.
       await enrichDescriptions(
         browserInstance,
-        jobs,
+        targets.map((t) => t.job),
         DESCRIPTION_CONCURRENCY,
         ENRICH_BATCH_SIZE
       );
+
+      // Pass 2 — Workday CXS JSON (fallback) for any req the Phenom pass left
+      // empty whose apply link routes into Workday.
+      const residual = targets.filter((t) => !t.job.description_html).length;
+      if (residual > 0) {
+        log.info(
+          { residual },
+          "[phenom-rbc] running Workday fallback for residual jobs"
+        );
+        await enrichResidualViaWorkday(targets);
+      }
     }
 
-    return jobs;
+    return targets.map((t) => t.job);
   } finally {
     if (owned) await browserInstance.close();
   }
