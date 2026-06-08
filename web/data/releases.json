@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.9.14",
+    "date": "2026-06-08",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "Revolut Canada now shows only Canadian roles. Revolut filters its careers board by location through the web address, and that filter quietly stopped working — instead of an empty result it started returning Revolut's full global board, so the scraper picked up six unrelated openings in London, Dubai, Lisbon, the Netherlands, the UAE, Krakow, and Tokyo and listed them under Revolut Canada, while the three genuine Canadian roles dropped off. The scraper no longer trusts that location filter on its own: every role it reads is now independently checked to be clearly in the Canadian market, and anything that isn't is dropped. If the board ever comes back with roles but none are Canadian, the run now fails loudly and retries on a fresh machine instead of importing the wrong market. We also removed the six incorrect postings and restored Revolut Canada's three real openings (Head of Risk, Head of Finance, and an MLRO role)."
+      }
+    ]
+  },
+  {
     "version": "2.9.13",
     "date": "2026-06-07",
     "changes": [
