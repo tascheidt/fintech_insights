@@ -1,5 +1,25 @@
 [
   {
+    "version": "2.9.16",
+    "date": "2026-06-08",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "RBC job descriptions are now complete too. After the BMO fix, the same teaser-only problem turned out to affect about a third of RBC's open roles (~515 postings across every department) — they showed only a one- or two-sentence summary. RBC publishes most descriptions directly, but a consistent subset loads a moment later than our scraper was waiting, so it captured only the teaser every run. The scraper now waits for each description to finish loading (without slowing down the ones that are already there), reads a couple of additional page formats, and, for any role still missing its body, pulls it from the authoritative source (Workday) — the same reliable feed behind TD and CIBC. Descriptions backfill automatically on the next RBC scrape. We also swept every other tracked bank: BMO is fixed and all others were already complete."
+      }
+    ]
+  },
+  {
+    "version": "2.9.15",
+    "date": "2026-06-08",
+    "changes": [
+      {
+        "type": "improvement",
+        "description": "Filtering a semantic search to a single company now returns that company's most relevant roles. Semantic search ranks the most-relevant roles across the whole tier and keeps the top 200 — so when you searched something like \"AI\" across the banks and then picked CIBC, the narrowing happened only within those 200 already-chosen results, and a company that didn't crack the top 200 (even one with hundreds of open roles) would show nothing. Picking a company now re-runs the search scoped to it, ranking its own roles by relevance, so you always see that company's closest matches. Keyword search and the company picker behave the same way as before."
+      }
+    ]
+  },
+  {
     "version": "2.9.14",
     "date": "2026-06-08",
     "changes": [

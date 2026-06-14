@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildWorkdayUrls,
+  parseWorkdayApplyUrl,
   parseWorkdayListingRow,
   parseWorkdayJobDetail,
   parseWorkdayJson,
@@ -17,6 +18,54 @@ import {
   resolveWorkdayJobCap,
   type WorkdayListingRow,
 } from "./workday-utils";
+
+describe("parseWorkdayApplyUrl", () => {
+  it("maps a Phenom applyUrl (with trailing /apply) to CXS endpoints + tenant coords", () => {
+    const t = parseWorkdayApplyUrl(
+      "https://bmo.wd3.myworkdayjobs.com/External/job/Toronto-Ontario-Canada/Senior-Machine-Learning-Engineer_R-2400512/apply"
+    );
+    expect(t).toEqual({
+      detailUrl:
+        "https://bmo.wd3.myworkdayjobs.com/wday/cxs/bmo/External/job/Toronto-Ontario-Canada/Senior-Machine-Learning-Engineer_R-2400512",
+      listingUrl: "https://bmo.wd3.myworkdayjobs.com/wday/cxs/bmo/External/jobs",
+      tenant: "bmo",
+      instance: "wd3",
+      site: "External",
+    });
+  });
+
+  it("handles an applyUrl with no trailing /apply", () => {
+    const t = parseWorkdayApplyUrl(
+      "https://rbc.wd3.myworkdayjobs.com/RBC_External/job/Toronto/Principal-Product-Manager_R-0000174965"
+    );
+    expect(t?.detailUrl).toBe(
+      "https://rbc.wd3.myworkdayjobs.com/wday/cxs/rbc/RBC_External/job/Toronto/Principal-Product-Manager_R-0000174965"
+    );
+    expect(t?.listingUrl).toBe(
+      "https://rbc.wd3.myworkdayjobs.com/wday/cxs/rbc/RBC_External/jobs"
+    );
+    expect(t).toMatchObject({ tenant: "rbc", instance: "wd3", site: "RBC_External" });
+  });
+
+  it("reads tenant + instance from the host (not hardcoded)", () => {
+    const t = parseWorkdayApplyUrl(
+      "https://acme.wd5.myworkdayjobs.com/Careers/job/NYC/Analyst_R-9/apply"
+    );
+    expect(t).toMatchObject({ tenant: "acme", instance: "wd5", site: "Careers" });
+  });
+
+  it("returns null for empty, non-Workday, or unparseable input", () => {
+    expect(parseWorkdayApplyUrl(undefined)).toBeNull();
+    expect(parseWorkdayApplyUrl(null)).toBeNull();
+    expect(parseWorkdayApplyUrl("")).toBeNull();
+    expect(parseWorkdayApplyUrl("https://jobs.rbc.com/ca/en/job/R-1/Title")).toBeNull();
+    expect(parseWorkdayApplyUrl("not a url")).toBeNull();
+    // Workday host but a non-/job path → null rather than a bad URL.
+    expect(
+      parseWorkdayApplyUrl("https://bmo.wd3.myworkdayjobs.com/External")
+    ).toBeNull();
+  });
+});
 
 describe("buildWorkdayUrls", () => {
   it("interpolates tenant, instance, and site into the listing POST URL", () => {
