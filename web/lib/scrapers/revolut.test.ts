@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import {
   assessListing,
   extractExternalId,
+  isCanadianLocation,
   mapRevolutJob,
   parseListingCounts,
   parseListingPage,
@@ -161,6 +162,50 @@ describe("assessListing", () => {
       ok: true,
       reason: "genuinely-empty",
     });
+  });
+});
+
+describe("isCanadianLocation", () => {
+  it("accepts country-level Canada tags (how Revolut labels its CA roles)", () => {
+    expect(isCanadianLocation("Remote: Canada")).toBe(true);
+    expect(isCanadianLocation("Canada")).toBe(true);
+    expect(isCanadianLocation("Toronto, Canada")).toBe(true);
+    // A multi-location role that includes Canada is still available in Canada.
+    expect(isCanadianLocation("Office: Toronto · London Remote: Canada · UK")).toBe(true);
+  });
+
+  it("accepts unambiguous Canadian cities and provinces without the country word", () => {
+    expect(isCanadianLocation("Toronto, Ontario")).toBe(true);
+    expect(isCanadianLocation("Vancouver, British Columbia")).toBe(true);
+    expect(isCanadianLocation("Montréal")).toBe(true);
+    expect(isCanadianLocation("Calgary")).toBe(true);
+  });
+
+  it("rejects the exact non-Canadian locations from the June 8 2026 incident", () => {
+    // These six are Revolut's global "Featured roles" that ingested under
+    // Revolut Canada when ?city=Canada was silently ignored.
+    expect(isCanadianLocation("London, England, United Kingdom")).toBe(false);
+    expect(
+      isCanadianLocation(
+        "Office: Dubai · Lisbon · London · MadridRemote: Porto · Portugal · Spain · Spain · UAE · UK"
+      )
+    ).toBe(false);
+    expect(isCanadianLocation("Netherlands")).toBe(false);
+    expect(isCanadianLocation("UAE")).toBe(false);
+    expect(isCanadianLocation("Krakow, Poland")).toBe(false);
+    expect(isCanadianLocation("Office: TokyoRemote: Japan")).toBe(false);
+  });
+
+  it("does not mistake ambiguous non-Canadian tokens for Canada", () => {
+    // London is Revolut's HQ (UK), not London, Ontario.
+    expect(isCanadianLocation("London, United Kingdom")).toBe(false);
+    expect(isCanadianLocation("Remote: Europe")).toBe(false);
+  });
+
+  it("rejects null / empty locations (not clearly Canadian)", () => {
+    expect(isCanadianLocation(null)).toBe(false);
+    expect(isCanadianLocation(undefined)).toBe(false);
+    expect(isCanadianLocation("")).toBe(false);
   });
 });
 
