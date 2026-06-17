@@ -120,17 +120,22 @@ function isTransientDbError(err: unknown): boolean {
 
 /**
  * Run an async DB operation, retrying ONLY on transient outages (see
- * isTransientDbError). The budget is ~63s (6 attempts, 1→32s capped) so a
- * single Supabase restart + schema-cache reload is ridden out instead of
- * discarding a scrape whose work is already done — the 7s failure-path budget
- * below could not (May 28 & May 31 2026 TD ingest incidents). A non-transient
- * error throws immediately; the caller is responsible for the operation being
- * idempotent on retry (runIngestStage upserts by external id).
+ * isTransientDbError). The budget is ~95s of backoff (8 attempts, 1→32s
+ * capped: 1,2,4,8,16,32,32) so even a slow Supabase recovery + schema-cache
+ * reload is ridden out instead of discarding a scrape whose work is already
+ * done. The budget has been widened twice in response to TD ingest incidents:
+ * the original 7s failure-path budget could not survive a restart (May 28 &
+ * May 31 2026), and the 6-attempt/~63s budget that replaced it still gave up
+ * on the June 17 2026 TD ingest — a clean 1,574-job fetch+enrich, then a ~55s+
+ * Supabase-origin outage (Cloudflare 520/521 → PGRST002) that exhausted all
+ * six attempts in ~49s of wall-clock and discarded the finished scrape. A
+ * non-transient error throws immediately; the caller is responsible for the
+ * operation being idempotent on retry (runIngestStage upserts by external id).
  */
 async function withTransientRetry<T>(
   label: string,
   fn: () => Promise<T>,
-  attempts = 6
+  attempts = 8
 ): Promise<T> {
   for (let i = 1; i <= attempts; i++) {
     try {
@@ -156,13 +161,16 @@ async function withTransientRetry<T>(
  * resilient to transient DB outages — if those silently fail, the task stays
  * `running` until the next morning's heartbeat sweep marks it `Timed out`,
  * hiding the real error from the GH Actions logs (May 28 2026 TD incident).
- * Budget is ~63s (6 attempts, 1→32s capped) so the mark-failed write can itself
- * outlast a Supabase restart — the old 7s budget could not (May 31 2026).
+ * Budget is ~95s of backoff (8 attempts, 1→32s capped) — kept in lock-step with
+ * withTransientRetry so the mark-failed write outlasts the same Supabase outage
+ * the ingest just rode out. The old 7s budget could not (May 31 2026), and the
+ * 6-attempt/~63s budget gave up alongside the ingest on the June 17 2026 TD
+ * outage.
  */
 async function withRetry(
   label: string,
   fn: () => PromiseLike<{ error: { message?: string } | null }>,
-  attempts = 6
+  attempts = 8
 ): Promise<void> {
   for (let i = 1; i <= attempts; i++) {
     try {

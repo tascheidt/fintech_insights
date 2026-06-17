@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.9.17",
+    "date": "2026-06-17",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "TD job updates no longer get thrown away when the database has a brief hiccup. TD's daily scrape collects and enriches its full ~1,600-role board correctly, but on June 17 the database it writes to went offline for about a minute right as those results were being saved — and the run gave up part-way through the wait, discarding a completed scrape and leaving TD's listings stale for the day. The save step now waits out a longer outage (up to roughly a minute and a half, retrying with steadily increasing pauses) before giving up, so a short database blip no longer costs a whole day's worth of TD updates. The same patience now also applies to the step that records a failure, so genuine problems still show up clearly in the logs instead of leaving a run stuck."
+      }
+    ]
+  },
+  {
     "version": "2.9.16",
     "date": "2026-06-08",
     "changes": [
