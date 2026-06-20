@@ -33,6 +33,7 @@ import {
   getNetThisWeek,
   getIncumbentBets,
 } from "@/lib/dashboard-queries";
+import { getIncumbentTrackingEnabledCached } from "@/lib/settings/incumbent-tracking";
 
 const RANGE_TO_DAYS: Record<string, number> = {
   "2w": 14,
@@ -62,6 +63,10 @@ export default async function DashboardPage({
   const matrixIncludeClosed = matrixScope === "all";
 
   const supabase = await createClient();
+
+  // Incumbent gate: when tracking is off, the Incumbent Bets rail is hidden and
+  // we skip its query entirely.
+  const incumbentEnabled = await getIncumbentTrackingEnabledCached();
 
   // Fetch backfill cutoffs first (needed by most queries)
   const cutoffs = await getCompanyBackfillCutoffs();
@@ -106,7 +111,8 @@ export default async function DashboardPage({
     getHotRoles(cutoffs),
     // Incumbent Bets rail (ROW 6) — senior big-bank hires, last 30 days.
     // Incumbent-only by construction; never touches a fintech aggregate.
-    getIncumbentBets(),
+    // Skipped when incumbent tracking is off (rail hidden below).
+    incumbentEnabled ? getIncumbentBets() : Promise.resolve([]),
     // Companies for filter dropdown (fintech-only — the dashboard is the
     // fintech surface; incumbents are excluded from the count + dropdown).
     supabase

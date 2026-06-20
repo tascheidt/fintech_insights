@@ -11,9 +11,10 @@
  * `getAllCompanyJobsWithBets` for the all-jobs drawer view.
  */
 
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getIncumbentTrackingEnabledCached } from "@/lib/settings/incumbent-tracking";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EditCompanyForm } from "@/components/companies/EditCompanyForm";
@@ -58,6 +59,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     .eq("is_active", true)
     .single();
   if (error || !company) notFound();
+
+  // Incumbent gate: when tracking is off, an incumbent bank is not a tracked
+  // entity in the product — it is hidden from every list and aggregate. A stale
+  // deep link to its page bounces back to the Companies index.
+  const incumbentEnabled = await getIncumbentTrackingEnabledCached();
+  if (company.tier === "incumbent" && !incumbentEnabled) redirect("/companies");
 
   // Phase 2: incumbent banks get a deliberately quieter Overview — a
   // "Senior hiring signal" panel instead of the bets-first editorial, an

@@ -20,6 +20,7 @@
  */
 
 import { createAdminClient } from "../lib/supabase/admin";
+import { getIncumbentTrackingEnabled } from "../lib/settings/incumbent-tracking";
 import {
   generateCompanyEditorial,
   applyEditorialToCompany,
@@ -91,6 +92,27 @@ async function main() {
     }));
   } else {
     companies = await getCompaniesNeedingEditorial({ maxAgeDays: args.maxAgeDays });
+  }
+
+  // Incumbent gate: when tracking is off, drop tier='incumbent' companies from
+  // every mode (all / slug / stale) so the editorial cron doesn't spend Gemini
+  // budget on hidden banks. Re-enable from Admin > Settings to include them.
+  if (companies.length > 0 && !(await getIncumbentTrackingEnabled(supabase))) {
+    const { data: incRows } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("tier", "incumbent");
+    const incumbentIds = new Set((incRows ?? []).map((r) => r.id));
+    const before = companies.length;
+    companies = companies.filter((c) => !incumbentIds.has(c.id));
+    const dropped = before - companies.length;
+    if (dropped > 0) {
+      console.log(
+        `Incumbent tracking disabled — skipped ${dropped} incumbent compan${
+          dropped === 1 ? "y" : "ies"
+        }.`
+      );
+    }
   }
 
   console.log(

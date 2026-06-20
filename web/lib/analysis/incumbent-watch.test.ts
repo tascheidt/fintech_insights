@@ -65,6 +65,14 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
+// Incumbent-tracking flag. `buildIncumbentWatch` short-circuits to null when
+// tracking is off; these grouping tests run with it on. Mutable via a hoisted
+// holder so one test can flip it off and assert the gate.
+const settingsState = vi.hoisted(() => ({ incumbentEnabled: true }));
+vi.mock("@/lib/settings/incumbent-tracking", () => ({
+  getIncumbentTrackingEnabled: () => Promise.resolve(settingsState.incumbentEnabled),
+}));
+
 // Imports come AFTER the mock so they pick up the mocked admin client.
 import { buildIncumbentWatch } from "./digest";
 
@@ -123,6 +131,7 @@ describe("buildIncumbentWatch", () => {
   afterEach(() => {
     if (savedKey !== undefined) process.env.GEMINI_API_KEY = savedKey;
     fixtureRows = [];
+    settingsState.incumbentEnabled = true;
     vi.restoreAllMocks();
   });
 
@@ -203,5 +212,18 @@ describe("buildIncumbentWatch", () => {
 
     expect(watch).not.toBeNull();
     expect(watch!.banks[0].head).toBe("TD · 1 senior Risk-AI role");
+  });
+
+  it("returns null when incumbent tracking is disabled, even with qualifying hires", async () => {
+    settingsState.incumbentEnabled = false;
+    fixtureRows = [
+      // Would otherwise qualify (staff+ in AI/ML), but the flag gates it out.
+      row("r1", "Staff AI Researcher", "staff", "engineering-ai-ml", RBC),
+      row("t1", "VP, Model Risk", "executive", "risk-management", TD),
+    ];
+
+    const watch = await buildIncumbentWatch(WEEK_START, WEEK_END);
+
+    expect(watch).toBeNull();
   });
 });

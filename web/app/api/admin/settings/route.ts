@@ -14,6 +14,8 @@ const DEFAULT_DESCRIPTIONS: Record<string, string> = {
   weekly_report: "Weekly report email schedule",
   analysis_settings: "Strategic analysis configuration",
   notification_settings: "Notification preferences",
+  incumbent_tracking_enabled:
+    "Master switch for tier=incumbent scraping, AI processing, and UI surfaces",
 };
 
 // GET /api/admin/settings - Fetch all system settings

@@ -25,7 +25,7 @@ These run for every new job posting after `collect`:
 
 ## Digest pipeline
 
-- **`digest.ts`** — Builds the weekly digest payload. Consumed by the email template and the in-app `DigestViewer`. User-facing → voice directive applies.
+- **`digest.ts`** — Builds the weekly digest payload. Consumed by the email template and the in-app `DigestViewer`. User-facing → voice directive applies. `buildIncumbentWatch` is gated by the `incumbent_tracking_enabled` flag (`web/lib/settings/incumbent-tracking.ts`) — when incumbent tracking is off (the default) it returns `null`, which is the existing "no qualifying hire" contract, so the email + viewer omit the block with no further change. See root CLAUDE.md §7 "Incumbent-tracking flag".
 
 ## Helpers (not entry points)
 

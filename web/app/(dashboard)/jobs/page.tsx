@@ -30,6 +30,7 @@ import {
 } from "@/lib/dashboard-queries";
 import { CATEGORY_GROUPS } from "@/lib/analysis/function-categories";
 import { JobsPageClient } from "@/components/jobs/JobsPageClient";
+import { getIncumbentTrackingEnabledCached } from "@/lib/settings/incumbent-tracking";
 
 type JobsPageSearchParams = {
   // Legacy
@@ -126,8 +127,16 @@ export default async function JobsPage({
   const inDigestParam = params.inDigest?.trim() || null;
   const fromParam = parseIsoDateParam(params.from);
   const toParam = parseIsoDateParam(params.to);
-  const tiers = parseTierParam(params.tier);
-  const tierFilter = parseTierFilter(params.tier);
+  // Incumbent gate: when tracking is off, force the tier scope to fintech so a
+  // `?tier=incumbent` / `?tier=all` deep link can't leak incumbent jobs, and the
+  // JobsHeader tier control is hidden (see `incumbentEnabled` prop below).
+  const incumbentEnabled = await getIncumbentTrackingEnabledCached();
+  const tiers = incumbentEnabled
+    ? parseTierParam(params.tier)
+    : (["fintech"] as const);
+  const tierFilter = incumbentEnabled
+    ? parseTierFilter(params.tier)
+    : ("fintech" as const);
   // A digest deep-link is a historical snapshot — many of its roles have since
   // closed, so it forces `all` to keep the snapshot whole regardless of the
   // active-only default.
@@ -288,6 +297,7 @@ export default async function JobsPage({
       companyCount={companyCount ?? companies.length}
       companyFilter={initialCompany}
       tierFilter={tierFilter}
+      showTierFilter={incumbentEnabled}
       statusFilter={statusFilter}
       searchTruncated={truncated}
       relevanceOrder={relevanceOrder}
