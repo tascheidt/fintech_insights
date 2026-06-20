@@ -6,7 +6,7 @@
  * front). Browser-based via puppeteer-core + @sparticuz/chromium, offloaded
  * to `scrape-heavy.yml`.
  *
- * The listing page (`/en-US/careers/?city=<location>`) renders each matching
+ * The listing page (`/careers/?city=<location>`) renders each matching
  * job as a stable anchor:
  *
  *   <a href="/en-US/careers/position/<slug>-<uuid>/" class="...">
@@ -18,8 +18,8 @@
  *
  * The UUID trailing the slug is the canonical external_id.
  *
- * Two hard-won facts about the markup (June 2026 — the scraper shipped broken
- * on both and quietly returned 0 jobs for weeks):
+ * Three hard-won facts about scraping this page (June 2026 — each shipped
+ * broken and quietly returned 0 jobs for a stretch):
  *
  *   1. Job hrefs carry a LOCALE PREFIX (`/en-US/careers/position/…`). The
  *      original selector `a[href^="/careers/position/"]` (anchored `^=`)
@@ -32,6 +32,17 @@
  *      so a single load captures everything — but `assertListingHealthy` warns
  *      if we ever parse fewer than the page's reported count (a Canada surge
  *      past the featured cap would need a scroll/pagination pass).
+ *   3. The careers URL we navigate to must be LOCALE-LESS. The tenant's
+ *      `careers_url` is `https://www.revolut.com/careers/?city=Canada` — NOT a
+ *      locale-prefixed `/en-US/careers/...`. The `/en-US/` path no longer
+ *      renders the board from a runner: it answers with a redirect / Cloudflare
+ *      challenge, so the page shows no anchors and no counters and the scrape
+ *      throws `unrendered` every run (June 20 2026 incident — Revolut Canada
+ *      went stale for days against `/en-US/careers/?city=Canada`; the canonical
+ *      `/careers/?city=Canada` renders normally). NOTE this is distinct from
+ *      fact 1: the job hrefs ON the page may still carry a locale prefix, which
+ *      is why the parser stays locale-agnostic — the constraint here is only the
+ *      URL we navigate to.
  *
  * An UNRECOGNISED `?city=` value is IGNORED by Revolut (it returns the full
  * board, not an empty state), so don't treat a bogus filter as "0 results".
@@ -524,7 +535,7 @@ export async function fetchRevolutJobs(
   void atsIdentifier;
   if (!careersUrl) {
     throw new Error(
-      "[revolut] careersUrl is required (e.g. https://www.revolut.com/en-US/careers/?city=Canada)"
+      "[revolut] careersUrl is required (e.g. https://www.revolut.com/careers/?city=Canada)"
     );
   }
 
