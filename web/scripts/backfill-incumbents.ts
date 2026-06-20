@@ -21,6 +21,7 @@
  */
 
 import { createAdminClient } from "../lib/supabase/admin";
+import { getIncumbentTrackingEnabled } from "../lib/settings/incumbent-tracking";
 import { generateCompanyInsight } from "../lib/analysis/company-insights";
 import { aggregateTechStackFromJobs } from "../lib/ai/tech-stack-aggregation";
 import { enrichTechStackWithAnalysis } from "../lib/ai/tech-stack-extraction";
@@ -63,6 +64,14 @@ async function main() {
   if (!process.env.GEMINI_API_KEY) {
     console.error("❌ GEMINI_API_KEY is required.");
     process.exit(1);
+  }
+
+  // Incumbent gate: this script is incumbent-only by construction. Refuse to
+  // spend Gemini budget on banks while incumbent tracking is disabled. Re-enable
+  // from Admin > Settings (or flip the system_settings flag) first.
+  if (!(await getIncumbentTrackingEnabled(supabase))) {
+    console.log("⏸  Incumbent tracking is disabled — aborting backfill. Enable it from Admin > Settings first.");
+    return;
   }
 
   console.log("🏦 Backfill incumbent intelligence");

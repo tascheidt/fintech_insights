@@ -87,6 +87,13 @@ export interface JobsHeaderProps {
   tierFilter: "fintech" | "incumbent" | "all";
 
   /**
+   * Whether to render the Fintech|Incumbent|All tier control. Off when
+   * incumbent tracking is disabled — the control is hidden (the scope is forced
+   * to fintech server-side). The control markup is kept for re-enable.
+   */
+  showTierFilter: boolean;
+
+  /**
    * Activity scope (URL-seeded). Like the tier control this drives a server
    * re-query — changing it pushes the `?status=` param. `active` is the
    * default (the board only shows live roles) so that value drops the param.
@@ -122,6 +129,7 @@ export function JobsHeader({
   digestContext,
   companyFilter,
   tierFilter,
+  showTierFilter,
   statusFilter,
   onChange,
   onExportCsv,
@@ -509,36 +517,39 @@ export function JobsHeader({
 
         {/* Tier segmented control — scopes which company tiers the list
             shows. Drives the `?tier=` URL param (server re-query). Kept
-            understated: same segmented styling as the recency control. */}
-        <div
-          role="group"
-          aria-label="Company tier"
-          className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]"
-        >
-          {([
-            ["fintech", "Fintech"],
-            ["incumbent", "Incumbent"],
-            ["all", "All"],
-          ] as const).map(([k, label]) => {
-            const active = tierFilter === k;
-            return (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setTier(k)}
-                className={cn(
-                  "rounded px-2.5 py-1.5 text-[11.5px] font-medium transition-colors",
-                  active
-                    ? "bg-sand-50 text-sand-900 ring-1 ring-sand-200"
-                    : "text-sand-500 hover:text-sand-700"
-                )}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+            understated: same segmented styling as the recency control.
+            Hidden when incumbent tracking is off (scope forced to fintech). */}
+        {showTierFilter && (
+          <div
+            role="group"
+            aria-label="Company tier"
+            className="inline-flex rounded-md border border-sand-200 bg-card p-[3px]"
+          >
+            {([
+              ["fintech", "Fintech"],
+              ["incumbent", "Incumbent"],
+              ["all", "All"],
+            ] as const).map(([k, label]) => {
+              const active = tierFilter === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setTier(k)}
+                  className={cn(
+                    "rounded px-2.5 py-1.5 text-[11.5px] font-medium transition-colors",
+                    active
+                      ? "bg-sand-50 text-sand-900 ring-1 ring-sand-200"
+                      : "text-sand-500 hover:text-sand-700"
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Status (activity) segmented control — scopes the board to live,
             closed, or all roles. Drives the `?status=` URL param (server

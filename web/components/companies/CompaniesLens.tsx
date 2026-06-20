@@ -39,11 +39,18 @@ const TABS: Array<{ key: LensKey; label: string; Icon: LucideIcon }> = [
 export interface CompaniesLensProps {
   active: LensKey;
   counts: Record<LensKey, number>;
+  /**
+   * Whether to show the Incumbents tab. Off when incumbent tracking is
+   * disabled — the tab (and the TABS entry) are kept in code, just not rendered.
+   */
+  showIncumbent?: boolean;
 }
 
-export function CompaniesLens({ active, counts }: CompaniesLensProps) {
+export function CompaniesLens({ active, counts, showIncumbent = true }: CompaniesLensProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const tabs = showIncumbent ? TABS : TABS.filter((t) => t.key !== "incumbent");
 
   const onSelect = React.useCallback(
     (key: LensKey) => {
@@ -60,7 +67,7 @@ export function CompaniesLens({ active, counts }: CompaniesLensProps) {
 
   return (
     <div className="inline-flex items-center gap-1 rounded-[10px] border border-border bg-background p-1">
-      {TABS.map(({ key, label, Icon }) => {
+      {tabs.map(({ key, label, Icon }) => {
         const isActive = active === key;
         return (
           <button

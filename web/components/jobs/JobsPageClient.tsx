@@ -48,6 +48,10 @@ export interface JobsPageClientProps {
   companyFilter: string;
   /** Active tier scope, URL-seeded — drives the JobsHeader tier control. */
   tierFilter: "fintech" | "incumbent" | "all";
+  /** Whether to render the Fintech|Incumbent|All tier control. Off when
+   *  incumbent tracking is disabled — the control is hidden and the scope is
+   *  forced to fintech server-side. */
+  showTierFilter: boolean;
   /** Active activity scope, URL-seeded — drives the JobsHeader status control.
    *  Server-filtered, so `rows` already contains only the chosen set. */
   statusFilter: "active" | "inactive" | "all";
@@ -81,6 +85,7 @@ function JobsPageClientInner({
   companyCount,
   companyFilter,
   tierFilter,
+  showTierFilter,
   statusFilter,
   searchTruncated,
   relevanceOrder,
@@ -134,6 +139,7 @@ function JobsPageClientInner({
         digestContext={digestContext}
         companyFilter={companyFilter}
         tierFilter={tierFilter}
+        showTierFilter={showTierFilter}
         statusFilter={statusFilter}
         onChange={onChange}
         onExportCsv={() => {

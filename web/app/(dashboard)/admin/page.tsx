@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { JobsTabContent } from "@/components/admin/JobsTabContent";
 import { FeedbackReviewTable } from "@/components/admin/FeedbackReviewTable";
+import { IncumbentTrackingToggle } from "@/components/admin/IncumbentTrackingToggle";
+import { getIncumbentTrackingEnabled } from "@/lib/settings/incumbent-tracking";
 import { parseCronExpression } from "@/lib/utils/cron";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -63,6 +65,10 @@ export default async function AdminPage() {
     .limit(1)
     .maybeSingle();
 
+  // Incumbent-tracking master switch (Settings tab). Read via the service-role
+  // helper so the value is independent of RLS visibility.
+  const incumbentTrackingEnabled = await getIncumbentTrackingEnabled();
+
   // Companies missing an editorial thesis. Driven by the v2 editorial
   // fields added in 20260425_company_editorial_v2.sql.
   const { data: needsEditorial } = await supabase
@@ -88,6 +94,7 @@ export default async function AdminPage() {
           <TabsTrigger value="jobs">Jobs</TabsTrigger>
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
         {/* Jobs Tab */}
@@ -187,6 +194,11 @@ export default async function AdminPage() {
         {/* Feedback Tab */}
         <TabsContent value="feedback">
           <FeedbackReviewTable />
+        </TabsContent>
+
+        {/* Settings Tab — feature flags. */}
+        <TabsContent value="settings" className="space-y-4">
+          <IncumbentTrackingToggle initialEnabled={incumbentTrackingEnabled} />
         </TabsContent>
       </Tabs>
     </div>

@@ -32,6 +32,7 @@ import {
 import { CompaniesIndexRow, type CompanyRow } from "@/components/companies/CompaniesIndexRow";
 import { CompaniesLens, type LensKey } from "@/components/companies/CompaniesLens";
 import { CompaniesViewToggle, type ViewKey } from "@/components/companies/CompaniesViewToggle";
+import { getIncumbentTrackingEnabledCached } from "@/lib/settings/incumbent-tracking";
 
 const LENS_KEYS: LensKey[] = ["all", "new", "accel", "quiet", "cont", "incumbent"];
 const VIEW_KEYS: ViewKey[] = ["signal", "alpha"];
@@ -74,13 +75,26 @@ export default async function CompaniesPage({
     .single();
   const canEdit = ["editor", "admin"].includes(profile?.role ?? "");
 
-  const isIncumbentLens = lens === "incumbent";
+  // Incumbent gate: when tracking is off, the Incumbents lens is unavailable.
+  // Force a `?lens=incumbent` deep link back to "all" (effectiveLens) and drop
+  // the tab so there is no way into the incumbent view.
+  const incumbentEnabled = await getIncumbentTrackingEnabledCached();
+  const effectiveLens: LensKey =
+    !incumbentEnabled && lens === "incumbent" ? "all" : lens;
+  const isIncumbentLens = effectiveLens === "incumbent";
 
   // Load fintech and incumbent lists in parallel. We always need BOTH so the
   // header counts stay stable regardless of which lens is active (fixing the
   // bug where the pivot sub-counts and "All" reset to 0 on the Incumbents
   // lens). The incumbent list is small (≤6 Big-6 banks); the fintech list is
-  // ≤30 per CLAUDE.md, so loading both is cheap.
+  // ≤30 per CLAUDE.md, so loading both is cheap. When incumbent tracking is
+  // off, we skip the incumbent query entirely (the lens is gone).
+  const incumbentQuery = supabase
+    .from("companies")
+    .select("id, name, slug, country, thesis, last_change, last_change_at, last_collected_at")
+    .eq("is_active", true)
+    .eq("tier", "incumbent")
+    .order("name");
   const [
     { data: fintechCompanies },
     { data: incumbentCompanies },
@@ -91,12 +105,11 @@ export default async function CompaniesPage({
       .eq("is_active", true)
       .eq("tier", "fintech")
       .order("name"),
-    supabase
-      .from("companies")
-      .select("id, name, slug, country, thesis, last_change, last_change_at, last_collected_at")
-      .eq("is_active", true)
-      .eq("tier", "incumbent")
-      .order("name"),
+    incumbentEnabled
+      ? incumbentQuery
+      : Promise.resolve({
+          data: [] as NonNullable<Awaited<typeof incumbentQuery>["data"]>,
+        }),
   ]);
 
   const fintechList = fintechCompanies ?? [];
@@ -218,9 +231,9 @@ export default async function CompaniesPage({
   for (const p of fintechPivots) counts[p.kind] += 1;
 
   const filtered =
-    lens === "all" || isIncumbentLens
+    effectiveLens === "all" || isIncumbentLens
       ? rows
-      : rows.filter((r) => r.status === lens);
+      : rows.filter((r) => r.status === effectiveLens);
   const sorted =
     view === "signal"
       ? [...filtered].sort(
@@ -231,7 +244,7 @@ export default async function CompaniesPage({
       : [...filtered].sort((a, b) => a.name.localeCompare(b.name));
 
   const splitIdx =
-    view === "signal" && lens === "all"
+    view === "signal" && effectiveLens === "all"
       ? sorted.findIndex((r) => r.status === "cont")
       : -1;
 
@@ -253,7 +266,7 @@ export default async function CompaniesPage({
           `shrink-0` so its label never clips. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3.5">
         <div className="-mx-1 min-w-0 flex-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <CompaniesLens active={lens} counts={counts} />
+          <CompaniesLens active={effectiveLens} counts={counts} showIncumbent={incumbentEnabled} />
         </div>
         <div className="-mx-1 shrink-0 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <CompaniesViewToggle active={view} />

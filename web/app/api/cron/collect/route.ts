@@ -5,6 +5,7 @@ import { createJobRun, executeCollectionJob, triggerAnalysisJobIfNeeded, refresh
 import { requireCronSecret } from "@/lib/auth/guards";
 import { checkAndAlertScraperHealth } from "@/lib/email/scraper-health";
 import { STALE_JOB_THRESHOLD_MS } from "@/lib/jobs/constants";
+import { getIncumbentTrackingEnabled } from "@/lib/settings/incumbent-tracking";
 import { log } from "@/lib/log";
 
 export const maxDuration = 300;
@@ -69,11 +70,21 @@ async function runCollect(req: NextRequest) {
     // Get all active companies. Skip sub-brands that piggy-back on a
     // parent's scrape (parent_company_id IS NOT NULL) — their jobs land
     // via the parent's scraper with `companySlugOverride` routing.
-    const { data: companies, error: companiesError } = await supabase
+    //
+    // Incumbent gate (primary cost control): when incumbent tracking is off we
+    // exclude tier='incumbent' banks here, which stops their scraping AND the
+    // downstream Flash-extract + Pro-analyze hot path — both run only on the
+    // companies returned by this query. Defaults to off; flip from Admin > Settings.
+    const incumbentEnabled = await getIncumbentTrackingEnabled(supabase);
+    let companiesQuery = supabase
       .from("companies")
       .select("id, name, ats_type")
       .eq("is_active", true)
       .is("parent_company_id", null);
+    if (!incumbentEnabled) {
+      companiesQuery = companiesQuery.eq("tier", "fintech");
+    }
+    const { data: companies, error: companiesError } = await companiesQuery;
 
     if (companiesError) {
       log.error({ err: companiesError.message }, "Failed to fetch companies");
@@ -88,7 +99,7 @@ async function runCollect(req: NextRequest) {
     }
 
     log.info(
-      { count: companies.length, companies: companies.map((c) => `${c.name} (${c.ats_type})`) },
+      { count: companies.length, incumbentEnabled, companies: companies.map((c) => `${c.name} (${c.ats_type})`) },
       "Processing companies"
     );
 

@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.10.0",
+    "date": "2026-06-19",
+    "changes": [
+      {
+        "type": "feature",
+        "description": "Incumbent (big-bank) tracking is now an admin toggle, and it's off by default. Tracking the large incumbent banks (RBC, BMO, TD, CIBC, National Bank, Scotiabank) was driving up scrape volume and AI processing cost, so the Brief has returned to its fintech-only focus. With the toggle off, the banks are no longer scraped or analyzed and every incumbent surface is hidden — the dashboard's Incumbent Bets rail, the Companies \"Incumbents\" lens, the Jobs page tier filter, and the weekly digest's Incumbent Watch section. Nothing is deleted: all previously collected bank data is preserved, so an admin can flip incumbent tracking back on at any time from Admin → Settings and every surface returns."
+      }
+    ]
+  },
+  {
     "version": "2.9.16",
     "date": "2026-06-08",
     "changes": [

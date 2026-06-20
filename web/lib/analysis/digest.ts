@@ -24,6 +24,7 @@ import {
   type CompanyTier,
 } from "@/lib/dashboard-queries";
 import { isIncumbentSignalJob } from "@/lib/analysis/incumbent-signal";
+import { getIncumbentTrackingEnabled } from "@/lib/settings/incumbent-tracking";
 import { ROLE_CATEGORIES } from "@/lib/analysis/function-categories";
 
 export type { RoleThemeSummary } from "@/lib/analysis/role-themes";
@@ -919,6 +920,11 @@ export async function buildIncumbentWatch(
   weekEnd: Date,
   config?: WeeklyDigestAiConfig
 ): Promise<IncumbentWatch | null> {
+  // Incumbent gate: when tracking is off, skip the block entirely (no grounded
+  // interpretation calls). `null` is the existing "no qualifying hire" contract,
+  // so the email template and DigestViewer already omit the section.
+  if (!(await getIncumbentTrackingEnabled())) return null;
+
   const banks = await getIncumbentWatchJobs(weekStart, weekEnd);
   if (banks.length === 0) return null;
 

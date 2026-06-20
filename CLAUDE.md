@@ -64,6 +64,8 @@ Two AI calls per job. `analyzeJob` (in `web/lib/analysis/strategic.ts`) and `cat
 
 Heavy browser scraping is offloaded to GitHub Actions on demand via `triggerScrapeWorkflow` in `web/lib/github.ts` (`scrape-heavy.yml`). Full topology, secrets, and decision tree in [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md).
 
+**Incumbent-tracking flag.** `collect`, `report` (Incumbent Watch), the `editorial` cron, and `backfill-incumbents.ts` all honor the `incumbent_tracking_enabled` flag (see §7). When it's off (the default), `collect` excludes `tier='incumbent'` companies at company-selection time — so incumbents are never scraped, extracted, or analyzed — and the digest's Incumbent Watch block is skipped. The flag is read via `getIncumbentTrackingEnabled` in `web/lib/settings/incumbent-tracking.ts`.
+
 All scheduled jobs MUST log into the `job_runs` table. `cron_logs` is deprecated — never reference it. See section 7.
 
 ## 5. AI model rules
@@ -92,6 +94,7 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 | `web/lib/scrapers/` | ATS scrapers (API + browser). See sub-CLAUDE. |
 | `web/lib/auth/` | Auth guards used by API routes. See sub-CLAUDE. |
 | `web/lib/jobs/` | Ingestion processor + analyzer (orchestrates the hot path). |
+| `web/lib/settings/` | DB-backed feature flags read from `system_settings` (e.g. `incumbent-tracking.ts`). |
 | `web/lib/dashboard-queries.ts` | Supabase query layer for dashboard. |
 | `web/components/{feature}/` | Feature components. |
 | `web/components/ui/` | shadcn/ui primitives. |
@@ -121,6 +124,7 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 - **Vercel webhook hiccup recipe:** if a merge to `main` shows GitHub status `Vercel - Deployment failed.` with **no** target URL and **no** entry in Vercel's Deployments tab, the webhook was rejected upstream of any build — there's no log to read because no build happened. Push an empty commit to retrigger: `git commit --allow-empty -m "chore: retrigger Vercel" && git push origin main`. Don't chase a phantom build error; verify a deployment record exists before debugging code.
 - **Company-active read scoping:** two independent `is_active` axes exist and MUST NOT be conflated — `companies.is_active` (do we track this company at all / soft-delete) vs `job_postings.is_active` (is this specific req still open). Deactivating a company does **not** cascade to its postings' job-level `is_active` (that would corrupt reactivation), so filtering the job axis does not exclude a deactivated company. User-facing reads MUST go through the `active_companies` / `active_job_postings` views (migration `20260601130000`), which bake in `companies.is_active = true` and compose cleanly with the job-axis `Active/Inactive/All` toggle. Enforced by the `design-system/active-company-scope` lint rule in the read-layer (`lib/dashboard-queries.ts`, `lib/analysis/**`, `lib/ai/**`); writes stay on the base tables (the views are read-only); admin / labs / ops / route code reads the base tables by design. New SQL RPCs that surface companies/jobs must filter `c.is_active = true` (lint can't see SQL). The Monzo incident (May 2026): company deactivated, 51 job-active postings, leaked into Jobs search + dashboard aggregates.
 - **Tier-/role-variant rendering:** when adding a tier or role variant of an existing page (`{isIncumbent ? <IncumbentBranch /> : <FintechBranch />}`), walk every conditional render block from the original (`{insight && ...}`, `{coreFunctions.length && ...}`) and decide explicitly: keep / drop / replace. The May 2026 incumbent-variant work loaded `latestInsight` for the page but had no code to render it, so admin-generated insights silently went nowhere.
+- **Incumbent-tracking flag:** `incumbent_tracking_enabled` in `system_settings` is the **single source of truth** for whether the incumbent (big-bank) tier is live. Default **off** (fintech-only) — June 2026, to control scrape volume + AI cost. Read it through `getIncumbentTrackingEnabled` / `getIncumbentTrackingEnabledCached` (`web/lib/settings/incumbent-tracking.ts`), which default to **false** on a missing row or read error (so OFF holds before the seed migration is applied). It gates scraping (`collect`), processing (digest Incumbent Watch, `editorial` cron, `backfill-incumbents.ts`), and every incumbent UI surface (dashboard rail, Companies `incumbent` lens, Jobs tier control, `/companies/[slug]` for banks → redirects to `/companies`). Admins flip it from **Admin → Settings**. This flag is independent of `companies.is_active` — do **not** gate incumbents by deactivating the companies (that conflates the two `is_active` axes and isn't cleanly reversible); the flag preserves all data and restores every surface when flipped back on.
 
 ## 8. Anti-patterns
 
