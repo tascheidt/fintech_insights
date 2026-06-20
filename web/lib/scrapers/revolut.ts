@@ -36,6 +36,16 @@
  * An UNRECOGNISED `?city=` value is IGNORED by Revolut (it returns the full
  * board, not an empty state), so don't treat a bogus filter as "0 results".
  *
+ * Because that server-side filter can silently stop narrowing, we DO NOT trust
+ * it alone. Every parsed role is independently checked against `isCanadianLocation`
+ * and anything not clearly in the Canadian market is dropped. If the filter is
+ * ignored and the board renders only non-Canadian roles (June 8 2026 incident:
+ * `?city=Canada` stopped narrowing and Revolut's global "Featured roles" — six
+ * London/Dubai/Lisbon/Netherlands/UAE/Krakow/Tokyo jobs — ingested under
+ * Revolut Canada), the scrape throws `RevolutScrapeError("filter-ignored")`
+ * rather than ingest the wrong market or silently return zero. (This guard is
+ * Canada-specific; a new Revolut-country tenant needs its own market matcher.)
+ *
  * Description enrichment: after the listing parse, each job's detail page is
  * visited (sequentially, reusing the Cloudflare-cleared page so we don't
  * re-trigger the challenge) and its description extracted — JSON-LD
@@ -205,6 +215,34 @@ export function mapRevolutJob(raw: RevolutRawJob): JobData {
 }
 
 // ---------------------------------------------------------------------------
+// Canadian-market guard (defense-in-depth against a silently-ignored ?city=)
+// ---------------------------------------------------------------------------
+
+/**
+ * Canadian provinces/territories + the major, *unambiguously* Canadian cities.
+ * Ambiguous tokens are deliberately excluded — "London" (UK), "Victoria",
+ * "Hamilton" — so a London-UK role can never read as Canadian. Revolut tags its
+ * Canada roles country-level ("Remote: Canada"), so the `canada(ian)?` token is
+ * the workhorse; this list is the safety net for the rare role that names a
+ * Canadian city without the country word.
+ */
+const CANADA_LOCATION_RE =
+  /\b(canada|canadian|ontario|quebec|qu[eé]bec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|newfoundland|labrador|prince edward island|northwest territories|nunavut|yukon|toronto|vancouver|montr[eé]al|calgary|ottawa|edmonton|winnipeg|mississauga|brampton|gatineau|markham|vaughan|kitchener|waterloo|burnaby|laval)\b/i;
+
+/**
+ * Does this listing location clearly belong to the Canadian market? Used as the
+ * authoritative filter on every Revolut row — we never trust the server-side
+ * `?city=` filter alone (it's silently ignored when Revolut doesn't recognise
+ * the value, returning the full global board). Conservative by design: a null
+ * or non-Canadian location returns false so only roles that are *clearly*
+ * Canadian survive.
+ */
+export function isCanadianLocation(location: string | null | undefined): boolean {
+  if (!location) return false;
+  return CANADA_LOCATION_RE.test(location);
+}
+
+// ---------------------------------------------------------------------------
 // Listing health-check (turns a silent "0 jobs" into a typed, retryable error)
 // ---------------------------------------------------------------------------
 
@@ -284,15 +322,16 @@ export function assessListing(
 }
 
 /**
- * Thrown when a Revolut scrape returns zero jobs for a reason that is NOT a
- * legitimately-empty filter — i.e. the page never rendered (`unrendered`) or
- * the job-anchor markup drifted (`selector-drift`). Typed so the failure is
- * legible in the `job_run_tasks` row and so `scrape-heavy.yml`'s `scrape-retry`
- * re-runs on a fresh runner. Mirrors `WorkdayBlockedError`.
+ * Thrown when a Revolut scrape can't yield a trustworthy set of Canadian jobs:
+ * the page never rendered (`unrendered`), the job-anchor markup drifted
+ * (`selector-drift`), or the `?city=` filter was ignored so the board rendered
+ * only non-Canadian roles (`filter-ignored`). Typed so the failure is legible
+ * in the `job_run_tasks` row and so `scrape-heavy.yml`'s `scrape-retry` re-runs
+ * on a fresh runner. Mirrors `WorkdayBlockedError`.
  */
 export class RevolutScrapeError extends Error {
   constructor(
-    public readonly reason: "unrendered" | "selector-drift",
+    public readonly reason: "unrendered" | "selector-drift" | "filter-ignored",
     detail: string,
     public readonly counts: ListingCounts
   ) {
@@ -519,18 +558,49 @@ export async function fetchRevolutJobs(
         return [];
       }
 
-      // We parsed jobs. Revolut server-renders only a ~6-item featured subset
-      // for large filters; warn if this filter has outgrown what one load
-      // captures (today Canada is well under that cap).
-      if (counts.filtered !== null && raw.length < counts.filtered) {
+      // Canadian-market guard. The server-side `?city=` filter is silently
+      // ignored when Revolut doesn't recognise the value (it returns the full
+      // global board, not an empty state — June 8 2026 incident). So we never
+      // trust it alone: keep only roles that independently read as Canadian.
+      const canadian = raw.filter((r) => isCanadianLocation(r.location));
+
+      if (canadian.length === 0) {
+        // We parsed roles (genuinely-empty already returned above) but none are
+        // Canadian — the `?city=` filter wasn't applied and we're looking at
+        // the global board. Fail loudly (typed, retryable) rather than ingest
+        // the wrong market or silently return zero.
+        const message = `parsed ${raw.length} role(s) but none are in the Canadian market — the ?city= filter looks ignored (filtered=${counts.filtered}, global=${counts.global})`;
+        log.error(
+          { careersUrl, parsed: raw.length, counts, sampleLocations: raw.slice(0, 5).map((r) => r.location) },
+          `[revolut] ${message}`
+        );
+        throw new RevolutScrapeError("filter-ignored", message, counts);
+      }
+
+      if (canadian.length < raw.length) {
         log.warn(
-          { careersUrl, parsed: raw.length, reported: counts.filtered },
-          "[revolut] parsed fewer roles than the page reports — Revolut may be lazy-loading beyond the rendered set; this filter now needs a scroll/pagination pass"
+          {
+            careersUrl,
+            parsed: raw.length,
+            canadian: canadian.length,
+            dropped: raw.filter((r) => !isCanadianLocation(r.location)).map((r) => r.location),
+          },
+          "[revolut] dropped non-Canadian role(s) that slipped past the ?city= filter"
         );
       }
 
-      log.info({ careersUrl, count: raw.length, counts }, "[revolut] listing parsed");
-      const jobs = raw.map(mapRevolutJob);
+      // Revolut server-renders only a ~6-item featured subset for large
+      // filters; warn if the Canadian filter has outgrown what one load
+      // captures (today Canada is well under that cap).
+      if (counts.filtered !== null && canadian.length < counts.filtered) {
+        log.warn(
+          { careersUrl, parsed: canadian.length, reported: counts.filtered },
+          "[revolut] parsed fewer Canadian roles than the page reports — Revolut may be lazy-loading beyond the rendered set; this filter now needs a scroll/pagination pass"
+        );
+      }
+
+      log.info({ careersUrl, count: canadian.length, counts }, "[revolut] listing parsed");
+      const jobs = canadian.map(mapRevolutJob);
       // Enrich descriptions from each detail page so the hot-path Flash
       // extractor can categorise the role (function_category / seniority /
       // department). Reuses the cleared page; best-effort per job.

@@ -83,6 +83,18 @@ jobs:
         working-directory: web
         run: npm ci
 
+      # Brief settle before re-hitting the origin. The retry exists for two
+      # failure modes: an Akamai IP greylist (a fresh runner IP is the fix, so a
+      # delay is harmless) AND a Supabase origin outage (the June 18 2026
+      # incident — Cloudflare 522s at the ingest write). For the latter the
+      # primary scrape and this retry fired ~1 min apart and BOTH hit the still
+      # down DB, wasting the retry at its first read. A short wait lets a brief
+      # origin blip clear before the retry's reads (which now also ride out
+      # transient outages in scrape-heavy.ts). Cheap relative to the ~40 min
+      # re-scrape it precedes.
+      - name: Settle before retry (let a transient origin blip clear)
+        run: sleep 90
+
       - name: Run heavy scraper (fresh-runner retry)
         working-directory: web
         env:

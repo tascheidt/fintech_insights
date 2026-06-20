@@ -104,6 +104,16 @@ function isTransientDbError(err: unknown): boolean {
     msg.includes("canceling statement due to") ||
     msg.includes("lock timeout") ||
     // Cloudflare gateway 5xx in front of the Supabase origin (HTML body).
+    // NB: the real interstitial HTML does NOT contain the literal string
+    // "error code 522" — it renders "Error 522", a "...timed out" banner, and a
+    // `utm_source=errorcode_522` footer link. The June 18 2026 outage hit RBC/
+    // CIBC with bare 522s that the old "error code 52x" matchers missed, so a
+    // rideable origin blip was thrown as a hard failure. Match the strings that
+    // actually appear: the CF 5xx footer marker (covers 520-524 uniformly) and
+    // the 522 connection-timeout banner.
+    msg.includes("5xx-error-landing") || // CF 5xx interstitial footer link (520-524)
+    msg.includes("errorcode_52") || //   utm_source=errorcode_52x in that link
+    msg.includes("origin web server timed out") || // 522 "What happened?" banner
     msg.includes("web server is returning an unknown error") || // 520
     msg.includes("web server is down") || // 521
     msg.includes("error code 520") ||
@@ -247,16 +257,31 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 3: Fetch Company record
+  // Step 3: Fetch Company record. Ridden out with withTransientRetry so a
+  // Supabase origin outage at the very START of the run is survived rather than
+  // killing the process at the first read — the same resilience every later DB
+  // op in this script already has. The June 18 2026 Supabase outage killed every
+  // fresh-runner `scrape-retry` here, at the first read, ~1 min after the
+  // primary scrape failed — and the old `companyError?.message || "Company not
+  // found"` reported a down DB as "Company not found" (the row plainly exists;
+  // it was dispatched by id), which made the logs lie about the real cause. A
+  // genuinely missing row (HTTP-OK, zero rows → PGRST116) is a hard config error
+  // and is NOT retried; only transient outages (isTransientDbError) are.
   console.log(`🔍 Fetching company record for ID: ${companyId}...`);
-  const { data: company, error: companyError } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("id", companyId)
-    .single();
-
-  if (companyError || !company) {
-    console.error(`❌ Error fetching company: ${companyError?.message || "Company not found"}`);
+  let company: Company;
+  try {
+    company = await withTransientRetry("fetch company", async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("*")
+        .eq("id", companyId)
+        .single();
+      if (error) throw error; // transient → retried; PGRST116 (no row) → rethrown
+      if (!data) throw new Error(`Company ${companyId} not found`);
+      return data as Company;
+    });
+  } catch (error) {
+    console.error(`❌ Error fetching company: ${describeError(error)}`);
     process.exit(1);
   }
   console.log(`✅ Found company: ${company.name} (${company.ats_type})`);
@@ -289,34 +314,46 @@ async function main() {
     // Update existing task
     console.log(`📝 Updating existing task: ${taskId}...`);
     
-    // Fetch existing task
-    const { data: existingTask, error: taskFetchError } = await supabase
-      .from("job_run_tasks")
-      .select("id, job_run_id")
-      .eq("id", taskId)
-      .single();
-
-    if (taskFetchError || !existingTask) {
-      console.error(`❌ Error fetching existing task: ${taskFetchError?.message || "Task not found"}`);
+    // Fetch existing task. Same outage-hardening as the company read above:
+    // the TASK_ID path is the one the fresh-runner retry takes, so these reads
+    // are exactly where a still-degraded origin would kill the retry. Ride out
+    // transient outages; surface a real failure via describeError instead of a
+    // misleading "Task not found".
+    try {
+      const existingTask = await withTransientRetry("fetch existing task", async () => {
+        const { data, error } = await supabase
+          .from("job_run_tasks")
+          .select("id, job_run_id")
+          .eq("id", taskId)
+          .single();
+        if (error) throw error;
+        if (!data) throw new Error(`Task ${taskId} not found`);
+        return data;
+      });
+      task = { id: existingTask.id, job_run_id: existingTask.job_run_id };
+    } catch (error) {
+      console.error(`❌ Error fetching existing task: ${describeError(error)}`);
       await browser?.close();
       process.exit(1);
     }
 
-    task = { id: existingTask.id, job_run_id: existingTask.job_run_id };
-    
     // Fetch the job run to verify it exists
-    const { data: existingJobRun, error: jobRunFetchError } = await supabase
-      .from("job_runs")
-      .select("id")
-      .eq("id", existingTask.job_run_id)
-      .single();
-
-    if (jobRunFetchError || !existingJobRun) {
-      console.error(`❌ Error: Job run not found for task ${taskId}`);
+    try {
+      jobRun = await withTransientRetry("fetch job run", async () => {
+        const { data, error } = await supabase
+          .from("job_runs")
+          .select("id")
+          .eq("id", task!.job_run_id)
+          .single();
+        if (error) throw error;
+        if (!data) throw new Error(`Job run not found for task ${taskId}`);
+        return data;
+      });
+    } catch (error) {
+      console.error(`❌ Error fetching job run for task ${taskId}: ${describeError(error)}`);
       await browser?.close();
       process.exit(1);
     }
-    jobRun = existingJobRun;
 
     // Update task status to running
     const { error: updateError } = await supabase

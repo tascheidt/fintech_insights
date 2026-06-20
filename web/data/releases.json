@@ -10,6 +10,16 @@
     ]
   },
   {
+      "version": "2.9.17",
+    "date": "2026-06-18",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "The big-bank scrapers (RBC, TD, CIBC, Scotiabank and the other heavy, browser-based ones) now survive a brief database outage instead of throwing away a completed scrape. On June 18 our database provider had a short outage right as several banks finished collecting — about 40 minutes of work each — and the runs failed at the very last step, when they went to save. The automatic fresh-machine retry then fired about a minute later, while the database was still down, and gave up immediately at its first read while reporting a misleading \"company not found\". Three fixes: the retry now waits briefly before re-trying so a short blip can clear; every step of the run (not just the final save) now rides out a transient outage and reports the real cause; and we recognise one more shape of provider error (a Cloudflare 522) that was previously treated as fatal. Affected banks refresh automatically on the next scheduled scrape."
+      }
+    ]
+  },
+  {
     "version": "2.9.16",
     "date": "2026-06-08",
     "changes": [
@@ -35,7 +45,7 @@
     "changes": [
       {
         "type": "fix",
-        "description": "The Jobs page company filter now always lists every company in the selected tier. Previously the \"All companies\" dropdown was built only from the companies that appeared in the current results — so when you ran a semantic search (say \"AI\") in the Incumbent view, a bank like CIBC could disappear from the dropdown entirely, not because it has no roles but because none of its postings happened to land among the search's top matches. The dropdown is now driven by the full set of companies you cover in the chosen tier (Fintech / Incumbent / All), independent of the search, so you can always filter to any of them."
+        "description": "Revolut Canada now shows only Canadian roles. Revolut filters its careers board by location through the web address, and that filter quietly stopped working — instead of an empty result it started returning Revolut's full global board, so the scraper picked up six unrelated openings in London, Dubai, Lisbon, the Netherlands, the UAE, Krakow, and Tokyo and listed them under Revolut Canada, while the three genuine Canadian roles dropped off. The scraper no longer trusts that location filter on its own: every role it reads is now independently checked to be clearly in the Canadian market, and anything that isn't is dropped. If the board ever comes back with roles but none are Canadian, the run now fails loudly and retries on a fresh machine instead of importing the wrong market. We also removed the six incorrect postings and restored Revolut Canada's three real openings (Head of Risk, Head of Finance, and an MLRO role)."
       }
     ]
   },
