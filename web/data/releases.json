@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.9.17",
+    "date": "2026-06-18",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "The big-bank scrapers (RBC, TD, CIBC, Scotiabank and the other heavy, browser-based ones) now survive a brief database outage instead of throwing away a completed scrape. On June 18 our database provider had a short outage right as several banks finished collecting — about 40 minutes of work each — and the runs failed at the very last step, when they went to save. The automatic fresh-machine retry then fired about a minute later, while the database was still down, and gave up immediately at its first read while reporting a misleading \"company not found\". Three fixes: the retry now waits briefly before re-trying so a short blip can clear; every step of the run (not just the final save) now rides out a transient outage and reports the real cause; and we recognise one more shape of provider error (a Cloudflare 522) that was previously treated as fatal. Affected banks refresh automatically on the next scheduled scrape."
+      }
+    ]
+  },
+  {
     "version": "2.9.16",
     "date": "2026-06-08",
     "changes": [
