@@ -36,7 +36,11 @@ async function main(): Promise<void> {
     country: "CA",
     ats_type: "revolut",
     ats_identifier: "revolut",
-    careers_url: "https://www.revolut.com/en-US/careers/?city=Canada",
+    // Locale-LESS URL is required: `/en-US/careers/...` answers with a
+    // redirect / Cloudflare challenge from a runner (renders no board, scrape
+    // throws `unrendered` — June 20 2026 incident). The canonical `/careers/`
+    // path renders normally. See web/lib/scrapers/revolut.ts header, fact 3.
+    careers_url: "https://www.revolut.com/careers/?city=Canada",
     is_active: false,
     tier: "fintech" as const,
   };
