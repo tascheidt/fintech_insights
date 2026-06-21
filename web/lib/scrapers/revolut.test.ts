@@ -15,6 +15,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assessListing,
+  describeBlockedPage,
   extractExternalId,
   isCanadianLocation,
   mapRevolutJob,
@@ -206,6 +207,36 @@ describe("isCanadianLocation", () => {
     expect(isCanadianLocation(null)).toBe(false);
     expect(isCanadianLocation(undefined)).toBe(false);
     expect(isCanadianLocation("")).toBe(false);
+  });
+});
+
+describe("describeBlockedPage", () => {
+  it("flags a Cloudflare 'Just a moment' interstitial as a challenge", () => {
+    const html =
+      `<!DOCTYPE html><html><head><title>Just a moment...</title></head>` +
+      `<body><div class="cf-browser-verification"></div>` +
+      `<script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1"></script>` +
+      `<p>Enable JavaScript and cookies to continue</p></body></html>`;
+    const diag = describeBlockedPage(html);
+    expect(diag.challenge).toBe(true);
+    expect(diag.title).toBe("Just a moment...");
+    expect(diag.markers).toEqual(
+      expect.arrayContaining(["just-a-moment", "challenge-platform", "enable-js-cookies"])
+    );
+  });
+
+  it("does NOT flag the real careers board (no markers, title present)", () => {
+    const diag = describeBlockedPage(CANADA_HTML);
+    expect(diag.challenge).toBe(false);
+    expect(diag.markers).toEqual([]);
+    expect(diag.title).toBe("Careers | Revolut United States");
+  });
+
+  it("does not treat a bare 'cloudflare' asset reference as a challenge", () => {
+    const html =
+      `<html><head><title>Careers</title></head>` +
+      `<body><img src="https://cdn.cloudflare.com/logo.png"><p>We have 632 open positions</p></body></html>`;
+    expect(describeBlockedPage(html).challenge).toBe(false);
   });
 });
 
