@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.10.2",
+    "date": "2026-06-21",
+    "changes": [
+      {
+        "type": "improvement",
+        "description": "The Revolut scraper is more resilient to Revolut's bot protection, and now reports the exact cause when a run can't load the careers board. Revolut recently tightened its anti-bot screening, and our automated scraper (which runs from a data-center machine) started being shown a security-check page instead of the jobs — so runs failed without explaining why. The scraper now presents itself more like a normal browser to get past that check where possible, waits for the check to clear, and when it still can't get through it records precisely that it was a security challenge (versus the site genuinely changing). Throughout, Revolut Canada's existing roles are preserved and only clearly-Canadian roles are ever imported."
+      }
+    ]
+  },
+  {
     "version": "2.10.1",
     "date": "2026-06-20",
     "changes": [

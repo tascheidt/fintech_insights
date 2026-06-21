@@ -72,9 +72,20 @@
  *
  * Cloudflare: a plain curl hits a "Just a quick security check" challenge
  * page (~873KB of Cloudflare-injected Inter font data). Puppeteer in a GH
- * Actions runner clears it because the IP/UA pair reads as residential
+ * Actions runner USED to clear it because the IP/UA pair read as residential
  * enough. Local dev runs may fail the challenge — that's expected; debug
  * against the workflow.
+ *
+ * June 2026: Revolut tightened that posture — datacenter-IP headless runs
+ * started getting the interstitial too (every run `unrendered`: no anchors AND
+ * no counters). Two defenses, both best-effort and unverifiable from a blocked
+ * box: (a) light anti-bot hardening (`--disable-blink-features=AutomationControlled`,
+ * `navigator.webdriver` masked, real Accept-Language + desktop viewport, plus a
+ * settle-wait for a managed challenge to auto-clear), and (b) `describeBlockedPage`,
+ * which stamps the failure with the challenge title/markers so a CF block reads
+ * differently from a genuine markup redesign in the task row. The hardening
+ * won't beat a TLS-fingerprint / Turnstile gate; if blocks persist the real
+ * fixes are a residential-IP path or a non-browser data source.
  *
  * A genuinely-empty result and a failed load look identical (both yield 0
  * anchors), so they USED to collapse into a silent "0 jobs, success".
@@ -332,6 +343,52 @@ export function assessListing(
   return { ok: true, reason: "genuinely-empty", counts };
 }
 
+// ---------------------------------------------------------------------------
+// Blocked-page diagnostic (turns an opaque `unrendered` into actionable evidence)
+// ---------------------------------------------------------------------------
+
+/**
+ * Strong anti-bot interstitial markers. Kept narrow on purpose — a bare
+ * "cloudflare" string appears in plenty of legit asset URLs, so it is NOT a
+ * marker; each entry here is copy/markup that only a challenge page carries.
+ */
+const CHALLENGE_MARKERS: Array<[string, RegExp]> = [
+  ["just-a-moment", /just a moment/i],
+  ["challenge-platform", /cdn-cgi\/challenge-platform|challenge-platform/i],
+  ["cf-chl", /cf[-_]chl|_cf_chl_opt/i],
+  ["browser-verification", /cf-browser-verification|checking your browser|verifying you are human/i],
+  ["attention-required", /attention required/i],
+  ["turnstile", /turnstile/i],
+  ["enable-js-cookies", /enable javascript and cookies/i],
+];
+
+export interface BlockDiagnostic {
+  /** The page's <title>, or null. A challenge page is usually "Just a moment...". */
+  title: string | null;
+  /** True when a STRONG anti-bot marker matched — i.e. we were served a challenge. */
+  challenge: boolean;
+  /** Which markers matched (names), for the log/task row. */
+  markers: string[];
+  /** First ~200 chars of visible body text, for eyeballing an unknown block. */
+  snippet: string;
+}
+
+/**
+ * Diagnose a page that rendered NEITHER job anchors NOR Revolut's counters.
+ * Distinguishes "Revolut handed the headless / datacenter-IP scraper a
+ * Cloudflare anti-bot challenge" from a genuine markup change, so the
+ * `unrendered` failure carries evidence instead of a guess. Pure + exported
+ * for unit testing.
+ */
+export function describeBlockedPage(html: string): BlockDiagnostic {
+  const doc = parseHtml(html);
+  const title = (doc.querySelector("title")?.textContent || "").trim() || null;
+  const bodyText = (doc.body?.textContent || "").replace(/\s+/g, " ").trim();
+  const hay = `${title ?? ""} ${html}`;
+  const markers = CHALLENGE_MARKERS.filter(([, re]) => re.test(hay)).map(([name]) => name);
+  return { title, challenge: markers.length > 0, markers, snippet: bodyText.slice(0, 200) };
+}
+
 /**
  * Thrown when a Revolut scrape can't yield a trustworthy set of Canadian jobs:
  * the page never rendered (`unrendered`), the job-anchor markup drifted
@@ -374,7 +431,13 @@ async function acquireBrowser(injected?: Browser): Promise<BrowserHandles> {
   ) as unknown as ChromiumLike;
   const executablePath = await chromium.executablePath();
   const browser = await puppeteer.default.launch({
-    args: chromium.args,
+    // `--disable-blink-features=AutomationControlled` drops the most obvious
+    // headless/automation tell that Cloudflare's managed challenge keys on.
+    // Best-effort — it won't beat a TLS-fingerprint or Turnstile gate, but it
+    // costs nothing and flips some managed challenges. (June 2026: Revolut's
+    // Cloudflare posture tightened and datacenter-IP headless runs started
+    // getting the "Just a moment" interstitial — see the `unrendered` path.)
+    args: [...chromium.args, "--disable-blink-features=AutomationControlled"],
     defaultViewport: chromium.defaultViewport,
     executablePath,
     headless: true,
@@ -390,14 +453,30 @@ async function fetchListing(page: Page, careersUrl: string): Promise<string> {
   // here; `fetchRevolutJobs` disambiguates from the page's own counters after
   // reading the content. (Selector kept in lockstep with the parser via
   // JOB_ANCHOR_SELECTOR — a mismatch is what shipped the silent-zero bug.)
-  await page
+  const anchorSeen = await page
     .waitForSelector(JOB_ANCHOR_SELECTOR, { timeout: 20_000 })
-    .catch(() => {
-      log.warn(
-        { careersUrl },
-        "[revolut] no job anchors after 20s — disambiguating from page counters"
-      );
-    });
+    .then(() => true)
+    .catch(() => false);
+
+  // No anchors yet — could be a legitimately-empty filter OR a Cloudflare
+  // challenge that auto-clears a few seconds after its JS runs. Give the real
+  // board a second chance by waiting for Revolut's visible "open positions"
+  // counter (present on every healthy page, filtered or not). If it never
+  // appears, fetchRevolutJobs's counters check + describeBlockedPage decide
+  // whether this was an empty filter or a block. String predicate so tsx's
+  // `__name` helper can't leak into the page context.
+  if (!anchorSeen) {
+    log.warn(
+      { careersUrl },
+      "[revolut] no job anchors after 20s — waiting for the open-positions counter (possible Cloudflare hold)"
+    );
+    await page
+      .waitForFunction(
+        "/open position/i.test((document.body && document.body.innerText) || '')",
+        { timeout: 15_000 }
+      )
+      .catch(() => {});
+  }
   return page.content();
 }
 
@@ -544,6 +623,16 @@ export async function fetchRevolutJobs(
   try {
     const page = await browserInstance.newPage();
     await page.setUserAgent(USER_AGENT);
+    // Look less like a headless bot to Cloudflare's managed challenge. All
+    // best-effort and string-sourced (so tsx's `__name` helper can't leak into
+    // the page context — same reason the detail extractor is a string):
+    //   - mask `navigator.webdriver` (the canonical automation flag),
+    //   - send a real Accept-Language, and a desktop viewport.
+    await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.evaluateOnNewDocument(
+      "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
+    );
     try {
       const html = await fetchListing(page, careersUrl);
       const raw = parseListingPage(html);
@@ -553,12 +642,21 @@ export async function fetchRevolutJobs(
       if (!verdict.ok) {
         // A failed load must NOT masquerade as an empty board. Throw a typed
         // error so the task row reads legibly and scrape-retry runs on a
-        // fresh runner.
+        // fresh runner. Attach a blocked-page diagnostic so the failure says
+        // *why* nothing rendered — an anti-bot challenge (Revolut serving the
+        // headless / datacenter-IP runner Cloudflare) reads very differently
+        // from a genuine markup redesign, and the two need different fixes.
+        const diag = describeBlockedPage(html);
         log.error(
-          { careersUrl, counts, reason: verdict.reason },
+          { careersUrl, counts, reason: verdict.reason, diag },
           `[revolut] ${verdict.message}`
         );
-        throw new RevolutScrapeError(verdict.reason, verdict.message, counts);
+        const detail = diag.challenge
+          ? `${verdict.message} — served an anti-bot challenge (title=${JSON.stringify(
+              diag.title
+            )}, markers=${diag.markers.join(",")}); a fresh-runner retry may clear it`
+          : verdict.message;
+        throw new RevolutScrapeError(verdict.reason, detail, counts);
       }
 
       if (verdict.reason === "genuinely-empty") {
