@@ -1,4 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { recordUsage, type OnUsage, type GeminiUsageMetadata } from "@/lib/ai/gemini-meter";
+import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
+import { resolveProvider } from "@/lib/ai/providers/registry";
+import { openAiCompatGenerate } from "@/lib/ai/providers/openai-compat";
 import { log } from "@/lib/log";
 
 /**
@@ -174,16 +178,36 @@ Quality scoring guide:
 Respond ONLY with valid JSON.`;
 
 
+export interface CategorizePostingOptions {
+  /**
+   * Model override. Defaults to Gemini Flash (production). An eval id
+   * (e.g. glm-5.2, deepseek-v4-flash) routes through the OpenAI-compatible
+   * provider for the bake-off. See lib/ai/providers/registry.ts.
+   */
+  model?: string;
+  /** Optional observer for token/cost usage (used by the eval harness). */
+  onUsage?: OnUsage;
+}
+
+const DEFAULT_CATEGORIZE_MODEL = "gemini-flash-latest";
+
 /**
- * Categorize a job posting and extract template sections using Gemini.
+ * Categorize a job posting and extract template sections.
+ *
+ * Uses Gemini Flash by default. Writes a `gemini_usage_events` row like every
+ * other AI call site (this previously had no telemetry — see web/lib/ai/CLAUDE.md
+ * "Telemetry"). The eval seam routes an eval model id to Fireworks.
  */
 export async function categorizePosting(
   jobTitle: string,
   companyName: string,
-  description: string
+  description: string,
+  options?: CategorizePostingOptions
 ): Promise<JobCategoryResult | null> {
+  const requestedModel = options?.model ?? DEFAULT_CATEGORIZE_MODEL;
+  const provider = resolveProvider(requestedModel);
   const key = process.env.GEMINI_API_KEY;
-  if (!key) {
+  if (provider === "gemini" && !key) {
     log.error("GEMINI_API_KEY not configured");
     return null;
   }
@@ -195,23 +219,57 @@ export async function categorizePosting(
     .replace("{categories}", ROLE_CATEGORIES.join(", "));
 
   try {
-    const genAI = new GoogleGenerativeAI(key);
-    
-    // Using Gemini Flash (via `gemini-flash-latest`) as requested
-    const model = genAI.getGenerativeModel({
-      model: "gemini-flash-latest",
-      generationConfig: {
+    let text: string;
+    let usageMetadata: GeminiUsageMetadata | null | undefined;
+    let modelServed = requestedModel;
+    const startMs = Date.now();
+
+    if (provider === "gemini") {
+      const genAI = new GoogleGenerativeAI(key as string);
+
+      // Using Gemini Flash (via `gemini-flash-latest`) as requested
+      const model = genAI.getGenerativeModel({
+        model: requestedModel,
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 64000,
+          responseMimeType: "application/json",
+        },
+      });
+
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
+      text = result.response.text()?.trim() ?? "{}";
+      usageMetadata = result.response.usageMetadata;
+    } else {
+      // Open-model evaluation path (eval-only; never a production default).
+      const r = await openAiCompatGenerate({
+        model: requestedModel,
+        prompt,
+        jsonMode: true,
         temperature: 0.2,
-        maxOutputTokens: 64000,
-        responseMimeType: "application/json",
-      },
-    });
+        maxOutputTokens: 8192,
+        timeoutMs: 60000,
+      });
+      text = r.text?.trim() ?? "{}";
+      usageMetadata = r.usageMetadata;
+      modelServed = r.modelServed;
+    }
 
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    const usage = recordUsage({
+      callSite: "categorizePosting",
+      modelRequested: requestedModel,
+      modelServed,
+      groundingEnabled: false,
+      usageMetadata,
+      latencyMs: Date.now() - startMs,
+      status: "ok",
+      extra: { jobTitle, provider },
     });
+    writeUsageEvent(usage);
+    options?.onUsage?.(usage);
 
-    const text = result.response.text()?.trim() ?? "{}";
     const parsed = JSON.parse(text) as Record<string, unknown>;
 
     return {

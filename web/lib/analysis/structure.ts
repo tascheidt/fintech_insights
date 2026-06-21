@@ -5,8 +5,10 @@ import {
   DEFAULT_JOB_STRUCTURE_AI_CONFIG,
   type JobStructureAiConfig,
 } from "@/lib/ai/prompt-config";
-import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
+import { recordUsage, type OnUsage, type GeminiUsageMetadata } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
+import { resolveProvider } from "@/lib/ai/providers/registry";
+import { openAiCompatGenerate } from "@/lib/ai/providers/openai-compat";
 import { log } from "@/lib/log";
 
 /**
@@ -138,8 +140,12 @@ export async function extractJobStructure(
   options?: number | ExtractJobStructureOptions
 ): Promise<JobStructureForDB | null> {
   const { config, retryCount, onUsage, disableThinking } = resolveExtractOptions(options);
+  // Eval-only seam: a Gemini model id (the production default) routes through
+  // the existing Gemini path unchanged; an eval id (e.g. glm-5.2) routes to the
+  // OpenAI-compatible provider. See lib/ai/providers/registry.ts.
+  const provider = resolveProvider(config.model);
   const key = process.env.GEMINI_API_KEY;
-  if (!key) {
+  if (provider === "gemini" && !key) {
     log.error("GEMINI_API_KEY not configured");
     return null;
   }
@@ -158,40 +164,63 @@ export async function extractJobStructure(
   let parsed: unknown = null;
 
   try {
-    const genAI = new GoogleGenerativeAI(key);
-
-    // Use Gemini Flash with JSON mode for guaranteed structured output
-    const generationConfig: NonNullable<
-      Parameters<typeof genAI.getGenerativeModel>[0]["generationConfig"]
-    > = {
-      temperature: config.temperature,
-      // Stage 1 should return a compact JSON payload. Cap output size to reduce
-      // malformed/truncated responses even if the saved runtime config is overly generous.
-      maxOutputTokens: effectiveMaxOutputTokens,
-      responseMimeType: "application/json",
-    };
-    // thinkingBudget:0 disables Gemini 2.5 reasoning tokens. Extraction is a
-    // mechanical JSON task; reasoning was ~75% of per-call cost (billed at the
-    // output rate) for zero quality gain. The field is runtime-supported but
-    // missing from @google/generative-ai@0.24.1's GenerationConfig type, so we
-    // attach it past the typing gap (same approach as lib/ai/embeddings.ts).
-    if (disableThinking) {
-      (generationConfig as Record<string, unknown>).thinkingConfig = { thinkingBudget: 0 };
-    }
-
-    const model = genAI.getGenerativeModel({
-      model: config.model,
-      generationConfig,
-    });
-
+    let responseText: string;
+    let usageMetadata: GeminiUsageMetadata | null | undefined;
+    let modelServed: string = config.model;
     const _startMs = Date.now();
-    const result = await withTimeout(
-      model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-      }),
-      GEMINI_REQUEST_TIMEOUT_MS,
-      `Gemini extraction for "${jobTitle}"`
-    );
+
+    if (provider === "gemini") {
+      const genAI = new GoogleGenerativeAI(key as string);
+
+      // Use Gemini Flash with JSON mode for guaranteed structured output
+      const generationConfig: NonNullable<
+        Parameters<typeof genAI.getGenerativeModel>[0]["generationConfig"]
+      > = {
+        temperature: config.temperature,
+        // Stage 1 should return a compact JSON payload. Cap output size to reduce
+        // malformed/truncated responses even if the saved runtime config is overly generous.
+        maxOutputTokens: effectiveMaxOutputTokens,
+        responseMimeType: "application/json",
+      };
+      // thinkingBudget:0 disables Gemini 2.5 reasoning tokens. Extraction is a
+      // mechanical JSON task; reasoning was ~75% of per-call cost (billed at the
+      // output rate) for zero quality gain. The field is runtime-supported but
+      // missing from @google/generative-ai@0.24.1's GenerationConfig type, so we
+      // attach it past the typing gap (same approach as lib/ai/embeddings.ts).
+      if (disableThinking) {
+        (generationConfig as Record<string, unknown>).thinkingConfig = { thinkingBudget: 0 };
+      }
+
+      const model = genAI.getGenerativeModel({
+        model: config.model,
+        generationConfig,
+      });
+
+      const result = await withTimeout(
+        model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+        }),
+        GEMINI_REQUEST_TIMEOUT_MS,
+        `Gemini extraction for "${jobTitle}"`
+      );
+      responseText = result.response.text()?.trim() ?? "";
+      usageMetadata = result.response.usageMetadata;
+    } else {
+      // Open-model evaluation path (e.g. glm-5.2, deepseek-v4-flash via
+      // Fireworks). Same prompt + JSON mode; usage mapped onto the meter shape
+      // so telemetry/pricing are unchanged. Eval-only — never a production model.
+      const r = await openAiCompatGenerate({
+        model: config.model,
+        prompt,
+        jsonMode: true,
+        temperature: config.temperature,
+        maxOutputTokens: effectiveMaxOutputTokens,
+        timeoutMs: GEMINI_REQUEST_TIMEOUT_MS,
+      });
+      responseText = r.text?.trim() ?? "";
+      usageMetadata = r.usageMetadata;
+      modelServed = r.modelServed;
+    }
 
     // Record the usage once. Production telemetry always fires (fire-and-
     // forget DB write); the optional `onUsage` observer runs in parallel
@@ -199,16 +228,17 @@ export async function extractJobStructure(
     const _usage = recordUsage({
       callSite: "extractJobStructure",
       modelRequested: config.model,
+      modelServed,
       groundingEnabled: false,
-      usageMetadata: result.response.usageMetadata,
+      usageMetadata,
       latencyMs: Date.now() - _startMs,
       status: "ok",
-      extra: { retryCount, jobTitle },
+      extra: { retryCount, jobTitle, provider },
     });
     writeUsageEvent(_usage);
     onUsage?.(_usage);
 
-    const text = result.response.text()?.trim() ?? "";
+    const text = responseText;
     
     // Log response for debugging (truncated to avoid log spam)
     if (!text || text.length === 0) {

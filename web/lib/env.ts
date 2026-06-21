@@ -33,6 +33,14 @@ const envSchema = z.object({
   GEMINI_TELEMETRY_DISABLED: z.string().optional(),
   LOG_CRON_AUTH: z.string().optional(),
 
+  // --- Open-model evaluation (Fireworks; eval harness only, NOT production) ---
+  // Read by the bake-off harness via lib/ai/providers/*. Optional: the app
+  // never needs these at boot; only scripts/model-bakeoff.ts uses them.
+  FIREWORKS_API_KEY: z.string().optional(),
+  FIREWORKS_BASE_URL: z.string().url().optional(),
+  FIREWORKS_GLM_MODEL: z.string().optional(),
+  FIREWORKS_DEEPSEEK_MODEL: z.string().optional(),
+
   // --- Sentry (server-side only — DSN deliberately not NEXT_PUBLIC_*) ---
   // Required in production; optional in development. The runtime check below
   // throws when production deploys ship without a DSN, so we cannot rely on a

@@ -56,6 +56,22 @@ export const GEMINI_PRICING: Record<string, ModelRates> = {
     outputPerM: 9.0,
     notes: "Concrete version behind gemini-flash-latest (2026-05).",
   },
+
+  // --- Open-model evaluation candidates (NOT production; eval harness only) ---
+  // Sticker rates via Fireworks (US OpenAI-compatible host), ~2026-06. These are
+  // for PR-to-PR cost comparison like the Gemini rows above; reconcile against a
+  // real Fireworks invoice before trusting absolute USD. Keyed by the canonical
+  // eval ids in `lib/ai/providers/registry.ts`. See docs/OPEN_MODEL_EVALUATION.md.
+  "glm-5.2": {
+    inputPerM: 1.2,
+    outputPerM: 4.1,
+    notes: "Z.ai GLM-5.2 via Fireworks serverless (eval only). Verify vs invoice.",
+  },
+  "deepseek-v4-flash": {
+    inputPerM: 0.14,
+    outputPerM: 0.28,
+    notes: "DeepSeek V4-Flash via Fireworks serverless (eval only). Verify vs invoice.",
+  },
 };
 
 /** Grounding (googleSearch) surcharge, USD per request. */

@@ -31,6 +31,30 @@ If your call is wrapped by an existing helper that already meters, do not meter 
 
 When you change voice tone, update `docs/voice.md` and `voice.ts` in the same PR.
 
+## Provider abstraction (eval-only — `providers/`)
+
+The `providers/` subdir is a **default-safe seam** for the open-model evaluation
+harness, NOT a production provider switch. Full methodology in
+[`docs/OPEN_MODEL_EVALUATION.md`](../../../docs/OPEN_MODEL_EVALUATION.md).
+
+- **`providers/registry.ts`** — `EVAL_MODEL_REGISTRY` (GLM-5.2, DeepSeek
+  V4-Flash + their Fireworks slugs) and `resolveProvider(modelId)`. These ids are
+  deliberately kept **out of** `AI_MODEL_OPTIONS` so the admin UI never exposes an
+  unvetted model. `resolveProvider` returns `"gemini"` for everything not in the
+  registry — so any production call site that never passes an eval id runs its
+  exact existing Gemini code path.
+- **`providers/openai-compat.ts`** — fetch-based Fireworks (OpenAI-compatible)
+  client + pure `mapOpenAiUsage()` that maps OpenAI usage onto the
+  `gemini-meter` shape, so `recordUsage` / pricing / telemetry work unchanged.
+- **`eval/agreement.ts`** — pure output-agreement scorers (L1 field agreement for
+  extraction, role-category agreement for categorize). This is where the
+  "≥95% L1 agreement" gate is actually computed.
+- **Pricing:** `glm-5.2` / `deepseek-v4-flash` sticker rates live in
+  `gemini-pricing.ts` alongside the Gemini rows (the table is keyed by model
+  string; `estimateUsd` returns 0 for unknown models).
+- Driven by `web/scripts/model-bakeoff.ts`; never wired into a cron or route.
+  `FIREWORKS_*` env is optional (eval only). **No production default changed.**
+
 ## Specialized helpers
 
 - **`strategy-analysis.ts`** — Strategy-narrative helpers shared by digest and company insight surfaces.

@@ -1,0 +1,19 @@
+{
+  "_README": "Human-labeled golden set for the open-model bake-off (extract-structure). Each record's `expected` is a hand-VERIFIED JobStructureForDB for the matching fixture job id in gemini-sample-jobs.json. Scoring a model against this set measures CORRECTNESS, not just similarity to Gemini. Populate ~25-30 stratified jobs, then run: npx tsx --env-file=.env.local scripts/model-bakeoff.ts --scenario=extract-structure --models=gemini-flash-latest,glm-5.2,deepseek-v4-flash --reference=golden. Until populated, omit --reference=golden and the harness scores against the Gemini baseline output instead.",
+  "_schema": {
+    "jobId": "string (must match an id in gemini-sample-jobs.json)",
+    "expected": {
+      "summary": "string",
+      "seniority_level": "intern|junior|mid|senior|staff|principal|lead|executive",
+      "salary_min": "number|null",
+      "salary_max": "number|null",
+      "salary_currency": "string (e.g. USD)",
+      "tech_stack": ["string"],
+      "keywords": ["string"],
+      "standardized_department": "string",
+      "function_category": "one of ROLE_CATEGORIES",
+      "location_structured": { "city": "string|null", "state": "string|null", "country": "string|null", "formatted": "string|null" }
+    }
+  },
+  "records": []
+}
