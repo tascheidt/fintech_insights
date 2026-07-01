@@ -21,22 +21,22 @@ describe("eval model registry", () => {
   });
 
   it("routes registered eval ids to fireworks", () => {
-    expect(resolveProvider("glm-5.2")).toBe("fireworks");
+    expect(resolveProvider("qwen3-30b-a3b")).toBe("fireworks");
     expect(resolveProvider("deepseek-v4-flash")).toBe("fireworks");
   });
 
   it("identifies eval models", () => {
-    expect(isEvalModel("glm-5.2")).toBe(true);
+    expect(isEvalModel("qwen3-30b-a3b")).toBe(true);
     expect(isEvalModel("gemini-flash-latest")).toBe(false);
-    expect(EVAL_MODEL_IDS).toContain("glm-5.2");
+    expect(EVAL_MODEL_IDS).toContain("qwen3-30b-a3b");
     expect(EVAL_MODEL_IDS).toContain("deepseek-v4-flash");
   });
 
   it("resolves the provider-native model path with env override", () => {
-    const spec = getEvalModelSpec("glm-5.2");
+    const spec = getEvalModelSpec("qwen3-30b-a3b");
     expect(spec).not.toBeNull();
-    expect(resolveProviderModel(spec!)).toBe("accounts/fireworks/models/glm-5p2");
-    process.env.FIREWORKS_GLM_MODEL = "accounts/fireworks/models/glm-5p2-custom";
-    expect(resolveProviderModel(spec!)).toBe("accounts/fireworks/models/glm-5p2-custom");
+    expect(resolveProviderModel(spec!)).toBe("accounts/fireworks/models/qwen3-30b-a3b");
+    process.env.FIREWORKS_QWEN3_30B_MODEL = "accounts/fireworks/models/qwen3-30b-a3b-custom";
+    expect(resolveProviderModel(spec!)).toBe("accounts/fireworks/models/qwen3-30b-a3b-custom");
   });
 });
