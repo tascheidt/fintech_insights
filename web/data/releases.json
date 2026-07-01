@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.10.3",
+    "date": "2026-07-01",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "Trimmed the database back under its storage limit and stopped it from creeping back up. The raw HTML of each job description — which the app never actually reads, since everything works off the plain-text version — was being stored for every posting and had grown into the single largest chunk of the database, tipping it over its capacity. We stopped storing that dead copy, reclaimed the space already used by it (and by other accumulated bloat), and set usage telemetry to age out after 90 days so the database no longer grows without bound. No visible change to the product; job search, semantic matching, and job detail pages all work exactly as before."
+      }
+    ]
+  },
+  {
     "version": "2.10.2",
     "date": "2026-06-21",
     "changes": [
