@@ -18,9 +18,18 @@ const SNAPSHOT_RETENTION_DAYS = 2;
 /** Days to keep `job_runs` rows (and, via ON DELETE CASCADE, their tasks). */
 const RUN_RETENTION_DAYS = 90;
 
+/**
+ * Days to keep `gemini_usage_events` telemetry rows. Every Gemini call appends
+ * one row and nothing ever deletes them, so the table grows unbounded (~36k
+ * rows / 15MB by July 2026). The cost-alarm cron only ever reads the last 24h,
+ * and dashboards read recent windows, so anything past 90 days is pure storage.
+ */
+const USAGE_EVENT_RETENTION_DAYS = 90;
+
 export interface RetentionResult {
   snapshotsNulled: number;
   runsDeleted: number;
+  usageEventsDeleted: number;
 }
 
 const daysAgoIso = (days: number): string =>
@@ -36,12 +45,15 @@ const daysAgoIso = (days: number): string =>
  * 2. Delete `job_runs` older than RUN_RETENTION_DAYS — cascades to
  *    `job_run_tasks`; `gemini_usage_events.job_run_id` is SET NULL (telemetry
  *    rows are preserved, just unlinked).
+ * 3. Delete `gemini_usage_events` older than USAGE_EVENT_RETENTION_DAYS — bounds
+ *    the otherwise-unbounded telemetry table.
  */
 export async function pruneJobRunRetention(
   supabase: AdminClient
 ): Promise<RetentionResult> {
   let snapshotsNulled = 0;
   let runsDeleted = 0;
+  let usageEventsDeleted = 0;
 
   try {
     const { data, error } = await supabase
@@ -68,5 +80,17 @@ export async function pruneJobRunRetention(
     log.error({ err }, "Retention: failed to delete old job_runs");
   }
 
-  return { snapshotsNulled, runsDeleted };
+  try {
+    const { data, error } = await supabase
+      .from("gemini_usage_events")
+      .delete()
+      .lt("created_at", daysAgoIso(USAGE_EVENT_RETENTION_DAYS))
+      .select("id");
+    if (error) throw error;
+    usageEventsDeleted = data?.length ?? 0;
+  } catch (err) {
+    log.error({ err }, "Retention: failed to delete old gemini_usage_events");
+  }
+
+  return { snapshotsNulled, runsDeleted, usageEventsDeleted };
 }

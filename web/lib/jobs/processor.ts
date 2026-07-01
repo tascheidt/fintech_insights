@@ -419,7 +419,11 @@ export async function runIngestStage(
           .from('job_postings')
           .update({
             last_seen_date: row.last_seen_date,
-            description_html: row.description_html,
+            // description_html is intentionally NOT persisted: it is never read
+            // by the app (extraction/search/UI all use description_text) and was
+            // pure dead weight — ~58MB of TOAST that pushed the DB over the
+            // free-tier quota (July 2026). Scrapers still use it in-memory to
+            // derive description_text; we just don't store it.
             description_text: row.description_text,
             description_hash: newDescriptionHash,
             department: row.department,
@@ -457,6 +461,9 @@ export async function runIngestStage(
           .from('job_postings')
           .insert({
             ...row,
+            // See note above: description_html is dead weight — never read, so
+            // don't store it even though the scraped `row` still carries it.
+            description_html: null,
             first_seen_date: row.last_seen_date,
             description_hash: newDescriptionHash,
           })
