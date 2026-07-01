@@ -26,6 +26,14 @@ const LocationSchema = z.object({
   formatted: z.string().nullable().describe("Formatted location string (e.g., 'Toronto, Ontario, Canada' or 'Toronto, Canada' if state is null)"),
 }).nullable().describe("Structured location extracted from description. Look for 'Location(s):' section. Return null if not found.");
 
+// A positive salary figure that tolerates a float input by rounding it to the
+// nearest integer before the int check. Keeps the DB contract (int columns)
+// while not discarding an otherwise-valid extraction over `22.50` / `50000.0`.
+const SalaryNumberSchema = z.preprocess(
+  (v) => (typeof v === "number" && Number.isFinite(v) ? Math.round(v) : v),
+  z.number().int().positive().nullable()
+);
+
 // Zod schema for job structure extraction
 export const JobStructureSchema = z.object({
   summary: z.string().describe("2-3 sentence summary of what this role entails"),
@@ -40,8 +48,13 @@ export const JobStructureSchema = z.object({
     "executive",
   ]).describe("Seniority level extracted from title and description"),
   salary: z.object({
-    min: z.number().int().positive().nullable(),
-    max: z.number().int().positive().nullable(),
+    // Models (esp. open-weight ones) routinely emit a float here — an hourly
+    // rate like `22.50`, or `50000.0` from a model that always writes decimals.
+    // `.int()` would reject the whole extraction over a benign non-integer and
+    // drop us to the partial-fallback path. Round to the nearest int first so a
+    // valid number survives; genuine non-numbers still fail the inner schema.
+    min: SalaryNumberSchema,
+    max: SalaryNumberSchema,
     currency: z.string().default("USD"),
   }).nullable().describe("Salary range if found in description, null otherwise"),
   tech_stack: z.array(z.string()).describe("Array of specific technologies, frameworks, tools, or platforms mentioned"),

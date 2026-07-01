@@ -1,0 +1,146 @@
+{
+  "scenario": "extract-structure",
+  "reference": "gemini-flash-latest",
+  "gitSha": "7b01798",
+  "generatedAt": "2026-06-27T20:32:02.836Z",
+  "fixtureFile": "/Users/tscheidt/Fintech_insights/web/scripts/fixtures/gemini-sample-jobs.json",
+  "fixtureCount": 2,
+  "models": [
+    "gemini-flash-latest",
+    "qwen3-30b-a3b",
+    "llama4-scout",
+    "mistral-small"
+  ],
+  "cost": {
+    "gemini-flash-latest": {
+      "jobs": 2,
+      "jsonOk": 0,
+      "jsonOkPct": 0,
+      "calls": 0,
+      "avgInputTokens": 0,
+      "avgOutputTokens": 0,
+      "avgTotalTokens": 0,
+      "estimatedUsd": 0,
+      "usdPerJob": 0,
+      "usdPer1k": 0,
+      "avgLatencyMs": 0
+    },
+    "qwen3-30b-a3b": {
+      "jobs": 2,
+      "jsonOk": 0,
+      "jsonOkPct": 0,
+      "calls": 0,
+      "avgInputTokens": 0,
+      "avgOutputTokens": 0,
+      "avgTotalTokens": 0,
+      "estimatedUsd": 0,
+      "usdPerJob": 0,
+      "usdPer1k": 0,
+      "avgLatencyMs": 0
+    },
+    "llama4-scout": {
+      "jobs": 2,
+      "jsonOk": 0,
+      "jsonOkPct": 0,
+      "calls": 0,
+      "avgInputTokens": 0,
+      "avgOutputTokens": 0,
+      "avgTotalTokens": 0,
+      "estimatedUsd": 0,
+      "usdPerJob": 0,
+      "usdPer1k": 0,
+      "avgLatencyMs": 0
+    },
+    "mistral-small": {
+      "jobs": 2,
+      "jsonOk": 0,
+      "jsonOkPct": 0,
+      "calls": 0,
+      "avgInputTokens": 0,
+      "avgOutputTokens": 0,
+      "avgTotalTokens": 0,
+      "estimatedUsd": 0,
+      "usdPerJob": 0,
+      "usdPer1k": 0,
+      "avgLatencyMs": 0
+    }
+  },
+  "runs": [
+    {
+      "model": "gemini-flash-latest",
+      "perJob": [
+        {
+          "jobId": "645839c0-151d-4404-8d8f-940ea48f368a",
+          "title": "ServiceNow Engineer",
+          "companySlug": "eq-bank",
+          "output": null,
+          "calls": []
+        },
+        {
+          "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d",
+          "title": "Senior Estates and Trust Coordinator",
+          "companySlug": "eq-bank",
+          "output": null,
+          "calls": []
+        }
+      ]
+    },
+    {
+      "model": "qwen3-30b-a3b",
+      "perJob": [
+        {
+          "jobId": "645839c0-151d-4404-8d8f-940ea48f368a",
+          "title": "ServiceNow Engineer",
+          "companySlug": "eq-bank",
+          "output": null,
+          "calls": []
+        },
+        {
+          "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d",
+          "title": "Senior Estates and Trust Coordinator",
+          "companySlug": "eq-bank",
+          "output": null,
+          "calls": []
+        }
+      ]
+    },
+    {
+      "model": "llama4-scout",
+      "perJob": [
+        {
+          "jobId": "645839c0-151d-4404-8d8f-940ea48f368a",
+          "title": "ServiceNow Engineer",
+          "companySlug": "eq-bank",
+          "output": null,
+          "calls": []
+        },
+        {
+          "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d",
+          "title": "Senior Estates and Trust Coordinator",
+          "companySlug": "eq-bank",
+          "output": null,
+          "calls": []
+        }
+      ]
+    },
+    {
+      "model": "mistral-small",
+      "perJob": [
+        {
+          "jobId": "645839c0-151d-4404-8d8f-940ea48f368a",
+          "title": "ServiceNow Engineer",
+          "companySlug": "eq-bank",
+          "output": null,
+          "calls": []
+        },
+        {
+          "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d",
+          "title": "Senior Estates and Trust Coordinator",
+          "companySlug": "eq-bank",
+          "output": null,
+          "calls": []
+        }
+      ]
+    }
+  ]
+}
