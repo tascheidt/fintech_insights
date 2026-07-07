@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.10.4",
+    "date": "2026-07-07",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "Simplii Financial jobs are being scraped again. Simplii has no careers page of its own — its postings surface inside CIBC's job board and get split out by a classifier — but turning off incumbent-bank tracking (to control scraping cost) stopped CIBC's board from being scraped at all, which silently stopped Simplii too even though Simplii is tracked as a regular fintech company. CIBC's own postings are still skipped while incumbent tracking is off; only the ones identified as Simplii are collected."
+      }
+    ]
+  },
+  {
     "version": "2.10.3",
     "date": "2026-07-01",
     "changes": [

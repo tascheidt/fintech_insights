@@ -9,6 +9,7 @@ import {
   getActiveJobStructureAiConfig,
   type JobStructureAiConfig,
 } from "@/lib/ai/prompt-config";
+import { getIncumbentTrackingEnabled } from "@/lib/settings/incumbent-tracking";
 import { createHash } from "crypto";
 import { log } from "@/lib/log";
 
@@ -306,13 +307,33 @@ export async function runIngestStage(
       return company.id;
     };
 
+    // Incumbent-tier parents (e.g. CIBC) are only included in a collect run
+    // with incumbent tracking off because a fintech sub-brand piggy-backs on
+    // their scrape (e.g. Simplii — see `workday-cibc.ts`). In that mode the
+    // parent's own postings must NOT be scraped/extracted/analyzed (the
+    // whole point of the flag), so keep only jobs the classifier routed to a
+    // resolved sub-brand and drop everything that would land on the parent.
+    const incumbentEnabled = await getIncumbentTrackingEnabled(supabase);
+    const subBrandOnly = company.tier === 'incumbent' && !incumbentEnabled;
+    if (subBrandOnly) {
+      const before = jobs.length;
+      jobs = jobs.filter((j) => resolveCompanyId(j) !== company.id);
+      log.info(
+        { parent: company.slug, before, kept: jobs.length },
+        '[ingest] incumbent tracking off; keeping only sub-brand-routed jobs for this parent'
+      );
+    }
+
     // Load existing job_postings for parent + every resolved sub-brand
     // so per-company existingMap/fetchedIds (used by closure detection)
     // are computed correctly. Paginated because PostgREST caps a single
     // .select() at 1000 rows — RBC/TD/Scotia each carry >1000 active
     // postings, so the unpaginated query silently dropped dedup entries
     // and the next scrape re-INSERTed already-known rows.
-    const ingestCompanyIds = [company.id, ...Array.from(overrideCompanies.values()).map((c) => c.id)];
+    const ingestCompanyIds = [
+      ...(subBrandOnly ? [] : [company.id]),
+      ...Array.from(overrideCompanies.values()).map((c) => c.id),
+    ];
     const PAGE = 1000;
     const existing: Array<{
       id: string;
