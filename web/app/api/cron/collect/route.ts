@@ -76,21 +76,40 @@ async function runCollect(req: NextRequest) {
     // downstream Flash-extract + Pro-analyze hot path — both run only on the
     // companies returned by this query. Defaults to off; flip from Admin > Settings.
     const incumbentEnabled = await getIncumbentTrackingEnabled(supabase);
-    let companiesQuery = supabase
+    const { data: allCompanies, error: companiesError } = await supabase
       .from("companies")
-      .select("id, name, ats_type")
+      .select("id, name, ats_type, tier")
       .eq("is_active", true)
       .is("parent_company_id", null);
-    if (!incumbentEnabled) {
-      companiesQuery = companiesQuery.eq("tier", "fintech");
-    }
-    const { data: companies, error: companiesError } = await companiesQuery;
 
     if (companiesError) {
       log.error({ err: companiesError.message }, "Failed to fetch companies");
       return NextResponse.json(
         { success: false, error: companiesError.message },
         { status: 500 }
+      );
+    }
+
+    let companies = allCompanies;
+    if (companies && !incumbentEnabled) {
+      // An incumbent-tier parent whose scrape also feeds an active fintech
+      // sub-brand (e.g. Simplii piggy-backs on CIBC's Workday tenant, see
+      // `workday-cibc.ts`) must still be scraped even with the flag off, or
+      // its fintech sub-brand silently stops updating too. `runIngestStage`
+      // enforces the actual cost control: for these parents it keeps only
+      // the jobs the classifier routed to the sub-brand and drops the
+      // parent's own postings, so CIBC itself still isn't scraped/analyzed.
+      const { data: fintechChildren } = await supabase
+        .from("companies")
+        .select("parent_company_id")
+        .eq("is_active", true)
+        .eq("tier", "fintech")
+        .not("parent_company_id", "is", null);
+      const incumbentParentsWithFintechChild = new Set(
+        (fintechChildren ?? []).map((c) => c.parent_company_id as string)
+      );
+      companies = companies.filter(
+        (c) => c.tier === "fintech" || incumbentParentsWithFintechChild.has(c.id)
       );
     }
 

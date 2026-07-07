@@ -46,6 +46,13 @@ vi.mock("@/lib/github", () => ({
   triggerScrapeWorkflow: vi.fn(),
 }));
 
+// Mutated per-test to control the incumbent-tracking flag read by
+// `runIngestStage`'s sub-brand-only gate.
+let incumbentTrackingEnabledMock = false;
+vi.mock("@/lib/settings/incumbent-tracking", () => ({
+  getIncumbentTrackingEnabled: vi.fn(() => Promise.resolve(incumbentTrackingEnabledMock)),
+}));
+
 vi.mock("@/lib/ai/prompt-config", () => ({
   getActiveJobStructureAiConfig: vi.fn().mockResolvedValue({
     stage: "job-structure",
@@ -418,5 +425,81 @@ describe("runIngestStage companySlugOverride routing", () => {
     // Falls back to parent — the job is inserted under the parent company_id.
     expect(insertedRows).toHaveLength(1);
     expect(insertedRows[0].company_id).toBe(FIXTURE_COMPANY.id);
+  });
+});
+
+describe("runIngestStage sub-brand-only mode (incumbent tracking off)", () => {
+  // Mirrors CIBC: tier='incumbent', but its Workday tenant also carries the
+  // Simplii (tier='fintech') sub-brand — see workday-cibc.ts.
+  const INCUMBENT_PARENT = {
+    id: "cibc-1",
+    slug: "cibc",
+    name: "CIBC",
+    ats_type: "workday-cibc",
+    ats_identifier: "cibc",
+    careers_url: null,
+    is_active: true,
+    tier: "incumbent",
+  } as const;
+
+  beforeEach(() => {
+    extractJobStructureMock.mockClear();
+    existingRows = [];
+    overrideCompanyRows = [];
+    insertedRows = [];
+    incumbentTrackingEnabledMock = false;
+  });
+
+  it("drops jobs that resolve to the incumbent parent itself when tracking is off", async () => {
+    const parentJob = { ...FIXTURE_JOB, external_id: "cibc-job-1" };
+
+    const { runIngestStage } = await import("./processor");
+    const result = await runIngestStage(
+      "task-subbrand-drop",
+      INCUMBENT_PARENT as never,
+      [parentJob] as never
+    );
+
+    expect(insertedRows).toHaveLength(0);
+    expect(result.newJobIds).toHaveLength(0);
+  });
+
+  it("keeps jobs the classifier routed to an active fintech sub-brand even when tracking is off", async () => {
+    overrideCompanyRows = [
+      {
+        id: "simplii-1",
+        slug: "simplii",
+        name: "Simplii Financial",
+        parent_company_id: INCUMBENT_PARENT.id,
+      },
+    ];
+    const parentJob = { ...FIXTURE_JOB, external_id: "cibc-job-2" };
+    const subBrandJob = {
+      ...FIXTURE_JOB,
+      external_id: "simplii-job-1",
+      companySlugOverride: "simplii",
+    };
+
+    const { runIngestStage } = await import("./processor");
+    const result = await runIngestStage(
+      "task-subbrand-keep",
+      INCUMBENT_PARENT as never,
+      [parentJob, subBrandJob] as never
+    );
+
+    expect(insertedRows).toHaveLength(1);
+    expect(insertedRows[0].company_id).toBe("simplii-1");
+    expect(result.newJobIds).toHaveLength(1);
+  });
+
+  it("ingests the parent's own postings normally once incumbent tracking is re-enabled", async () => {
+    incumbentTrackingEnabledMock = true;
+    const parentJob = { ...FIXTURE_JOB, external_id: "cibc-job-3" };
+
+    const { runIngestStage } = await import("./processor");
+    await runIngestStage("task-subbrand-flagon", INCUMBENT_PARENT as never, [parentJob] as never);
+
+    expect(insertedRows).toHaveLength(1);
+    expect(insertedRows[0].company_id).toBe(INCUMBENT_PARENT.id);
   });
 });
