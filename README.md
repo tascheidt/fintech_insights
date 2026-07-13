@@ -15,6 +15,7 @@ A competitive intelligence tool that tracks job postings from Canadian and inter
 
 ### Canadian Fintechs (Strategic Analysis)
 - Wealthsimple
+- Koho
 - Questrade
 - Tangerine (pending ATS verification)
 
@@ -22,7 +23,7 @@ A competitive intelligence tool that tracks job postings from Canadian and inter
 - Monzo
 - Starling Bank
 
-*Note: Koho, Neo Financial, and Revolut are pending ATS identifier verification*
+*Note: Neo Financial and Revolut are pending ATS identifier verification*
 
 ## Installation
 

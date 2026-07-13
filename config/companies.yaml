@@ -7,13 +7,14 @@ companies:
     ats_identifier: wealthsimple
     careers_url: https://jobs.ashbyhq.com/wealthsimple
 
-  # Note: Koho's ATS identifier needs investigation - currently disabled
-  # - name: Koho
-  #   slug: koho
-  #   country: CA
-  #   ats_type: lever
-  #   ats_identifier: koho
-  #   careers_url: https://www.koho.ca/careers/
+  # Koho moved its board to Ashby (verified July 2026) — same platform and
+  # scraper as Wealthsimple. Fixed via web/scripts/fix-koho-ashby.ts.
+  - name: Koho
+    slug: koho
+    country: CA
+    ats_type: ashby
+    ats_identifier: koho
+    careers_url: https://jobs.ashbyhq.com/koho
 
   # Note: Neo Financial's ATS identifier needs investigation - currently disabled
   # - name: Neo Financial
