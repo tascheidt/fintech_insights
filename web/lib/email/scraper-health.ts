@@ -1,10 +1,12 @@
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getResendError } from "@/lib/email/resend-result";
+import { getIncumbentTrackingEnabled } from "@/lib/settings/incumbent-tracking";
 import {
   ScraperAlertEmail,
   type ScraperIssue,
   type ScraperCanary,
+  type StaleCompanyIssue,
 } from "./templates/scraper-alert";
 import { log } from "@/lib/log";
 
@@ -57,6 +59,88 @@ export function evaluateCanary({ today, rolling }: CanaryInput): CanaryDecision 
     return { fire: false, reason: "skip_today_not_below_threshold" };
   }
   return { fire: true, reason: "fire_partial_corpus_drop" };
+}
+
+/**
+ * Staleness watchdog threshold: an active company with no successful scrape
+ * — or zero active postings — for this many consecutive days is flagged in
+ * the daily health email, EVERY day until fixed.
+ *
+ * The per-run "failed"/"empty" issues above only see the current run, and
+ * "empty" only fires on the transition day (`closedThisRun > 0`). Miss that
+ * one email and every following day looks healthy: 0 active jobs, 0 closed
+ * this run, no alert. That persistence gap is exactly how Koho sat dark for
+ * months after its ATS migration (July 2026). The watchdog converts every
+ * one-shot miss into a recurring nag.
+ */
+export const STALE_SCRAPE_THRESHOLD_DAYS = 7;
+
+export interface StalenessInput {
+  /** ISO timestamp of the company's last completed scrape task, or null if none exists. */
+  lastSuccessAt: string | null;
+  /** Current count of `is_active=true` postings for the company. */
+  activeJobCount: number;
+  /** ISO timestamp the company row was created, or null. */
+  companyCreatedAt: string | null;
+  /**
+   * Sub-brands (parent_company_id set, e.g. Simplii) never get their own
+   * scrape task — their jobs land via the parent's scrape — so "no completed
+   * task" is meaningless for them. Only the postings signal applies.
+   */
+  isSubBrand: boolean;
+  now: Date;
+}
+
+export interface StalenessDecision {
+  staleScrape: boolean;
+  noActiveJobs: boolean;
+  /** Whole days since the last successful scrape; null if never scraped. */
+  daysSinceLastSuccess: number | null;
+}
+
+/**
+ * Pure staleness check — no DB, no side effects.
+ *
+ * Companies younger than the threshold are always healthy (onboarding grace:
+ * a freshly added company legitimately has no scrape history and possibly no
+ * postings yet). Past the grace window:
+ *  - `staleScrape`: no completed scrape task within the threshold (skipped
+ *    for sub-brands — see StalenessInput.isSubBrand).
+ *  - `noActiveJobs`: zero active postings. A tracked company whose board is
+ *    genuinely empty for a week is rare enough that a recurring flag is
+ *    signal, not noise (and the fix — deactivating with a reason — silences it).
+ */
+export function evaluateStaleness({
+  lastSuccessAt,
+  activeJobCount,
+  companyCreatedAt,
+  isSubBrand,
+  now,
+}: StalenessInput): StalenessDecision {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const thresholdMs = STALE_SCRAPE_THRESHOLD_DAYS * dayMs;
+
+  const daysSinceLastSuccess = lastSuccessAt
+    ? Math.floor((now.getTime() - Date.parse(lastSuccessAt)) / dayMs)
+    : null;
+
+  const createdMs = companyCreatedAt ? Date.parse(companyCreatedAt) : null;
+  const inOnboardingGrace =
+    createdMs !== null && now.getTime() - createdMs < thresholdMs;
+  if (inOnboardingGrace) {
+    return { staleScrape: false, noActiveJobs: false, daysSinceLastSuccess };
+  }
+
+  const staleScrape =
+    !isSubBrand &&
+    (daysSinceLastSuccess === null ||
+      daysSinceLastSuccess >= STALE_SCRAPE_THRESHOLD_DAYS);
+
+  return {
+    staleScrape,
+    noActiveJobs: activeJobCount === 0,
+    daysSinceLastSuccess,
+  };
 }
 
 /**
@@ -186,7 +270,15 @@ export async function checkAndAlertScraperHealth(
       evaluableCompanyIds,
     });
 
-    if (issues.length === 0 && canaries.length === 0) {
+    // Staleness watchdog: unlike everything above, this looks at ALL active
+    // companies — not just this run's tasks — and re-fires daily until fixed.
+    // Companies already flagged as failed/empty in this run are excluded so
+    // they aren't double-reported.
+    const staleIssues = await detectStaleCompanies(supabase, {
+      excludeCompanyIds: issueCompanyIds,
+    });
+
+    if (issues.length === 0 && canaries.length === 0 && staleIssues.length === 0) {
       log.info("Scraper health check passed — no issues detected.");
       return;
     }
@@ -199,6 +291,11 @@ export async function checkAndAlertScraperHealth(
     if (canaries.length > 0) {
       log.warn(
         `Scraper-break canary: ${canaries.length} incumbent scraper(s) showing partial-corpus drop for [${canaries.map((c) => c.companyName).join(", ")}]`
+      );
+    }
+    if (staleIssues.length > 0) {
+      log.warn(
+        `Staleness watchdog: ${staleIssues.length} active compan(ies) stale for ${STALE_SCRAPE_THRESHOLD_DAYS}+ days [${staleIssues.map((s) => s.companyName).join(", ")}]`
       );
     }
 
@@ -226,14 +323,20 @@ export async function checkAndAlertScraperHealth(
 
     const issueCount = issues.length;
     const canaryCount = canaries.length;
-    const totalCount = issueCount + canaryCount;
+    const staleCount = staleIssues.length;
+    const totalCount = issueCount + canaryCount + staleCount;
     const subject = (() => {
-      if (issueCount === 0 && canaryCount > 0) {
+      if (issueCount === 0 && canaryCount === 0 && staleCount > 0) {
+        return staleCount === 1
+          ? `⚠️ Stale scraper: ${staleIssues[0].companyName} (${STALE_SCRAPE_THRESHOLD_DAYS}+ days)`
+          : `⚠️ Stale scrapers: ${staleCount} companies (${STALE_SCRAPE_THRESHOLD_DAYS}+ days)`;
+      }
+      if (issueCount === 0 && canaryCount > 0 && staleCount === 0) {
         return canaryCount === 1
           ? `⚠️ Scraper-break canary: ${canaries[0].companyName}`
           : `⚠️ Scraper-break canary: ${canaryCount} incumbent scrapers`;
       }
-      if (issueCount === 1 && canaryCount === 0) {
+      if (issueCount === 1 && canaryCount === 0 && staleCount === 0) {
         return `⚠️ Scraper alert: ${issues[0].companyName}`;
       }
       return `⚠️ Scraper alert: ${totalCount} ${totalCount === 1 ? "issue" : "issues"} need attention`;
@@ -243,7 +346,7 @@ export async function checkAndAlertScraperHealth(
       from,
       to: email,
       subject,
-      react: ScraperAlertEmail({ issues, canaries, jobRunId, appUrl }),
+      react: ScraperAlertEmail({ issues, canaries, staleIssues, jobRunId, appUrl }),
     }));
 
     const result = await resend.batch.send(emails);
@@ -403,6 +506,127 @@ export async function detectIncumbentCanaries(
     return canaries;
   } catch (err) {
     log.error({ err }, "Canary detection failed");
+    return [];
+  }
+}
+
+/**
+ * Staleness watchdog: flag every `is_active=true` company that has gone
+ * STALE_SCRAPE_THRESHOLD_DAYS+ days with no successful scrape task, or that
+ * currently has zero active postings.
+ *
+ * Deliberately persistent — unlike the per-run failed/empty issues, this
+ * re-fires on every daily collect until the company is fixed or deactivated,
+ * so a single missed email can't turn into months of silence (the Koho
+ * failure mode, July 2026).
+ *
+ * Scope rules:
+ *  - Incumbent-tier companies are excluded while `incumbent_tracking_enabled`
+ *    is off — their scrapes are intentionally paused by the flag.
+ *  - Sub-brands (parent_company_id set) are only checked on the postings
+ *    signal; they never get their own scrape task.
+ *  - Companies younger than the threshold are in onboarding grace.
+ *  - `opts.excludeCompanyIds`: companies already reported as failed/empty in
+ *    the current run, to avoid double-reporting.
+ *
+ * Read-only; errors are swallowed and logged — the watchdog must never block
+ * the existing scraper-health email.
+ */
+export async function detectStaleCompanies(
+  supabase: SupabaseAdminClient,
+  opts?: { excludeCompanyIds?: Set<string>; now?: Date }
+): Promise<StaleCompanyIssue[]> {
+  try {
+    const now = opts?.now ?? new Date();
+
+    const { data: companies, error: companiesError } = await supabase
+      .from("companies")
+      .select("id, name, slug, tier, parent_company_id, created_at")
+      .eq("is_active", true);
+
+    if (companiesError) {
+      log.error(
+        { err: companiesError.message },
+        "Staleness watchdog: failed to fetch companies"
+      );
+      return [];
+    }
+    if (!companies || companies.length === 0) return [];
+
+    const incumbentEnabled = await getIncumbentTrackingEnabled(supabase);
+    const candidates = companies.filter(
+      (c) =>
+        !opts?.excludeCompanyIds?.has(c.id) &&
+        (incumbentEnabled || c.tier !== "incumbent")
+    );
+    if (candidates.length === 0) return [];
+
+    // Per-company pairs of small queries (same shape as the canary check —
+    // the active-company set is ~10-20 rows, so parallel point-reads beat
+    // an RPC here).
+    const results = await Promise.all(
+      candidates.map(async (company) => {
+        const isSubBrand = company.parent_company_id !== null;
+
+        const [lastTask, { count: activeCount }] = await Promise.all([
+          isSubBrand
+            ? Promise.resolve(null)
+            : supabase
+                .from("job_run_tasks")
+                .select("completed_at")
+                .eq("company_id", company.id)
+                .eq("status", "completed")
+                .not("completed_at", "is", null)
+                .order("completed_at", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+                .then((r) => r.data),
+          supabase
+            .from("job_postings")
+            .select("id", { count: "exact", head: true })
+            .eq("company_id", company.id)
+            .eq("is_active", true),
+        ]);
+
+        const decision = evaluateStaleness({
+          lastSuccessAt: lastTask?.completed_at ?? null,
+          activeJobCount: activeCount ?? 0,
+          companyCreatedAt: (company.created_at as string | null) ?? null,
+          isSubBrand,
+          now,
+        });
+
+        const issues: StaleCompanyIssue[] = [];
+        if (decision.staleScrape) {
+          issues.push({
+            companyName: company.name,
+            companySlug: company.slug,
+            kind: "stale_scrape",
+            daysSinceLastSuccess: decision.daysSinceLastSuccess,
+            activeJobCount: activeCount ?? 0,
+            explanation:
+              decision.daysSinceLastSuccess === null
+                ? `No successful scrape has ever completed for this company. Check its ATS config (ats_type / ats_identifier / careers_url) — the board may have moved.`
+                : `Last successful scrape was ${decision.daysSinceLastSuccess} days ago (threshold: ${STALE_SCRAPE_THRESHOLD_DAYS}). Check its ATS config — the board may have moved (the Koho pattern).`,
+          });
+        }
+        if (decision.noActiveJobs) {
+          issues.push({
+            companyName: company.name,
+            companySlug: company.slug,
+            kind: "no_active_jobs",
+            daysSinceLastSuccess: decision.daysSinceLastSuccess,
+            activeJobCount: 0,
+            explanation: `Company is active but has zero active postings. Either the board is genuinely empty, or the scraper is pointed at a dead/moved board. If tracking should stop, deactivate the company with a reason instead of leaving it dark.`,
+          });
+        }
+        return issues;
+      })
+    );
+
+    return results.flat();
+  } catch (err) {
+    log.error({ err }, "Staleness watchdog failed");
     return [];
   }
 }

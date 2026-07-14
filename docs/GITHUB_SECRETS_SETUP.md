@@ -9,6 +9,12 @@ The workflow needs these two secrets:
 1. `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
 2. `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key (for admin operations)
 
+The weekly scraper-drift-check workflow (`scraper-drift-check.yml`) additionally needs:
+
+3. `RESEND_API_KEY` - Resend API key, so drift findings can be emailed to admins (same value as the Vercel env var)
+
+The full secret-per-workflow matrix lives in [`CRON_TOPOLOGY.md`](./CRON_TOPOLOGY.md) → "Required secrets".
+
 ## Step-by-Step Instructions
 
 ### Step 1: Find Your Supabase Credentials

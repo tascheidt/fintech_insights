@@ -16,8 +16,10 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluateCanary,
+  evaluateStaleness,
   CANARY_DROP_RATIO,
   CANARY_MIN_ROLLING_AVG,
+  STALE_SCRAPE_THRESHOLD_DAYS,
 } from "./scraper-health";
 
 describe("evaluateCanary", () => {
@@ -105,6 +107,145 @@ describe("evaluateCanary", () => {
 
     it("rolling-average floor is 5 — banks below this don't fire", () => {
       expect(CANARY_MIN_ROLLING_AVG).toBe(5);
+    });
+  });
+});
+
+/**
+ * The staleness watchdog is the persistence layer the per-run alerts lack:
+ * "failed" and "empty" only see the current run (and "empty" only fires on
+ * the transition day), so one missed email became months of silence for
+ * Koho (July 2026). `evaluateStaleness` is the pure rule; it must re-fire
+ * for as long as the condition holds.
+ */
+describe("evaluateStaleness", () => {
+  const NOW = new Date("2026-07-14T12:00:00Z");
+  const daysAgo = (n: number) =>
+    new Date(NOW.getTime() - n * 24 * 60 * 60 * 1000).toISOString();
+
+  const base = {
+    lastSuccessAt: daysAgo(1),
+    activeJobCount: 25,
+    companyCreatedAt: daysAgo(400),
+    isSubBrand: false,
+    now: NOW,
+  };
+
+  describe("healthy companies stay silent", () => {
+    it("does not flag a company scraped yesterday with active postings", () => {
+      const d = evaluateStaleness(base);
+      expect(d.staleScrape).toBe(false);
+      expect(d.noActiveJobs).toBe(false);
+      expect(d.daysSinceLastSuccess).toBe(1);
+    });
+
+    it("does not flag at threshold - 1 days", () => {
+      const d = evaluateStaleness({
+        ...base,
+        lastSuccessAt: daysAgo(STALE_SCRAPE_THRESHOLD_DAYS - 1),
+      });
+      expect(d.staleScrape).toBe(false);
+    });
+  });
+
+  describe("stale scrape", () => {
+    it("flags a company with no successful scrape in exactly threshold days", () => {
+      const d = evaluateStaleness({
+        ...base,
+        lastSuccessAt: daysAgo(STALE_SCRAPE_THRESHOLD_DAYS),
+      });
+      expect(d.staleScrape).toBe(true);
+      expect(d.daysSinceLastSuccess).toBe(STALE_SCRAPE_THRESHOLD_DAYS);
+    });
+
+    it("flags a company that has NEVER had a successful scrape", () => {
+      // The Koho end-state: config points at a dead board, every scrape
+      // fails or the company predates task tracking.
+      const d = evaluateStaleness({ ...base, lastSuccessAt: null });
+      expect(d.staleScrape).toBe(true);
+      expect(d.daysSinceLastSuccess).toBeNull();
+    });
+
+    it("keeps firing far past the threshold (persistent, not transition-day)", () => {
+      const d = evaluateStaleness({ ...base, lastSuccessAt: daysAgo(90) });
+      expect(d.staleScrape).toBe(true);
+      expect(d.daysSinceLastSuccess).toBe(90);
+    });
+  });
+
+  describe("zero active postings", () => {
+    it("flags an established company with no active postings", () => {
+      const d = evaluateStaleness({ ...base, activeJobCount: 0 });
+      expect(d.noActiveJobs).toBe(true);
+      // Scrape itself is fresh — only the postings signal fires.
+      expect(d.staleScrape).toBe(false);
+    });
+
+    it("fires both signals together when scrape is stale AND board is empty", () => {
+      const d = evaluateStaleness({
+        ...base,
+        lastSuccessAt: daysAgo(30),
+        activeJobCount: 0,
+      });
+      expect(d.staleScrape).toBe(true);
+      expect(d.noActiveJobs).toBe(true);
+    });
+  });
+
+  describe("sub-brands (parent_company_id set)", () => {
+    it("never fires stale_scrape — sub-brands have no scrape task of their own", () => {
+      // Simplii's jobs land via CIBC's scrape; "no completed task" is
+      // structurally true and meaningless.
+      const d = evaluateStaleness({
+        ...base,
+        isSubBrand: true,
+        lastSuccessAt: null,
+      });
+      expect(d.staleScrape).toBe(false);
+    });
+
+    it("still fires no_active_jobs for a sub-brand gone dark (the Simplii pattern)", () => {
+      const d = evaluateStaleness({
+        ...base,
+        isSubBrand: true,
+        lastSuccessAt: null,
+        activeJobCount: 0,
+      });
+      expect(d.noActiveJobs).toBe(true);
+    });
+  });
+
+  describe("onboarding grace", () => {
+    it("suppresses both signals for a company added yesterday", () => {
+      // A fresh company legitimately has no scrape history yet.
+      const d = evaluateStaleness({
+        ...base,
+        companyCreatedAt: daysAgo(1),
+        lastSuccessAt: null,
+        activeJobCount: 0,
+      });
+      expect(d.staleScrape).toBe(false);
+      expect(d.noActiveJobs).toBe(false);
+    });
+
+    it("grace ends at the threshold — day 7 company is judged normally", () => {
+      const d = evaluateStaleness({
+        ...base,
+        companyCreatedAt: daysAgo(STALE_SCRAPE_THRESHOLD_DAYS),
+        lastSuccessAt: null,
+        activeJobCount: 0,
+      });
+      expect(d.staleScrape).toBe(true);
+      expect(d.noActiveJobs).toBe(true);
+    });
+
+    it("a null created_at gets no grace (judged normally)", () => {
+      const d = evaluateStaleness({
+        ...base,
+        companyCreatedAt: null,
+        lastSuccessAt: daysAgo(10),
+      });
+      expect(d.staleScrape).toBe(true);
     });
   });
 });

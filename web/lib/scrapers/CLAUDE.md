@@ -83,7 +83,8 @@ Companies with `ats_type: custom` use the generic Puppeteer scraper (`scrapeGene
 
 ## ATS detection
 
-- **`detect-ats.ts`** — `detectATSFromUrl` infers the ATS type from a careers URL. Used by the company-onboarding flow.
+- **`detect-ats.ts`** — `detectATSFromUrl` infers the ATS type from a careers URL. Used by the company-onboarding flow and the weekly drift check.
+- **`drift.ts`** — pure decision rules for the weekly scraper-drift check (`web/scripts/scraper-drift-check.ts` + `scraper-drift-check.yml`, Mon 12:00 UTC). Flags inactive fintech companies whose board is live somewhere (`dormant_live_board` — probes the configured board plus a "slug sweep" across the four API-probeable providers: lever/greenhouse/workable/ashby), active companies whose careers_url resolves to a different ATS (`ats_drift`), and active companies whose configured API endpoint died (`dead_config`). Born from the Koho incident (July 2026): company deactivated with a dead Lever config while its real board filled up on Ashby. Unit-tested in `drift.test.ts`; details in `docs/OBSERVABILITY.md`.
 
 ## Shared
 

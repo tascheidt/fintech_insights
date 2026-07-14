@@ -1,5 +1,19 @@
 [
   {
+    "version": "2.11.0",
+    "date": "2026-07-14",
+    "changes": [
+      {
+        "type": "feature",
+        "description": "Scrapers can no longer go quietly dark. Two new safety nets close the gap that let Koho sit unscraped for months: a daily staleness watchdog flags any tracked company with no successful scrape or zero open postings for a week — and keeps flagging it every day until it's fixed, instead of alerting once and going silent — and a weekly drift check probes every company's job board (including deactivated ones) to catch boards that moved to a different hiring platform or came back to life. Both alert admins by email, and deactivated companies can now carry a written reason so an intentional shutdown is distinguishable from a broken scraper that was parked and forgotten."
+      },
+      {
+        "type": "fix",
+        "description": "The weekly editorial refresh no longer fails outright on a single slow or garbled AI response. One company's generation stalling past the time limit (Neo Financial, July 13) and one unparseable response from the theme labeler each used to kill their part of the run; both now retry up to three times with a short pause, and the theme labeler got more headroom against cut-off responses plus better diagnostics when one still fails."
+      }
+    ]
+  },
+  {
     "version": "2.10.5",
     "date": "2026-07-13",
     "changes": [

@@ -30,6 +30,14 @@ export const THEME_LABELER_PROMPT_VERSION = "cross-company-themes-v1";
 export const THEME_LABELER_MODEL = "gemini-flash-latest" as const;
 const THEME_TIMEOUT_MS = 45_000;
 
+/**
+ * Total attempts (1 initial + 2 retries, 1s/2s backoff) — the v2.3.1
+ * generateInsightWithLLM shape. The July 13 2026 editorial-cron run died on
+ * "No JSON found in theme labeler response": a single malformed/truncated
+ * Flash response with no retry behind it.
+ */
+const THEME_MAX_ATTEMPTS = 3;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -185,12 +193,51 @@ async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise
 }
 
 /**
- * Generate editorial labels for the given group bundles. One LLM call total.
+ * Extract a JSON object from a response that may carry markdown fences or
+ * stray prose (same salvage ladder as company-insights / company-editorial).
+ */
+function extractThemeJson(text: string): string | null {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (fenced?.[1]) return fenced[1];
+  const obj = text.match(/\{[\s\S]*\}/);
+  if (obj?.[0]) return obj[0];
+  return null;
+}
+
+/**
+ * Generate editorial labels for the given group bundles. One LLM call per
+ * attempt; transient failures (empty / malformed JSON / timeout) retry up
+ * to THEME_MAX_ATTEMPTS with linear backoff.
  */
 export async function generateThemeLabels(
   bundles: ThemeInputBundle[]
 ): Promise<ThemeLabelOutput[]> {
   if (bundles.length === 0) return [];
+
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= THEME_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await attemptThemeLabels(bundles);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < THEME_MAX_ATTEMPTS) {
+        log.warn(
+          `[theme-labeler] attempt ${attempt}/${THEME_MAX_ATTEMPTS} failed (${
+            err instanceof Error ? err.message : String(err)
+          }); retrying`
+        );
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
+  }
+  throw lastErr instanceof Error
+    ? lastErr
+    : new Error(String(lastErr ?? "theme labeler failed"));
+}
+
+async function attemptThemeLabels(
+  bundles: ThemeInputBundle[]
+): Promise<ThemeLabelOutput[]> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY not configured");
 
@@ -204,7 +251,11 @@ export async function generateThemeLabels(
     model: THEME_LABELER_MODEL,
     generationConfig: {
       temperature: 0.25,
-      maxOutputTokens: 2048,
+      // 4096 was 2048 — headroom against mid-JSON truncation, the same
+      // failure the company-insights call hit before v2.3.1 doubled its
+      // budget. A truncated body has no closing brace, so the salvage
+      // regex finds "no JSON" and the whole refresh dies.
+      maxOutputTokens: 4096,
       responseMimeType: "application/json",
     },
   });
@@ -259,9 +310,13 @@ export async function generateThemeLabels(
   try {
     parsed = JSON.parse(text);
   } catch {
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error("No JSON found in theme labeler response");
-    parsed = JSON.parse(m[0].replace(/,(\s*[}\]])/g, "$1"));
+    const preview = text.length > 200 ? `${text.slice(0, 200)}...` : text;
+    log.warn(
+      `[theme-labeler] JSON parse failed; response length ${text.length}, preview: ${preview}`
+    );
+    const candidate = extractThemeJson(text);
+    if (!candidate) throw new Error("No JSON found in theme labeler response");
+    parsed = JSON.parse(candidate.replace(/,(\s*[}\]])/g, "$1"));
   }
 
   const result = ThemeOutputSchema.safeParse(parsed);

@@ -35,12 +35,33 @@ export interface ScraperCanary {
   explanation: string;
 }
 
+/**
+ * Staleness watchdog entry — an active company that has gone 7+ days with no
+ * successful scrape (`stale_scrape`) or currently has zero active postings
+ * (`no_active_jobs`). Unlike `issues`, these re-fire in every daily email
+ * until fixed. See `lib/email/scraper-health.ts#detectStaleCompanies`.
+ */
+export interface StaleCompanyIssue {
+  companyName: string;
+  companySlug: string;
+  kind: "stale_scrape" | "no_active_jobs";
+  daysSinceLastSuccess: number | null;
+  activeJobCount: number;
+  explanation: string;
+}
+
 interface ScraperAlertEmailProps {
   issues: ScraperIssue[];
   canaries?: ScraperCanary[];
+  staleIssues?: StaleCompanyIssue[];
   jobRunId: string;
   appUrl?: string;
 }
+
+const STALE_LABELS: Record<StaleCompanyIssue["kind"], string> = {
+  stale_scrape: "No successful scrape in 7+ days",
+  no_active_jobs: "Zero active postings",
+};
 
 const ISSUE_LABELS: Record<ScraperIssue["issueType"], string> = {
   failed: "Scrape error",
@@ -50,18 +71,24 @@ const ISSUE_LABELS: Record<ScraperIssue["issueType"], string> = {
 export function ScraperAlertEmail({
   issues,
   canaries = [],
+  staleIssues = [],
   jobRunId,
   appUrl = "https://fintech-talent-brief.vercel.app",
 }: ScraperAlertEmailProps) {
   const adminUrl = `${appUrl}/admin`;
-  const totalCount = issues.length + canaries.length;
+  const totalCount = issues.length + canaries.length + staleIssues.length;
   const subject = (() => {
-    if (issues.length === 0 && canaries.length > 0) {
+    if (issues.length === 0 && canaries.length === 0 && staleIssues.length > 0) {
+      return staleIssues.length === 1
+        ? `Stale scraper: ${staleIssues[0].companyName}`
+        : `Stale scrapers: ${staleIssues.length} companies`;
+    }
+    if (issues.length === 0 && canaries.length > 0 && staleIssues.length === 0) {
       return canaries.length === 1
         ? `Scraper-break canary: ${canaries[0].companyName}`
         : `Scraper-break canary: ${canaries.length} incumbent scrapers`;
     }
-    if (issues.length === 1 && canaries.length === 0) {
+    if (issues.length === 1 && canaries.length === 0 && staleIssues.length === 0) {
       return `Scraper alert: ${issues[0].companyName} — ${ISSUE_LABELS[issues[0].issueType]}`;
     }
     return `Scraper alert: ${totalCount} ${totalCount === 1 ? "issue" : "issues"} need attention`;
@@ -143,6 +170,41 @@ export function ScraperAlertEmail({
                       avg: <strong>{canary.rollingAvg7d.toFixed(1)}/day</strong>
                     </Text>
                     <Text style={detail}>{canary.explanation}</Text>
+                  </Section>
+                ))}
+              </>
+            )}
+
+            {staleIssues.length > 0 && (
+              <>
+                <Text style={canaryHeading}>Staleness watchdog</Text>
+                <Text style={body}>
+                  {staleIssues.length === 1
+                    ? "1 active company has gone stale."
+                    : `${staleIssues.length} active companies have gone stale.`}{" "}
+                  These re-fire daily until the company is fixed or
+                  deactivated with a reason — a stale company usually means
+                  its board moved to a different ATS.
+                </Text>
+
+                {staleIssues.map((stale) => (
+                  <Section
+                    key={`${stale.companySlug}-${stale.kind}`}
+                    style={canaryCard}
+                  >
+                    <Text style={companyName}>{stale.companyName}</Text>
+                    <Text style={tagCanary}>{STALE_LABELS[stale.kind]}</Text>
+                    <Text style={detail}>
+                      Last successful scrape:{" "}
+                      <strong>
+                        {stale.daysSinceLastSuccess === null
+                          ? "never"
+                          : `${stale.daysSinceLastSuccess} day(s) ago`}
+                      </strong>{" "}
+                      — active postings:{" "}
+                      <strong>{stale.activeJobCount}</strong>
+                    </Text>
+                    <Text style={detail}>{stale.explanation}</Text>
                   </Section>
                 ))}
               </>
