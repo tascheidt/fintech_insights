@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.11.0",
+    "date": "2026-07-15",
+    "changes": [
+      {
+        "type": "feature",
+        "description": "The weekly digest now reads like it was written by an editor, not assembled by a pipeline. A review of six consecutive issues found every company entry followed the same three-sentence template and the opening headline was nearly identical week after week. The digest writer now leads with the most interesting specific fact of the week, quotes real job titles, gives quiet weeks one plain sentence instead of three padded ones, and remembers recent issues — so it can say \"third straight week of risk hiring\" or note when an open-roles count has been climbing. The opening summary is now written fresh each week (with the old deterministic summary kept as an automatic fallback), the \"New This Week\" section — renamed \"Signals\" — no longer repeats the same paragraph that appears in Company Highlights, and a short \"What we're watching\" note closes the issue when something has earned a follow-up."
+      }
+    ]
+  },
+  {
     "version": "2.10.5",
     "date": "2026-07-13",
     "changes": [

@@ -46,6 +46,7 @@ Avoid these in headlines and analytical summaries (validator flags them):
 - Hype / slang: “bets big”, “doubles down”, “game-changer”, “huge”, “massive”, “crushing it”, “moonshot”
 - Newsletter hype: “TLDR”, “you won’t believe”, “secret weapon”
 - Overreach: “clearly proves”, “definitely means” (prefer “suggests”, “is consistent with”)
+- Template / telemetry diction (reads machine-written): “this activity continues”, “talent acquisition trends”, “observed data”, “establishes a baseline” — and avoid the stock skeletons “established year-to-date pattern”, “no new trends were detected”, “represents a minor addition”
 
 Extend lists through PRs to `voice.md` and mirror in `web/lib/ai/voice.ts` (`BANNED_PHRASES`).
 
@@ -55,7 +56,7 @@ Extend lists through PRs to `voice.md` and mirror in `web/lib/ai/voice.ts` (`BAN
 
 | Type | Notes |
 |------|--------|
-| **Digest** (`digest`) | Match weekly brief: objective, no emoji, no dramatic strategy language unless evidence-heavy. |
+| **Digest** (`digest`) | Objective, no emoji, no dramatic strategy language unless evidence-heavy. Editorial v2 (Jul 2026): write like an editor, not a classifier — lead with the most interesting specific fact, quote 1–2 real job titles when they carry the story, vary sentence structure between entries, spend words where the signal is (quiet week = one plain sentence), use the serial-memory context for earned streak claims, and never use the template skeletons listed above. |
 | **Job & company insights** (`analysis`) | Same as digest for headlines and summaries; `model_reasoning` can be technical but still neutral. |
 | **Narrative / strategy** (`narrative`) | Tech stack and initiative narratives: analytical, name vendors/systems when evidenced, state uncertainty when thin. |
 | **Chat** (`chat`) | Slightly warmer and conversational is OK; still no emoji spam, no hype phrases above, cite uncertainty. |

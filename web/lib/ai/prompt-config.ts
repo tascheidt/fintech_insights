@@ -103,6 +103,7 @@ const REQUIRED_PLACEHOLDERS: Record<PromptStage, string[]> = {
     "{continuing_themes}",
     "{new_themes}",
     "{sample_titles}",
+    "{previous_weeks}",
   ],
 };
 
@@ -222,15 +223,14 @@ The narrative should answer:
 - Where does the company appear opinionated or unusually finance-specific?
 - What important uncertainty remains because hiring data and strategic context are both incomplete?`;
 
-export const DEFAULT_WEEKLY_DIGEST_PROMPT = `You are writing a weekly hiring brief for fintech professionals.
-
-Use simple, objective language. Start with what the company is hiring for. Then say whether this week's jobs continue an existing pattern or suggest something new. Only call out a new signal when the evidence clearly supports it.
+export const DEFAULT_WEEKLY_DIGEST_PROMPT = `You are the editor of a weekly fintech hiring brief. Subscribers read this every Monday, so your entry for this company must feel specifically written for THIS week — never assembled from stock phrases. Evidence-first, plain language, no hype.
 
 Company: {company_name}
 
-Weekly job count: {week_job_count}
-Current open jobs: {current_open_job_count}
-Year-to-date jobs observed: {year_to_date_job_count}
+THIS WEEK'S DATA
+New postings this week: {week_job_count}
+Currently open roles: {current_open_job_count}
+Roles posted year-to-date: {year_to_date_job_count}
 
 Weekly role themes:
 {weekly_role_themes}
@@ -241,27 +241,37 @@ Current open role themes:
 Year-to-date role themes:
 {year_to_date_role_themes}
 
-Continuing themes:
-{continuing_themes}
+Themes continuing an established pattern: {continuing_themes}
+Themes that are new this week: {new_themes}
 
-Potentially new themes this week:
-{new_themes}
-
-Representative job titles:
+Representative job titles this week:
 {sample_titles}
+
+RECENT WEEKS (what the brief already told readers about this company):
+{previous_weeks}
 
 Write JSON with exactly these fields:
 {
-  "headline": "6-12 words, plain and specific",
-  "body": "2-3 sentences. Sentence 1 should describe the current hiring pattern. Sentence 2 should say whether it continues an existing pattern or indicates something new. Sentence 3 is optional if there is a clearly supported new signal."
+  "headline": "6-12 words, plain and specific. Must not repeat the sentence shape of the recent-week headlines above.",
+  "body": "See LENGTH RULE.",
+  "new_signal": "One sentence naming ONLY the genuinely new thing this week and why it matters, quoting the job title(s) behind it. Use null when nothing is genuinely new."
 }
 
-Writing rules:
-- Prefer "continues to hire" or "is still hiring" when the pattern is established.
-- Do not use hype, slang, emojis, or dramatic strategic language.
-- Do not mention tech stacks unless they are essential to describing the role type.
-- Mention exact role families or representative titles when helpful.
-- If there is no clear change this week, say that directly.
+LENGTH RULE — spend words where the signal is:
+- Nothing genuinely new: body is ONE short sentence saying so plainly, plus at most one concrete detail (a title or a number). Do not pad a quiet week into three sentences.
+- A real new signal or a notable number: body is 2-4 sentences that LEAD with the new or most interesting fact, then set it against the established pattern.
+
+WRITING RULES:
+- Lead with the most interesting specific fact, not the company's routine.
+- Quote 1-2 actual job titles when they carry the story — a title like "Staff AI Platform Engineer" is more informative than any adjective.
+- Use a number only when the number itself is the story (open roles climbing week over week, an unusual year-to-date total). A stat line under your text already shows the raw counts; never restate them mechanically.
+- Use the recent-weeks context for memory: if a theme has now appeared several weeks running, say so ("third straight week of..."); if this week breaks with last week, note the break. Never claim a streak the context does not show.
+- Say "nothing new" like a person would: "Same mix it has run all year." — short and direct.
+- BANNED constructions (these made past issues read machine-written; do not use them or close variants): "This activity continues", "established year-to-date pattern", "aligns with the company's established", "no new trends were detected", "observed data", "establishes a baseline", "represents a minor addition", "suggests a minor".
+- Do not open the body with "[Company] continues to hire" or "[Company] is still hiring" — earn any continuity framing with a specific detail instead of a stock opener.
+- At most ONE clearly flagged inference ("that reads as...", "the kind of hire a company makes when..."). Everything else stays observational.
+- Translate internal theme labels into natural prose: "risk and fraud" becomes "risk roles"; "ai and machine learning for risk" becomes "AI-risk work". Never paste a lowercase taxonomy label into a sentence.
+- No hype, slang, emojis, exclamation marks, or dramatic strategy language. Only claim a new direction when the postings clearly support it.
 
 Respond with ONLY valid JSON.`;
 
@@ -289,10 +299,13 @@ export const DEFAULT_WEEKLY_DIGEST_AI_CONFIG: WeeklyDigestAiConfig = {
   stage: "weekly-digest",
   model: "gemini-flash-latest",
   promptTemplate: DEFAULT_WEEKLY_DIGEST_PROMPT,
-  temperature: 0.2,
+  // Slightly higher temperature than the extraction stages on purpose: the
+  // editorial-v2 prompt asks for varied sentence structure, and 0.2 was one
+  // of the reasons every entry converged on the same three-beat skeleton.
+  temperature: 0.4,
   maxOutputTokens: 2048,
-  version: "digest-default-v1",
-  benchmarkScore: 82,
+  version: "digest-editorial-v2",
+  benchmarkScore: null,
 };
 
 function getStageSchema(stage: PromptStage) {

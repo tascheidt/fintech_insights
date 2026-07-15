@@ -165,7 +165,7 @@ export function buildIndustryTrendRows(
 // Strategy signals
 // ---------------------------------------------------------------------------
 
-/** A single "New This Week" strategy-signal row. */
+/** A single "Signals" (formerly "New This Week") strategy-signal row. */
 export interface StrategySignalRow {
   signal: StrategySignal;
   /** null when the signal's company isn't in the digest. */

@@ -61,6 +61,23 @@ function GlobalSummarySection({ summary }: { summary: GlobalSummary }) {
 }
 
 /**
+ * "What we're watching" — optional forward-looking closer from the AI lede
+ * (editorial v2). Omitted entirely when the digest has no watch item.
+ */
+function WatchingSection({ watching }: { watching: string }) {
+  return (
+    <Section style={companySection}>
+      <Heading as="h2" style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px" }}>
+        What we&apos;re watching
+      </Heading>
+      <Text style={{ fontSize: "14px", color: EMAIL_COLORS.fg2, lineHeight: "1.6", margin: "0" }}>
+        {watching}
+      </Text>
+    </Section>
+  );
+}
+
+/**
  * Per-company section. The data shaping (slug, hrefs, leading-theme,
  * continuity flags) lives in the shared helpers; this component only owns
  * the email-specific primitives + styles.
@@ -93,7 +110,7 @@ function CompanySection({
 
       <Text style={{ ...statsLine, marginBottom: "12px", color: EMAIL_COLORS.fg2 }}>
         {isContinuing ? (
-          `This continues an existing hiring pattern for ${company.company_name}.`
+          "No new role areas this week."
         ) : hasNewThemes ? (
           <>
             {"New this week: "}
@@ -226,13 +243,13 @@ export function WeeklyDigestEmail({
             </table>
           </Section>
 
-          {/* New This Week */}
+          {/* Signals — genuinely new role areas this week */}
           {signalRows.length > 0 && (
             <>
               <Hr style={divider} />
               <Section style={companySection}>
                 <Heading as="h2" style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px" }}>
-                  New This Week
+                  Signals
                 </Heading>
                 {signalRows.slice(0, 3).map((row, idx) => (
                   <div key={idx} style={{ marginBottom: "16px", paddingBottom: "16px", borderBottom: idx < Math.min(signalRows.length - 1, 2) ? `1px solid ${EMAIL_COLORS.border}` : "none" }}>
@@ -254,9 +271,11 @@ export function WeeklyDigestEmail({
                         row.signal.signal
                       )}
                     </Text>
-                    <Text style={{ fontSize: "13px", color: EMAIL_COLORS.fg2, lineHeight: "1.5", marginBottom: "6px" }}>
-                      {row.signal.detail}
-                    </Text>
+                    {row.signal.detail && (
+                      <Text style={{ fontSize: "13px", color: EMAIL_COLORS.fg2, lineHeight: "1.5", marginBottom: "6px" }}>
+                        {row.signal.detail}
+                      </Text>
+                    )}
                     <Text style={{ fontSize: "12px", color: EMAIL_COLORS.fgMuted }}>
                       {row.signal.interpretation}
                     </Text>
@@ -390,6 +409,14 @@ export function WeeklyDigestEmail({
                 No new job postings this week. Check back next Monday!
               </Text>
             </Section>
+          )}
+
+          {/* What we're watching — forward-looking closer (editorial v2) */}
+          {digest.global_summary?.watching && (
+            <>
+              <Hr style={divider} />
+              <WatchingSection watching={digest.global_summary.watching} />
+            </>
           )}
 
           <Hr style={divider} />

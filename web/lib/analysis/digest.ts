@@ -76,6 +76,12 @@ interface HistoricalJobRow {
 export interface DigestCommentary {
   headline: string;
   body: string;
+  /**
+   * One sentence naming only the genuinely new thing this week (editorial v2).
+   * Null / absent when nothing is genuinely new — the "Signals" section then
+   * falls back to `body` for backwards compatibility with stored digests.
+   */
+  new_signal?: string | null;
 }
 
 export interface WeeklyDigestCompanyInput {
@@ -90,6 +96,14 @@ export interface WeeklyDigestCompanyInput {
   new_themes: string[];
   sample_titles: string[];
   continuity: "continuing" | "mixed" | "new_focus";
+  /**
+   * Compact serial-memory block: what the brief said about this company in
+   * recent issues (headline, counts, new themes per week). Lets the model
+   * make earned streak claims ("third straight week of…") and avoid
+   * repeating last week's sentence shapes. Optional — absent on first
+   * tracked week or when the lookup fails.
+   */
+  previous_weeks?: string;
 }
 
 export type CompanyHiringPattern = WeeklyDigestCompanyInput;
@@ -135,6 +149,12 @@ export interface NotableMovement {
 
 export interface GlobalSummary extends DigestCommentary {
   key_insight: string;
+  /**
+   * Optional forward-looking closer ("What we're watching") from the
+   * AI-written lede (editorial v2). Null/absent on the deterministic
+   * fallback and on digests stored before v2.
+   */
+  watching?: string | null;
 }
 
 /**
@@ -270,9 +290,14 @@ function parseDigestCommentaryResponse(text: string, companyName: string): Diges
   try {
     const parsed = JSON.parse(cleaned);
     if (parsed.headline && parsed.body) {
+      const newSignal =
+        typeof parsed.new_signal === "string" && parsed.new_signal.trim().length > 0
+          ? parsed.new_signal.replace(/\s+/g, " ").trim()
+          : null;
       return {
         headline: String(parsed.headline).replace(/\s+/g, " ").trim(),
         body: String(parsed.body).replace(/\s+/g, " ").trim(),
+        new_signal: newSignal,
       };
     }
   } catch {
@@ -318,7 +343,11 @@ function buildWeeklyDigestPrompt(
     .replace("{year_to_date_role_themes}", formatRoleThemesForPrompt(input.year_to_date_role_themes))
     .replace("{continuing_themes}", input.continuing_themes.join(", ") || "None")
     .replace("{new_themes}", input.new_themes.join(", ") || "None")
-    .replace("{sample_titles}", input.sample_titles.join("; ") || "None");
+    .replace("{sample_titles}", input.sample_titles.join("; ") || "None")
+    .replace(
+      "{previous_weeks}",
+      input.previous_weeks || "None — this is the first tracked week for this company."
+    );
 }
 
 export async function generateWeeklyDigestCommentary(
@@ -378,6 +407,107 @@ export async function generateWeeklyDigestCommentary(
   return commentary;
 }
 
+// ============================================================================
+// Serial memory — what the brief said in recent issues (editorial v2)
+// ============================================================================
+
+/** Per-company + lede context pulled from the last few stored digests. */
+interface PreviousDigestContext {
+  /** company_id → compact chronological notes block for the prompt. */
+  notesByCompany: Map<string, string>;
+  /** Recent global-summary headlines (most recent first) — anti-repetition. */
+  previousLedes: string[];
+}
+
+const PREVIOUS_DIGEST_LOOKBACK = 4;
+
+/**
+ * Load what the brief already told readers: the last few digests' per-company
+ * headlines, counts, and new themes, plus the global-summary headlines. This
+ * is what lets the writer make earned streak claims ("third straight week
+ * of…"), cite open-count trajectories, and avoid re-serving last week's
+ * sentence shapes. Failure-safe: any error returns empty context — the digest
+ * must never fail because history was unavailable.
+ */
+async function getPreviousDigestContext(
+  companyIds: string[],
+  weekStart: Date
+): Promise<PreviousDigestContext> {
+  const empty: PreviousDigestContext = {
+    notesByCompany: new Map(),
+    previousLedes: [],
+  };
+  if (companyIds.length === 0) return empty;
+
+  try {
+    const supabase = createAdminClient();
+    const { data: digests, error: digestError } = await supabase
+      .from("weekly_digests")
+      .select("id, week_start, global_summary")
+      .lt("week_start", weekStart.toISOString())
+      .order("week_start", { ascending: false })
+      .limit(PREVIOUS_DIGEST_LOOKBACK);
+
+    if (digestError || !digests || digests.length === 0) return empty;
+
+    const digestIds = digests.map((d) => d.id);
+    const weekStartById = new Map(
+      digests.map((d) => [d.id, String(d.week_start).slice(0, 10)])
+    );
+
+    const previousLedes = digests
+      .map((d) => {
+        const summary = d.global_summary as { headline?: unknown } | null;
+        return summary && typeof summary.headline === "string"
+          ? summary.headline
+          : null;
+      })
+      .filter((headline): headline is string => Boolean(headline));
+
+    const { data: rows, error: rowsError } = await supabase
+      .from("weekly_digest_companies")
+      .select(
+        "digest_id, company_id, headline, new_job_count, current_open_job_count, new_themes"
+      )
+      .in("digest_id", digestIds)
+      .in("company_id", companyIds);
+
+    if (rowsError || !rows) return { notesByCompany: new Map(), previousLedes };
+
+    // Oldest week first so the prompt reads chronologically.
+    const digestOrder = new Map(
+      [...digests].reverse().map((d, index) => [d.id, index])
+    );
+    const linesByCompany = new Map<string, { order: number; line: string }[]>();
+    for (const row of rows) {
+      const order = digestOrder.get(row.digest_id) ?? 0;
+      const weekLabel = weekStartById.get(row.digest_id) ?? "unknown week";
+      const newThemes = Array.isArray(row.new_themes)
+        ? (row.new_themes as string[]).join(", ")
+        : "";
+      const line =
+        `- Week of ${weekLabel}: ${row.new_job_count ?? 0} new postings, ` +
+        `${row.current_open_job_count ?? 0} open at the time; ` +
+        `headline: "${row.headline ?? ""}"` +
+        (newThemes ? `; new that week: ${newThemes}` : "; nothing new that week");
+      const existing = linesByCompany.get(row.company_id) ?? [];
+      existing.push({ order, line });
+      linesByCompany.set(row.company_id, existing);
+    }
+
+    const notesByCompany = new Map<string, string>();
+    for (const [companyId, entries] of linesByCompany) {
+      entries.sort((a, b) => a.order - b.order);
+      notesByCompany.set(companyId, entries.map((entry) => entry.line).join("\n"));
+    }
+
+    return { notesByCompany, previousLedes };
+  } catch (error) {
+    console.warn("[digest] Failed to load previous digest context:", error);
+    return empty;
+  }
+}
+
 function buildGlobalSummary(
   companies: CompanyWeeklySummary[],
   industryTrends: IndustryTrend[],
@@ -426,6 +556,136 @@ function buildGlobalSummary(
     key_insight: keyInsight,
     body: bodyParts.join(" ").replace(/\s+/g, " ").trim(),
   };
+}
+
+/**
+ * AI-written weekly lede (editorial v2). One ungrounded Flash call that turns
+ * the already-generated company entries + cross-company trends into an
+ * issue-specific opening, with the recent ledes passed in as an
+ * anti-repetition list (the deterministic builder produced a near-identical
+ * headline five weeks out of six). Falls back to `buildGlobalSummary` on any
+ * failure — the digest never breaks because the lede call failed.
+ */
+async function generateGlobalSummaryCommentary(
+  companies: CompanyWeeklySummary[],
+  industryTrends: IndustryTrend[],
+  totalJobs: number,
+  config: WeeklyDigestAiConfig,
+  previousLedes: string[]
+): Promise<GlobalSummary | null> {
+  if (companies.length === 0 || totalJobs === 0) return null;
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+
+  const companyLines = companies
+    .map((company) => {
+      const pattern = company.hiring_pattern;
+      const newThemes = pattern.new_themes.join(", ") || "none";
+      return (
+        `- ${company.company_name}: ${company.new_job_count} new, ` +
+        `${company.current_open_job_count} open, ${company.year_to_date_job_count} posted YTD; ` +
+        `continuity: ${pattern.continuity}; new themes: ${newThemes}; ` +
+        `entry headline: "${company.ai_commentary.headline}"` +
+        (company.ai_commentary.new_signal
+          ? `; signal: ${company.ai_commentary.new_signal}`
+          : "")
+      );
+    })
+    .join("\n");
+
+  const trendLines = industryTrends
+    .map((trend) => `- ${trend.trend}: ${trend.jobCount} roles across ${trend.companies.length} companies`)
+    .join("\n") || "None";
+
+  const ledeLines = previousLedes.length > 0
+    ? previousLedes.map((lede) => `- "${lede}"`).join("\n")
+    : "None available";
+
+  const taskPrompt = `You are the editor writing the opening of this week's fintech hiring brief. The per-company entries are already written; your job is the lede a subscriber reads first.
+
+This week: ${totalJobs} new roles across ${companies.length} companies.
+
+Company entries:
+${companyLines}
+
+Cross-company role themes:
+${trendLines}
+
+Recent issues opened with these headlines — your headline must not resemble them in wording or shape:
+${ledeLines}
+
+Write JSON with exactly these fields:
+{
+  "headline": "6-12 words naming this week's single most interesting specific fact — a company, a role, or a number. Never a generic theme statement.",
+  "key_insight": "One sentence: the most interesting thing in this week's data and why it matters.",
+  "body": "2-4 sentences. Expand on the key insight with the concrete evidence behind it, then one sentence on what the rest of the week looked like. Vary sentence structure; no lists.",
+  "watching": "One forward-looking sentence naming what next week's postings would confirm or deny, grounded in this week's entries. Use null if nothing has earned a watch item."
+}
+
+Rules:
+- The most interesting fact is not always the biggest company or the largest count — a single unusual senior title at a quiet company can lead the issue.
+- Quote job titles when they carry the story; use a number only when the number is the point.
+- Plain, specific, evidence-first language. No hype, no emojis, no exclamation marks.
+- Do not repeat the company entries verbatim — synthesize.
+
+Respond with ONLY valid JSON.`;
+
+  const prompt = `${getVoiceDirective("digest")}\n\n${taskPrompt}`;
+
+  try {
+    const genAI = new GoogleGenerativeAI(key);
+    const model = genAI.getGenerativeModel({
+      model: config.model,
+      generationConfig: {
+        temperature: config.temperature,
+        maxOutputTokens: config.maxOutputTokens,
+      },
+    });
+
+    const _startMs = Date.now();
+    const response = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+
+    writeUsageEvent(
+      recordUsage({
+        callSite: "generateDigestGlobalSummary",
+        modelRequested: config.model,
+        groundingEnabled: false,
+        usageMetadata: response.response.usageMetadata,
+        latencyMs: Date.now() - _startMs,
+        status: "ok",
+        extra: { companyCount: companies.length },
+      })
+    );
+
+    const text = response.response.text()?.trim();
+    if (!text) return null;
+
+    const parsed = JSON.parse(cleanJsonText(text)) as Record<string, unknown>;
+    const headline = typeof parsed.headline === "string" ? parsed.headline.replace(/\s+/g, " ").trim() : "";
+    const keyInsight = typeof parsed.key_insight === "string" ? parsed.key_insight.replace(/\s+/g, " ").trim() : "";
+    const body = typeof parsed.body === "string" ? parsed.body.replace(/\s+/g, " ").trim() : "";
+    const watching =
+      typeof parsed.watching === "string" && parsed.watching.trim().length > 0
+        ? parsed.watching.replace(/\s+/g, " ").trim()
+        : null;
+
+    if (!headline || !keyInsight || !body) return null;
+
+    const voice = checkVoice({ headline, body, insight_summary: keyInsight });
+    if (!voice.passed) {
+      console.warn("[voice] digest global summary:", voice.warnings.join("; "));
+    }
+
+    return { headline, key_insight: keyInsight, body, watching };
+  } catch (error) {
+    console.warn(
+      "[digest] Global summary AI call failed; using deterministic fallback:",
+      error
+    );
+    return null;
+  }
 }
 
 async function getHistoricalPatternContext(
@@ -643,7 +903,10 @@ function buildStrategySignals(companies: CompanyWeeklySummary[]): StrategySignal
       company: company.company_name,
       alignment: "new_direction",
       signal: company.ai_commentary.headline,
-      detail: company.ai_commentary.body,
+      // Editorial v2: the Signals section carries only the signal-specific
+      // sentence — the full body appears once, in the company section below.
+      // Fall back to the body for pre-v2 commentary without a new_signal.
+      detail: company.ai_commentary.new_signal?.trim() || company.ai_commentary.body,
       interpretation: `New this week: ${company.hiring_pattern.new_themes.join(", ").toLowerCase()}.`,
     }));
 }
@@ -955,7 +1218,10 @@ export async function generateWeeklyReport(
 ): Promise<WeeklyDigest> {
   const { weekStart, weekEnd } = getWeekBoundaries();
   const config = await getActiveWeeklyDigestAiConfig();
-  const historicalContexts = await getHistoricalPatternContext(Array.from(weeklyData.keys()), weekStart);
+  const [historicalContexts, previousDigestContext] = await Promise.all([
+    getHistoricalPatternContext(Array.from(weeklyData.keys()), weekStart),
+    getPreviousDigestContext(Array.from(weeklyData.keys()), weekStart),
+  ]);
   const companies: CompanyWeeklySummary[] = [];
   const companyDataArray = Array.from(weeklyData.values());
 
@@ -970,6 +1236,9 @@ export async function generateWeeklyReport(
           yearToDateRoleThemes: [],
         };
         const hiringPattern = buildWeeklyDigestCompanyInput(companyData, historicalContext);
+        hiringPattern.previous_weeks = previousDigestContext.notesByCompany.get(
+          companyData.company_id
+        );
         const aiCommentary = await generateWeeklyDigestCommentary(hiringPattern, config);
 
         return {
@@ -1003,7 +1272,16 @@ export async function generateWeeklyReport(
   const totalJobs = companies.reduce((sum, company) => sum + company.new_job_count, 0);
   const industryTrends = detectIndustryTrends(companies);
   const strategySignals = buildStrategySignals(companies);
-  const globalSummary = buildGlobalSummary(companies, industryTrends, totalJobs);
+  // Editorial v2: AI-written lede with the deterministic builder as fallback —
+  // the fixed template produced a near-identical opening five weeks out of six.
+  const globalSummary =
+    (await generateGlobalSummaryCommentary(
+      companies,
+      industryTrends,
+      totalJobs,
+      config,
+      previousDigestContext.previousLedes
+    )) ?? buildGlobalSummary(companies, industryTrends, totalJobs);
 
   // Incumbent Watch — gated big-bank senior-hiring interlude. A failure here
   // must never break the fintech-spined digest, so it degrades to null.
