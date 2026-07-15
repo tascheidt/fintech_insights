@@ -47,6 +47,16 @@ export const EDITORIAL_MODEL = "gemini-pro-latest" as const;
 
 const EDITORIAL_TIMEOUT_MS = 120_000;
 
+/**
+ * Total attempts per company (1 initial + 2 retries, 1s/2s backoff — the
+ * same shape as generateInsightWithLLM's v2.3.1 retry). Retries cover the
+ * transient failure modes seen in the weekly cron: a one-off Pro stall past
+ * the 120s timeout (Neo Financial, July 13 2026 run), an empty response,
+ * and a truncated/malformed JSON body. Each attempt is a fresh Gemini call
+ * with its own telemetry row; the (deterministic) context is built once.
+ */
+const EDITORIAL_MAX_ATTEMPTS = 3;
+
 // ---------------------------------------------------------------------------
 // Output schema (Zod) — matches `bets` column shape + editorial fields.
 // ---------------------------------------------------------------------------
@@ -445,7 +455,8 @@ function extractJson(text: string): string {
   return text;
 }
 
-export async function generateCompanyEditorial(
+async function attemptEditorialGeneration(
+  prompt: string,
   companyId: string,
   companyName: string
 ): Promise<EditorialOutput> {
@@ -453,13 +464,6 @@ export async function generateCompanyEditorial(
   if (!key) {
     throw new Error("GEMINI_API_KEY not configured");
   }
-
-  const ctx = await buildEditorialContext(companyId, companyName);
-
-  const prompt = EDITORIAL_PROMPT.replace(
-    "{voice_block}",
-    getVoiceDirective("narrative")
-  ).replace("{context_block}", formatContextBlock(ctx));
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
@@ -545,13 +549,55 @@ export async function generateCompanyEditorial(
     );
   }
 
+  return result.data;
+}
+
+export async function generateCompanyEditorial(
+  companyId: string,
+  companyName: string
+): Promise<EditorialOutput> {
+  const ctx = await buildEditorialContext(companyId, companyName);
+
+  const prompt = EDITORIAL_PROMPT.replace(
+    "{voice_block}",
+    getVoiceDirective("narrative")
+  ).replace("{context_block}", formatContextBlock(ctx));
+
+  // Retry transient failures (timeout / empty / truncated JSON / schema
+  // miss) — same 3-attempt linear-backoff shape as generateInsightWithLLM.
+  // The Neo Financial run (July 13 2026) hard-failed the weekly cron on a
+  // single 120s Pro stall that a retry would have absorbed.
+  let data: EditorialOutput | null = null;
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= EDITORIAL_MAX_ATTEMPTS; attempt++) {
+    try {
+      data = await attemptEditorialGeneration(prompt, companyId, companyName);
+      break;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < EDITORIAL_MAX_ATTEMPTS) {
+        log.warn(
+          `[editorial] attempt ${attempt}/${EDITORIAL_MAX_ATTEMPTS} failed for ${companyName} (${
+            err instanceof Error ? err.message : String(err)
+          }); retrying`
+        );
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
+  }
+  if (data === null) {
+    throw lastErr instanceof Error
+      ? lastErr
+      : new Error(String(lastErr ?? "editorial generation failed"));
+  }
+
   // Voice check (warnings only — never block). The thesis is a sentence
   // rather than a headline, so it slots into `body`; `last_change` is the
   // closest field to a one-line summary.
   const voice = checkVoice({
-    body: result.data.thesis,
-    insight_summary: result.data.last_change,
-    executive_summary: result.data.interpretation,
+    body: data.thesis,
+    insight_summary: data.last_change,
+    executive_summary: data.interpretation,
   });
   if (!voice.passed) {
     log.warn(
@@ -561,7 +607,7 @@ export async function generateCompanyEditorial(
   }
 
   // Stamp synthetic IDs onto bets so the DB row stays stable across renders.
-  const stampedBets = result.data.bets.map((b, i) => ({
+  const stampedBets = data.bets.map((b, i) => ({
     ...b,
     id: b.id ?? `bet-${i + 1}`,
   }));
@@ -574,7 +620,7 @@ export async function generateCompanyEditorial(
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
   const minIso = ninetyDaysAgo.toISOString().slice(0, 10);
-  let lastChangeAt = result.data.last_change_at;
+  let lastChangeAt = data.last_change_at;
   if (lastChangeAt > todayIso || lastChangeAt < minIso) {
     log.warn(
       {
@@ -587,7 +633,7 @@ export async function generateCompanyEditorial(
   }
 
   return {
-    ...result.data,
+    ...data,
     last_change_at: lastChangeAt,
     bets: stampedBets,
   };

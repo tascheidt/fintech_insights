@@ -1,11 +1,25 @@
 [
   {
-    "version": "2.11.0",
+    "version": "2.12.0",
     "date": "2026-07-15",
     "changes": [
       {
         "type": "feature",
         "description": "The weekly digest now reads like it was written by an editor, not assembled by a pipeline. A review of six consecutive issues found every company entry followed the same three-sentence template and the opening headline was nearly identical week after week. The digest writer now leads with the most interesting specific fact of the week, quotes real job titles, gives quiet weeks one plain sentence instead of three padded ones, and remembers recent issues — so it can say \"third straight week of risk hiring\" or note when an open-roles count has been climbing. The opening summary is now written fresh each week (with the old deterministic summary kept as an automatic fallback), the \"New This Week\" section — renamed \"Signals\" — no longer repeats the same paragraph that appears in Company Highlights, and a short \"What we're watching\" note closes the issue when something has earned a follow-up."
+      }
+    ]
+  },
+  {
+    "version": "2.11.0",
+    "date": "2026-07-14",
+    "changes": [
+      {
+        "type": "feature",
+        "description": "Scrapers can no longer go quietly dark. Two new safety nets close the gap that let Koho sit unscraped for months: a daily staleness watchdog flags any tracked company with no successful scrape or zero open postings for a week — and keeps flagging it every day until it's fixed, instead of alerting once and going silent — and a weekly drift check probes every company's job board (including deactivated ones) to catch boards that moved to a different hiring platform or came back to life. Both alert admins by email, and deactivated companies can now carry a written reason so an intentional shutdown is distinguishable from a broken scraper that was parked and forgotten."
+      },
+      {
+        "type": "fix",
+        "description": "The weekly editorial refresh no longer fails outright on a single slow or garbled AI response. One company's generation stalling past the time limit (Neo Financial, July 13) and one unparseable response from the theme labeler each used to kill their part of the run; both now retry up to three times with a short pause, and the theme labeler got more headroom against cut-off responses plus better diagnostics when one still fails."
       }
     ]
   },
