@@ -64,6 +64,27 @@ The canary fires for a bank when BOTH thresholds hold:
 
 The pure threshold rule is `evaluateCanary({today, rolling}) → { fire, reason }` in [`web/lib/email/scraper-health.ts`](../web/lib/email/scraper-health.ts); it has unit tests in `scraper-health.test.ts`. Firing canaries are appended to the existing scraper-alert email under a "Scraper-break canary" section so admins don't get a second message. Failed canary detection logs a structured `log.error` but never blocks the rest of the scraper-health flow.
 
+## Staleness watchdog (persistent, all active companies)
+
+The `failed`/`empty` issues and the canary all share a blind spot: they only see **the current run's tasks**, and `empty` only fires on the transition day (`closedThisRun > 0`). Miss that one email and every following day reads healthy — zero active jobs, zero closed this run, no alert. That persistence gap is how Koho sat dark for months after migrating its board to Ashby (July 2026).
+
+`detectStaleCompanies` in [`web/lib/email/scraper-health.ts`](../web/lib/email/scraper-health.ts) closes it. On every collect run it evaluates **every** `is_active=true` company and appends a "Staleness watchdog" section to the same scraper-alert email — re-firing daily until the company is fixed or deactivated:
+
+- `stale_scrape` — no `completed` scrape task in `STALE_SCRAPE_THRESHOLD_DAYS` (7) days, or never.
+- `no_active_jobs` — zero `is_active=true` postings.
+
+Scope rules: incumbent-tier companies are excluded while `incumbent_tracking_enabled` is off (parked intentionally); sub-brands (`parent_company_id` set, e.g. Simplii) are only checked on the postings signal (they never get their own scrape task); companies younger than the threshold are in onboarding grace; companies already flagged as `failed`/`empty` in the run aren't double-reported. The pure rule is `evaluateStaleness(...)`, unit-tested in `scraper-health.test.ts`. Errors are swallowed/logged — the watchdog never blocks the health email.
+
+## Weekly scraper-drift check (config vs reality)
+
+The daily checks watch scrape *outcomes*; nothing re-asks whether the stored ATS *config* still matches reality — a deactivated company's board coming back to life, or an active company's `careers_url` now resolving to a different provider. The weekly drift check ([`.github/workflows/scraper-drift-check.yml`](../.github/workflows/scraper-drift-check.yml), Mon 12:00 UTC, running [`web/scripts/scraper-drift-check.ts`](../web/scripts/scraper-drift-check.ts) in-runner) probes exactly that:
+
+- `dormant_live_board` — an inactive `tier='fintech'` company with a live board showing open roles, found by probing the configured board **and** trying the company slug on every API-probeable provider (lever/greenhouse/workable/ashby — the "slug sweep"). This is the probe that would have caught Koho months earlier. `companies.deactivated_reason` (migration `20260714000000`) is included in the alert so intentional dormancy ("shut down") is distinguishable from a parked broken scraper — set it whenever deactivating a company.
+- `ats_drift` — an active company whose `careers_url` resolves (high-confidence `detectATSFromUrl`) to a different `ats_type`/`ats_identifier` than configured.
+- `dead_config` — an active company whose configured API board endpoint no longer answers, with any live slug-sweep hit named as the likely destination.
+
+Findings are emailed to admins via Resend (`--dry-run` logs only). Decision rules are pure in [`web/lib/scrapers/drift.ts`](../web/lib/scrapers/drift.ts), unit-tested in `drift.test.ts`. The script exits 0 even with findings — the email is the signal; non-zero is reserved for the script itself breaking.
+
 ## Daily Gemini cost alarm
 
 A GitHub Actions workflow ([`gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml)) runs daily at 14:00 UTC and `curl`s `/api/admin/cost-alarm` with `Authorization: Bearer ${CRON_SECRET}`.

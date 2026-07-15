@@ -1,0 +1,87 @@
+name: Scraper Drift Check
+
+# Weekly sweep that compares every company's stored ATS config against its
+# live careers surface (see web/scripts/scraper-drift-check.ts):
+#   - inactive fintech companies with a live board somewhere → dormant_live_board
+#   - active companies whose careers_url resolves to a different ATS → ats_drift
+#   - active companies whose configured API board endpoint died → dead_config
+# Findings are emailed to admins via Resend. Runs the script directly in the
+# Action runner (same pattern as editorial-cron.yml) — keeps it off the
+# Vercel cron quota (cap is 2).
+#
+# Born from the Koho incident (July 2026): the company sat deactivated with a
+# dead Lever config for months while its real board filled up on Ashby.
+#
+# Required repository secrets:
+#   - NEXT_PUBLIC_SUPABASE_URL
+#   - NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   - SUPABASE_SERVICE_ROLE_KEY
+#   - RESEND_API_KEY
+#
+# Schedule: Monday 12:00 UTC — after company-insights (09:00) and editorial
+# (11:00) so the weekly ops emails arrive together.
+
+on:
+  schedule:
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Log findings without sending the admin email"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      # Checkout MUST come first: the job-level `working-directory: ./web`
+      # default applies to every `run:` step, and ./web doesn't exist until
+      # the repo is checked out.
+      - uses: actions/checkout@v5
+
+      - name: Validate required secrets
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          for secret in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY RESEND_API_KEY; do
+            value=$(eval echo \$$secret)
+            if [ -z "$value" ]; then
+              echo "::error::Missing required secret $secret"
+              exit 1
+            fi
+          done
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Run scraper-drift-check
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -e
+          ARGS=""
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS="--dry-run"
+          fi
+          echo "Running: npx tsx scripts/scraper-drift-check.ts $ARGS"
+          npx tsx scripts/scraper-drift-check.ts $ARGS
