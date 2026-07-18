@@ -29,6 +29,11 @@ export const BANNED_PHRASES = [
   "tl;dr",
   "tldr",
   "won the internet",
+  // Template / telemetry diction — reads machine-written (digest voice v2).
+  "this activity continues",
+  "talent acquisition trends",
+  "observed data",
+  "establishes a baseline",
 ] as const;
 
 /** Core rules injected into prompts (compact for token budget). */
@@ -41,9 +46,12 @@ export const VOICE_RULES_CORE = `VOICE (required for all user-visible text you p
 - Avoid banned hype phrasing including: betting big, doubles down, game-changer, massive, moonshot, TLDR-style hooks.`;
 
 const DIGEST_ADDENDUM = `For this digest summary specifically:
-- Prefer "continues to hire" or "is still hiring" when the pattern is established.
+- Write like an editor, not a classifier: vary sentence structure; never fall back on stock skeletons like "This activity continues an established year-to-date pattern" or telemetry diction ("no new trends were detected", "observed data").
+- Lead with the most interesting specific fact; quote 1-2 real job titles when they carry the story.
+- Spend words where the signal is: a quiet week gets one plain sentence, a real signal gets the detail.
+- Use a number only when the number is the story; never restate stats mechanically.
 - Do not mention tech stacks unless essential to the role type.
-- If there is no clear change this week, say that directly.`;
+- If there is no clear change this week, say so in one short, human sentence.`;
 
 const NARRATIVE_ADDENDUM = `For this narrative:
 - Name systems, vendors, or role clusters when the evidence supports it.

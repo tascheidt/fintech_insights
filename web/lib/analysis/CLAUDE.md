@@ -25,7 +25,7 @@ These run for every new job posting after `collect`:
 
 ## Digest pipeline
 
-- **`digest.ts`** — Builds the weekly digest payload. Consumed by the email template and the in-app `DigestViewer`. User-facing → voice directive applies. `buildIncumbentWatch` is gated by the `incumbent_tracking_enabled` flag (`web/lib/settings/incumbent-tracking.ts`) — when incumbent tracking is off (the default) it returns `null`, which is the existing "no qualifying hire" contract, so the email + viewer omit the block with no further change. See root CLAUDE.md §7 "Incumbent-tracking flag".
+- **`digest.ts`** — Builds the weekly digest payload. Consumed by the email template and the in-app `DigestViewer`. User-facing → voice directive applies. Editorial v2 (Jul 2026): per-company summaries get a `{previous_weeks}` serial-memory block (last 4 stored digests) and return an extra `new_signal` sentence for the "Signals" section; the lede is AI-written (`generateGlobalSummaryCommentary`, Flash ungrounded, telemetered) with the deterministic `buildGlobalSummary` as fallback. Both AI calls are failure-safe — history-lookup or lede failure never fails the digest. See [`docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md`](../../../docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md). `buildIncumbentWatch` is gated by the `incumbent_tracking_enabled` flag (`web/lib/settings/incumbent-tracking.ts`) — when incumbent tracking is off (the default) it returns `null`, which is the existing "no qualifying hire" contract, so the email + viewer omit the block with no further change. See root CLAUDE.md §7 "Incumbent-tracking flag".
 
 ## Helpers (not entry points)
 

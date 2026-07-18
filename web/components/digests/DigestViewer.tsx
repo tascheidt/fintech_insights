@@ -51,6 +51,12 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
               </p>
             )}
             <p className="text-muted-foreground">{globalSummary.body}</p>
+            {globalSummary.watching && (
+              <p className="text-sm text-muted-foreground border-t pt-3">
+                <span className="font-medium text-foreground">What we&apos;re watching: </span>
+                {globalSummary.watching}
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -168,13 +174,13 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
         </Card>
       )}
 
-      {/* New This Week */}
+      {/* Signals — genuinely new role areas this week */}
       {signalRows.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
-              New This Week
+              Signals
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -207,7 +213,9 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                           row.signal.signal
                         )}
                       </div>
-                      <div className="text-sm mt-2">{row.signal.detail}</div>
+                      {row.signal.detail && (
+                        <div className="text-sm mt-2">{row.signal.detail}</div>
+                      )}
                       <div className="text-sm text-muted-foreground mt-2">
                         {row.signal.interpretation}
                       </div>
@@ -334,7 +342,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {isContinuing ? (
-                          `This continues an existing hiring pattern for ${company.company_name}.`
+                          "No new role areas this week."
                         ) : hasNewThemes ? (
                           <>
                             {"New this week: "}

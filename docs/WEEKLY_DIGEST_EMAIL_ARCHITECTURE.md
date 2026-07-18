@@ -2,7 +2,7 @@
 
 **Document Purpose:** Current-state technical overview of the shared weekly digest model, persistence layer, and email delivery flow.
 
-**Last Updated:** 2026-03-10
+**Last Updated:** 2026-07-15
 
 ---
 
@@ -16,6 +16,8 @@ The key editorial rule is:
 - use simple, objective language
 
 The digest no longer treats tech-stack commentary as a primary output. The main content is role-focused and continuity-aware.
+
+**Editorial v2 (Jul 2026).** A review of six consecutive issues found the output template-written: the same three-beat sentence skeleton in every company entry ("continues hiring" appeared 79 times across six issues), a near-identical deterministic lede five weeks out of six, the "New This Week" section duplicating company-section prose verbatim, and no memory between issues. v2 changes: an editorial company-summary prompt with anti-template rules and a signal-proportional length rule; serial memory (`{previous_weeks}`) so entries can make earned streak claims; an AI-written lede (Flash, ungrounded, telemetered) with the deterministic builder as fallback; a `new_signal` field so the renamed **Signals** section carries one signal-specific sentence instead of duplicating the body; and an optional **What we're watching** closer.
 
 ---
 
@@ -144,17 +146,29 @@ The weekly digest company summary prompt is now a Prompt Forge stage:
 - stage key: `weekly-digest`
 - system settings key: `weekly_digest_ai`
 
-### Prompt goals
+### Prompt goals (editorial v2)
 
-The prompt is tuned to:
-- state what roles are open
-- say whether the week continues an existing pattern or shows a change
-- mention a new insight only when supported by the roles
-- avoid hype, slang, and inflated strategy language
+The company-summary prompt is tuned to:
+- lead with the most interesting specific fact, quoting 1–2 real job titles when they carry the story
+- spend words where the signal is: a quiet week gets one plain sentence, a real signal gets 2–4
+- use the `{previous_weeks}` serial-memory block for earned streak claims ("third straight week of…") and to avoid repeating recent sentence shapes
+- return a third field, `new_signal` — one sentence naming only the genuinely new thing — used by the "Signals" section so it never duplicates the body
+- ban the v1 template skeletons ("This activity continues…", "established year-to-date pattern", telemetry diction like "no new trends were detected")
+- avoid hype, slang, and inflated strategy language (voice directive still applies)
+
+The default runs at temperature 0.4 (up from 0.2) because sentence-structure variety is an explicit goal.
+
+### Serial memory
+
+`getPreviousDigestContext` (in `digest.ts`) loads the last 4 stored digests' per-company rows (headline, counts, new themes) plus their global-summary headlines. Per-company notes feed `{previous_weeks}`; the recent lede headlines feed the global-summary call as an anti-repetition list. The lookup is failure-safe: any error yields empty context, never a failed digest.
+
+### Global summary (AI lede with deterministic fallback)
+
+`generateGlobalSummaryCommentary` writes the issue lede from the already-generated company entries + cross-company trends: `headline`, `key_insight`, `body`, and an optional forward-looking `watching` line rendered as "What we're watching". One ungrounded Flash call, telemetered to `gemini_usage_events` (`callSite: generateDigestGlobalSummary`). On any failure it returns null and `buildGlobalSummary` (the deterministic v1 builder) supplies the fallback — the digest never fails because the lede call did.
 
 ### Scope note
 
-Prompt tuning currently covers company-level digest summaries. The global summary is assembled deterministically from the shared digest model to keep the top-level narrative more objective and stable.
+Prompt Forge covers the company-level summaries (`weekly-digest` stage). Note the `{previous_weeks}` placeholder is **required**: a stored `weekly_digest_ai` config that lacks it fails placeholder validation at load time and the code falls back to the editorial-v2 default template.
 
 ---
 
@@ -213,7 +227,8 @@ Each company section should answer:
 ### Cross-company sections
 
 - `Role Focus This Week` summarizes role themes that appeared across multiple companies.
-- `New This Week` is reserved for higher-confidence changes in role focus.
+- `Signals` (formerly `New This Week`) is reserved for higher-confidence changes in role focus. It renders headline + the one-sentence `new_signal` (falling back to `body` for pre-v2 stored digests), so prose is never duplicated between it and the company sections.
+- `What we're watching` is an optional forward-looking closer from the AI lede.
 
 ---
 
