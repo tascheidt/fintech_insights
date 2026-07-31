@@ -15,17 +15,22 @@ export const DEFAULT_FEEDBACK_TYPES: FeedbackType[] = [
   { value: "general", label: "General", titlePlaceholder: "What\u2019s on your mind?" },
 ];
 
-/** A user's feedback submission (returned by GET /api/feedback) */
+/**
+ * A user's own feedback submission (returned by GET /api/feedback).
+ *
+ * Intentionally carries NO `triage_*` fields. Triage output is internal
+ * classification written for an admin audience, and on failure it holds raw
+ * model error text; exposing it here is how a Gemini 404 became user-facing
+ * copy. Users get the review state and, where an admin wrote one, their note.
+ */
 export interface FeedbackItem {
   id: string;
   type: string;
   title: string;
   description: string;
-  status: string;
-  triage_decision: string | null;
-  triage_confidence: number | null;
-  triage_reasoning: string | null;
-  triage_suggested_title: string | null;
+  review_state: "needs_review" | "approved" | "rejected" | "shipped";
+  admin_notes: string | null;
+  github_issue_url: string | null;
   created_at: string;
 }
 
@@ -36,24 +41,41 @@ export interface FeedbackSubmission {
   title: string;
   description: string;
   page_url: string | null;
+  /** LEGACY mirror of the AI verdict. Use `triage_decision` / `review_state`. */
   status: string;
+  /** Human review axis, independent of the AI verdict. */
+  review_state: "needs_review" | "approved" | "rejected" | "shipped";
   triage_decision: string | null;
   triage_confidence: number | null;
+  /** Admin-facing prose. Never render this on a user-facing surface. */
   triage_reasoning: string | null;
   triage_mapped_priority: string | null;
+  /** UUID of the submission this duplicates, or null. */
   triage_duplicate_of: string | null;
   triage_suggested_title: string | null;
   triage_suggested_labels: string[] | null;
   triage_completed_at: string | null;
+  /** Last triage failure. Internal only. */
+  triage_error: string | null;
   generated_issue: string | null;
   admin_override_decision: string | null;
   admin_notes: string | null;
   reviewed_at: string | null;
   github_issue_number: number | null;
   github_issue_url: string | null;
+  code_gen_triggered_at: string | null;
   created_at: string;
   updated_at: string;
   profiles: { email: string } | null;
+}
+
+/** Paginated envelope returned by the admin GET handler. */
+export interface AdminFeedbackPage {
+  items: FeedbackSubmission[];
+  page: number;
+  page_size: number;
+  total: number;
+  has_more: boolean;
 }
 
 /** GitHub integration config */

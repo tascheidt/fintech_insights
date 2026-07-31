@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { FeedbackConfig } from "../types";
 import { resolveConfig } from "../config";
-import { adminPatchSchema } from "../validation";
-import { createGitHubIssue } from "../services/github";
+import { adminPatchSchema, reviewStateFromLegacyDecision } from "../validation";
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
+
+/** review_state -> the legacy admin_override_decision mirror, where one exists. */
+const LEGACY_DECISION: Record<string, string | null> = {
+  needs_review: null,
+  approved: "accepted",
+  rejected: "declined",
+  shipped: "accepted",
+};
 
 /**
  * Create route handlers for admin feedback management.
@@ -11,6 +21,12 @@ import { createGitHubIssue } from "../services/github";
  * ```
  * export const { GET, PATCH } = createAdminFeedbackHandlers(config);
  * ```
+ *
+ * GitHub issue creation deliberately does NOT live here — see
+ * `createIssueHandler`. It used to be bolted onto the accept PATCH, which meant
+ * the UI re-sent an "accept" purely to create an issue (re-stamping reviewed_by
+ * and reviewed_at each time), and the only guard against a double-create was a
+ * read-then-write check that two concurrent requests both passed.
  */
 export function createAdminFeedbackHandlers(rawConfig: FeedbackConfig) {
   const config = resolveConfig(rawConfig);
@@ -37,47 +53,64 @@ export function createAdminFeedbackHandlers(rawConfig: FeedbackConfig) {
     return { supabase, user };
   }
 
-  /** GET — Fetch all feedback submissions (admin only) */
+  /** GET — Fetch feedback submissions (admin only), paginated */
   async function GET(req: NextRequest) {
     const auth = await requireAdmin();
     if ("error" in auth && auth.error) return auth.error;
     const { supabase } = auth;
 
     const { searchParams } = new URL(req.url);
+    const reviewState = searchParams.get("review_state");
     const status = searchParams.get("status");
 
-    // Build the FK join dynamically from config
+    const pageSize = Math.min(
+      MAX_PAGE_SIZE,
+      Math.max(1, Number(searchParams.get("page_size")) || DEFAULT_PAGE_SIZE)
+    );
+    const page = Math.max(0, Number(searchParams.get("page")) || 0);
+    const from = page * pageSize;
+
     const joinExpr = `${config.userTable}!${config.userForeignKey}(${config.userEmailColumn})`;
 
     let query = supabase
       .from("feedback_submissions")
       .select(
-        `id, type, title, description, page_url, status,
+        `id, type, title, description, page_url, status, review_state,
          triage_decision, triage_confidence, triage_reasoning,
          triage_mapped_priority, triage_duplicate_of, triage_suggested_title,
-         triage_suggested_labels, triage_completed_at, generated_issue,
+         triage_suggested_labels, triage_completed_at, triage_error,
+         generated_issue,
          admin_override_decision, admin_notes, reviewed_at,
          github_issue_number, github_issue_url,
+         code_gen_triggered_at,
          created_at, updated_at,
-         ${joinExpr}`
+         ${joinExpr}`,
+        { count: "exact" }
       )
       .order("created_at", { ascending: false })
-      .limit(50);
+      .range(from, from + pageSize - 1);
 
-    if (status) {
-      query = query.eq("status", status);
-    }
+    // review_state is the review queue's axis; `status` remains filterable for
+    // the legacy AI-verdict view.
+    if (reviewState) query = query.eq("review_state", reviewState);
+    if (status) query = query.eq("status", status);
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data ?? []);
+    return NextResponse.json({
+      items: data ?? [],
+      page,
+      page_size: pageSize,
+      total: count ?? 0,
+      has_more: (count ?? 0) > from + (data?.length ?? 0),
+    });
   }
 
-  /** PATCH — Admin actions on feedback (accept/decline/note) */
+  /** PATCH — Admin review actions (approve / reject / reopen / note) */
   async function PATCH(req: NextRequest) {
     const auth = await requireAdmin();
     if ("error" in auth && auth.error) return auth.error;
@@ -98,16 +131,23 @@ export function createAdminFeedbackHandlers(rawConfig: FeedbackConfig) {
       );
     }
 
-    const { id, admin_override_decision, admin_notes } = parsed.data;
+    const { id, admin_notes } = parsed.data;
+    const reviewState =
+      parsed.data.review_state ??
+      (parsed.data.admin_override_decision
+        ? reviewStateFromLegacyDecision(parsed.data.admin_override_decision)
+        : undefined);
 
     const updateData: Record<string, unknown> = {
       reviewed_by: user.id,
       reviewed_at: new Date().toISOString(),
     };
 
-    if (admin_override_decision) {
-      updateData.admin_override_decision = admin_override_decision;
-      updateData.status = admin_override_decision;
+    if (reviewState) {
+      updateData.review_state = reviewState;
+      // Keep the legacy mirror consistent. Reopening clears it: a reopened
+      // submission has no standing human decision.
+      updateData.admin_override_decision = LEGACY_DECISION[reviewState];
     }
     if (admin_notes !== undefined) {
       updateData.admin_notes = admin_notes;
@@ -118,69 +158,12 @@ export function createAdminFeedbackHandlers(rawConfig: FeedbackConfig) {
       .update(updateData)
       .eq("id", id)
       .select(
-        "id, status, admin_override_decision, admin_notes, reviewed_at, github_issue_number, github_issue_url"
+        "id, status, review_state, admin_override_decision, admin_notes, reviewed_at, github_issue_number, github_issue_url"
       )
       .single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // Auto-create GitHub issue when admin accepts feedback
-    if (
-      admin_override_decision === "accepted" &&
-      !data.github_issue_number &&
-      config.github
-    ) {
-      try {
-        const { data: feedback } = await supabase
-          .from("feedback_submissions")
-          .select(
-            "title, triage_suggested_title, generated_issue, type, triage_suggested_labels"
-          )
-          .eq("id", id)
-          .single();
-
-        if (!feedback?.generated_issue) {
-          return NextResponse.json({
-            ...data,
-            github_error:
-              "No generated issue content \u2014 run AI triage first",
-          });
-        }
-
-        const labels = [
-          "feedback",
-          feedback.type,
-          ...(feedback.triage_suggested_labels ?? []),
-        ].filter(Boolean);
-
-        const issue = await createGitHubIssue(config.github, {
-          title: feedback.triage_suggested_title || feedback.title,
-          body: feedback.generated_issue,
-          labels,
-        });
-
-        await supabase
-          .from("feedback_submissions")
-          .update({
-            github_issue_number: issue.number,
-            github_issue_url: issue.html_url,
-          })
-          .eq("id", id);
-
-        data.github_issue_number = issue.number;
-        data.github_issue_url = issue.html_url;
-      } catch (err) {
-        console.error("Failed to create GitHub issue:", err);
-        return NextResponse.json({
-          ...data,
-          github_error:
-            err instanceof Error
-              ? err.message
-              : "Unknown error creating GitHub issue",
-        });
-      }
     }
 
     return NextResponse.json(data);

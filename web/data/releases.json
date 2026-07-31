@@ -1,5 +1,27 @@
 [
   {
+    "version": "2.14.0",
+    "date": "2026-07-31",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "An AI verdict on your feedback is no longer the last word. Previously the AI's decision was written straight into the submission's status, and the admin review screen hid its approve and reject controls for anything already marked accepted or declined — so nothing the AI resolved could be revisited without editing the database. Reviewing is now a separate step from triage, every decision is reversible, and nine submissions that had been closed or silently parked without a person ever seeing them are back in the queue."
+      },
+      {
+        "type": "improvement",
+        "description": "The feedback review screen now opens on what actually needs attention rather than everything at once, shows whether a submission is waiting, planned, rejected or shipped separately from what the AI thought, links possible duplicates to the real submission, pages through history instead of cutting off at fifty, and reports failures instead of quietly showing success."
+      },
+      {
+        "type": "improvement",
+        "description": "Your feedback history now shows a plain status and, where we've left one, a note from the team — instead of the AI's internal notes, which were written for reviewers and occasionally displayed raw error text. Submissions that became tracked work now link to their progress."
+      },
+      {
+        "type": "fix",
+        "description": "Opening a GitHub issue or starting code generation twice no longer creates duplicates. Both actions are now recorded server-side, so a double-click or a page refresh can't produce a second issue or a second pull request."
+      }
+    ]
+  },
+  {
     "version": "2.13.0",
     "date": "2026-07-31",
     "changes": [

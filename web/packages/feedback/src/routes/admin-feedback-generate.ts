@@ -45,7 +45,7 @@ export function createCodeGenHandler(rawConfig: FeedbackConfig) {
 
     const { data: feedback, error } = await supabase
       .from("feedback_submissions")
-      .select("id, status, github_issue_number")
+      .select("id, review_state, github_issue_number, code_gen_triggered_at")
       .eq("id", id)
       .single();
 
@@ -56,13 +56,6 @@ export function createCodeGenHandler(rawConfig: FeedbackConfig) {
       );
     }
 
-    if (feedback.status !== "accepted") {
-      return NextResponse.json(
-        { error: "Feedback must be accepted before generating code" },
-        { status: 400 }
-      );
-    }
-
     if (!feedback.github_issue_number) {
       return NextResponse.json(
         { error: "No GitHub issue linked to this feedback" },
@@ -70,17 +63,50 @@ export function createCodeGenHandler(rawConfig: FeedbackConfig) {
       );
     }
 
+    if (feedback.review_state !== "shipped") {
+      return NextResponse.json(
+        { error: "Feedback must have an issue opened before generating code" },
+        { status: 409 }
+      );
+    }
+
+    // Whether code generation had already run lived only in React state, so a
+    // page refresh re-armed the button and a second click dispatched another
+    // workflow run — and therefore opened another PR against the same issue.
+    // The stamp below is the durable guard. `force` exists because a genuinely
+    // failed run is a legitimate reason to dispatch again.
+    const force = new URL(_req.url).searchParams.get("force") === "true";
+    if (feedback.code_gen_triggered_at && !force) {
+      return NextResponse.json(
+        {
+          error: "Code generation already triggered for this issue",
+          triggered_at: feedback.code_gen_triggered_at,
+          hint: "Re-run with ?force=true if the previous workflow failed",
+        },
+        { status: 409 }
+      );
+    }
+
     try {
       await triggerCodeGenWorkflow(config.github, feedback.github_issue_number);
-      return NextResponse.json({
-        triggered: true,
-        issue_number: feedback.github_issue_number,
-      });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to trigger workflow";
-      return NextResponse.json({ error: message }, { status: 500 });
+      return NextResponse.json({ error: message }, { status: 502 });
     }
+
+    await supabase
+      .from("feedback_submissions")
+      .update({
+        code_gen_triggered_at: new Date().toISOString(),
+        code_gen_triggered_by: user.id,
+      })
+      .eq("id", id);
+
+    return NextResponse.json({
+      triggered: true,
+      issue_number: feedback.github_issue_number,
+    });
   }
 
   return { POST };
