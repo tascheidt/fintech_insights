@@ -138,6 +138,18 @@ mapping lives in [`docs/OBSERVABILITY.md`](./OBSERVABILITY.md). The
 separate Sentry alert rule routes it on the alarm tag rather than monitor
 state.
 
+## Event-driven work (not scheduled, but scheduler-adjacent)
+
+**Feedback triage** is worth listing here because it used to be a scheduler venue nobody could see. It ran as a Supabase Edge Function (`triage-feedback`) invoked by an `AFTER INSERT` trigger through `pg_net` — outside the repo, outside CI, with `verify_jwt: false` so anyone on the internet could invoke it, and with `net._http_response` empty so there was no way to tell whether it had ever fired.
+
+It now runs in-app:
+
+| Trigger | Endpoint | Auth |
+|---|---|---|
+| `POST /api/feedback` (fire-and-forget, via the `onSubmissionCreated` hook) | `POST /api/internal/feedback/triage` | `CRON_SECRET` bearer |
+
+No new Vercel cron (the cap of two is untouched) and no GitHub Action — this is request-driven, not scheduled. The rule it illustrates: **if work needs a secret and runs on a schedule or a trigger, it belongs in a venue this document can describe.** A database trigger calling an out-of-repo function is a scheduler you cannot review, cannot test, and cannot roll back with a deploy.
+
 ## Out of scope
 
 - `config/settings.yaml` has a `schedule:` block. That is for the **legacy

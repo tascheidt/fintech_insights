@@ -30,6 +30,19 @@ export const AI_MODEL_VALUES = AI_MODEL_OPTIONS.map((option) => option.value) as
   ...(typeof AI_MODEL_OPTIONS)[number]["value"][],
 ];
 
+export type ApprovedModel = (typeof AI_MODEL_OPTIONS)[number]["value"];
+
+/**
+ * Named handles for call-sites that always want a specific tier and have no
+ * user-selectable config row (e.g. feedback triage). The annotation is the
+ * point: these are typed as `ApprovedModel`, so dropping or renaming an entry
+ * in `AI_MODEL_OPTIONS` fails the build here rather than silently leaving a
+ * stray literal behind. Prefer these over re-typing the string — CLAUDE.md §5
+ * requires every model string to resolve through this file.
+ */
+export const PRO_MODEL: ApprovedModel = "gemini-pro-latest";
+export const FLASH_MODEL: ApprovedModel = "gemini-flash-latest";
+
 /**
  * Embedding model for Jobs semantic search. Kept separate from
  * `AI_MODEL_OPTIONS` (those are user-selectable text-gen tiers) but still the

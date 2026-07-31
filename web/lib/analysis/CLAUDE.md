@@ -23,6 +23,15 @@ These run for every new job posting after `collect`:
 - **`bet-suggester.ts`** — Pure rule-based candidate generator (no AI). Surfaces 1–4 candidate bets to the editor based on pivot classification + keyword bursts. Surfaced via `EditCompanyEditorialForm`'s "Suggest from hiring data" button.
 - **`company-news.ts`** — Lighter news-feed builder for the company page.
 
+## Feedback triage (event-driven, not per-job)
+
+- **`feedback-triage.ts`** — `triageFeedback` (Pro, ungrounded). Classifies an incoming `feedback_submissions` row and drafts the GitHub issue markdown an admin ships from. Everything except the Gemini call is pure and unit-tested: `enforceTriagePolicy`, `sanitizeDuplicate`, `clampConfidence`, `parseTriageJson`, `buildTriagePrompt`. Internal classification → **no voice directive**; `triage_reasoning` is admin-facing and must never be rendered to the submitting user.
+  - **Two rubrics.** `DEFECT_TYPES` (`bug`) gets a defect rubric that asks about specificity and blast radius and can never decline on roadmap-priority grounds; everything else gets the product-prioritization rubric. A single rubric is what let a scraper outage be judged as an unprioritized feature.
+  - **Duplicates are links, never verdicts.** Candidates carry real UUIDs (shortlisted by the `feedback_duplicate_candidates` trigram RPC, declines included), a returned id is dropped unless it was in the candidate set, and a duplicate link alone can never produce a `no`.
+- **`feedback-triage-runner.ts`** — the Supabase-facing half: loads the submission and candidates, runs the engine, persists. Called by `POST /api/internal/feedback/triage` (CRON_SECRET-guarded), which `POST /api/feedback` invokes fire-and-forget via the `onSubmissionCreated` hook.
+
+Replaced an out-of-tree Supabase Edge Function; the full rationale is in [`docs/FEEDBACK_PIPELINE.md`](../../../docs/FEEDBACK_PIPELINE.md).
+
 ## Digest pipeline
 
 - **`digest.ts`** — Builds the weekly digest payload. Consumed by the email template and the in-app `DigestViewer`. User-facing → voice directive applies. Editorial v2 (Jul 2026): per-company summaries get a `{previous_weeks}` serial-memory block (last 4 stored digests) and return an extra `new_signal` sentence for the "Signals" section; the lede is AI-written (`generateGlobalSummaryCommentary`, Flash ungrounded, telemetered) with the deterministic `buildGlobalSummary` as fallback. Both AI calls are failure-safe — history-lookup or lede failure never fails the digest. See [`docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md`](../../../docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md). `buildIncumbentWatch` is gated by the `incumbent_tracking_enabled` flag (`web/lib/settings/incumbent-tracking.ts`) — when incumbent tracking is off (the default) it returns `null`, which is the existing "no qualifying hire" contract, so the email + viewer omit the block with no further change. See root CLAUDE.md §7 "Incumbent-tracking flag".

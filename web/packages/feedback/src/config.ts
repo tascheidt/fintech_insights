@@ -56,5 +56,6 @@ export function resolveConfig(config: FeedbackConfig): ResolvedFeedbackConfig {
     adminRoleValue,
     github: config.github,
     email: config.email,
+    onSubmissionCreated: config.onSubmissionCreated,
   };
 }

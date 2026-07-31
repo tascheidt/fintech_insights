@@ -88,6 +88,31 @@ Both are refreshable via `web/scripts/regenerate-editorial.ts` (per company or `
 
 **Never pin a versioned or preview model ID** (e.g. `gemini-3-flash-preview`, `gemini-2.0-flash`, `gemini-1.5-pro`). Always the `-latest` alias. The comparison harness and production telemetry are how we catch a bad alias rotation; pinning bypasses that signal.
 
+### What pinning a preview actually cost us (July 2026)
+
+Feedback triage ran from a Supabase Edge Function that lived outside this repo, pinned to `gemini-3-pro-preview`. On 2026-07-31 Google retired that id:
+
+```
+Triage error: Gemini API error (404):
+"This model models/gemini-3-pro-preview is no longer available."
+```
+
+Every submission from that point sat in `reviewing` forever. Three compounding failures made it invisible:
+
+1. **Out of tree.** `prompt-config.test.ts` asserts no production model matches `/preview/i` and names this exact string as the example — but it cannot see a call site that isn't in the repository.
+2. **No telemetry.** The call wrote no `gemini_usage_events` row, so the daily cost alarm saw neither the spend before nor the sudden drop to zero after.
+3. **The error was the user-facing status.** The handler wrote `Triage error: <raw Gemini message>` into `triage_reasoning`, which the submitter's feedback history renders verbatim.
+
+The engine now lives at `web/lib/analysis/feedback-triage.ts` on `PRO_MODEL`, telemetered like every other call site. The rule generalizes: **a model string outside this repo is the same anti-pattern with a longer fuse.**
+
+## Feedback triage call site
+
+| Call site        | Module                                     | Model               | Grounded | Prompt version       |
+|------------------|--------------------------------------------|---------------------|----------|----------------------|
+| `triageFeedback` | `web/lib/analysis/feedback-triage.ts`      | `gemini-pro-latest` | no       | `feedback-triage-v2` |
+
+Internal classification, so **no voice directive** (rule 5). Reachable only through `POST /api/internal/feedback/triage` behind `CRON_SECRET`; replay historical submissions with `web/scripts/triage-feedback.ts --replay --dry-run`.
+
 ## Cost reconciliation & the daily alarm
 
 `estimateUsd` (`web/lib/ai/gemini-pricing.ts`) is a **cost model, not the invoice**. A 2026-05 SKU-level reconciliation against the GCP export pinned the cause of the ~2.7x undercount ($66 telemetry vs $179.75 billed): the **floating aliases had rotated to Gemini 3.x while the rate table still held 2.x rates**. `gemini-flash-latest` (now Gemini 3.5 Flash) was billing **$1.50 in / $9.00 out** per 1M — not $0.30/$2.50 — and that one line was 93% of the bill. Grounding was *not* the gap: Google Search grounding was **free-tier** in the export (SKU "search query gemini 3 free": 577 queries, $0.00). The rates are now corrected and reconcile to ~1%.
