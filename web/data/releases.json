@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.12.1",
+    "date": "2026-07-31",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "Hardened how feedback submissions are stored. Signed-in users could previously write any column of a feedback row directly, including the fields that record an AI triage verdict — which meant a submission could be made to look pre-approved before an admin ever saw it. Submissions are now restricted at the database level to the five fields the form actually collects, and the review and triage fields are writable only by the server."
+      }
+    ]
+  },
+  {
     "version": "2.12.0",
     "date": "2026-07-15",
     "changes": [
@@ -84,7 +94,7 @@
     ]
   },
   {
-      "version": "2.9.17",
+    "version": "2.9.17",
     "date": "2026-06-18",
     "changes": [
       {

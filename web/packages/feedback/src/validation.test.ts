@@ -13,7 +13,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { adminPatchSchema } from "./validation";
+import { adminPatchSchema, createFeedbackSchema } from "./validation";
+import { DEFAULT_FEEDBACK_TYPES } from "./types";
 
 describe("adminPatchSchema", () => {
   it("parses a valid admin PATCH body", () => {
@@ -48,5 +49,49 @@ describe("adminPatchSchema", () => {
       expect(paths).toContain("id");
       expect(paths).toContain("admin_override_decision");
     }
+  });
+});
+
+/**
+ * `pageUrl` is written by the client from `usePathname()`, but the route is
+ * reachable directly — and the value is rendered back into the admin review
+ * table. These cases lock the bound and the shape so the Zod layer agrees with
+ * the DB constraint `feedback_page_url_len` (migration 20260731093000).
+ */
+describe("createFeedbackSchema — pageUrl", () => {
+  const schema = createFeedbackSchema(DEFAULT_FEEDBACK_TYPES);
+
+  const base = {
+    type: "bug",
+    title: "Revolut jobs stopped appearing",
+    description: "The Revolut company page has shown zero open roles since Monday.",
+  };
+
+  it("accepts an app-relative path", () => {
+    const result = schema.safeParse({ ...base, pageUrl: "/companies/revolut" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a submission with no pageUrl at all", () => {
+    const result = schema.safeParse(base);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an absolute URL (off-site value stored and rendered to admins)", () => {
+    const result = schema.safeParse({
+      ...base,
+      pageUrl: "https://example.com/phishing",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a pageUrl longer than the DB constraint allows", () => {
+    const result = schema.safeParse({ ...base, pageUrl: "/" + "a".repeat(500) });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an unknown feedback type", () => {
+    const result = schema.safeParse({ ...base, type: "urgent" });
+    expect(result.success).toBe(false);
   });
 });

@@ -12,7 +12,15 @@ export function createFeedbackSchema(feedbackTypes: FeedbackType[]) {
       .string()
       .min(10, "Description must be at least 10 characters")
       .max(5000),
-    pageUrl: z.string().optional(),
+    // Client sends `usePathname()`, so this is an in-app path, not a URL.
+    // Bounded to match the DB constraint (feedback_page_url_len, 500 chars)
+    // and shape-checked so a direct API caller cannot stash arbitrary text —
+    // it is rendered back in the admin review table.
+    pageUrl: z
+      .string()
+      .max(500)
+      .regex(/^\//, "pageUrl must be an app-relative path")
+      .optional(),
   });
 }
 
