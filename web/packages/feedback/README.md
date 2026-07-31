@@ -10,7 +10,7 @@ Reusable feedback submission, admin triage, and GitHub issue pipeline for Next.j
 | **Services** | GitHub issue creation, email notifications, Zod validation |
 | **Types** | `FeedbackConfig`, `FeedbackItem`, `FeedbackSubmission`, etc. |
 | **SQL migration** | Ready-to-run DDL for `feedback_submissions` table |
-| **UI templates** | Copy-paste React components (adapt to your design system) |
+| **UI templates** | Email template only. The React UI components were removed — three stale near-copies of the host app's live components had drifted apart (different props, different states). Read the real ones in `web/components/feedback/` and `web/components/admin/`. |
 
 ## Quick start
 
@@ -86,13 +86,23 @@ export const { POST } = createCodeGenHandler(feedbackConfig);
 
 ### 5. Add UI components
 
-Copy the templates from `templates/components/` into your app's components directory. Customize:
+This package ships route handlers and services, not UI. Use the host app's live
+components as the reference implementation:
 
-- **UI imports**: Replace `@/components/ui/*` with your app's component library
-- **API_PATH / ADMIN_API_PATH**: Must match your config's `apiBasePath` / `adminApiBasePath`
-- **APP_NAME**: Your application name
+- `web/components/feedback/FeedbackDialog.tsx` — submission form
+- `web/components/feedback/FeedbackHistory.tsx` — the submitter's own history
+- `web/components/admin/FeedbackReviewTable.tsx` — admin review queue
 
 Required shadcn/ui components (if using shadcn): `dialog`, `button`, `input`, `textarea`, `select`, `card`
+
+Two things to carry over rather than reinvent:
+
+- **The admin queue must key off `review_state`, not `status`.** An AI verdict
+  routes a submission into the queue; it must never resolve it, and every state
+  needs to be reversible.
+- **Never render `triage_reasoning` or `triage_error` to the submitting user.**
+  They are internal classification output written for admins, and on failure
+  they hold raw model error text.
 
 ## Configuration reference
 
@@ -114,6 +124,9 @@ Required shadcn/ui components (if using shadcn): `dialog`, `button`, `input`, `t
 | `adminRoleValue` | No | `"admin"` | Value that identifies admins |
 | `github` | No | — | `{ token, owner, repo, codeGenWorkflowFile? }` |
 | `email` | No | — | `{ resendApiKey, fromAddress, adminPanelPath? }` |
+| `rateLimit` | No | off | `{ maxPerHour, duplicateWindowMinutes }` — DB-counted, since serverless instances share no memory |
+| `logger` | No | `console` | Host logger, so package messages reach your structured logs |
+| `onSubmissionCreated` | No | — | Fire-and-forget hook after insert; wire your AI triage here |
 
 ## Environment variables
 
@@ -136,9 +149,21 @@ NEXT_PUBLIC_APP_URL=
 
 ## Feedback flow
 
-1. **User submits** feedback via the dialog component -> `POST /api/feedback`
-2. **Email notification** sent to all admin users (if email configured)
-3. **AI triage** runs asynchronously (external Edge Function, not included)
-4. **Admin reviews** in the review table -> `PATCH /api/admin/feedback`
-5. **GitHub issue** auto-created when admin accepts (if GitHub configured)
-6. **Code generation** triggered via GitHub Actions workflow (if configured)
+1. **User submits** via the dialog -> `POST /api/feedback`
+2. **Email notification** to all admins (if email configured)
+3. **AI triage** runs asynchronously, kicked off by your `onSubmissionCreated`
+   hook. The engine is not part of this package — see
+   `web/lib/analysis/feedback-triage.ts` in the host app for a reference
+   implementation, and `docs/FEEDBACK_PIPELINE.md` for the rules it enforces.
+4. **Admin reviews** -> `PATCH /api/admin/feedback` (sets `review_state`)
+5. **GitHub issue** opened explicitly -> `POST /api/admin/feedback/[id]/issue`
+6. **Code generation** -> `POST /api/admin/feedback/[id]/generate-code`
+
+Steps 5 and 6 are separate, idempotent endpoints on purpose. Issue creation used
+to be bolted onto the accept PATCH, which meant re-sending "accept" just to
+create an issue and a double-create guard that two concurrent requests both
+passed.
+
+> **Do not host triage as a public endpoint.** The original implementation was a
+> Supabase Edge Function with `verify_jwt: false` — a free LLM call for anyone on
+> the internet, and a write over any row whose id they knew.

@@ -19,7 +19,7 @@ export async function notifyAdminsOfNewFeedback(
   feedback: FeedbackNotification
 ): Promise<void> {
   if (!config.email) {
-    console.warn("Email config not provided, skipping admin notification");
+    config.logger.warn("Email config not provided, skipping admin notification");
     return;
   }
 
@@ -42,7 +42,7 @@ export async function notifyAdminsOfNewFeedback(
       .filter((e): e is string => typeof e === "string" && e.length > 0);
 
     if (adminEmails.length === 0) {
-      console.warn("No admin users found for feedback notification");
+      config.logger.warn("No admin users found for feedback notification");
       return;
     }
 
@@ -72,16 +72,16 @@ export async function notifyAdminsOfNewFeedback(
       { label: "feedback_admin_notification", maxAttempts: 3, baseMs: 1000 }
     );
     if (!outcome.ok) {
-      console.error(
+      config.logger.error(
         "Resend batch error (admin notification, after retries):",
         outcome.error
       );
       return;
     }
-    console.log(
+    config.logger.info(
       `Admin notification sent to ${adminEmails.length} admin(s) on attempt ${outcome.attempts}`
     );
   } catch (err) {
-    console.error("Failed to send admin feedback notification:", err);
+    config.logger.error("Failed to send admin feedback notification:", err);
   }
 }

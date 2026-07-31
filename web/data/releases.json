@@ -1,5 +1,23 @@
 [
   {
+    "version": "2.14.1",
+    "date": "2026-07-31",
+    "changes": [
+      {
+        "type": "improvement",
+        "description": "Requesting a company now opens a form that matches what it asks for — with its own prompt for the company name, careers page and job board — instead of the generic feedback form defaulted to 'feature request'."
+      },
+      {
+        "type": "fix",
+        "description": "Submitting the same feedback twice no longer creates a second copy, and the form now confirms rather than showing an error when it happens. Feedback submissions are also rate limited per person, so a stuck retry can't run up AI costs or flood admin inboxes."
+      },
+      {
+        "type": "improvement",
+        "description": "The automated implementation workflow now follows the current Claude Opus release instead of a hardcoded version that had gone stale and disagreed with the label it stamped on its own commits."
+      }
+    ]
+  },
+  {
     "version": "2.14.0",
     "date": "2026-07-31",
     "changes": [

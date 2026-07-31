@@ -86,6 +86,26 @@ export interface GitHubConfig {
   codeGenWorkflowFile?: string;
 }
 
+/**
+ * Minimal logging surface. The package deliberately does not import the host
+ * app's logger (it must stay portable), but writing to `console` from inside
+ * Next.js route handlers means nothing reaches the app's structured logs. Pass
+ * the host logger here to close that gap; defaults to `console`.
+ */
+export interface FeedbackLogger {
+  info: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+}
+
+/** Per-user submission rate limiting */
+export interface RateLimitConfig {
+  /** Max submissions per user per rolling hour. */
+  maxPerHour: number;
+  /** Window in which an identical title from the same user is treated as a resubmit. */
+  duplicateWindowMinutes: number;
+}
+
 /** Email integration config */
 export interface EmailConfig {
   resendApiKey: string;
@@ -127,6 +147,18 @@ export interface FeedbackConfig {
   /** Role value that identifies admins (default: "admin") */
   adminRoleValue?: string;
 
+  /**
+   * Per-user submission limits. Omit to disable.
+   *
+   * Each submission costs an AI triage call and an admin email fan-out, so an
+   * unbounded endpoint is a spend amplifier as much as a spam vector. Counted in
+   * the database, not in memory — serverless instances share no state.
+   */
+  rateLimit?: RateLimitConfig;
+
+  /** Structured logger for package-internal messages. Defaults to `console`. */
+  logger?: FeedbackLogger;
+
   /** GitHub integration (issue creation + code gen workflow) */
   github?: GitHubConfig;
   /** Email notification integration */
@@ -150,5 +182,5 @@ export interface FeedbackConfig {
 
 /** Resolved config with all defaults applied */
 export type ResolvedFeedbackConfig = Required<
-  Pick<FeedbackConfig, "appName" | "appUrl" | "feedbackTypes" | "apiBasePath" | "adminApiBasePath" | "createServerClient" | "createAdminClient" | "getUser" | "isAdmin" | "userTable" | "userEmailColumn" | "userRoleColumn" | "userForeignKey" | "adminRoleValue">
-> & Pick<FeedbackConfig, "github" | "email" | "onSubmissionCreated">;
+  Pick<FeedbackConfig, "appName" | "appUrl" | "feedbackTypes" | "apiBasePath" | "adminApiBasePath" | "createServerClient" | "createAdminClient" | "getUser" | "isAdmin" | "userTable" | "userEmailColumn" | "userRoleColumn" | "userForeignKey" | "adminRoleValue" | "logger">
+> & Pick<FeedbackConfig, "github" | "email" | "onSubmissionCreated" | "rateLimit">;

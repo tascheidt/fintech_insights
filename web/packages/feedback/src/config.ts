@@ -57,5 +57,7 @@ export function resolveConfig(config: FeedbackConfig): ResolvedFeedbackConfig {
     github: config.github,
     email: config.email,
     onSubmissionCreated: config.onSubmissionCreated,
+    rateLimit: config.rateLimit,
+    logger: config.logger ?? console,
   };
 }

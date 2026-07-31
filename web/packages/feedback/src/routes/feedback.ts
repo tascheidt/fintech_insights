@@ -42,6 +42,52 @@ export function createFeedbackHandlers(rawConfig: FeedbackConfig) {
 
     const { type, title, description, pageUrl } = parsed.data;
 
+    // Rate limit + accidental-resubmit guard.
+    //
+    // Every submission costs a Gemini Pro triage call and a Resend batch to every
+    // admin, and nothing previously stopped a signed-in user from looping the
+    // endpoint. Counted in the database rather than in memory because serverless
+    // instances don't share state.
+    if (config.rateLimit) {
+      const { maxPerHour, duplicateWindowMinutes } = config.rateLimit;
+      const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+      const { count } = await supabase
+        .from("feedback_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .gte("created_at", since);
+
+      if ((count ?? 0) >= maxPerHour) {
+        return NextResponse.json(
+          {
+            error: `You've submitted a lot of feedback in the last hour. Please try again shortly.`,
+          },
+          { status: 429 }
+        );
+      }
+
+      // A repeated title from the same user inside a short window is almost
+      // always a double-click or a retry, not a second opinion.
+      const dupSince = new Date(
+        Date.now() - duplicateWindowMinutes * 60 * 1000
+      ).toISOString();
+      const { data: recent } = await supabase
+        .from("feedback_submissions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("title", title)
+        .gte("created_at", dupSince)
+        .limit(1);
+
+      if (recent && recent.length > 0) {
+        return NextResponse.json(
+          { error: "You've already submitted this — we've got it.", id: recent[0].id },
+          { status: 409 }
+        );
+      }
+    }
+
     // Only the five user-authored columns are written here. `status` is
     // deliberately omitted so the column default ('submitted') supplies it —
     // the DB grant (migration 20260731093000) does not include `status`, and

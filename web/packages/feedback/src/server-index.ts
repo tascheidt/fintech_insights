@@ -30,4 +30,6 @@ export type {
   FeedbackType,
   GitHubConfig,
   EmailConfig,
+  FeedbackLogger,
+  RateLimitConfig,
 } from "./types";
