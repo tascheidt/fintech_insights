@@ -86,6 +86,16 @@ The v2 editorial fields (working thesis, interpretation, strategic bets, last me
 
 Both are refreshable via `web/scripts/regenerate-editorial.ts` (per company or `--all`) and the `editorial-cron.yml` GH Actions workflow (Mondays 11:00 UTC). The bet auto-suggestions surfaced in the editorial form are rule-based (`web/lib/analysis/bet-suggester.ts`) — no AI calls.
 
+## User-triggered call sites
+
+Not every call is scheduled. These fire on a user action, so their volume tracks usage rather than corpus size:
+
+| Call site                        | Module                                    | Model                 | Grounded | Prompt version              |
+|----------------------------------|-------------------------------------------|-----------------------|----------|-----------------------------|
+| `generateSearchReportSynthesis`  | `web/lib/analysis/search-report.ts`       | `gemini-flash-latest` | no       | `search-report-synthesis-v1`|
+
+One call per report generated from the Jobs page (see [`SHARED_REPORTS.md`](./SHARED_REPORTS.md)). Bounded on both axes: the prompt samples at most 40 postings at 1800 chars each, so a report's input is capped regardless of how many rows the search returned. It is **failure-tolerant by design** — a null return renders a table-only report rather than failing the request, because the output is served behind a public share link. Both the ok and error paths write telemetry, so a rash of retries is visible in `gemini_usage_events` rather than silent.
+
 **Never pin a versioned or preview model ID** (e.g. `gemini-3-flash-preview`, `gemini-2.0-flash`, `gemini-1.5-pro`). Always the `-latest` alias. The comparison harness and production telemetry are how we catch a bad alias rotation; pinning bypasses that signal.
 
 ## Cost reconciliation & the daily alarm

@@ -89,6 +89,7 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 | Where | What |
 |---|---|
 | `web/app/(dashboard)/` | Server-component dashboard pages. |
+| `web/app/(public)/` | Unauthenticated surfaces. Currently the shared search report at `/r/[token]`. See §7 "Public surfaces". |
 | `web/app/api/` | API routes; cron handlers under `web/app/api/cron/`. |
 | `web/lib/ai/` | Gemini infrastructure (prompt-config, meter, telemetry, voice). See sub-CLAUDE. |
 | `web/lib/analysis/` | AI analysis modules (extract, analyze, digest, company insights). See sub-CLAUDE. |
@@ -96,6 +97,7 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 | `web/lib/auth/` | Auth guards used by API routes. See sub-CLAUDE. |
 | `web/lib/jobs/` | Ingestion processor + analyzer (orchestrates the hot path). |
 | `web/lib/settings/` | DB-backed feature flags read from `system_settings` (e.g. `incumbent-tracking.ts`). |
+| `web/lib/reports/` | Shared search reports — types/caps, share-token minting, persistence. |
 | `web/lib/dashboard-queries.ts` | Supabase query layer for dashboard. |
 | `web/components/{feature}/` | Feature components. |
 | `web/components/ui/` | shadcn/ui primitives. |
@@ -117,10 +119,12 @@ Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/
 - **Zod errors:** `result.error.issues`, never `.errors`. Vercel's TS is strict; local lint may not catch it.
 - **Logging:** `log.*` from `@/lib/log` in API routes. Avoid raw `console.*`.
 - **Job tracking:** every scheduled or manual job row goes in `job_runs`. Valid `job_type`: `collect` | `analyze` | `report` | `company-insights` | `insight-generation`. Valid `status`: `pending` | `running` | `completed` | `failed` | `cancelled`. Never reference the deprecated `cron_logs` table.
+- **Shared-report retention:** `shared_search_reports.jobs_snapshot` denormalizes up to `MAX_REPORT_JOBS` result rows per report (the artifact must not drift after it's sent, and the public renderer must not need a live query). Rows carry a 90-day `expires_at` and are deleted by `pruneJobRunRetention` — don't remove that step, and don't raise the cap without re-checking the storage math (June 2026 quota incident).
 - **Job-run retention:** `job_run_tasks.scraped_data` (the full ATS corpus snapshot, 12–17 MB per big-bank run) is **intentionally transient** — it exists only for a same-run `startFromStage:'ingest'` resume (25-min window). The daily collect cron runs `pruneJobRunRetention` (`web/lib/jobs/retention.ts`) to null snapshots >2 days old, delete `job_runs` >90 days old, and delete `gemini_usage_events` >90 days old (the telemetry table is otherwise append-only and unbounded). Don't add code that relies on `scraped_data` surviving long-term, and don't treat `job_run_tasks` / `job_runs` / `gemini_usage_events` as a permanent archive. (Letting `scraped_data` accumulate put the DB at 224% of the free-tier quota — June 2026.)
 - **`job_postings.description_html` is not persisted.** Scrapers still produce it and use it in-memory to derive `description_text`, but the ingest upsert in `web/lib/jobs/processor.ts` writes `description_html = null`. It is never read by the app (extraction, full-text/semantic search, and the job-detail UI all use `description_text`/`summary`), so storing it was ~58 MB of pure TOAST dead weight that pushed the DB over the free-tier quota (July 2026). Don't re-add it to the write payload; if a surface ever needs raw HTML, re-derive or re-scrape rather than persisting it for every row.
 - **Deactivating a company:** set `companies.deactivated_reason` (migration `20260714000000`) alongside `is_active = false`. The reason is surfaced by the weekly scraper-drift check so "shut down" stays distinguishable from "scraper broken, parked" — a reasonless deactivation is how Koho went dark for months (July 2026).
 - **Auth:** import guards from `web/lib/auth/guards.ts`. Don't reinvent.
+- **Public surfaces:** `web/proxy.ts` gates every page except `PUBLIC_PATHS` and the `PUBLIC_PREFIXES` list (currently just `/r/`, the shared search report). A new entry there is a hole in the auth boundary and needs the same two properties as that one: **the capability is in the URL** (an unguessable token, minted server-side) and **the page issues no live queries** — it renders only its own snapshot row, so there is nothing for an anonymous visitor to widen or enumerate. Public report reads go through the service role behind an exact token match; the table has owner-scoped RLS and deliberately **no `anon` policy** (a token-scoped policy can't express "only the row whose token you already knew", so granting one would make every report enumerable). Capability URLs must also carry `robots: { index: false, follow: false }`. Rationale + full flow in [`docs/SHARED_REPORTS.md`](./docs/SHARED_REPORTS.md).
 - **Build before push:** `cd web && npm run build` is the contract. Vercel will fail the deploy on a TS error that local dev tolerates.
 - **Changelog discipline:** every user-facing change gets an entry in `web/data/releases.json`. Types: `feature` | `fix` | `improvement`. Bump `web/package.json` version per semver: patch (1.0.x) bug fixes, minor (1.x.0) features, major (x.0.0) breaking changes.
 - **Tests:** Vitest for unit (pure functions only), Playwright for one smoke (`e2e/smoke.spec.ts`); see `docs/AGENTS.md`#Tests.
@@ -161,7 +165,7 @@ The relevant docs include:
 - [`docs/AGENTS.md`](./docs/AGENTS.md) — operator's manual
 - Per-area sub-CLAUDEs: [`web/lib/analysis/CLAUDE.md`](./web/lib/analysis/CLAUDE.md), [`web/lib/scrapers/CLAUDE.md`](./web/lib/scrapers/CLAUDE.md), [`web/lib/ai/CLAUDE.md`](./web/lib/ai/CLAUDE.md), [`web/lib/auth/CLAUDE.md`](./web/lib/auth/CLAUDE.md)
 - [`docs/CRON_TOPOLOGY.md`](./docs/CRON_TOPOLOGY.md), [`docs/AI_HYGIENE.md`](./docs/AI_HYGIENE.md), [`docs/INGESTION_PIPELINE.md`](./docs/INGESTION_PIPELINE.md), [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md)
-- [`docs/voice.md`](./docs/voice.md), [`docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md`](./docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md)
+- [`docs/voice.md`](./docs/voice.md), [`docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md`](./docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md), [`docs/SHARED_REPORTS.md`](./docs/SHARED_REPORTS.md)
 - [`web/components/README.md`](./web/components/README.md), [`web/components/DESIGN_SYSTEM.md`](./web/components/DESIGN_SYSTEM.md) — design system docs (update on token / chip / editorial-surface changes)
 - [`web/data/releases.json`](./web/data/releases.json) — user-facing changelog
 - `web/.env.example` when env vars change
