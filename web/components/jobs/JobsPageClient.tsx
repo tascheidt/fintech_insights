@@ -20,9 +20,14 @@ import {
 } from "@/components/jobs/JobsRail";
 import { JobSelectionProvider, useJobSelection } from "@/components/jobs/JobSelectionContext";
 import { JobGeneratorModal } from "@/components/jobs/JobGeneratorModal";
+import { SearchReportModal } from "@/components/reports/SearchReportModal";
 import type { JobsListRow } from "@/lib/dashboard-queries";
 import { classifyJob } from "@/lib/analysis/role-themes";
 import { downloadJobsCsv } from "@/lib/jobs/export-csv";
+import {
+  MAX_REPORT_JOBS,
+  type ReportSearchContext,
+} from "@/lib/reports/types";
 
 export interface JobsPageClientProps {
   rows: JobsListRow[];
@@ -93,6 +98,7 @@ function JobsPageClientInner({
   const [filters, setFilters] = React.useState<JobsFilterState>(initial);
   const { selected, clear } = useJobSelection();
   const [generatorOpen, setGeneratorOpen] = React.useState(false);
+  const [reportOpen, setReportOpen] = React.useState(false);
 
   const onChange = React.useCallback((next: JobsFilterState) => {
     setFilters(next);
@@ -125,6 +131,32 @@ function JobsPageClientInner({
     [rows, selected]
   );
 
+  // The report snapshots the visible result set, in the order it's ranked, up
+  // to MAX_REPORT_JOBS. The server re-reads every id, so this list is a
+  // selection — not the data the report is built from.
+  const reportJobIds = React.useMemo(
+    () => filtered.slice(0, MAX_REPORT_JOBS).map((r) => r.id),
+    [filtered]
+  );
+
+  // Company is passed by display name, not slug — the report is read by people
+  // outside the product, and a slug means nothing to them.
+  const reportSearchContext = React.useMemo<ReportSearchContext>(
+    () => ({
+      query: filters.q.trim() || null,
+      mode: filters.mode,
+      company:
+        companyFilter !== "all"
+          ? companies.find((c) => c.slug === companyFilter)?.name ?? null
+          : null,
+      functionGroup: filters.fn !== "all" ? filters.fn : null,
+      recency: filters.recency,
+      tier: tierFilter,
+      status: statusFilter,
+    }),
+    [filters, companyFilter, companies, tierFilter, statusFilter]
+  );
+
   return (
     <div className="space-y-[14px]">
       <JobsHeader
@@ -151,6 +183,7 @@ function JobsPageClientInner({
                 : "jobs";
           downloadJobsCsv(filtered, stem);
         }}
+        onGenerateReport={() => setReportOpen(true)}
       />
 
       {searchTruncated && filters.q.trim().length > 0 && (
@@ -200,6 +233,14 @@ function JobsPageClientInner({
         open={generatorOpen}
         onOpenChange={setGeneratorOpen}
         selectedJobs={selectedJobs}
+      />
+
+      <SearchReportModal
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        jobIds={reportJobIds}
+        totalMatchCount={filtered.length}
+        searchContext={reportSearchContext}
       />
     </div>
   );
