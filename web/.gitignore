@@ -53,5 +53,8 @@ scripts/artifacts/*-smoke.json
 scripts/artifacts/*-page.html
 
 # Generated extracts from one-off reporting scripts
-# (e.g. scripts/report-ai-engineering-roles.ts).
-reports/
+# (e.g. scripts/report-ai-engineering-roles.ts, which writes to web/reports/).
+# Leading slash is load-bearing: unanchored, this pattern matches a directory
+# named `reports` at ANY depth and silently swallowed source dirs
+# (lib/reports, app/api/reports, components/reports).
+/reports/

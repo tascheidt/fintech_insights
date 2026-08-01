@@ -30,6 +30,7 @@ export interface RetentionResult {
   snapshotsNulled: number;
   runsDeleted: number;
   usageEventsDeleted: number;
+  sharedReportsDeleted: number;
 }
 
 const daysAgoIso = (days: number): string =>
@@ -47,6 +48,10 @@ const daysAgoIso = (days: number): string =>
  *    rows are preserved, just unlinked).
  * 3. Delete `gemini_usage_events` older than USAGE_EVENT_RETENTION_DAYS — bounds
  *    the otherwise-unbounded telemetry table.
+ * 4. Delete `shared_search_reports` past their `expires_at` — each carries a
+ *    denormalized `jobs_snapshot`, so an unbounded table of them is the same
+ *    storage shape that put us over quota in June 2026. Expiry also means a
+ *    share link a user has lost track of stops resolving.
  */
 export async function pruneJobRunRetention(
   supabase: AdminClient
@@ -54,6 +59,7 @@ export async function pruneJobRunRetention(
   let snapshotsNulled = 0;
   let runsDeleted = 0;
   let usageEventsDeleted = 0;
+  let sharedReportsDeleted = 0;
 
   try {
     const { data, error } = await supabase
@@ -92,5 +98,17 @@ export async function pruneJobRunRetention(
     log.error({ err }, "Retention: failed to delete old gemini_usage_events");
   }
 
-  return { snapshotsNulled, runsDeleted, usageEventsDeleted };
+  try {
+    const { data, error } = await supabase
+      .from("shared_search_reports")
+      .delete()
+      .lt("expires_at", new Date().toISOString())
+      .select("id");
+    if (error) throw error;
+    sharedReportsDeleted = data?.length ?? 0;
+  } catch (err) {
+    log.error({ err }, "Retention: failed to delete expired shared reports");
+  }
+
+  return { snapshotsNulled, runsDeleted, usageEventsDeleted, sharedReportsDeleted };
 }

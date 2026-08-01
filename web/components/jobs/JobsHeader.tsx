@@ -17,7 +17,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { Search, Bell, Check, Download, Sparkles } from "lucide-react";
+import { Search, Bell, Check, Download, Sparkles, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -105,6 +105,13 @@ export interface JobsHeaderProps {
 
   /** Optional handler for the Export CSV button. When omitted the button hides. */
   onExportCsv?: () => void;
+
+  /**
+   * Optional handler for the Generate report button — sits alongside Export
+   * CSV. When omitted the button hides. Export hands the analyst the raw rows;
+   * this hands a colleague a readable, shareable artifact.
+   */
+  onGenerateReport?: () => void;
 }
 
 /** Debounce a value so we don't spam URL replaces on every keystroke. */
@@ -133,6 +140,7 @@ export function JobsHeader({
   statusFilter,
   onChange,
   onExportCsv,
+  onGenerateReport,
 }: JobsHeaderProps) {
   const router = useRouter();
   // We deliberately do NOT pull the live `useSearchParams()` value into the
@@ -384,6 +392,23 @@ export function JobsHeader({
             >
               <Download className="h-3.5 w-3.5" aria-hidden />
               Export CSV ({filteredCount.toLocaleString()})
+            </Button>
+          )}
+          {onGenerateReport && (
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={onGenerateReport}
+              disabled={filteredCount === 0}
+              title={
+                filteredCount === 0
+                  ? "Nothing to report on"
+                  : "Summarize these results and share them by link or email"
+              }
+            >
+              <FileText className="h-3.5 w-3.5" aria-hidden />
+              Generate report
             </Button>
           )}
         </div>

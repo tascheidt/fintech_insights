@@ -11,6 +11,18 @@ const PUBLIC_PATHS = new Set([
   "/account/update-password",
 ]);
 
+// Path prefixes readable without a session. `/r/` serves shared search reports
+// (`app/(public)/r/[token]`): the token in the URL is the capability, the page
+// renders only that report's own snapshot, and every link out of it goes to
+// /login. Keep this list short — a prefix is a hole in the auth boundary, so a
+// new entry needs the same "capability in the URL, no live queries" property.
+const PUBLIC_PREFIXES = ["/r/"];
+
+function isPublicPath(pathname: string): boolean {
+  if (PUBLIC_PATHS.has(pathname)) return true;
+  return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -45,7 +57,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && !PUBLIC_PATHS.has(pathname)) {
+  if (!user && !isPublicPath(pathname)) {
     // Preserve the original destination so that links from emails (and
     // any other deep link) land where the user intended after logging in.
     const loginUrl = new URL("/login", request.url);
