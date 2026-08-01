@@ -52,6 +52,30 @@ Anonymous routes are not allowed — if you genuinely need an unauthenticated
 public endpoint, document the exception in the route file and add rate
 limiting (see Stream P1 — `/api/feedback` rate limit).
 
+`/api/reports/**` is `requireUser` like everything else, with one extra rule:
+the three routes are **owner-scoped**, and because the store uses the
+service-role client (which bypasses RLS) the ownership check is written into
+each query (`created_by = user.id`) rather than delegated. A non-owner gets a
+404, not a 403, so ids aren't probeable.
+
+## Public pages (not routes)
+
+`proxy.ts` gates every *page* except `PUBLIC_PATHS` (exact matches) and
+`PUBLIC_PREFIXES` (prefix matches — currently just `/r/`, the shared search
+report at `app/(public)/r/[token]`).
+
+A prefix there is a hole in the auth boundary. Adding one requires both:
+
+1. **The capability is in the URL** — an unguessable, server-minted token, not
+   a guessable id.
+2. **The page issues no live queries** — it renders a stored snapshot only, so
+   there is nothing an anonymous visitor can widen, enumerate, or filter-bypass.
+
+Public reads use the service role behind an exact token match; the backing
+table keeps owner-scoped RLS with **no `anon` policy**. Capability URLs must
+set `robots: { index: false, follow: false }`. See
+[`docs/SHARED_REPORTS.md`](../../../docs/SHARED_REPORTS.md).
+
 ## Email + password auth (in addition to Google OAuth)
 
 Two client hooks back all browser-side auth:
