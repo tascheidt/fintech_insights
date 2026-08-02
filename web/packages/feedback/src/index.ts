@@ -8,6 +8,8 @@ export {
   type FeedbackType,
   type GitHubConfig,
   type EmailConfig,
+  type FeedbackLogger,
+  type RateLimitConfig,
   type ResolvedFeedbackConfig,
 } from "./types";
 

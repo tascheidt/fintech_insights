@@ -27,7 +27,24 @@ export function RequestCompanyButton() {
         </CardContent>
       </Card>
 
-      <FeedbackDialog open={open} onOpenChange={setOpen} />
+      {/*
+        Preset so the dialog matches the promise on the card. Without it the
+        user clicked "Request Company" and got "Send us your thoughts" defaulted
+        to a feature request — leaving them to guess the format, and triage to
+        guess the intent.
+      */}
+      <FeedbackDialog
+        open={open}
+        onOpenChange={setOpen}
+        preset={{
+          type: "general",
+          heading: "Request a company",
+          subheading: "Tell us who to track and where their roles are posted",
+          titlePlaceholder: "Which company should we add?",
+          descriptionPlaceholder:
+            "Company name and the URL of their careers page. If you know which job board they use (Greenhouse, Lever, Workday, Ashby…), that speeds things up.",
+        }}
+      />
     </>
   );
 }

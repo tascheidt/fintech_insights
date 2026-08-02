@@ -48,6 +48,19 @@ export const feedbackConfig: FeedbackConfig = {
 
   onSubmissionCreated: ({ id }) => triggerTriage(id),
 
+  // Each submission costs a Gemini Pro triage call plus a Resend batch to every
+  // admin. 10/hour is far above real use and far below what a loop would do.
+  rateLimit: { maxPerHour: 10, duplicateWindowMinutes: 10 },
+
+  // Route package-internal messages into the app's pino pipeline instead of
+  // raw console (CLAUDE.md §7). The package keeps `console` as its default so
+  // it stays portable.
+  logger: {
+    info: (...args) => log.info({ args }, "[feedback]"),
+    warn: (...args) => log.warn({ args }, "[feedback]"),
+    error: (...args) => log.error({ args }, "[feedback]"),
+  },
+
   github: process.env.GJ_GITHUB_TOKEN
     ? {
         token: process.env.GJ_GITHUB_TOKEN,

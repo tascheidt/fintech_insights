@@ -39,11 +39,24 @@ const TITLE_PLACEHOLDERS: Record<string, string> = {
 interface FeedbackDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Optional preset for callers that open this dialog for a specific purpose.
+   * `RequestCompanyButton` promises "Request a Company" and then opened a
+   * generic "Send us your thoughts" form defaulted to `feature`, leaving the
+   * user to guess what to type — and triage to guess what they meant.
+   */
+  preset?: {
+    type?: string;
+    heading?: string;
+    subheading?: string;
+    titlePlaceholder?: string;
+    descriptionPlaceholder?: string;
+  };
 }
 
-export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
+export function FeedbackDialog({ open, onOpenChange, preset }: FeedbackDialogProps) {
   const pathname = usePathname();
-  const [type, setType] = useState("feature");
+  const [type, setType] = useState(preset?.type ?? "feature");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -53,7 +66,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
   const canSubmit = title.trim().length >= 3 && description.trim().length >= 10;
 
   function resetForm() {
-    setType("feature");
+    setType(preset?.type ?? "feature");
     setTitle("");
     setDescription("");
     setStatus("idle");
@@ -76,7 +89,17 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
       });
 
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+        // 409 = we already have an identical submission from this user.
+        // Treat it as success: the user's intent was recorded either way.
+        if (res.status === 409) {
+          setStatus("success");
+          setTimeout(() => {
+            onOpenChange(false);
+            resetForm();
+          }, 3000);
+          return;
+        }
         throw new Error(data.error || "Failed to submit feedback");
       }
 
@@ -112,9 +135,9 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
         ) : (
           <form onSubmit={handleSubmit}>
             <DialogHeader>
-              <DialogTitle>Send us your thoughts</DialogTitle>
+              <DialogTitle>{preset?.heading ?? "Send us your thoughts"}</DialogTitle>
               <DialogDescription>
-                Help shape The Fintech Talent Brief
+                {preset?.subheading ?? "Help shape The Fintech Talent Brief"}
               </DialogDescription>
             </DialogHeader>
 
@@ -147,7 +170,11 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
                 </label>
                 <Input
                   id="feedback-title"
-                  placeholder={TITLE_PLACEHOLDERS[type] || "What would you like to suggest?"}
+                  placeholder={
+                    preset?.titlePlaceholder ??
+                    TITLE_PLACEHOLDERS[type] ??
+                    "What would you like to suggest?"
+                  }
                   value={title}
                   onChange={(e) => setTitle(e.target.value.slice(0, 200))}
                   onBlur={() => setTitleTouched(true)}
@@ -172,7 +199,10 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
                 </div>
                 <Textarea
                   id="feedback-description"
-                  placeholder="Share any context that helps us understand your feedback."
+                  placeholder={
+                    preset?.descriptionPlaceholder ??
+                    "Share any context that helps us understand your feedback."
+                  }
                   value={description}
                   onChange={(e) => setDescription(e.target.value.slice(0, 5000))}
                   maxLength={5000}

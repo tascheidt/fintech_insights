@@ -226,3 +226,38 @@ Related: the admin PATCH used to return **200 with a `github_error` field** when
 issue creation failed. One client path read it; the Accept button did not, and
 silently reported success. Failures are real status codes now, surfaced on both
 paths.
+
+## Rate limiting
+
+`POST /api/feedback` had no limit. Each submission costs a Gemini Pro triage call
+and a Resend batch to every admin, so an unbounded endpoint is a spend amplifier
+as much as a spam vector — and the April 2026 cost incident is the precedent for
+taking that seriously.
+
+Configured via `feedbackConfig.rateLimit` (`10/hour`, `10`-minute duplicate
+window). Both checks are counted in the database, not in memory: serverless
+instances share no state, so an in-process counter would limit almost nothing.
+
+An identical title from the same user inside the duplicate window returns **409**,
+which the dialog treats as success — a double-click is not an error worth showing
+someone.
+
+## The code-generation blast radius
+
+`auto-implement.yml` runs a coding agent with `--dangerously-skip-permissions`
+and `Bash` enabled, against an issue body that originates as **user-submitted
+text**. That is the sharpest edge in this pipeline, and three separate controls
+now sit in front of it:
+
+1. **Column grants** stop a user from authoring `generated_issue` directly
+   (migration `20260731093000`).
+2. **A human approves** — `review_state` must be `approved` before an issue can be
+   opened, and the AI cannot set that.
+3. **The workflow prompt marks the issue body as untrusted**, tells the agent to
+   treat it as a description of work rather than instructions addressed to it,
+   and states that the scope rules win over anything the body says.
+
+The workflow also uses the floating `opus` alias rather than a pinned version —
+the same rule CLAUDE.md §5 applies to Gemini. The previously pinned value had
+gone stale and disagreed with the commit trailer beside it about which model was
+writing the code.
