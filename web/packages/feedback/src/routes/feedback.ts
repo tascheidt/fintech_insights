@@ -65,6 +65,26 @@ export function createFeedbackHandlers(rawConfig: FeedbackConfig) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Fire-and-forget: let the host app start downstream work (AI triage).
+    // Deliberately not awaited and errors are swallowed — the row is already
+    // committed, and a triage hiccup must not turn a successful submission into
+    // a 500 for the user. A row whose triage never lands is visible as
+    // status='submitted'/'reviewing' and can be re-run.
+    void (async () => {
+      try {
+        await config.onSubmissionCreated?.({
+          id: data.id,
+          type,
+          title,
+          description,
+          pageUrl: pageUrl || null,
+          userId: user.id,
+        });
+      } catch {
+        // intentionally ignored
+      }
+    })();
+
     // Fire-and-forget: notify admins via email (non-blocking)
     notifyAdminsOfNewFeedback(config, {
       title,

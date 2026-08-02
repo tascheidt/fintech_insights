@@ -109,9 +109,24 @@ export interface FeedbackConfig {
   github?: GitHubConfig;
   /** Email notification integration */
   email?: EmailConfig;
+
+  /**
+   * Called fire-and-forget after a submission is persisted, so the host app can
+   * kick off downstream work (AI triage, analytics) without this package taking
+   * a dependency on it. Errors are swallowed — the user's submission has already
+   * succeeded by this point and must not fail because a follow-up did.
+   */
+  onSubmissionCreated?: (submission: {
+    id: string;
+    type: string;
+    title: string;
+    description: string;
+    pageUrl: string | null;
+    userId: string;
+  }) => void | Promise<void>;
 }
 
 /** Resolved config with all defaults applied */
 export type ResolvedFeedbackConfig = Required<
   Pick<FeedbackConfig, "appName" | "appUrl" | "feedbackTypes" | "apiBasePath" | "adminApiBasePath" | "createServerClient" | "createAdminClient" | "getUser" | "isAdmin" | "userTable" | "userEmailColumn" | "userRoleColumn" | "userForeignKey" | "adminRoleValue">
-> & Pick<FeedbackConfig, "github" | "email">;
+> & Pick<FeedbackConfig, "github" | "email" | "onSubmissionCreated">;

@@ -1,5 +1,23 @@
 [
   {
+    "version": "2.14.0",
+    "date": "2026-08-01",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "Feedback triage had stopped working entirely. It ran on a specific preview version of Gemini that Google retired, so every submission since then was accepted into the queue and then silently left unreviewed — and the raw error text was shown back to the person who submitted it. Triage now runs inside the app on the current Gemini model, so a future model rotation can't take it down the same way."
+      },
+      {
+        "type": "improvement",
+        "description": "Bug reports and feature requests are now judged differently. Everything was previously scored against the same question — 'does this match a current product priority?' — which is the wrong question to ask about something being broken. Bug reports are now assessed on how specific and how widely felt they are, and can no longer be turned down for not matching a roadmap item."
+      },
+      {
+        "type": "fix",
+        "description": "Duplicate detection no longer discards real reports. It previously matched submissions against a positional list that pointed at nothing, and two genuine reports of a broken company scraper were auto-declined against a phantom duplicate with no way to reopen them. Duplicates are now linked to the actual submission they match, and finding a duplicate never on its own rejects a report."
+      }
+    ]
+  },
+  {
     "version": "2.13.1",
     "date": "2026-08-01",
     "changes": [

@@ -61,9 +61,13 @@ harness, NOT a production provider switch. Full methodology in
 - **`tech-stack-extraction.ts`** / **`tech-stack-aggregation.ts`** — Detects and aggregates company tech-stack signals from descriptions.
 - **`embeddings.ts`** — `embedText()` wraps `gemini-embedding-001` (768d, L2-normalized) for Jobs semantic search; meters like any other call site. Two callers: the `backfill-job-embeddings.ts` sweep and the `/jobs` semantic query path in `dashboard-queries.ts`. `jobEmbeddingInput()` composes the per-job text (title + summary/description).
 
+## Named model handles
+
+`PRO_MODEL` / `FLASH_MODEL` in `prompt-config.ts` are typed as `ApprovedModel`, so a call site that always wants one tier (and has no user-selectable config row) imports the handle instead of retyping the literal. Removing or renaming an entry in `AI_MODEL_OPTIONS` then fails the build at the call site rather than leaving a stray string behind. `feedback-triage.ts` uses `PRO_MODEL` this way.
+
 ## Rules of the road
 
-1. **No hardcoded model strings outside `prompt-config.ts`.**
+1. **No hardcoded model strings outside `prompt-config.ts`.** A model id living outside this repo is the same failure with a longer fuse: feedback triage ran from a Supabase Edge Function pinned to `gemini-3-pro-preview`, which `prompt-config.test.ts` names by example and could not catch, because the call site was out of tree. Google retired that id on 2026-07-31 and every submission silently stopped being triaged.
 2. **Every new call site writes to `gemini_usage_events`** via `writeUsageEvent`.
 3. **Don't stack grounded calls** — check upstream for an existing `googleSearch` enable before adding another. The Apr 2026 incident was two grounded Pro calls per job.
 4. **Cache keys include `prompt_config_version`** — otherwise prompt tweaks silently serve stale outputs.
