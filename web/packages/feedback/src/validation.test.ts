@@ -13,7 +13,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { adminPatchSchema, createFeedbackSchema } from "./validation";
+import {
+  adminPatchSchema,
+  createFeedbackSchema,
+  reviewStateFromLegacyDecision,
+} from "./validation";
 import { DEFAULT_FEEDBACK_TYPES } from "./types";
 
 describe("adminPatchSchema", () => {
@@ -93,5 +97,60 @@ describe("createFeedbackSchema — pageUrl", () => {
   it("rejects an unknown feedback type", () => {
     const result = schema.safeParse({ ...base, type: "urgent" });
     expect(result.success).toBe(false);
+  });
+});
+
+/**
+ * The review-state axis. `status` used to hold both the AI's verdict and the
+ * human's decision, and the triage engine wrote terminal values straight into
+ * it — so an AI decline was final and 20 of 21 production rows were never
+ * human-reviewable. These cases lock the separation, and in particular that
+ * reopening is expressible.
+ */
+describe("adminPatchSchema — review_state", () => {
+  const ID = "550e8400-e29b-41d4-a716-446655440000";
+
+  it.each(["needs_review", "approved", "rejected", "shipped"])(
+    "accepts review_state=%s",
+    (state) => {
+      const result = adminPatchSchema.safeParse({ id: ID, review_state: state });
+      expect(result.success).toBe(true);
+    }
+  );
+
+  it("accepts reopening an AI-resolved submission", () => {
+    // The behaviour the old model could not express at all.
+    const result = adminPatchSchema.safeParse({ id: ID, review_state: "needs_review" });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unknown review_state", () => {
+    const result = adminPatchSchema.safeParse({ id: ID, review_state: "wontfix" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a body with an id but nothing to change", () => {
+    const result = adminPatchSchema.safeParse({ id: ID });
+    expect(result.success).toBe(false);
+  });
+
+  it("still accepts the legacy admin_override_decision shape", () => {
+    const result = adminPatchSchema.safeParse({
+      id: ID,
+      admin_override_decision: "accepted",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a notes-only update", () => {
+    const result = adminPatchSchema.safeParse({ id: ID, admin_notes: "Chased upstream." });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("reviewStateFromLegacyDecision", () => {
+  it("maps accepted to approved and declined to rejected", () => {
+    expect(reviewStateFromLegacyDecision("accepted")).toBe("approved");
+    expect(reviewStateFromLegacyDecision("declined")).toBe("rejected");
   });
 });

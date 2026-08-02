@@ -24,9 +24,42 @@ export function createFeedbackSchema(feedbackTypes: FeedbackType[]) {
   });
 }
 
-/** Zod schema for admin PATCH actions */
-export const adminPatchSchema = z.object({
-  id: z.string().uuid(),
-  admin_override_decision: z.enum(["accepted", "declined"]).optional(),
-  admin_notes: z.string().max(2000).optional(),
-});
+/** Human review states. Independent of the AI's `triage_decision`. */
+export const REVIEW_STATES = [
+  "needs_review",
+  "approved",
+  "rejected",
+  "shipped",
+] as const;
+
+export type ReviewState = (typeof REVIEW_STATES)[number];
+
+/**
+ * Zod schema for admin PATCH actions.
+ *
+ * `review_state` is the current axis; `admin_override_decision` is retained so
+ * an older client (or a queued request mid-deploy) keeps working. Note that
+ * `needs_review` is a legal target — reopening a submission the AI resolved is
+ * the whole point of the column, and there was previously no way to do it.
+ */
+export const adminPatchSchema = z
+  .object({
+    id: z.string().uuid(),
+    review_state: z.enum(REVIEW_STATES).optional(),
+    admin_override_decision: z.enum(["accepted", "declined"]).optional(),
+    admin_notes: z.string().max(2000).optional(),
+  })
+  .refine(
+    (v) =>
+      v.review_state !== undefined ||
+      v.admin_override_decision !== undefined ||
+      v.admin_notes !== undefined,
+    { message: "Provide review_state, admin_override_decision, or admin_notes" }
+  );
+
+/** Map a legacy accept/decline into the review-state axis. */
+export function reviewStateFromLegacyDecision(
+  decision: "accepted" | "declined"
+): ReviewState {
+  return decision === "accepted" ? "approved" : "rejected";
+}

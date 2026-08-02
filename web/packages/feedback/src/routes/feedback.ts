@@ -106,14 +106,21 @@ export function createFeedbackHandlers(rawConfig: FeedbackConfig) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // `triage_reasoning`, `triage_confidence` and `triage_decision` are
+    // deliberately NOT selected. They are internal classification output written
+    // for an admin audience ("duplicate", "we haven't prioritized this"), and on
+    // failure the old engine wrote raw Gemini error strings into
+    // triage_reasoning — which this surface rendered verbatim to the person who
+    // submitted the feedback. Users see the review state and, if an admin wrote
+    // one, the admin's note. See docs/FEEDBACK_PIPELINE.md.
     const { data, error } = await supabase
       .from("feedback_submissions")
       .select(
-        "id, type, title, description, status, triage_decision, triage_confidence, triage_reasoning, triage_suggested_title, created_at"
+        "id, type, title, description, review_state, admin_notes, github_issue_url, created_at"
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(50);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

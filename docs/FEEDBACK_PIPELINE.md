@@ -168,3 +168,61 @@ stay off user surfaces.
 A row that started triage but never finished keeps `status='reviewing'` with
 `triage_attempted_at` set and `triage_completed_at` null. That is the retry
 signal; re-run with `--id=<uuid> --write`.
+
+## The two review axes
+
+`status` was doing two jobs: it held the AI's verdict *and* the human workflow
+state, and the triage engine wrote terminal values (`accepted` / `declined`)
+straight into it. `FeedbackReviewTable` hid its accept/decline controls once
+status was terminal, so **an AI verdict was final in the UI** — 20 of the 21
+pre-existing rows were never human-reviewable.
+
+Two independent axes now, in the same spirit as the
+`companies.is_active` / `job_postings.is_active` split in root CLAUDE.md §7 —
+and for the same reason: conflating two axes corrupts both.
+
+| Column | Values | Meaning |
+|---|---|---|
+| `triage_decision` | `yes` · `maybe` · `no` | what the AI concluded |
+| `review_state` | `needs_review` · `approved` · `rejected` · `shipped` | what a human decided |
+| `status` | *legacy* | mirror of the AI verdict, retained for compatibility |
+
+Rules:
+
+- **The admin queue keys off `review_state`**, and defaults to `needs_review`.
+  Never filter the review queue by `status`.
+- **Triage never writes `review_state`.** An AI verdict routes a submission into
+  the queue; it does not resolve it.
+- **Every state is reversible.** `needs_review` is a legal PATCH target, so
+  reopening something the AI resolved is a normal action rather than a SQL job.
+
+### What the backfill recovered
+
+The backfill rule is just *"no recorded human decision means it still needs
+one"*, which resurfaces exactly the rows that were lost without special-casing
+any of them. Against production it moves 13 rows to `shipped` and returns **9 to
+`needs_review`**, among them:
+
+- both Revolut scraper bug reports, auto-declined against a phantom duplicate;
+- the five AI-approved submissions that were never actioned and never opened an
+  issue, the oldest from 2026-02-17;
+- today's submission, stuck in `reviewing` by the retired-model outage.
+
+## Idempotency
+
+Two actions could previously fire twice and produce duplicate side effects.
+
+- **GitHub issue creation** was overloaded onto the accept PATCH, guarded only by
+  a read-then-write check on `github_issue_number` that two concurrent requests
+  both passed. It now has its own endpoint (`POST /api/admin/feedback/[id]/issue`),
+  treats an existing issue as success, and is backstopped by a partial unique
+  index on `github_issue_number`.
+- **Code generation** tracked "already triggered" in React state, so a page
+  refresh re-armed the button and a second click dispatched another workflow run
+  — and another PR against the same issue. It is now stamped on the row
+  (`code_gen_triggered_at`), with `?force=true` for the legitimate re-run case.
+
+Related: the admin PATCH used to return **200 with a `github_error` field** when
+issue creation failed. One client path read it; the Accept button did not, and
+silently reported success. Failures are real status codes now, surfaced on both
+paths.

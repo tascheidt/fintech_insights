@@ -4,7 +4,18 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronDown, ChevronRight, Copy, Check, ExternalLink, Code2, Loader2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Check,
+  ExternalLink,
+  Code2,
+  Loader2,
+  AlertTriangle,
+  Link2,
+  RotateCcw,
+} from "lucide-react";
 
 interface FeedbackSubmission {
   id: string;
@@ -13,6 +24,7 @@ interface FeedbackSubmission {
   description: string;
   page_url: string | null;
   status: string;
+  review_state: "needs_review" | "approved" | "rejected" | "shipped";
   triage_decision: string | null;
   triage_confidence: number | null;
   triage_reasoning: string | null;
@@ -21,68 +33,114 @@ interface FeedbackSubmission {
   triage_suggested_title: string | null;
   triage_suggested_labels: string[] | null;
   triage_completed_at: string | null;
+  triage_error: string | null;
   generated_issue: string | null;
   admin_override_decision: string | null;
   admin_notes: string | null;
   reviewed_at: string | null;
   github_issue_number: number | null;
   github_issue_url: string | null;
+  code_gen_triggered_at: string | null;
   created_at: string;
   profiles: { email: string } | null;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  submitted: "bg-muted text-muted-foreground",
-  reviewing: "bg-accent-soft text-accent-soft-foreground",
-  accepted: "bg-growth-500/10 text-growth-500",
-  maybe: "bg-primary-soft text-primary-soft-foreground",
-  declined: "bg-destructive/10 text-destructive",
+/** Human review axis. */
+const REVIEW_STYLES: Record<string, string> = {
+  needs_review: "bg-highlight-soft text-highlight-soft-foreground",
+  approved: "bg-primary-soft text-primary-soft-foreground",
+  rejected: "bg-muted text-muted-foreground",
+  shipped: "bg-growth-500/10 text-growth-500",
 };
 
+const REVIEW_LABELS: Record<string, string> = {
+  needs_review: "Needs review",
+  approved: "Approved",
+  rejected: "Rejected",
+  shipped: "Shipped",
+};
+
+/** AI verdict axis — shown alongside, never instead of, the review state. */
 const DECISION_STYLES: Record<string, string> = {
   yes: "bg-growth-500/10 text-growth-500",
   maybe: "bg-primary-soft text-primary-soft-foreground",
   no: "bg-destructive/10 text-destructive",
 };
 
-const STATUS_FILTERS = ["all", "submitted", "reviewing", "maybe", "accepted", "declined"];
+const FILTERS: Array<{ value: string; label: string }> = [
+  { value: "needs_review", label: "Needs review" },
+  { value: "approved", label: "Approved" },
+  { value: "shipped", label: "Shipped" },
+  { value: "rejected", label: "Rejected" },
+  { value: "all", label: "All" },
+];
+
+const PAGE_SIZE = 50;
 
 export function FeedbackReviewTable() {
   const [items, setItems] = useState<FeedbackSubmission[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  // Defaults to the queue that needs a human, not to everything. Under the old
+  // status model an AI-accepted row and a shipped one both read "accepted", so
+  // five submissions sat unactioned for months with nothing surfacing them.
+  const [filter, setFilter] = useState("needs_review");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [codeGenLoading, setCodeGenLoading] = useState<string | null>(null);
-  const [codeGenTriggered, setCodeGenTriggered] = useState<Set<string>>(new Set());
-  const [issueError, setIssueError] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const fetchFeedback = useCallback(async () => {
     try {
-      const url = filter === "all" ? "/api/admin/feedback" : `/api/admin/feedback?status=${filter}`;
-      const res = await fetch(url);
+      const params = new URLSearchParams({
+        page: String(page),
+        page_size: String(PAGE_SIZE),
+      });
+      if (filter !== "all") params.set("review_state", filter);
+
+      const res = await fetch(`/api/admin/feedback?${params}`);
       if (res.ok) {
         const data = await res.json();
-        setItems(data);
+        setItems(data.items ?? []);
+        setTotal(data.total ?? 0);
+        setHasMore(Boolean(data.has_more));
       }
     } catch {
       // Silently fail
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, page]);
 
   useEffect(() => {
     setLoading(true);
     fetchFeedback();
   }, [fetchFeedback]);
 
-  async function handleAction(id: string, decision: "accepted" | "declined") {
+  function setError(id: string, message: string | null) {
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (message) next[id] = message;
+      else delete next[id];
+      return next;
+    });
+  }
+
+  /** Titles for duplicate links currently on screen. */
+  const titleById = new Map(items.map((i) => [i.id, i.title]));
+
+  async function setReviewState(
+    id: string,
+    reviewState: "needs_review" | "approved" | "rejected"
+  ) {
     setActionLoading(id);
+    setError(id, null);
     try {
-      const body: Record<string, string> = { id, admin_override_decision: decision };
+      const body: Record<string, string> = { id, review_state: reviewState };
       if (adminNotes[id]) body.admin_notes = adminNotes[id];
 
       const res = await fetch("/api/admin/feedback", {
@@ -91,9 +149,12 @@ export function FeedbackReviewTable() {
         body: JSON.stringify(body),
       });
 
-      if (res.ok) {
-        await fetchFeedback();
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setError(id, json.error ?? `Update failed (${res.status})`);
+        return;
       }
+      await fetchFeedback();
     } finally {
       setActionLoading(null);
     }
@@ -107,33 +168,36 @@ export function FeedbackReviewTable() {
 
   async function handleCreateIssue(id: string) {
     setActionLoading(id);
-    setIssueError((prev) => { const next = { ...prev }; delete next[id]; return next; });
+    setError(id, null);
     try {
-      const res = await fetch("/api/admin/feedback", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, admin_override_decision: "accepted" }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.github_error) {
-          setIssueError((prev) => ({ ...prev, [id]: json.github_error }));
-        } else {
-          await fetchFeedback();
-        }
+      const res = await fetch(`/api/admin/feedback/${id}/issue`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      // Failures are real status codes now — the old handler returned 200 with
+      // a `github_error` field, which one client path read and the other didn't.
+      if (!res.ok) {
+        setError(id, json.error ?? `Issue creation failed (${res.status})`);
+        return;
       }
+      await fetchFeedback();
     } finally {
       setActionLoading(null);
     }
   }
 
-  async function handleGenerateCode(id: string) {
+  async function handleGenerateCode(id: string, force = false) {
     setCodeGenLoading(id);
+    setError(id, null);
     try {
-      const res = await fetch(`/api/admin/feedback/${id}/generate-code`, { method: "POST" });
-      if (res.ok) {
-        setCodeGenTriggered((prev) => new Set(prev).add(id));
+      const res = await fetch(
+        `/api/admin/feedback/${id}/generate-code${force ? "?force=true" : ""}`,
+        { method: "POST" }
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(id, json.hint ? `${json.error} — ${json.hint}` : json.error);
+        return;
       }
+      await fetchFeedback();
     } finally {
       setCodeGenLoading(null);
     }
@@ -142,23 +206,29 @@ export function FeedbackReviewTable() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h3 className="font-semibold">Feedback Submissions</h3>
-            <CardDescription>Review and triage user feedback</CardDescription>
+            <CardDescription>
+              Review and triage user feedback
+              {total > 0 && ` — ${total} in this view`}
+            </CardDescription>
           </div>
-          <div className="flex gap-1">
-            {STATUS_FILTERS.map((s) => (
+          <div className="flex gap-1 flex-wrap">
+            {FILTERS.map((f) => (
               <button
-                key={s}
-                onClick={() => setFilter(s)}
+                key={f.value}
+                onClick={() => {
+                  setFilter(f.value);
+                  setPage(0);
+                }}
                 className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                  filter === s
+                  filter === f.value
                     ? "bg-foreground text-background"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                {f.label}
               </button>
             ))}
           </div>
@@ -168,11 +238,17 @@ export function FeedbackReviewTable() {
         {loading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Loading...</p>
         ) : items.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">No feedback found</p>
+          <p className="text-sm text-muted-foreground text-center py-8">
+            No feedback in this view
+          </p>
         ) : (
           <div className="divide-y">
             {items.map((item) => {
               const isExpanded = expandedId === item.id;
+              const duplicateTitle = item.triage_duplicate_of
+                ? titleById.get(item.triage_duplicate_of)
+                : null;
+
               return (
                 <div key={item.id} className="py-3">
                   <button
@@ -187,19 +263,28 @@ export function FeedbackReviewTable() {
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
-                          STATUS_STYLES[item.status] || STATUS_STYLES.submitted
+                          REVIEW_STYLES[item.review_state] ?? REVIEW_STYLES.needs_review
                         }`}
                       >
-                        {item.status}
+                        {REVIEW_LABELS[item.review_state] ?? item.review_state}
                       </span>
                       {item.triage_decision && (
                         <span
                           className={`px-1.5 py-0.5 rounded text-xs shrink-0 ${
                             DECISION_STYLES[item.triage_decision] || ""
                           }`}
+                          title="AI verdict"
                         >
-                          {item.triage_decision}
+                          AI: {item.triage_decision}
                           {item.triage_confidence ? ` (${item.triage_confidence}/10)` : ""}
+                        </span>
+                      )}
+                      {item.triage_error && (
+                        <span
+                          className="shrink-0 text-destructive"
+                          title="Triage failed — see details"
+                        >
+                          <AlertTriangle className="h-3.5 w-3.5" />
                         </span>
                       )}
                       <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
@@ -228,9 +313,22 @@ export function FeedbackReviewTable() {
                         </p>
                         <p className="text-sm whitespace-pre-wrap">{item.description}</p>
                         {item.page_url && (
-                          <p className="text-xs text-muted-foreground">Page: {item.page_url}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Page: {item.page_url}
+                          </p>
                         )}
                       </div>
+
+                      {item.triage_error && (
+                        <div className="space-y-1 rounded-md border border-destructive/20 bg-destructive/5 p-3">
+                          <p className="text-xs font-medium text-destructive uppercase tracking-wide">
+                            Triage failed
+                          </p>
+                          <p className="text-xs text-destructive font-mono break-all">
+                            {item.triage_error}
+                          </p>
+                        </div>
+                      )}
 
                       {item.triage_reasoning && (
                         <div className="space-y-1">
@@ -244,9 +342,18 @@ export function FeedbackReviewTable() {
                             </p>
                           )}
                           {item.triage_duplicate_of && (
-                            <p className="text-xs text-accent-soft-foreground">
-                              Possible duplicate: {item.triage_duplicate_of}
-                            </p>
+                            <button
+                              onClick={() => {
+                                setFilter("all");
+                                setPage(0);
+                                setExpandedId(item.triage_duplicate_of);
+                              }}
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              <Link2 className="h-3 w-3" />
+                              Possible duplicate of{" "}
+                              {duplicateTitle ?? item.triage_duplicate_of}
+                            </button>
                           )}
                         </div>
                       )}
@@ -273,12 +380,18 @@ export function FeedbackReviewTable() {
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 text-xs"
-                                onClick={() => copyIssueMarkdown(item.generated_issue!, item.id)}
+                                onClick={() =>
+                                  copyIssueMarkdown(item.generated_issue!, item.id)
+                                }
                               >
                                 {copiedId === item.id ? (
-                                  <><Check className="h-3 w-3" /> Copied</>
+                                  <>
+                                    <Check className="h-3 w-3" /> Copied
+                                  </>
                                 ) : (
-                                  <><Copy className="h-3 w-3" /> Copy</>
+                                  <>
+                                    <Copy className="h-3 w-3" /> Copy
+                                  </>
                                 )}
                               </Button>
                             </div>
@@ -289,87 +402,129 @@ export function FeedbackReviewTable() {
                         </div>
                       )}
 
-                      {item.status === "accepted" && (
-                        <div className="pt-2 border-t flex items-center gap-2">
-                          {item.github_issue_number ? (
+                      {errors[item.id] && (
+                        <p className="text-xs text-destructive">{errors[item.id]}</p>
+                      )}
+
+                      {/*
+                        Actions are available in EVERY state. The previous
+                        version hid this whole block once status was 'accepted'
+                        or 'declined' — both of which the AI wrote directly — so
+                        an AI verdict was final and two genuine bug reports were
+                        unreachable without SQL.
+                      */}
+                      <div className="space-y-2 pt-2 border-t">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Admin Actions
+                        </p>
+                        <Textarea
+                          placeholder="Add notes (optional)"
+                          value={adminNotes[item.id] ?? item.admin_notes ?? ""}
+                          onChange={(e) =>
+                            setAdminNotes((prev) => ({
+                              ...prev,
+                              [item.id]: e.target.value,
+                            }))
+                          }
+                          className="min-h-[60px] text-sm"
+                        />
+                        <div className="flex gap-2 flex-wrap">
+                          {item.review_state !== "approved" && (
+                            <Button
+                              size="sm"
+                              onClick={() => setReviewState(item.id, "approved")}
+                              disabled={actionLoading === item.id}
+                            >
+                              Approve
+                            </Button>
+                          )}
+                          {item.review_state !== "rejected" && (
                             <Button
                               size="sm"
                               variant="outline"
-                              disabled={codeGenLoading === item.id || codeGenTriggered.has(item.id)}
-                              onClick={() => handleGenerateCode(item.id)}
-                              className="text-xs h-7"
+                              onClick={() => setReviewState(item.id, "rejected")}
+                              disabled={actionLoading === item.id}
                             >
-                              {codeGenLoading === item.id ? (
-                                <><Loader2 className="h-3 w-3 animate-spin" /> Triggering...</>
-                              ) : codeGenTriggered.has(item.id) ? (
-                                <><Check className="h-3 w-3" /> Code generation triggered</>
-                              ) : (
-                                <><Code2 className="h-3 w-3" /> Generate Code</>
-                              )}
+                              Reject
                             </Button>
-                          ) : (
-                            <div className="space-y-1">
+                          )}
+                          {item.review_state !== "needs_review" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setReviewState(item.id, "needs_review")}
+                              disabled={actionLoading === item.id}
+                              title="Return this submission to the review queue"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              Reopen
+                            </Button>
+                          )}
+
+                          {item.review_state === "approved" &&
+                            !item.github_issue_number && (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                disabled={actionLoading === item.id}
+                                disabled={
+                                  actionLoading === item.id || !item.generated_issue
+                                }
                                 onClick={() => handleCreateIssue(item.id)}
-                                className="text-xs h-7"
+                                title={
+                                  item.generated_issue
+                                    ? undefined
+                                    : "No generated issue — run triage first"
+                                }
                               >
                                 {actionLoading === item.id ? (
-                                  <><Loader2 className="h-3 w-3 animate-spin" /> Creating...</>
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin" /> Creating...
+                                  </>
                                 ) : (
-                                  <><ExternalLink className="h-3 w-3" /> Create GitHub Issue</>
+                                  <>
+                                    <ExternalLink className="h-3 w-3" /> Create GitHub Issue
+                                  </>
                                 )}
                               </Button>
-                              {issueError[item.id] && (
-                                <p className="text-xs text-destructive">{issueError[item.id]}</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                            )}
 
-                      {!item.admin_override_decision && item.status !== "accepted" && item.status !== "declined" && (
-                        <div className="space-y-2 pt-2 border-t">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Admin Actions
-                          </p>
-                          <Textarea
-                            placeholder="Add notes (optional)"
-                            value={adminNotes[item.id] || ""}
-                            onChange={(e) =>
-                              setAdminNotes((prev) => ({ ...prev, [item.id]: e.target.value }))
-                            }
-                            className="min-h-[60px] text-sm"
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleAction(item.id, "accepted")}
-                              disabled={actionLoading === item.id}
-                            >
-                              Accept
-                            </Button>
+                          {item.github_issue_number && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleAction(item.id, "declined")}
-                              disabled={actionLoading === item.id}
+                              disabled={codeGenLoading === item.id}
+                              onClick={() =>
+                                handleGenerateCode(item.id, !!item.code_gen_triggered_at)
+                              }
                             >
-                              Decline
+                              {codeGenLoading === item.id ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin" /> Triggering...
+                                </>
+                              ) : item.code_gen_triggered_at ? (
+                                <>
+                                  <RotateCcw className="h-3 w-3" /> Re-run code gen
+                                </>
+                              ) : (
+                                <>
+                                  <Code2 className="h-3 w-3" /> Generate Code
+                                </>
+                              )}
                             </Button>
-                          </div>
-                        </div>
-                      )}
-
-                      {item.admin_override_decision && (
-                        <div className="text-xs text-muted-foreground pt-2 border-t">
-                          Admin decision: <span className="font-medium">{item.admin_override_decision}</span>
-                          {item.admin_notes && <> — {item.admin_notes}</>}
-                          {item.reviewed_at && (
-                            <> on {new Date(item.reviewed_at).toLocaleDateString()}</>
                           )}
+                        </div>
+                        {item.code_gen_triggered_at && (
+                          <p className="text-xs text-muted-foreground">
+                            Code generation triggered{" "}
+                            {new Date(item.code_gen_triggered_at).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+
+                      {item.reviewed_at && (
+                        <div className="text-xs text-muted-foreground pt-2 border-t">
+                          Last reviewed {new Date(item.reviewed_at).toLocaleDateString()}
+                          {item.admin_notes && <> — {item.admin_notes}</>}
                         </div>
                       )}
                     </div>
@@ -377,6 +532,30 @@ export function FeedbackReviewTable() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {(page > 0 || hasMore) && (
+          <div className="flex items-center justify-between pt-4 mt-2 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={page === 0 || loading}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Previous
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Page {page + 1} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!hasMore || loading}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
           </div>
         )}
       </CardContent>
