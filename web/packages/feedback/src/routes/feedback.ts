@@ -42,6 +42,13 @@ export function createFeedbackHandlers(rawConfig: FeedbackConfig) {
 
     const { type, title, description, pageUrl } = parsed.data;
 
+    // Only the five user-authored columns are written here. `status` is
+    // deliberately omitted so the column default ('submitted') supplies it —
+    // the DB grant (migration 20260731093000) does not include `status`, and
+    // sending it would be rejected. Every other column (triage_*,
+    // generated_issue, admin_*, github_*) is service-role-only by the same
+    // grant, which is what stops a client from bypassing this route and
+    // PostgREST-inserting a pre-"accepted" row.
     const { data, error } = await supabase
       .from("feedback_submissions")
       .insert({
@@ -50,7 +57,6 @@ export function createFeedbackHandlers(rawConfig: FeedbackConfig) {
         title,
         description,
         page_url: pageUrl || null,
-        status: "submitted",
       })
       .select("id, status, created_at")
       .single();
