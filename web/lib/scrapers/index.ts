@@ -13,8 +13,8 @@ import { fetchWorkdayTdJobs } from "./workday-td";
 import { fetchWorkdayCibcJobs } from "./workday-cibc";
 import { fetchRevolutJobs } from "./revolut";
 
-export type { JobData } from "./types";
-export { jobToRow } from "./types";
+export type { JobData, JobRow, AtsSalaryFields } from "./types";
+export { jobToRow, atsSalaryFields } from "./types";
 export { detectATSFromUrl, SUPPORTED_ATS, type ATSType, type ATSDetectionResult } from "./detect-ats";
 export { scrapeJobsWithBrowser, scrapeGenericJobBoard, scrapeSuccessFactors } from "./browser";
 

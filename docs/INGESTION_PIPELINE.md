@@ -19,6 +19,22 @@ The gate in [`web/lib/jobs/processor.ts`](../web/lib/jobs/processor.ts) skips `e
 
 Why this matters: re-running `collect` on a stable career page will *not* re-pay for Flash extraction. If you add a new field to the structure schema, you need to either bump a config version or null-out hashes on a backfill so the gate re-fires.
 
+## Salary provenance: ATS-published beats AI-extracted
+
+`salary_min` / `salary_max` / `salary_currency` have **two** writers, and the ATS one wins.
+
+Historically the only writer was `extractAndUpdateStructure`, which reads the range out of the description prose. That silently loses every board whose ATS publishes compensation as *structured data outside the description* — Ashby is exactly that shape: Wealthsimple and Koho render "CA$54K – CA$68K • Offers Equity" from the API's `compensation` object, which never appears in `descriptionHtml`, so the Flash extractor had nothing to find and every Ashby row ingested with a null salary (August 2026).
+
+So `ashby.ts` now requests `?includeCompensation=true` and parses the block itself (`parseAshbyCompensation`), tagging the result `salary_source: "ats"`. The ingest layer keys off that tag in two places:
+
+- **`runIngestStage`** writes the columns on the per-job refresh, *outside* the `description_hash` gate — a repriced req updates even when its prose never moved.
+- **`extractAndUpdateStructure`** takes `preserveScrapedSalary` and then omits the salary columns entirely. Without it, the extractor's (correct) null would erase the published range on the very next scrape.
+
+Two invariants worth keeping:
+
+- **Only annual figures.** The columns are bare integers with no interval, so hourly/monthly bands and equity/bonus components are deliberately dropped rather than converted. Those postings fall through to the AI path unchanged.
+- **Absence means "don't touch", not "clear".** A scraper that publishes no structured range leaves the columns off the write payload — writing nulls would wipe the AI-extracted salary of every non-Ashby board on every scrape.
+
 ## Closed-job detection and the mass-closure floor
 
 `runIngestStage` closes a req by set difference: any active `job_postings` row for the company whose `external_id` did **not** appear in this scrape gets `is_active=false` + `closed_date`. This is correct *only* if the scrape is the complete corpus.
