@@ -37,8 +37,9 @@ The `providers/` subdir is a **default-safe seam** for the open-model evaluation
 harness, NOT a production provider switch. Full methodology in
 [`docs/OPEN_MODEL_EVALUATION.md`](../../../docs/OPEN_MODEL_EVALUATION.md).
 
-- **`providers/registry.ts`** — `EVAL_MODEL_REGISTRY` (GLM-5.2, DeepSeek
-  V4-Flash + their Fireworks slugs) and `resolveProvider(modelId)`. These ids are
+- **`providers/registry.ts`** — `EVAL_MODEL_REGISTRY` (Qwen3-30B-A3B, Llama 4
+  Scout, Mistral Small, DeepSeek V4-Flash + their Fireworks slugs; GLM-5.2 retired
+  after Round 1) and `resolveProvider(modelId)`. These ids are
   deliberately kept **out of** `AI_MODEL_OPTIONS` so the admin UI never exposes an
   unvetted model. `resolveProvider` returns `"gemini"` for everything not in the
   registry — so any production call site that never passes an eval id runs its
@@ -49,8 +50,9 @@ harness, NOT a production provider switch. Full methodology in
 - **`eval/agreement.ts`** — pure output-agreement scorers (L1 field agreement for
   extraction, role-category agreement for categorize). This is where the
   "≥95% L1 agreement" gate is actually computed.
-- **Pricing:** `glm-5.2` / `deepseek-v4-flash` sticker rates live in
-  `gemini-pricing.ts` alongside the Gemini rows (the table is keyed by model
+- **Pricing:** candidate sticker rates (`qwen3-30b-a3b`, `llama4-scout`,
+  `mistral-small`, `deepseek-v4-flash`; `glm-5.2` retained for old artifacts) live
+  in `gemini-pricing.ts` alongside the Gemini rows (the table is keyed by model
   string; `estimateUsd` returns 0 for unknown models).
 - Driven by `web/scripts/model-bakeoff.ts`; never wired into a cron or route.
   `FIREWORKS_*` env is optional (eval only). **No production default changed.**

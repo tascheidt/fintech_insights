@@ -62,15 +62,36 @@ export const GEMINI_PRICING: Record<string, ModelRates> = {
   // for PR-to-PR cost comparison like the Gemini rows above; reconcile against a
   // real Fireworks invoice before trusting absolute USD. Keyed by the canonical
   // eval ids in `lib/ai/providers/registry.ts`. See docs/OPEN_MODEL_EVALUATION.md.
+  // GLM-5.2 retired from the candidate set (June 2026) — dominated on
+  // extract-structure (pricier than gemini-flash, ~8x slower, lower agreement).
+  // Pricing row kept so historical artifacts still cost-resolve.
   "glm-5.2": {
     inputPerM: 1.2,
     outputPerM: 4.1,
-    notes: "Z.ai GLM-5.2 via Fireworks serverless (eval only). Verify vs invoice.",
+    notes: "RETIRED candidate. Row retained so old bake-off artifacts resolve. Verify vs invoice.",
   },
   "deepseek-v4-flash": {
     inputPerM: 0.14,
     outputPerM: 0.28,
     notes: "DeepSeek V4-Flash via Fireworks serverless (eval only). Verify vs invoice.",
+  },
+  // Fireworks serverless tiers (~2026-06 sticker, blended estimates). The
+  // 16-80B MoE/dense tier is ~$0.90 blended; Llama 4 Scout sits lower. These
+  // are PR-to-PR estimates only — reconcile against the Fireworks invoice.
+  "qwen3-30b-a3b": {
+    inputPerM: 0.9,
+    outputPerM: 0.9,
+    notes: "Qwen3-30B-A3B via Fireworks serverless (eval only). Blended-tier estimate; verify vs invoice.",
+  },
+  "llama4-scout": {
+    inputPerM: 0.22,
+    outputPerM: 0.88,
+    notes: "Llama 4 Scout via Fireworks serverless (eval only). Estimate; verify vs invoice.",
+  },
+  "mistral-small": {
+    inputPerM: 0.9,
+    outputPerM: 0.9,
+    notes: "Mistral Small 3.2 24B via Fireworks serverless (eval only). Blended-tier estimate; verify vs invoice.",
   },
 };
 

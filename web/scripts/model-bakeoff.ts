@@ -110,9 +110,6 @@ function parseFlags(argv: string[]): Flags {
   if (models.length === 0) {
     models = ["gemini-flash-latest", "glm-5.2", "deepseek-v4-flash"];
   }
-  if (reference === "golden" && scenario !== "extract-structure") {
-    throw new Error("--reference=golden is only supported for --scenario=extract-structure.");
-  }
   return { scenario, models, reference: reference ?? models[0], limit, dryRun };
 }
 
@@ -136,10 +133,34 @@ async function loadGolden(): Promise<Map<string, JobStructureForDB>> {
   try {
     const raw = await readFile(file, "utf8");
     const parsed = JSON.parse(raw) as { records: { jobId: string; expected: JobStructureForDB }[] };
+    if (!parsed.records?.length) {
+      throw new Error(
+        `${file} has no records. Author the golden set first — open scripts/golden-labeler.html ` +
+        `(regenerate it with: npx tsx scripts/build-golden-labeler.ts), label the jobs, and download ` +
+        `the file back to scripts/fixtures/golden-extraction.json.`
+      );
+    }
     return new Map(parsed.records.map((r) => [r.jobId, r.expected]));
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("has no records")) throw err;
     throw new Error(
-      `--reference=golden requires ${file}. Populate it with human-verified extractions first.`
+      `--reference=golden requires ${file}. Author it via scripts/golden-labeler.html ` +
+      `(see: npx tsx scripts/build-golden-labeler.ts).`
+    );
+  }
+}
+
+async function loadGoldenCategorize(): Promise<Map<string, JobCategoryResult>> {
+  const file = resolve(process.cwd(), "scripts/fixtures/golden-categorize.json");
+  try {
+    const raw = await readFile(file, "utf8");
+    const parsed = JSON.parse(raw) as { records: { jobId: string; expected: JobCategoryResult }[] };
+    if (!parsed.records?.length) throw new Error(`${file} has no records.`);
+    return new Map(parsed.records.map((r) => [r.jobId, r.expected]));
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("has no records")) throw err;
+    throw new Error(
+      `--reference=golden (categorize) requires ${file} with human-verified records.`
     );
   }
 }
@@ -416,12 +437,17 @@ async function main() {
       extractionAgreement = {};
       for (const run of runs) extractionAgreement[run.model] = summarizeExtractionAgreement(run, refMap);
     } else {
-      const refRun = runs.find((r) => r.model === flags.reference);
-      const refMap = new Map(
-        (refRun?.perJob ?? [])
-          .filter((p) => p.output !== null)
-          .map((p) => [p.jobId, p.output as JobCategoryResult])
-      );
+      let refMap: Map<string, JobCategoryResult>;
+      if (flags.reference === "golden") {
+        refMap = await loadGoldenCategorize();
+      } else {
+        const refRun = runs.find((r) => r.model === flags.reference);
+        refMap = new Map(
+          (refRun?.perJob ?? [])
+            .filter((p) => p.output !== null)
+            .map((p) => [p.jobId, p.output as JobCategoryResult])
+        );
+      }
       categorizationAgreement = {};
       for (const run of runs)
         categorizationAgreement[run.model] = summarizeCategorizationAgreement(run, refMap);
