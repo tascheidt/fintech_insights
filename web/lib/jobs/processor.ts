@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchJobs, jobToRow, type JobData, isBrowserScraper } from "@/lib/scrapers";
+import { fetchJobs, jobToRow, atsSalaryFields, type JobData, isBrowserScraper } from "@/lib/scrapers";
 import { triggerScrapeWorkflow } from "@/lib/github";
 import type { Browser } from "puppeteer-core";
 import type { Company, IngestResult } from "./types";
@@ -168,7 +168,18 @@ export async function extractAndUpdateStructure(
   description: string,
   rawDepartment?: string | null,
   rawLocation?: string | null,
-  config?: JobStructureAiConfig
+  config?: JobStructureAiConfig,
+  options?: {
+    /**
+     * The scraper already wrote a salary range taken from the ATS's own
+     * structured compensation data (see `atsSalaryFields`). When true this
+     * update leaves `salary_*` alone: the published range outranks anything
+     * the extractor infers from prose, and on an Ashby board the description
+     * doesn't contain the range at all — so the AI reliably returns null and
+     * would otherwise erase the value we just ingested.
+     */
+    preserveScrapedSalary?: boolean;
+  }
 ): Promise<void> {
   const supabase = createAdminClient();
 
@@ -227,9 +238,13 @@ export async function extractAndUpdateStructure(
       .update({
         summary: structure.summary,
         seniority_level: structure.seniority_level,
-        salary_min: structure.salary_min,
-        salary_max: structure.salary_max,
-        salary_currency: structure.salary_currency,
+        ...(options?.preserveScrapedSalary
+          ? {}
+          : {
+              salary_min: structure.salary_min,
+              salary_max: structure.salary_max,
+              salary_currency: structure.salary_currency,
+            }),
         tech_stack: structure.tech_stack,
         keywords: structure.keywords || [],
         standardized_department: structure.standardized_department,
@@ -407,6 +422,12 @@ export async function runIngestStage(
         is_active: true,
       };
 
+      // Salary published as structured data by the ATS (Ashby today). Null
+      // means the board published none for this job — leave the columns alone
+      // so the AI extraction path keeps owning them, rather than nulling a
+      // previously extracted range on every scrape.
+      const atsSalary = atsSalaryFields(job);
+
       const existingEntry = existingByCompany.get(targetCompanyId)?.get(job.external_id);
       // Normalized content fingerprint for the description_hash gate. A null
       // stored hash is treated as "changed" so the first scrape after deploy
@@ -455,6 +476,10 @@ export async function runIngestStage(
             posted_date: row.posted_date,
             is_active: true,
             closed_date: null,
+            // Refresh the published range on every scrape so a repriced req
+            // updates even when the description (and so the hash gate) hasn't
+            // moved. Omitted entirely when the ATS publishes no range.
+            ...(atsSalary ?? {}),
           })
           .eq('id', existingId);
         updatedJobs++;
@@ -470,7 +495,8 @@ export async function runIngestStage(
               row.description_text,
               row.department,
               row.location,
-              activeConfig
+              activeConfig,
+              { preserveScrapedSalary: atsSalary !== null }
             )
           );
         } else if (row.description_text) {
@@ -506,7 +532,8 @@ export async function runIngestStage(
                 row.description_text,
                 row.department,
                 row.location,
-                activeConfig
+                activeConfig,
+                { preserveScrapedSalary: atsSalary !== null }
               )
             );
           }

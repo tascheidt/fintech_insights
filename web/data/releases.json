@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.15.2",
+    "date": "2026-08-10",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "Wealthsimple and Koho publish a salary range on every posting, and we were dropping all of them. Their job board keeps compensation in a structured field that never appears in the description text, so the range was invisible to the description-based extraction and every one of those roles was stored with no salary. Ranges are now read straight from the board, refresh when a role is repriced even if its description hasn't changed, and are no longer overwritten by an extraction that couldn't see them. Only annual figures are stored — hourly bands, equity and bonus lines are left out rather than mixed into the same number."
+      }
+    ]
+  },
+  {
     "version": "2.15.1",
     "date": "2026-08-01",
     "changes": [

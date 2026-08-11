@@ -11,7 +11,7 @@ These hit the ATS provider's JSON endpoint. They run inside Vercel functions and
 - **`lever.ts`** — Lever boards.
 - **`greenhouse.ts`** — Greenhouse boards.
 - **`workable.ts`** — Workable boards.
-- **`ashby.ts`** — Ashby boards.
+- **`ashby.ts`** — Ashby boards (Wealthsimple, Koho). Fetches with **`?includeCompensation=true`** — without that flag Ashby omits the `compensation` block entirely. This is the one scraper that populates `salary_min/max/currency` itself: Ashby boards render their published range ("CA$54K – CA$68K • Offers Equity") from that structured block and **never** put it in `descriptionHtml`, so the downstream Flash description extractor had nothing to find and every Ashby row ingested with a null salary until August 2026. `parseAshbyCompensation` prefers structured `summaryComponents` / `compensationTiers`, falls back to `scrapeableCompensationSalarySummary`, and tags a parsed range `salary_source: "ats"` (see `types.ts` → `atsSalaryFields`), which tells `runIngestStage` to refresh the columns outside the `description_hash` gate and tells `extractAndUpdateStructure` not to overwrite them. **Annual only** — the columns are bare integers with no interval, so hourly/monthly bands, equity and bonus components are dropped rather than converted, and a bare `$` with no country prefix is refused rather than guessed as USD. Pure parsers unit-tested in `ashby.test.ts`; provenance rules in `docs/INGESTION_PIPELINE.md`.
 
 ## Browser scrapers (offloaded to GitHub Actions)
 
@@ -88,7 +88,7 @@ Companies with `ats_type: custom` use the generic Puppeteer scraper (`scrapeGene
 
 ## Shared
 
-- **`types.ts`** — `JobData` shape and `jobToRow` mapper to the DB row.
+- **`types.ts`** — `JobData` shape and `jobToRow` mapper to the DB row. Also `atsSalaryFields`, the single place that decides whether a scraper's salary is authoritative: it returns null unless the job carries `salary_source: "ats"` **and** a parsed range, and null means "leave the salary columns alone", never "clear them" — the columns are shared with the AI extractor, so an unconditional write would wipe every AI-extracted salary on every scrape.
 - **`utils.ts`** — Shared HTML/text helpers.
 - **`index.ts`** — Factory + re-exports.
 

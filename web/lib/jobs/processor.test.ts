@@ -36,11 +36,20 @@ vi.mock("@/lib/analysis/structure", () => ({
   isValidLocation: () => true,
 }));
 
-vi.mock("@/lib/scrapers", () => ({
-  fetchJobs: vi.fn().mockResolvedValue([]),
-  jobToRow: (job: unknown) => job,
-  isBrowserScraper: () => false,
-}));
+// The index barrel pulls in puppeteer, so it's mocked wholesale — but
+// `atsSalaryFields` is real pure logic from ./types (no heavy deps), and the
+// ingest path's salary handling is only meaningfully covered if it runs.
+vi.mock("@/lib/scrapers", async () => {
+  const types = await vi.importActual<typeof import("../scrapers/types")>(
+    "@/lib/scrapers/types"
+  );
+  return {
+    fetchJobs: vi.fn().mockResolvedValue([]),
+    jobToRow: (job: unknown) => job,
+    atsSalaryFields: types.atsSalaryFields,
+    isBrowserScraper: () => false,
+  };
+});
 
 vi.mock("@/lib/github", () => ({
   triggerScrapeWorkflow: vi.fn(),
@@ -84,6 +93,11 @@ let overrideCompanyRows: Array<{
 // Track inserted job_postings rows so override-routing tests can assert
 // what landed where.
 let insertedRows: Array<Record<string, unknown>> = [];
+
+// Track job_postings UPDATE payloads. Covers three distinct writes — the
+// per-job refresh, the post-extraction structure write, and closure — so
+// assertions filter by the keys they care about.
+let updatedRows: Array<Record<string, unknown>> = [];
 
 function buildSupabaseMock() {
   // Update chain supports: .eq(...), .eq(...).eq(...) (closure path), .in(...)
@@ -148,7 +162,10 @@ function buildSupabaseMock() {
       };
       return {
         select: vi.fn(() => selectChain),
-        update: vi.fn(() => buildUpdateChain()),
+        update: vi.fn((payload: Record<string, unknown>) => {
+          updatedRows.push(payload);
+          return buildUpdateChain();
+        }),
         insert: vi.fn((row: Record<string, unknown>) => {
           insertedRows.push(row);
           return insertChain;
@@ -501,5 +518,127 @@ describe("runIngestStage sub-brand-only mode (incumbent tracking off)", () => {
 
     expect(insertedRows).toHaveLength(1);
     expect(insertedRows[0].company_id).toBe(INCUMBENT_PARENT.id);
+  });
+});
+
+/**
+ * ATS-published salary (Ashby). Wealthsimple publishes its ranges in Ashby's
+ * structured `compensation` block and nowhere in the description, so the two
+ * things that must hold are: the range reaches `job_postings` on every scrape
+ * (not just when the description hash moves), and the Flash description
+ * extractor — which sees no range and returns null — cannot then erase it.
+ */
+describe("runIngestStage ATS-published salary", () => {
+  const SALARIED_JOB = {
+    ...FIXTURE_JOB,
+    salary_source: "ats",
+    salary_min: 54000,
+    salary_max: 68000,
+    salary_currency: "CAD",
+  };
+
+  const existingJobRow = (hash: string) => [
+    {
+      id: "existing-job-1",
+      external_id: FIXTURE_JOB.external_id,
+      description_hash: hash,
+      company_id: FIXTURE_COMPANY.id,
+    },
+  ];
+
+  /** The per-job refresh write — identified by a key only it carries. */
+  const refreshWrites = () => updatedRows.filter((row) => "last_seen_date" in row);
+  /** The post-extraction structure write. */
+  const structureWrites = () => updatedRows.filter((row) => "summary" in row);
+
+  beforeEach(() => {
+    extractJobStructureMock.mockClear();
+    extractJobStructureMock.mockResolvedValue(null);
+    existingRows = [];
+    overrideCompanyRows = [];
+    insertedRows = [];
+    updatedRows = [];
+    incumbentTrackingEnabledMock = false;
+  });
+
+  it("refreshes the published range even when the description hash is unchanged", async () => {
+    // A repriced req whose prose never moved: the hash gate skips extraction,
+    // so this write is the only chance to pick up the new range.
+    existingRows = existingJobRow(STORED_HASH_MATCH);
+
+    const { runIngestStage } = await import("./processor");
+    await runIngestStage("task-salary-1", FIXTURE_COMPANY as never, [SALARIED_JOB] as never);
+
+    expect(extractJobStructureMock).toHaveBeenCalledTimes(0);
+    expect(refreshWrites()[0]).toMatchObject({
+      salary_min: 54000,
+      salary_max: 68000,
+      salary_currency: "CAD",
+    });
+  });
+
+  it("leaves salary columns untouched for a board that publishes no range", async () => {
+    // Every non-Ashby scraper. Writing salary here would null out the
+    // AI-extracted value on every single scrape.
+    existingRows = existingJobRow(STORED_HASH_MATCH);
+
+    const { runIngestStage } = await import("./processor");
+    await runIngestStage("task-salary-2", FIXTURE_COMPANY as never, [FIXTURE_JOB] as never);
+
+    const refresh = refreshWrites()[0];
+    expect(refresh).not.toHaveProperty("salary_min");
+    expect(refresh).not.toHaveProperty("salary_max");
+    expect(refresh).not.toHaveProperty("salary_currency");
+  });
+
+  it("does not let the description extractor overwrite an ATS-published range", async () => {
+    existingRows = existingJobRow(STORED_HASH_DIFFERENT);
+    extractJobStructureMock.mockResolvedValue({
+      summary: "Backend role on payments infra.",
+      seniority_level: "senior",
+      // The range is not in the description, so the extractor finds nothing.
+      salary_min: null,
+      salary_max: null,
+      salary_currency: "USD",
+      tech_stack: [],
+      keywords: [],
+      standardized_department: "Engineering",
+      function_category: "other",
+      location_structured: null,
+    });
+
+    const { runIngestStage } = await import("./processor");
+    await runIngestStage("task-salary-3", FIXTURE_COMPANY as never, [SALARIED_JOB] as never);
+
+    expect(extractJobStructureMock).toHaveBeenCalledTimes(1);
+    const structure = structureWrites()[0];
+    expect(structure).toBeDefined();
+    expect(structure).not.toHaveProperty("salary_min");
+    expect(structure).not.toHaveProperty("salary_currency");
+  });
+
+  it("still writes extracted salary when the ATS published none", async () => {
+    existingRows = existingJobRow(STORED_HASH_DIFFERENT);
+    extractJobStructureMock.mockResolvedValue({
+      summary: "Backend role on payments infra.",
+      seniority_level: "senior",
+      salary_min: 150000,
+      salary_max: 190000,
+      salary_currency: "USD",
+      tech_stack: [],
+      keywords: [],
+      standardized_department: "Engineering",
+      function_category: "other",
+      location_structured: null,
+    });
+
+    const { runIngestStage } = await import("./processor");
+    await runIngestStage("task-salary-4", FIXTURE_COMPANY as never, [FIXTURE_JOB] as never);
+
+    expect(structureWrites()[0]).toMatchObject({
+      salary_min: 150000,
+      salary_max: 190000,
+      salary_currency: "USD",
+    });
   });
 });
