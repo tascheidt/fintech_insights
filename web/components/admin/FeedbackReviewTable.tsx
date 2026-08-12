@@ -92,6 +92,7 @@ export function FeedbackReviewTable() {
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [codeGenLoading, setCodeGenLoading] = useState<string | null>(null);
+  const [retriageLoading, setRetriageLoading] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   // A failed list fetch used to be swallowed, leaving the table rendering the
   // "No feedback in this view" empty state. When the deployed schema lagged the
@@ -219,6 +220,30 @@ export function FeedbackReviewTable() {
       await fetchFeedback();
     } finally {
       setCodeGenLoading(null);
+    }
+  }
+
+  /**
+   * Re-run AI triage. A failed triage used to be terminal from here — the row
+   * showed its error and offered nothing to do about it, so recovering needed
+   * shell access and a .env.local.
+   */
+  async function handleRetriage(id: string) {
+    setRetriageLoading(id);
+    setError(id, null);
+    try {
+      const res = await fetch(`/api/admin/feedback/${id}/retriage`, {
+        method: "POST",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(id, json.error ?? `Triage failed (${res.status})`);
+      }
+      // Refresh either way: on failure the engine has persisted a fresh
+      // triage_error, which is more useful than the one already on screen.
+      await fetchFeedback();
+    } finally {
+      setRetriageLoading(null);
     }
   }
 
@@ -357,15 +382,33 @@ export function FeedbackReviewTable() {
                         )}
                       </div>
 
-                      {item.triage_error && (
-                        <div className="space-y-1 rounded-md border border-destructive/20 bg-destructive/5 p-3">
+                      {item.triage_error ? (
+                        <div className="space-y-2 rounded-md border border-destructive/20 bg-destructive/5 p-3">
                           <p className="text-xs font-medium text-destructive uppercase tracking-wide">
                             Triage failed
                           </p>
                           <p className="text-xs text-destructive font-mono break-all">
                             {item.triage_error}
                           </p>
+                          <RetriageButton
+                            id={item.id}
+                            loading={retriageLoading === item.id}
+                            onClick={handleRetriage}
+                          />
                         </div>
+                      ) : (
+                        !item.triage_completed_at && (
+                          <div className="space-y-2 rounded-md border bg-muted/40 p-3">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Not yet triaged
+                            </p>
+                            <RetriageButton
+                              id={item.id}
+                              loading={retriageLoading === item.id}
+                              onClick={handleRetriage}
+                            />
+                          </div>
+                        )
                       )}
 
                       {item.triage_reasoning && (
@@ -598,5 +641,42 @@ export function FeedbackReviewTable() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Re-run triage. Rendered both when a triage attempt failed and when one never
+ * completed — the second case is what a stuck 'reviewing' row looks like after
+ * the engine set triage_attempted_at and then threw.
+ */
+function RetriageButton({
+  id,
+  loading,
+  onClick,
+}: {
+  id: string;
+  loading: boolean;
+  onClick: (id: string) => void;
+}) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={loading}
+      onClick={() => onClick(id)}
+      className="h-7 text-xs"
+    >
+      {loading ? (
+        <>
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Re-running triage...
+        </>
+      ) : (
+        <>
+          <RotateCcw className="h-3 w-3" />
+          Re-run triage
+        </>
+      )}
+    </Button>
   );
 }

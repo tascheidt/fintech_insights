@@ -22,9 +22,16 @@ FeedbackDialog (UserMenu · RequestCompanyButton)
 
 Admin → /admin → Feedback tab
        ├─ PATCH  /api/admin/feedback           accept · decline · note
+       ├─ POST   /api/admin/feedback/[id]/issue      → GitHub issue
+       ├─ POST   /api/admin/feedback/[id]/retriage   → runTriageForSubmission
        └─ POST   /api/admin/feedback/[id]/generate-code
                                                → workflow_dispatch → auto-implement.yml
 ```
+
+The three `[id]` routes are all `requireAdmin`. `retriage` lives in the app
+rather than in `@tascheidt/feedback` because the package is host-agnostic and
+reaches triage only through the `onSubmissionCreated` hook — the engine it would
+have to call is this app's.
 
 ## Column ownership
 
@@ -167,7 +174,34 @@ stay off user surfaces.
 
 A row that started triage but never finished keeps `status='reviewing'` with
 `triage_attempted_at` set and `triage_completed_at` null. That is the retry
-signal; re-run with `--id=<uuid> --write`.
+signal.
+
+**Retrying is an admin action, not a developer one.** `POST /api/admin/feedback/[id]/retriage`
+(`requireAdmin`) calls `runTriageForSubmission` directly and backs the "Re-run
+triage" control that `FeedbackReviewTable` renders inside the failure block, and
+on any row that never completed. It rejects a row whose `triage_attempted_at` is
+under five minutes old and still incomplete, so a double-click cannot spend two
+Pro calls.
+
+Before this existed, the only retry paths were `/api/internal/feedback/triage`
+(CRON_SECRET — not reachable from a browser session) and
+`web/scripts/triage-feedback.ts --id=<uuid> --write` (shell + `.env.local`). The
+UI therefore displayed a failure it could not act on, and two report-generation
+bug reports sat untriaged from 2026-07-31 to 2026-08-12. The script remains the
+right tool for bulk and `--replay --dry-run` work.
+
+The 2026-08-12 incident is worth keeping straight, because the visible error
+named the wrong culprit. The tombstone in `triage_reasoning` read *"model
+`gemini-3-pro-preview` is no longer available"*, which looks like a model-config
+problem. It was not: `gemini_usage_events` shows `triageFeedback` calling
+`gemini-pro-latest` with `status='ok'` at 13:43:41 that same day, and
+`generateSearchReportSynthesis` calling `gemini-flash-latest` `ok` at 13:41:29.
+Both AI calls succeeded and both *persists* failed, because the July migrations
+adding `triage_error` / `review_state` had never been applied. The stale 404 came
+from the retired edge function, which was still trigger-wired until
+`20260731120000` was applied. **Check `gemini_usage_events.status` before
+believing a model string in an error message** — a tombstone from a retired
+call-site outlives the call-site.
 
 ## The two review axes
 

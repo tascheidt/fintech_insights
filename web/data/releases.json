@@ -10,6 +10,10 @@
       {
         "type": "improvement",
         "description": "When the admin feedback list can't load, it now says so and offers a retry instead of rendering an empty list. The failure that hid the queue looked identical to having no feedback at all."
+      },
+      {
+        "type": "feature",
+        "description": "Feedback whose AI triage failed can now be re-run from the admin screen. Previously a failed triage was permanent as far as the interface was concerned — it showed you the error and offered nothing to do about it, and recovering needed a developer with a terminal."
       }
     ]
   },
