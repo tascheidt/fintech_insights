@@ -1,5 +1,23 @@
 [
   {
+    "version": "2.15.3",
+    "date": "2026-08-12",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "Generating a report from a jobs search failed with \"Failed to save the report\", and the admin feedback screen showed nothing at all. Both had the same cause: the database changes that shipped alongside those features at the end of July were never applied to the live database, so the report table didn't exist and the feedback queue was asking for columns that weren't there. The database has been brought up to date and both screens work again — including your own feedback history, which was failing for the same reason."
+      },
+      {
+        "type": "improvement",
+        "description": "When the admin feedback list can't load, it now says so and offers a retry instead of rendering an empty list. The failure that hid the queue looked identical to having no feedback at all."
+      },
+      {
+        "type": "feature",
+        "description": "Feedback whose AI triage failed can now be re-run from the admin screen. Previously a failed triage was permanent as far as the interface was concerned — it showed you the error and offered nothing to do about it, and recovering needed a developer with a terminal."
+      }
+    ]
+  },
+  {
     "version": "2.15.2",
     "date": "2026-08-10",
     "changes": [

@@ -62,6 +62,31 @@ When a search is active the row cap lifts from 500 → 1000; if the cap is hit t
 
 **Client paging.** The table reveals `PAGE_SIZE` (25) rows at a time with an append-style "Load more" footer (`JobsListTable`), not a numbered pager — the list is ranked (newest / most-relevant first), so the top is what matters and appending preserves cross-page selection. Paging is purely client-side over the already-loaded, already-filtered set; it resets to the first page whenever the result set or sort order changes. The header counter reads "N matches" (the full filtered count, independent of how many rows are revealed); the footer reads "Showing 1–N of M".
 
+## Shipping a schema change
+
+**A merged migration is not an applied migration.** Vercel deploys code; nothing in this repo deploys SQL. A PR that adds a file under `web/supabase/migrations/` and goes green has changed nothing about the database — applying it is a separate, manual step against the Supabase project (`joqruwbipwmaysufhgyc`), and if you skip it the deployed code starts asking the database for objects that aren't there.
+
+That is not hypothetical. On 2026-08-12, six merged migrations were found unapplied, the oldest from 2026-07-14:
+
+| Migration | What was missing in production |
+|---|---|
+| `20260714000000_company_deactivated_reason` | `companies.deactivated_reason` |
+| `20260731000000_shared_search_reports` | the whole `shared_search_reports` table |
+| `20260731090000_feedback_schema_baseline` | (no-op) |
+| `20260731093000_feedback_column_grants` | column-scoped grants — the privilege-escalation fix was never live |
+| `20260731120000_feedback_triage_inhouse` | `triage_error`, `triage_attempted_at`; dead webhook trigger still firing |
+| `20260731150000_feedback_review_state` | `review_state`, `code_gen_triggered_at`, `code_gen_triggered_by` |
+
+The user-visible result was two features that looked implemented and were not: **Generate report** returned "Failed to save the report" (inserting into a table that did not exist), and the admin feedback queue plus every user's own feedback history rendered empty (PostgREST 400s on `review_state`). Both had been merged and deployed for a fortnight.
+
+**So, when your change includes a migration:**
+
+1. Apply it to the project immediately after the deploy — the Supabase MCP `apply_migration`, or the SQL editor.
+2. Verify the objects exist, don't assume the statement ran. `to_regclass('public.<table>')`, or an `information_schema.columns` count for new columns.
+3. Say in the PR description whether it has been applied yet. A reviewer cannot tell from the diff.
+
+**Do not trust `supabase_migrations.schema_migrations` as the record of what is applied.** Much of this schema was built through the SQL editor, so the ledger is missing entries for objects that demonstrably exist (`company_news_cache`, `incumbent_tracking_flag`, and others), and the versions it does carry don't match the filenames in this repo. The schema itself is the only source of truth — query the object, not the ledger.
+
 ## Verifying before deletion
 
 When code *looks* unused, verify before you delete it:

@@ -92,7 +92,13 @@ export function FeedbackReviewTable() {
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [codeGenLoading, setCodeGenLoading] = useState<string | null>(null);
+  const [retriageLoading, setRetriageLoading] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // A failed list fetch used to be swallowed, leaving the table rendering the
+  // "No feedback in this view" empty state. When the deployed schema lagged the
+  // code the GET 500'd on a missing column and the queue read as *empty* rather
+  // than broken, which is a far more expensive failure than an ugly error.
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchFeedback = useCallback(async () => {
     try {
@@ -103,14 +109,28 @@ export function FeedbackReviewTable() {
       if (filter !== "all") params.set("review_state", filter);
 
       const res = await fetch(`/api/admin/feedback?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data.items ?? []);
-        setTotal(data.total ?? 0);
-        setHasMore(Boolean(data.has_more));
+      if (!res.ok) {
+        const detail = await res
+          .json()
+          .then((body) => (typeof body?.error === "string" ? body.error : null))
+          .catch(() => null);
+        setFetchError(detail || `Request failed (${res.status})`);
+        setItems([]);
+        setTotal(0);
+        setHasMore(false);
+        return;
       }
+
+      const data = await res.json();
+      setFetchError(null);
+      setItems(data.items ?? []);
+      setTotal(data.total ?? 0);
+      setHasMore(Boolean(data.has_more));
     } catch {
-      // Silently fail
+      setFetchError("Could not reach the feedback API.");
+      setItems([]);
+      setTotal(0);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
@@ -203,6 +223,30 @@ export function FeedbackReviewTable() {
     }
   }
 
+  /**
+   * Re-run AI triage. A failed triage used to be terminal from here — the row
+   * showed its error and offered nothing to do about it, so recovering needed
+   * shell access and a .env.local.
+   */
+  async function handleRetriage(id: string) {
+    setRetriageLoading(id);
+    setError(id, null);
+    try {
+      const res = await fetch(`/api/admin/feedback/${id}/retriage`, {
+        method: "POST",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(id, json.error ?? `Triage failed (${res.status})`);
+      }
+      // Refresh either way: on failure the engine has persisted a fresh
+      // triage_error, which is more useful than the one already on screen.
+      await fetchFeedback();
+    } finally {
+      setRetriageLoading(null);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -237,6 +281,25 @@ export function FeedbackReviewTable() {
       <CardContent>
         {loading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Loading...</p>
+        ) : fetchError ? (
+          <div className="py-8 flex flex-col items-center gap-3 text-center">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Couldn&apos;t load feedback</p>
+              <p className="text-xs text-muted-foreground max-w-md break-words">
+                {fetchError}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setLoading(true);
+                fetchFeedback();
+              }}
+              className="text-xs px-2.5 py-1 rounded border hover:bg-muted transition-colors"
+            >
+              Retry
+            </button>
+          </div>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             No feedback in this view
@@ -319,15 +382,33 @@ export function FeedbackReviewTable() {
                         )}
                       </div>
 
-                      {item.triage_error && (
-                        <div className="space-y-1 rounded-md border border-destructive/20 bg-destructive/5 p-3">
+                      {item.triage_error ? (
+                        <div className="space-y-2 rounded-md border border-destructive/20 bg-destructive/5 p-3">
                           <p className="text-xs font-medium text-destructive uppercase tracking-wide">
                             Triage failed
                           </p>
                           <p className="text-xs text-destructive font-mono break-all">
                             {item.triage_error}
                           </p>
+                          <RetriageButton
+                            id={item.id}
+                            loading={retriageLoading === item.id}
+                            onClick={handleRetriage}
+                          />
                         </div>
+                      ) : (
+                        !item.triage_completed_at && (
+                          <div className="space-y-2 rounded-md border bg-muted/40 p-3">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Not yet triaged
+                            </p>
+                            <RetriageButton
+                              id={item.id}
+                              loading={retriageLoading === item.id}
+                              onClick={handleRetriage}
+                            />
+                          </div>
+                        )
                       )}
 
                       {item.triage_reasoning && (
@@ -560,5 +641,42 @@ export function FeedbackReviewTable() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Re-run triage. Rendered both when a triage attempt failed and when one never
+ * completed — the second case is what a stuck 'reviewing' row looks like after
+ * the engine set triage_attempted_at and then threw.
+ */
+function RetriageButton({
+  id,
+  loading,
+  onClick,
+}: {
+  id: string;
+  loading: boolean;
+  onClick: (id: string) => void;
+}) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={loading}
+      onClick={() => onClick(id)}
+      className="h-7 text-xs"
+    >
+      {loading ? (
+        <>
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Re-running triage...
+        </>
+      ) : (
+        <>
+          <RotateCcw className="h-3 w-3" />
+          Re-run triage
+        </>
+      )}
+    </Button>
   );
 }
