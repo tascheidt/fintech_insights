@@ -52,6 +52,16 @@ Because the admin client bypasses RLS, **every owner-scoped call in the store
 writes the ownership check into the query** (`created_by = ownerId`). A non-owner
 gets a 404, not a 403, so report ids aren't probeable.
 
+The same reasoning covers `increment_shared_report_view`, the SECURITY DEFINER
+counter behind `recordReportView`. It exists so the public page can bump
+`view_count` without anyone holding UPDATE on the table, and it is called only
+from the service-role client — so its EXECUTE grant is `{postgres, service_role}`
+and nothing else. The original migration revoked `PUBLIC` and `anon` but not
+`authenticated`, which left it callable at `/rest/v1/rpc/` by any signed-in user
+who learned a report id (they could inflate a sender's view count — the only
+usage signal a sender gets). Closed in `20260812120000_shared_report_view_grant`.
+Revoke from all three roles when adding a definer function here.
+
 ## The auth boundary
 
 `web/proxy.ts` gates everything except `PUBLIC_PATHS` and, now, the

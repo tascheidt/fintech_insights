@@ -93,6 +93,11 @@ export function FeedbackReviewTable() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [codeGenLoading, setCodeGenLoading] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // A failed list fetch used to be swallowed, leaving the table rendering the
+  // "No feedback in this view" empty state. When the deployed schema lagged the
+  // code the GET 500'd on a missing column and the queue read as *empty* rather
+  // than broken, which is a far more expensive failure than an ugly error.
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchFeedback = useCallback(async () => {
     try {
@@ -103,14 +108,28 @@ export function FeedbackReviewTable() {
       if (filter !== "all") params.set("review_state", filter);
 
       const res = await fetch(`/api/admin/feedback?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data.items ?? []);
-        setTotal(data.total ?? 0);
-        setHasMore(Boolean(data.has_more));
+      if (!res.ok) {
+        const detail = await res
+          .json()
+          .then((body) => (typeof body?.error === "string" ? body.error : null))
+          .catch(() => null);
+        setFetchError(detail || `Request failed (${res.status})`);
+        setItems([]);
+        setTotal(0);
+        setHasMore(false);
+        return;
       }
+
+      const data = await res.json();
+      setFetchError(null);
+      setItems(data.items ?? []);
+      setTotal(data.total ?? 0);
+      setHasMore(Boolean(data.has_more));
     } catch {
-      // Silently fail
+      setFetchError("Could not reach the feedback API.");
+      setItems([]);
+      setTotal(0);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
@@ -237,6 +256,25 @@ export function FeedbackReviewTable() {
       <CardContent>
         {loading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Loading...</p>
+        ) : fetchError ? (
+          <div className="py-8 flex flex-col items-center gap-3 text-center">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Couldn&apos;t load feedback</p>
+              <p className="text-xs text-muted-foreground max-w-md break-words">
+                {fetchError}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setLoading(true);
+                fetchFeedback();
+              }}
+              className="text-xs px-2.5 py-1 rounded border hover:bg-muted transition-colors"
+            >
+              Retry
+            </button>
+          </div>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             No feedback in this view
