@@ -18,18 +18,28 @@ export { jobToRow, atsSalaryFields } from "./types";
 export { detectATSFromUrl, SUPPORTED_ATS, type ATSType, type ATSDetectionResult } from "./detect-ats";
 export { scrapeJobsWithBrowser, scrapeGenericJobBoard, scrapeSuccessFactors } from "./browser";
 
+export interface FetchJobsOptions {
+  /**
+   * CIBC is normally scraped only as Simplii's parent feed while incumbent
+   * tracking is disabled. Narrow Workday's search before fetching details.
+   */
+  cibcSimpliiOnly?: boolean;
+}
+
 /**
  * Fetch jobs from a company's ATS
  * @param atsType - The ATS platform type
  * @param atsIdentifier - The company's identifier on the ATS
  * @param careersUrl - Optional careers URL for browser-based scraping fallback
  * @param browser - Optional browser instance (for dependency injection in GitHub Actions)
+ * @param options - Optional tenant-specific collection scope
  */
 export async function fetchJobs(
   atsType: string,
   atsIdentifier: string,
   careersUrl?: string,
-  browser?: Browser
+  browser?: Browser,
+  options: FetchJobsOptions = {}
 ): Promise<JobData[]> {
   switch (atsType.toLowerCase()) {
     case "lever":
@@ -83,7 +93,7 @@ export async function fetchJobs(
     case "workday-td":
       return fetchWorkdayTdJobs();
     case "workday-cibc":
-      return fetchWorkdayCibcJobs();
+      return fetchWorkdayCibcJobs({ simpliiOnly: options.cibcSimpliiOnly });
 
     // Revolut runs a custom Next.js careers page behind Cloudflare. The
     // generic Puppeteer scraper drops every job because their URLs are

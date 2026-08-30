@@ -80,6 +80,7 @@ let existingRows: Array<{
   external_id: string;
   description_hash: string | null;
   company_id?: string;
+  is_active?: boolean;
 }> = [];
 
 // For tests that need to control the companySlugOverride child lookup.
@@ -115,7 +116,11 @@ function buildSupabaseMock() {
       Promise.resolve(payload).then(onFulfilled);
     return chain;
   };
-  const buildUpdateChain = () => makeThenableChain();
+  const buildUpdateChain = (count = 0) => makeThenableChain({
+    count,
+    data: null,
+    error: null,
+  });
 
   const insertChain: Record<string, unknown> = {};
   insertChain.select = vi.fn(() => insertChain);
@@ -164,7 +169,7 @@ function buildSupabaseMock() {
         select: vi.fn(() => selectChain),
         update: vi.fn((payload: Record<string, unknown>) => {
           updatedRows.push(payload);
-          return buildUpdateChain();
+          return buildUpdateChain(1);
         }),
         insert: vi.fn((row: Record<string, unknown>) => {
           insertedRows.push(row);
@@ -464,6 +469,7 @@ describe("runIngestStage sub-brand-only mode (incumbent tracking off)", () => {
     existingRows = [];
     overrideCompanyRows = [];
     insertedRows = [];
+    updatedRows = [];
     incumbentTrackingEnabledMock = false;
   });
 
@@ -507,6 +513,93 @@ describe("runIngestStage sub-brand-only mode (incumbent tracking off)", () => {
     expect(insertedRows).toHaveLength(1);
     expect(insertedRows[0].company_id).toBe("simplii-1");
     expect(result.newJobIds).toHaveLength(1);
+  });
+
+  it("pins sub-brand-only scope across scrape and ingest if the live flag changes", async () => {
+    incumbentTrackingEnabledMock = true;
+    overrideCompanyRows = [
+      {
+        id: "simplii-1",
+        slug: "simplii",
+        name: "Simplii Financial",
+        parent_company_id: INCUMBENT_PARENT.id,
+      },
+    ];
+    const parentJob = { ...FIXTURE_JOB, external_id: "cibc-job-pinned" };
+    const subBrandJob = {
+      ...FIXTURE_JOB,
+      external_id: "simplii-job-pinned",
+      companySlugOverride: "simplii",
+    };
+
+    const { runIngestStage } = await import("./processor");
+    await runIngestStage(
+      "task-subbrand-pinned",
+      INCUMBENT_PARENT as never,
+      [parentJob, subBrandJob] as never,
+      undefined,
+      undefined,
+      { subBrandOnly: true }
+    );
+
+    expect(insertedRows).toHaveLength(1);
+    expect(insertedRows[0].company_id).toBe("simplii-1");
+  });
+
+  it("pins full-parent scope across scrape and ingest if the live flag changes", async () => {
+    incumbentTrackingEnabledMock = false;
+    const parentJob = { ...FIXTURE_JOB, external_id: "cibc-job-full-pinned" };
+
+    const { runIngestStage } = await import("./processor");
+    await runIngestStage(
+      "task-parent-pinned",
+      INCUMBENT_PARENT as never,
+      [parentJob] as never,
+      undefined,
+      undefined,
+      { subBrandOnly: false }
+    );
+
+    expect(insertedRows).toHaveLength(1);
+    expect(insertedRows[0].company_id).toBe(INCUMBENT_PARENT.id);
+  });
+
+  it("retains the child scope when zero Simplii jobs remain so closures still run", async () => {
+    overrideCompanyRows = [
+      {
+        id: "simplii-1",
+        slug: "simplii",
+        name: "Simplii Financial",
+        parent_company_id: INCUMBENT_PARENT.id,
+      },
+    ];
+    existingRows = [
+      {
+        id: "old-simplii-job",
+        external_id: "simplii-job-now-closed",
+        description_hash: null,
+        company_id: "simplii-1",
+        is_active: true,
+      },
+    ];
+
+    const { runIngestStage } = await import("./processor");
+    const result = await runIngestStage(
+      "task-subbrand-empty",
+      INCUMBENT_PARENT as never,
+      [],
+      undefined,
+      undefined,
+      {
+        subBrandOnly: true,
+        subBrandSlugs: ["simplii"],
+      }
+    );
+
+    expect(result.closed).toBe(1);
+    expect(
+      updatedRows.some((row) => row.is_active === false && row.closed_date)
+    ).toBe(true);
   });
 
   it("ingests the parent's own postings normally once incumbent tracking is re-enabled", async () => {
