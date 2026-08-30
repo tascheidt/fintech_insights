@@ -78,14 +78,12 @@
  *
  * June 2026: Revolut tightened that posture — datacenter-IP headless runs
  * started getting the interstitial too (every run `unrendered`: no anchors AND
- * no counters). Two defenses, both best-effort and unverifiable from a blocked
- * box: (a) light anti-bot hardening (`--disable-blink-features=AutomationControlled`,
- * `navigator.webdriver` masked, real Accept-Language + desktop viewport, plus a
- * settle-wait for a managed challenge to auto-clear), and (b) `describeBlockedPage`,
- * which stamps the failure with the challenge title/markers so a CF block reads
- * differently from a genuine markup redesign in the task row. The hardening
- * won't beat a TLS-fingerprint / Turnstile gate; if blocks persist the real
- * fixes are a residential-IP path or a non-browser data source.
+ * no counters). The browser path has light anti-bot hardening and
+ * `describeBlockedPage` stamps failures with the challenge markers. When that
+ * diagnostic confirms a challenge, an Aug 2026 fallback reads Revolut's exact
+ * server-rendered `#__NEXT_DATA__` script through a reader endpoint, filters
+ * its complete position array locally, and enriches the surviving detail
+ * payloads. If both paths fail, the typed error requests another fresh runner.
  *
  * A genuinely-empty result and a failed load look identical (both yield 0
  * anchors), so they USED to collapse into a silent "0 jobs, success".
@@ -103,6 +101,8 @@ import { detectLocationType, htmlToText, decodeHtmlEntities } from "./utils";
 import { log } from "@/lib/log";
 
 const REVOLUT_ORIGIN = "https://www.revolut.com";
+const REVOLUT_READER_ORIGIN = "https://r.jina.ai/";
+const READER_TIMEOUT_MS = 60_000;
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -115,6 +115,25 @@ export interface RevolutRawJob {
   title: string;
   url: string;
   location: string | null;
+}
+
+export interface RevolutPayloadLocation {
+  country?: string;
+  name?: string;
+  type?: string;
+}
+
+export interface RevolutPayloadPosition {
+  id?: string;
+  text?: string;
+  description?: string;
+  team?: string;
+  locations?: RevolutPayloadLocation[];
+}
+
+interface RevolutReaderPageProps {
+  positions?: RevolutPayloadPosition[];
+  position?: RevolutPayloadPosition;
 }
 
 function parseHtml(html: string): Document {
@@ -234,6 +253,77 @@ export function mapRevolutJob(raw: RevolutRawJob): JobData {
     posted_date: null,
     url: raw.url,
   };
+}
+
+/**
+ * Reader responses prepend a short provenance header before the selected
+ * `#__NEXT_DATA__` script. Pull out and validate that JSON payload without
+ * depending on the human-readable title/URL lines.
+ */
+export function parseRevolutReaderPageProps(body: string): RevolutReaderPageProps {
+  const marker = "Markdown Content:";
+  const markerIndex = body.indexOf(marker);
+  const afterMarker = markerIndex === -1 ? body : body.slice(markerIndex + marker.length);
+  const jsonStart = afterMarker.indexOf("{");
+  if (jsonStart === -1) {
+    throw new Error("Revolut reader response contained no Next.js JSON payload");
+  }
+  const parsed = JSON.parse(afterMarker.slice(jsonStart).trim()) as {
+    props?: { pageProps?: RevolutReaderPageProps };
+  };
+  const pageProps = parsed.props?.pageProps;
+  if (!pageProps || typeof pageProps !== "object") {
+    throw new Error("Revolut reader response contained no pageProps");
+  }
+  return pageProps;
+}
+
+/** Format the structured Next.js location array like the visible job card. */
+export function formatRevolutLocations(
+  locations: RevolutPayloadLocation[] | undefined
+): string | null {
+  if (!Array.isArray(locations) || locations.length === 0) return null;
+  const office: string[] = [];
+  const remote: string[] = [];
+
+  for (const location of locations) {
+    const raw = (location.name || location.country || "").trim();
+    if (!raw) continue;
+    const label = raw.replace(/\s*-\s*Remote$/i, "").trim();
+    const bucket = /remote/i.test(location.type || "") ? remote : office;
+    if (!bucket.includes(label)) bucket.push(label);
+  }
+
+  return [
+    office.length > 0 ? `Office: ${office.join(" · ")}` : "",
+    remote.length > 0 ? `Remote: ${remote.join(" · ")}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ") || null;
+}
+
+/** Map a server-rendered Revolut position to canonical JobData. */
+export function mapRevolutPayloadPosition(
+  position: RevolutPayloadPosition
+): JobData | null {
+  const externalId = extractExternalId(position.id?.trim() || "");
+  const title = position.text?.trim() || "";
+  if (!externalId || !title) return null;
+  const location = formatRevolutLocations(position.locations);
+  const job = mapRevolutJob({
+    externalId,
+    title,
+    location,
+    // The id-only route is canonical and avoids reimplementing Revolut's
+    // occasionally-inconsistent title slugger.
+    url: `${REVOLUT_ORIGIN}/careers/position/${externalId}/`,
+  });
+  if (position.description) {
+    const decoded = decodeHtmlEntities(position.description);
+    job.description_html = decoded;
+    job.description_text = htmlToText(decoded);
+  }
+  return job;
 }
 
 // ---------------------------------------------------------------------------
@@ -606,6 +696,96 @@ async function enrichDescriptions(page: Page, jobs: JobData[]): Promise<void> {
   log.info({ enriched, total: jobs.length }, "[revolut] description enrichment complete");
 }
 
+async function fetchReaderPageProps(targetUrl: string): Promise<RevolutReaderPageProps> {
+  const response = await fetch(`${REVOLUT_READER_ORIGIN}${targetUrl}`, {
+    headers: {
+      Accept: "text/plain",
+      "X-Engine": "browser",
+      "X-Target-Selector": "script#__NEXT_DATA__",
+      "X-Timeout": "45",
+    },
+    signal: AbortSignal.timeout(READER_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new Error(`reader status ${response.status}`);
+  }
+  return parseRevolutReaderPageProps(await response.text());
+}
+
+async function enrichReaderDescriptions(jobs: JobData[]): Promise<void> {
+  let enriched = 0;
+  for (const job of jobs) {
+    if (!job.url) continue;
+    try {
+      const detail = (await fetchReaderPageProps(job.url)).position;
+      if (!detail || detail.id?.toLowerCase() !== job.external_id.toLowerCase()) {
+        throw new Error("detail payload did not match the requested position");
+      }
+      if (detail.text) job.title = detail.text;
+      const location = formatRevolutLocations(detail.locations);
+      if (location) {
+        job.location = location;
+        job.location_type = detectLocationType(location, detail.description || "");
+      }
+      if (detail.description) {
+        const decoded = decodeHtmlEntities(detail.description);
+        job.description_html = decoded;
+        job.description_text = htmlToText(decoded);
+        enriched++;
+      }
+    } catch (error) {
+      log.warn(
+        { externalId: job.external_id, err: error instanceof Error ? error.message : String(error) },
+        "[revolut] reader detail enrichment failed"
+      );
+    }
+  }
+  log.info(
+    { enriched, total: jobs.length },
+    "[revolut] reader description enrichment complete"
+  );
+}
+
+/**
+ * Cloudflare blocks GitHub's browser before Revolut renders any jobs. The
+ * server-rendered Next.js payload still contains the full public position
+ * array, so fetch that exact script through a standard reader and apply the
+ * Canadian-market guard locally. This is a fallback only; the direct browser
+ * remains primary while it works.
+ */
+export async function fetchRevolutJobsViaReader(
+  careersUrl: string
+): Promise<JobData[]> {
+  const requested = new URL(careersUrl);
+  if (!/^(?:www\.)?revolut\.com$/i.test(requested.hostname)) {
+    throw new Error("reader fallback only accepts a revolut.com careers URL");
+  }
+  // Keep the relay target pinned to the public Revolut origin. `careersUrl`
+  // comes from tenant configuration, so it must never turn this fallback into
+  // an arbitrary third-party fetch.
+  const target = new URL("/careers/", REVOLUT_ORIGIN);
+
+  const pageProps = await fetchReaderPageProps(target.toString());
+  if (!Array.isArray(pageProps.positions)) {
+    throw new Error("reader payload contained no positions array");
+  }
+
+  const canadianPositions = pageProps.positions.filter((position) =>
+    (position.locations ?? []).some((location) =>
+      isCanadianLocation(`${location.name ?? ""} ${location.country ?? ""}`)
+    )
+  );
+  const jobs = canadianPositions
+    .map(mapRevolutPayloadPosition)
+    .filter((job): job is JobData => job !== null);
+  log.info(
+    { global: pageProps.positions.length, canadian: jobs.length, source: "reader-next-data" },
+    "[revolut] recovered listing from server-rendered payload"
+  );
+  await enrichReaderDescriptions(jobs);
+  return jobs;
+}
+
 export async function fetchRevolutJobs(
   atsIdentifier: string,
   careersUrl: string | undefined,
@@ -651,12 +831,30 @@ export async function fetchRevolutJobs(
           { careersUrl, counts, reason: verdict.reason, diag },
           `[revolut] ${verdict.message}`
         );
-        const detail = diag.challenge
-          ? `${verdict.message} — served an anti-bot challenge (title=${JSON.stringify(
-              diag.title
-            )}, markers=${diag.markers.join(",")}); a fresh-runner retry may clear it`
-          : verdict.message;
-        throw new RevolutScrapeError(verdict.reason, detail, counts);
+        if (diag.challenge) {
+          log.warn(
+            { careersUrl, markers: diag.markers },
+            "[revolut] browser was challenged; trying server-rendered payload fallback"
+          );
+          try {
+            return await fetchRevolutJobsViaReader(careersUrl);
+          } catch (fallbackError) {
+            const fallbackMessage =
+              fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+            log.error(
+              { careersUrl, err: fallbackMessage },
+              "[revolut] server-rendered payload fallback failed"
+            );
+            throw new RevolutScrapeError(
+              verdict.reason,
+              `${verdict.message} — served an anti-bot challenge (title=${JSON.stringify(
+                diag.title
+              )}, markers=${diag.markers.join(",")}); payload fallback failed: ${fallbackMessage}`,
+              counts
+            );
+          }
+        }
+        throw new RevolutScrapeError(verdict.reason, verdict.message, counts);
       }
 
       if (verdict.reason === "genuinely-empty") {

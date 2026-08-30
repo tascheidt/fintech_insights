@@ -17,10 +17,13 @@ import {
   assessListing,
   describeBlockedPage,
   extractExternalId,
+  formatRevolutLocations,
   isCanadianLocation,
   mapRevolutJob,
+  mapRevolutPayloadPosition,
   parseListingCounts,
   parseListingPage,
+  parseRevolutReaderPageProps,
   type ListingCounts,
 } from "./revolut";
 
@@ -253,5 +256,50 @@ describe("mapRevolutJob", () => {
       description_text: null,
     });
     expect(job.url).toContain("/en-US/careers/position/head-of-finance-");
+  });
+});
+
+describe("server-rendered payload fallback", () => {
+  const position = {
+    id: "bbec30b1-a090-4fd1-b441-fa3f3445ad8a",
+    text: "Head of Lending",
+    team: "Credit",
+    description: "<h3>About the role</h3><p>Lead lending in Canada.</p>",
+    locations: [{ country: "Canada", name: "Canada", type: "remote" }],
+  };
+
+  it("parses the Next.js script from a reader response preamble", () => {
+    const body =
+      "Title: Careers | Revolut\n\nURL Source: https://www.revolut.com/careers/\n\n" +
+      "Markdown Content:\n" +
+      JSON.stringify({ props: { pageProps: { positions: [position] } } });
+    expect(parseRevolutReaderPageProps(body).positions).toEqual([position]);
+  });
+
+  it("formats structured locations like the visible careers cards", () => {
+    expect(
+      formatRevolutLocations([
+        { country: "Canada", name: "Toronto", type: "office" },
+        { country: "Canada", name: "Canada - Remote", type: "remote" },
+      ])
+    ).toBe("Office: Toronto Remote: Canada");
+  });
+
+  it("maps a payload position with a stable id and full description", () => {
+    const job = mapRevolutPayloadPosition(position);
+    expect(job).toMatchObject({
+      external_id: "bbec30b1-a090-4fd1-b441-fa3f3445ad8a",
+      title: "Head of Lending",
+      location: "Remote: Canada",
+      location_type: "remote",
+      description_text: "ABOUT THE ROLE\n\nLead lending in Canada.",
+      url: "https://www.revolut.com/careers/position/bbec30b1-a090-4fd1-b441-fa3f3445ad8a/",
+    });
+  });
+
+  it("rejects malformed reader responses instead of returning a silent zero", () => {
+    expect(() => parseRevolutReaderPageProps("Just a moment...")).toThrow(
+      "no Next.js JSON payload"
+    );
   });
 });

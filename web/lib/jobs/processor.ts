@@ -274,7 +274,20 @@ export async function runIngestStage(
   company: Company,
   jobs: JobData[],
   onProgress?: (processed: number, total: number) => void,
-  config?: JobStructureAiConfig
+  config?: JobStructureAiConfig,
+  options?: {
+    /**
+     * Pin this run to fintech sub-brands even if the live feature flag changes
+     * between scrape and ingest. The heavy scraper uses this for CIBC/Simplii.
+     */
+    subBrandOnly?: boolean;
+    /**
+     * Child slugs that belong to the scoped corpus even when the current
+     * scrape returns zero matches. Needed so closure detection can close the
+     * last Simplii role instead of losing the child company lookup.
+     */
+    subBrandSlugs?: string[];
+  }
 ): Promise<IngestResult> {
   const supabase = createAdminClient();
   const activeConfig = config ?? await getActiveJobStructureAiConfig();
@@ -295,6 +308,9 @@ export async function runIngestStage(
       if (j.companySlugOverride && j.companySlugOverride !== company.slug) {
         overrideSlugs.add(j.companySlugOverride);
       }
+    }
+    for (const slug of options?.subBrandSlugs ?? []) {
+      if (slug !== company.slug) overrideSlugs.add(slug);
     }
     const overrideCompanies = new Map<string, { id: string; name: string }>();
     if (overrideSlugs.size > 0) {
@@ -328,8 +344,10 @@ export async function runIngestStage(
     // parent's own postings must NOT be scraped/extracted/analyzed (the
     // whole point of the flag), so keep only jobs the classifier routed to a
     // resolved sub-brand and drop everything that would land on the parent.
-    const incumbentEnabled = await getIncumbentTrackingEnabled(supabase);
-    const subBrandOnly = company.tier === 'incumbent' && !incumbentEnabled;
+    const subBrandOnly =
+      options?.subBrandOnly ??
+      (company.tier === 'incumbent' &&
+        !(await getIncumbentTrackingEnabled(supabase)));
     if (subBrandOnly) {
       const before = jobs.length;
       jobs = jobs.filter((j) => resolveCompanyId(j) !== company.id);

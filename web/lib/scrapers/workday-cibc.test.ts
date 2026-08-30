@@ -19,7 +19,7 @@ import {
   type WorkdayListingResponse,
   type WorkdayJobDetailResponse,
 } from "./workday-utils";
-import { isSimpliiPosting } from "./workday-cibc";
+import { buildCibcListingRequest, isSimpliiPosting } from "./workday-cibc";
 
 const LISTING_FIXTURE: WorkdayListingResponse = JSON.parse(
   readFileSync(
@@ -49,6 +49,26 @@ describe("workday-cibc URL builders", () => {
     ).toBe(
       "https://cibc.wd3.myworkdayjobs.com/search/job/Toronto-ON/Manager_2521234"
     );
+  });
+});
+
+describe("workday-cibc listing scope", () => {
+  it("uses the full Workday corpus by default", () => {
+    expect(buildCibcListingRequest(40)).toEqual({
+      limit: 20,
+      offset: 40,
+      searchText: "",
+      appliedFacets: {},
+    });
+  });
+
+  it("narrows Workday to Simplii candidates in sub-brand-only mode", () => {
+    expect(buildCibcListingRequest(0, { simpliiOnly: true })).toEqual({
+      limit: 20,
+      offset: 0,
+      searchText: "Simplii",
+      appliedFacets: {},
+    });
   });
 });
 

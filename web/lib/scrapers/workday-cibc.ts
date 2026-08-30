@@ -17,8 +17,15 @@
  * route to Simplii. Sub-brand split is per-row only — there is no
  * separate Simplii URL or listing endpoint.
  *
- * Cost knob: `WORKDAY_CIBC_MAX_JOBS` env caps the run. Unset → full
- * corpus.
+ * When incumbent tracking is disabled, the heavy-scraper entrypoint calls
+ * this scraper with `simpliiOnly: true`. Workday then searches for
+ * "Simplii" before pagination, shrinking the candidate set from ~500 CIBC
+ * postings to roughly 10. The post-enrichment classifier remains authoritative
+ * and drops search false positives. Full-corpus mode is preserved whenever
+ * incumbent tracking is enabled.
+ *
+ * Cost knob: `WORKDAY_CIBC_MAX_JOBS` env caps the selected result set.
+ * Unset → all results for the active mode.
  */
 
 import type { JobData } from "./types";
@@ -41,6 +48,29 @@ const INSTANCE = "wd3";
 const SITE = "search";
 const PAGE_LIMIT = 20;
 const FETCH_TIMEOUT_MS = 15_000;
+
+export interface WorkdayCibcOptions {
+  /** Search Workday for Simplii candidates instead of scanning all CIBC roles. */
+  simpliiOnly?: boolean;
+}
+
+/** Pure request builder so the cost-sensitive search scope is pinned in tests. */
+export function buildCibcListingRequest(
+  offset: number,
+  options: WorkdayCibcOptions = {}
+): {
+  limit: number;
+  offset: number;
+  searchText: string;
+  appliedFacets: Record<string, never>;
+} {
+  return {
+    limit: PAGE_LIMIT,
+    offset,
+    searchText: options.simpliiOnly ? "Simplii" : "",
+    appliedFacets: {},
+  };
+}
 
 /**
  * Simplii brand classifier. Pure, exported for unit testing.
@@ -85,7 +115,9 @@ export function isSimpliiPosting(input: {
   return { isMatch: false };
 }
 
-export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
+export async function fetchWorkdayCibcJobs(
+  options: WorkdayCibcOptions = {}
+): Promise<JobData[]> {
   const urls = buildWorkdayUrls(TENANT, INSTANCE, SITE);
   const headers = buildWorkdayHeaders(TENANT, INSTANCE, SITE);
   const cap = resolveWorkdayJobCap(process.env.WORKDAY_CIBC_MAX_JOBS);
@@ -104,12 +136,7 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
         "Content-Type": "application/json",
         ...(cookieJar ? { Cookie: cookieJar } : {}),
       },
-      body: JSON.stringify({
-        limit: PAGE_LIMIT,
-        offset,
-        searchText: "",
-        appliedFacets: {},
-      }),
+      body: JSON.stringify(buildCibcListingRequest(offset, options)),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
@@ -147,6 +174,7 @@ export async function fetchWorkdayCibcJobs(): Promise<JobData[]> {
       fetched: jobs.length,
       total,
       cap: cap ?? "uncapped",
+      mode: options.simpliiOnly ? "simplii-only" : "full-cibc",
     },
     "[workday-cibc] listings complete; enriching descriptions"
   );

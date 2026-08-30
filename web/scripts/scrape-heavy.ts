@@ -22,6 +22,7 @@ import { fetchJobs } from "@/lib/scrapers";
 import { runIngestStage } from "@/lib/jobs/processor";
 import { triggerAnalysisForJobs } from "@/lib/jobs/runner";
 import type { Company } from "@/lib/jobs/types";
+import { getIncumbentTrackingEnabled } from "@/lib/settings/incumbent-tracking";
 
 /**
  * Render an unknown thrown value as a human-readable string for logs and the
@@ -285,6 +286,18 @@ async function main() {
     process.exit(1);
   }
   console.log(`✅ Found company: ${company.name} (${company.ats_type})`);
+  // The scheduler still invokes an incumbent parent when an active fintech
+  // child shares its ATS (CIBC → Simplii). Pin that scope for both scrape and
+  // ingest so a setting change mid-run cannot turn a narrowed candidate set
+  // into a partial parent corpus.
+  const subBrandOnly =
+    company.tier === "incumbent" &&
+    !(await getIncumbentTrackingEnabled(supabase));
+  if (subBrandOnly) {
+    console.log(
+      `🎯 Incumbent tracking is off; collecting fintech sub-brand jobs only for ${company.name}`
+    );
+  }
 
   // Step 4: Launch full puppeteer browser instance
   console.log("🌐 Launching Puppeteer browser...");
@@ -453,7 +466,8 @@ async function main() {
       company.ats_type,
       company.ats_identifier || "",
       company.careers_url || undefined,
-      browser
+      browser,
+      { cibcSimpliiOnly: subBrandOnly }
     );
     console.log(`✅ Fetched ${jobs.length} jobs`);
 
@@ -511,7 +525,20 @@ async function main() {
     // upserts by external id — so a full retry from the top is safe.
     console.log("💾 Ingesting jobs into database...");
     const ingestResult = await withTransientRetry("ingest jobs", () =>
-      runIngestStage(task.id, company as Company, jobs)
+      runIngestStage(
+        task.id,
+        company as Company,
+        jobs,
+        undefined,
+        undefined,
+        {
+          subBrandOnly,
+          subBrandSlugs:
+            subBrandOnly && company.ats_type === "workday-cibc"
+              ? ["simplii"]
+              : [],
+        }
+      )
     );
     console.log(`✅ Ingest complete:`);
     console.log(`   - New jobs: ${ingestResult.newJobIds.length}`);
