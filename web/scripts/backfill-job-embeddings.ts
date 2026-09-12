@@ -25,6 +25,7 @@
 import { createAdminClient } from "../lib/supabase/admin";
 import { embedText, jobEmbeddingInput } from "../lib/ai/embeddings";
 import { EMBEDDING_MODEL, EMBEDDING_DIMS } from "../lib/ai/prompt-config";
+import { embeddingFetchRetryDelay } from "./embedding-fetch-retry";
 
 interface JobRow {
   id: string;
@@ -76,7 +77,9 @@ async function main() {
     if (remaining <= 0) break;
     const pageSize = Math.min(PAGE, remaining);
 
-    const { data, error: fetchError } = await supabase
+    // Rebuild the same page on every attempt. Do not advance the offset or
+    // append rows until the read succeeds, and never retry embedding writes.
+    const fetchPage = () => supabase
       .from("job_postings")
       .select("id, title, summary, description_text")
       .not("description_text", "is", null)
@@ -87,6 +90,19 @@ async function main() {
       .order("first_seen_date", { ascending: false })
       .range(from, from + pageSize - 1);
 
+    let response = await fetchPage();
+    for (let attempt = 1; ; attempt++) {
+      const delay = embeddingFetchRetryDelay(response, attempt);
+      if (delay === null) break;
+      console.warn(
+        `⚠️ Fetching jobs ${from}-${from + pageSize - 1} failed ` +
+        `(attempt ${attempt}/6, HTTP ${response.status}); retrying in ${delay}ms`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      response = await fetchPage();
+    }
+
+    const { data, error: fetchError } = response;
     if (fetchError) {
       console.error("❌ Error fetching jobs:", fetchError);
       process.exit(1);
