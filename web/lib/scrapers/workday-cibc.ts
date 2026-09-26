@@ -23,13 +23,16 @@
  * postings to roughly 10. The post-enrichment classifier remains authoritative
  * and drops search false positives. Full-corpus mode is preserved whenever
  * incumbent tracking is enabled.
+ * If Akamai challenges the direct CXS listing in Simplii-only mode, a
+ * browser-backed reader fetches the same Workday search and CXS details.
+ * The fallback validates the displayed result count before returning jobs.
  *
  * Cost knob: `WORKDAY_CIBC_MAX_JOBS` env caps the selected result set.
  * Unset → all results for the active mode.
  */
 
 import type { JobData } from "./types";
-import { htmlToText } from "./utils";
+import { detectLocationType, htmlToText } from "./utils";
 import {
   buildWorkdayUrls,
   buildWorkdayHeaders,
@@ -37,6 +40,7 @@ import {
   parseWorkdayListingRow,
   parseWorkdayJobDetail,
   parseWorkdayJson,
+  WorkdayBlockedError,
   resolveWorkdayJobCap,
   type WorkdayListingResponse,
   type WorkdayJobDetailResponse,
@@ -48,6 +52,107 @@ const INSTANCE = "wd3";
 const SITE = "search";
 const PAGE_LIMIT = 20;
 const FETCH_TIMEOUT_MS = 15_000;
+const READER_TIMEOUT_MS = 60_000;
+const READER_ORIGIN = "https://r.jina.ai/";
+const READER_SEARCH_URL = "https://cibc.wd3.myworkdayjobs.com/en-US/search?q=Simplii";
+
+interface ReaderPage {
+  url?: string;
+  httpStatus?: number;
+  content?: string;
+  links?: unknown;
+}
+
+async function fetchReaderPage(
+  targetUrl: string,
+  listing = false
+): Promise<ReaderPage> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await fetch(`${READER_ORIGIN}${targetUrl}`, {
+        headers: {
+          Accept: "application/json",
+          "X-Engine": "browser",
+          "X-No-Cache": "true",
+          ...(listing
+            ? {
+                "X-Wait-For-Selector": "a[data-automation-id=jobTitle]",
+                "X-With-Links-Summary": "all",
+              }
+            : {}),
+        },
+        signal: AbortSignal.timeout(READER_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        throw new Error(`CIBC reader request failed: HTTP ${response.status}`);
+      }
+      const envelope: unknown = await response.json();
+      if (!envelope || typeof envelope !== "object" || !("data" in envelope)) {
+        throw new Error("CIBC reader returned no data envelope");
+      }
+      const page = envelope.data as ReaderPage;
+      if (page?.url !== targetUrl || page.httpStatus !== 200) {
+        throw new Error("CIBC reader did not return the requested Workday page");
+      }
+      return page;
+    } catch (error) {
+      if (attempt === 3) throw error;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
+    }
+  }
+  throw new Error("CIBC reader attempts exhausted");
+}
+
+/** Convert a browser-rendered Workday search page into the usual job rows. */
+export function parseCibcReaderListing(page: ReaderPage): JobData[] {
+  const count = page.content?.match(/(?:^|\n)(\d+)\s+JOBS?\s+FOUND\b/i);
+  if (!count || !Array.isArray(page.links)) {
+    throw new Error("CIBC reader search did not render a complete jobs list");
+  }
+  const total = Number(count[1]);
+  const urls = buildWorkdayUrls(TENANT, INSTANCE, SITE);
+  const jobs: JobData[] = [];
+  const seen = new Set<string>();
+  for (const link of page.links) {
+    if (!Array.isArray(link) || link.length !== 2 ||
+        typeof link[0] !== "string" || typeof link[1] !== "string") continue;
+    let href: URL;
+    try {
+      href = new URL(link[1]);
+    } catch {
+      continue;
+    }
+    if (href.protocol !== "https:" || href.hostname !== "cibc.wd3.myworkdayjobs.com") continue;
+    const path = href.pathname.match(/^\/(?:[a-z]{2}-[a-z]{2}\/)?search(\/job\/.+)$/i);
+    if (!path) continue;
+    if (!link[0].trim() || seen.has(path[1])) {
+      throw new Error("CIBC reader search contained an empty or duplicate job link");
+    }
+    seen.add(path[1]);
+    const job = parseWorkdayListingRow(
+      { title: link[0], externalPath: path[1] },
+      urls.jobPublicUrl
+    );
+    if (!job) throw new Error("CIBC reader search contained an invalid job");
+    jobs.push(job);
+  }
+  // The public Workday page shows at most 20 roles. Never ingest a partial
+  // page: that could incorrectly mark an unseen Simplii role as closed.
+  if (total !== jobs.length || total > PAGE_LIMIT) {
+    throw new Error(`CIBC reader search was incomplete: ${jobs.length} links for ${total} jobs`);
+  }
+  return jobs;
+}
+
+/** Read the same CXS detail JSON through a browser-backed relay. */
+export function parseCibcReaderDetail(page: ReaderPage): WorkdayJobDetailResponse {
+  if (!page.content) throw new Error("CIBC reader detail was empty");
+  const detail: WorkdayJobDetailResponse = JSON.parse(page.content);
+  if (!detail.jobPostingInfo?.title || !detail.jobPostingInfo.jobDescription) {
+    throw new Error("CIBC reader detail had no job title or description");
+  }
+  return detail;
+}
 
 export interface WorkdayCibcOptions {
   /** Search Workday for Simplii candidates instead of scanning all CIBC roles. */
@@ -126,45 +231,51 @@ export async function fetchWorkdayCibcJobs(
   let offset = 0;
   let total: number | null = null;
   let cookieJar = "";
+  let listingViaReader = false;
+  let detailsViaReader = false;
 
   // Step 1: paginate the listing.
-  while (true) {
-    const res = await fetch(urls.listingPostUrl, {
-      method: "POST",
-      headers: {
-        ...headers,
-        "Content-Type": "application/json",
-        ...(cookieJar ? { Cookie: cookieJar } : {}),
-      },
-      body: JSON.stringify(buildCibcListingRequest(offset, options)),
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      throw new Error(`Workday CIBC listing error: ${res.status}`);
-    }
-    if (!cookieJar) cookieJar = extractCookieJar(res);
-    // Akamai can return HTTP 200 with an HTML challenge body (greylisted
-    // runner IP) — parseWorkdayJson throws a typed WorkdayBlockedError so the
-    // failure is legible and the scrape-heavy.yml retry re-runs on a fresh IP.
-    const data = await parseWorkdayJson<WorkdayListingResponse>(res, TENANT);
-    const rows = data.jobPostings ?? [];
-    if (rows.length === 0) break;
-    // Workday returns the real `total` only on the first page; subsequent
-    // pages echo `total: 0` while still returning real `jobPostings`. Treat
-    // any non-positive value as missing or we exit the loop at offset=40.
-    if (typeof data.total === "number" && data.total > 0) {
-      total = data.total;
-    }
+  try {
+    while (true) {
+      const res = await fetch(urls.listingPostUrl, {
+        method: "POST",
+        headers: {
+          ...headers,
+          "Content-Type": "application/json",
+          ...(cookieJar ? { Cookie: cookieJar } : {}),
+        },
+        body: JSON.stringify(buildCibcListingRequest(offset, options)),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        throw new Error(`Workday CIBC listing error: ${res.status}`);
+      }
+      if (!cookieJar) cookieJar = extractCookieJar(res);
+      const data = await parseWorkdayJson<WorkdayListingResponse>(res, TENANT);
+      const rows = data.jobPostings ?? [];
+      if (rows.length === 0) break;
+      // Workday returns the real `total` only on the first page; subsequent
+      // pages echo `total: 0` while still returning real `jobPostings`.
+      if (typeof data.total === "number" && data.total > 0) {
+        total = data.total;
+      }
 
-    for (const row of rows) {
-      const job = parseWorkdayListingRow(row, urls.jobPublicUrl);
-      if (!job) continue;
-      jobs.push(job);
-    }
+      for (const row of rows) {
+        const job = parseWorkdayListingRow(row, urls.jobPublicUrl);
+        if (job) jobs.push(job);
+      }
 
-    offset += rows.length;
-    if (cap != null && jobs.length >= cap) break;
-    if (total != null && offset >= total) break;
+      offset += rows.length;
+      if (cap != null && jobs.length >= cap) break;
+      if (total != null && offset >= total) break;
+    }
+  } catch (error) {
+    if (!options.simpliiOnly || !(error instanceof WorkdayBlockedError)) throw error;
+    log.warn({ err: error.message }, "[workday-cibc] direct listing blocked; using browser-backed reader");
+    jobs.length = 0;
+    jobs.push(...parseCibcReaderListing(await fetchReaderPage(READER_SEARCH_URL, true)));
+    total = jobs.length;
+    listingViaReader = true;
   }
 
   if (cap != null && jobs.length > cap) jobs.length = cap;
@@ -175,6 +286,7 @@ export async function fetchWorkdayCibcJobs(
       total,
       cap: cap ?? "uncapped",
       mode: options.simpliiOnly ? "simplii-only" : "full-cibc",
+      source: listingViaReader ? "reader" : "direct",
     },
     "[workday-cibc] listings complete; enriching descriptions"
   );
@@ -187,26 +299,43 @@ export async function fetchWorkdayCibcJobs(
     const externalPath = extractExternalPathFromPublicUrl(job.url);
     if (!externalPath) continue;
     try {
-      const detailRes = await fetch(urls.jobGetUrl(externalPath), {
-        headers: {
-          ...headers,
-          ...(cookieJar ? { Cookie: cookieJar } : {}),
-        },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-      if (!detailRes.ok) {
-        throw new Error(`status ${detailRes.status}`);
+      const detailUrl = urls.jobGetUrl(externalPath);
+      let detail: WorkdayJobDetailResponse;
+      if (!detailsViaReader) {
+        try {
+          const detailRes = await fetch(detailUrl, {
+            headers: {
+              ...headers,
+              ...(cookieJar ? { Cookie: cookieJar } : {}),
+            },
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+          });
+          if (!detailRes.ok) throw new Error(`status ${detailRes.status}`);
+          detail = await parseWorkdayJson<WorkdayJobDetailResponse>(detailRes, TENANT);
+        } catch (error) {
+          if (!options.simpliiOnly) throw error;
+          detailsViaReader = true;
+          log.warn(
+            { externalId: job.external_id, err: error instanceof Error ? error.message : String(error) },
+            "[workday-cibc] direct detail failed; using browser-backed reader"
+          );
+          detail = parseCibcReaderDetail(await fetchReaderPage(detailUrl));
+        }
+      } else {
+        detail = parseCibcReaderDetail(await fetchReaderPage(detailUrl));
       }
-      const detail = await parseWorkdayJson<WorkdayJobDetailResponse>(
-        detailRes,
-        TENANT
-      );
       const parsed = parseWorkdayJobDetail(detail);
+      if (options.simpliiOnly && !parsed.description_text) {
+        throw new Error("Workday CIBC detail had no description");
+      }
       if (parsed.description_html) {
         job.description_html = parsed.description_html;
         job.description_text = parsed.description_text || htmlToText(parsed.description_html);
       }
-      if (parsed.location && !job.location) job.location = parsed.location;
+      if (parsed.location && !job.location) {
+        job.location = parsed.location;
+        job.location_type = detectLocationType(parsed.location, job.description_text ?? "");
+      }
       if (parsed.posted_date && !job.posted_date) job.posted_date = parsed.posted_date;
       enriched++;
     } catch (e) {
@@ -218,6 +347,9 @@ export async function fetchWorkdayCibcJobs(
         },
         "[workday-cibc] detail enrichment failed"
       );
+      // In Simplii-only mode a description may be the only brand signal.
+      // An incomplete run could incorrectly close an active Simplii role.
+      if (options.simpliiOnly) throw e;
     }
   }
 
