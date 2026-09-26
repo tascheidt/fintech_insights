@@ -19,7 +19,12 @@ import {
   type WorkdayListingResponse,
   type WorkdayJobDetailResponse,
 } from "./workday-utils";
-import { buildCibcListingRequest, isSimpliiPosting } from "./workday-cibc";
+import {
+  buildCibcListingRequest,
+  isSimpliiPosting,
+  parseCibcReaderDetail,
+  parseCibcReaderListing,
+} from "./workday-cibc";
 
 const LISTING_FIXTURE: WorkdayListingResponse = JSON.parse(
   readFileSync(
@@ -69,6 +74,59 @@ describe("workday-cibc listing scope", () => {
       searchText: "Simplii",
       appliedFacets: {},
     });
+  });
+});
+
+describe("CIBC browser-backed reader fallback", () => {
+  const listing = {
+    content: "2 JOBS FOUND\n\n1 - 2 of 2 jobs",
+    links: [
+      ["", "https://cibc.wd3.myworkdayjobs.com/en-US/search"],
+      [
+        "Senior Designer - Simplii Financial",
+        "https://cibc.wd3.myworkdayjobs.com/en-US/search/job/Toronto-ON/Senior-Designer---Simplii-Financial_2618894?q=Simplii",
+      ],
+      [
+        "Operations Specialist",
+        "https://cibc.wd3.myworkdayjobs.com/en-US/search/job/Halifax-NS/Operations-Specialist_2619337?q=Simplii",
+      ],
+    ],
+  };
+
+  it("keeps only canonical CIBC Workday job links and preserves requisition IDs", () => {
+    const jobs = parseCibcReaderListing(listing);
+    expect(jobs).toHaveLength(2);
+    expect(jobs[0]).toMatchObject({
+      title: "Senior Designer - Simplii Financial",
+      external_id: "Senior-Designer---Simplii-Financial_2618894",
+      url: "https://cibc.wd3.myworkdayjobs.com/search/job/Toronto-ON/Senior-Designer---Simplii-Financial_2618894",
+    });
+    expect(jobs[1].title).toBe("Operations Specialist");
+  });
+
+  it("rejects a partial page before it can close unseen Simplii roles", () => {
+    expect(() => parseCibcReaderListing({ ...listing, content: "3 JOBS FOUND" }))
+      .toThrow("2 links for 3 jobs");
+    expect(() => parseCibcReaderListing({ ...listing, content: "21 JOBS FOUND" }))
+      .toThrow("2 links for 21 jobs");
+  });
+
+  it("rejects a result pointing off the CIBC Workday site", () => {
+    const wrongHost = {
+      ...listing,
+      links: [listing.links[0], listing.links[1], [
+        "Operations Specialist",
+        "https://example.com/search/job/Halifax-NS/Operations-Specialist_2619337",
+      ]],
+    };
+    expect(() => parseCibcReaderListing(wrongHost)).toThrow("1 links for 2 jobs");
+  });
+
+  it("accepts the original Workday detail JSON, including its full description", () => {
+    const detail = parseCibcReaderDetail({ content: JSON.stringify(DETAIL_FIXTURE) });
+    expect(detail.jobPostingInfo?.title).toBe(DETAIL_FIXTURE.jobPostingInfo?.title);
+    expect(detail.jobPostingInfo?.jobDescription).toBe(DETAIL_FIXTURE.jobPostingInfo?.jobDescription);
+    expect(() => parseCibcReaderDetail({ content: "{}" })).toThrow("no job title or description");
   });
 });
 
