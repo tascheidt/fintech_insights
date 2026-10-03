@@ -60,27 +60,54 @@ interface ReaderPage {
   url?: string;
   httpStatus?: number;
   content?: string;
+  text?: string;
   links?: unknown;
 }
 
-async function fetchReaderPage(
+/** Structural diagnostics only: never log page bodies, cookies or headers. */
+export function summarizeCibcReaderPage(page: ReaderPage) {
+  const text = typeof page.text === "string" ? page.text :
+    typeof page.content === "string" ? page.content : "";
+  return {
+    httpStatus: page.httpStatus,
+    textLength: text.length,
+    count: text.match(/(?:^|\n)\s*(\d+)\s+JOBS?\s+FOUND\b/i)?.[1] ?? null,
+    linksType: Array.isArray(page.links) ? "array" : typeof page.links,
+    linksCount: Array.isArray(page.links) ? page.links.length : null,
+    maintenanceNotice: /maintenance|temporarily unavailable|service unavailable/i.test(text),
+    challengeNotice: /akamai|cloudflare|access denied|verify you are human/i.test(text),
+  };
+}
+
+/** Listings are structured DOM data, not articles for readability extraction. */
+export function buildCibcReaderHeaders(listing = false): Record<string, string> {
+  return {
+    Accept: "application/json",
+    "X-Engine": "browser",
+    "X-No-Cache": "true",
+    ...(listing
+      ? {
+          "X-Respond-With": "text",
+          // Reader waits for network idle (or this bound), rather than
+          // snapshotting as soon as the first job link appears.
+          "X-Timeout": "30",
+          "X-Wait-For-Selector": "a[data-automation-id=jobTitle]",
+          "X-With-Links-Summary": "all",
+        }
+      : {}),
+  };
+}
+
+async function fetchReaderPage<T>(
   targetUrl: string,
+  parse: (page: ReaderPage) => T,
   listing = false
-): Promise<ReaderPage> {
+): Promise<T> {
   for (let attempt = 1; attempt <= 3; attempt++) {
+    let snapshot: ReturnType<typeof summarizeCibcReaderPage> | undefined;
     try {
       const response = await fetch(`${READER_ORIGIN}${targetUrl}`, {
-        headers: {
-          Accept: "application/json",
-          "X-Engine": "browser",
-          "X-No-Cache": "true",
-          ...(listing
-            ? {
-                "X-Wait-For-Selector": "a[data-automation-id=jobTitle]",
-                "X-With-Links-Summary": "all",
-              }
-            : {}),
-        },
+        headers: buildCibcReaderHeaders(listing),
         signal: AbortSignal.timeout(READER_TIMEOUT_MS),
       });
       if (!response.ok) {
@@ -91,11 +118,18 @@ async function fetchReaderPage(
         throw new Error("CIBC reader returned no data envelope");
       }
       const page = envelope.data as ReaderPage;
+      if (page && typeof page === "object") snapshot = summarizeCibcReaderPage(page);
       if (page?.url !== targetUrl || page.httpStatus !== 200) {
         throw new Error("CIBC reader did not return the requested Workday page");
       }
-      return page;
+      // HTTP 200 is not a complete scrape. Validate the snapshot before
+      // accepting an attempt, using the same bounded transport budget.
+      return parse(page);
     } catch (error) {
+      log.warn(
+        { targetUrl, attempt, snapshot, err: error instanceof Error ? error.message : String(error) },
+        "[workday-cibc] reader attempt failed validation or transport"
+      );
       if (attempt === 3) throw error;
       await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
     }
@@ -105,9 +139,13 @@ async function fetchReaderPage(
 
 /** Convert a browser-rendered Workday search page into the usual job rows. */
 export function parseCibcReaderListing(page: ReaderPage): JobData[] {
-  const count = page.content?.match(/(?:^|\n)(\d+)\s+JOBS?\s+FOUND\b/i);
+  const text = page.text ?? page.content;
+  const count = text?.match(/(?:^|\n)\s*(\d+)\s+JOBS?\s+FOUND\b/i);
   if (!count || !Array.isArray(page.links)) {
-    throw new Error("CIBC reader search did not render a complete jobs list");
+    throw new Error(
+      `CIBC reader search did not render a complete jobs list (count=${count?.[1] ?? "missing"}, ` +
+      `links=${Array.isArray(page.links) ? page.links.length : "missing"}, textBytes=${text?.length ?? 0})`
+    );
   }
   const total = Number(count[1]);
   const urls = buildWorkdayUrls(TENANT, INSTANCE, SITE);
@@ -273,7 +311,7 @@ export async function fetchWorkdayCibcJobs(
     if (!options.simpliiOnly || !(error instanceof WorkdayBlockedError)) throw error;
     log.warn({ err: error.message }, "[workday-cibc] direct listing blocked; using browser-backed reader");
     jobs.length = 0;
-    jobs.push(...parseCibcReaderListing(await fetchReaderPage(READER_SEARCH_URL, true)));
+    jobs.push(...await fetchReaderPage(READER_SEARCH_URL, parseCibcReaderListing, true));
     total = jobs.length;
     listingViaReader = true;
   }
@@ -319,10 +357,10 @@ export async function fetchWorkdayCibcJobs(
             { externalId: job.external_id, err: error instanceof Error ? error.message : String(error) },
             "[workday-cibc] direct detail failed; using browser-backed reader"
           );
-          detail = parseCibcReaderDetail(await fetchReaderPage(detailUrl));
+          detail = await fetchReaderPage(detailUrl, parseCibcReaderDetail);
         }
       } else {
-        detail = parseCibcReaderDetail(await fetchReaderPage(detailUrl));
+        detail = await fetchReaderPage(detailUrl, parseCibcReaderDetail);
       }
       const parsed = parseWorkdayJobDetail(detail);
       if (options.simpliiOnly && !parsed.description_text) {

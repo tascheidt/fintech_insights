@@ -21,10 +21,20 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
         working-directory: web
-      - run: npx tsx scripts/check-cibc-live.ts
+      - name: Verify exhausted incomplete reads fail without success output
+        working-directory: web
+        run: |
+          set +e
+          npx tsx scripts/check-cibc-live.ts --incomplete-only
+          result=$?
+          set -e
+          test "$result" -eq 1
+          node -e 'const fs = require("fs"); const dir = "scripts/artifacts/cibc-live"; const failure = JSON.parse(fs.readFileSync(`${dir}/failure.json`)); if (failure.readerPages !== 3 || fs.existsSync(`${dir}/summary.json`)) process.exit(1);'
+          mv scripts/artifacts/cibc-live scripts/artifacts/cibc-live-exhaustion
+      - run: npx tsx scripts/check-cibc-live.ts --incomplete-first
         working-directory: web
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cibc-public-source-evidence
-          path: web/scripts/artifacts/cibc-live/
+          path: web/scripts/artifacts/cibc-live*/

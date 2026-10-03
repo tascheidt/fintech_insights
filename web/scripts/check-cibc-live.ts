@@ -1,11 +1,15 @@
 /** Read-only source check: no database, ingest, Gemini, or email calls. */
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { fetchWorkdayCibcJobs } from "../lib/scrapers/workday-cibc";
 
 async function main() {
   const originalFetch = globalThis.fetch;
   let readerPages = 0;
+  const injectIncomplete = process.argv.includes("--incomplete-first");
+  const incompleteOnly = process.argv.includes("--incomplete-only");
+  let injectedIncomplete = false;
   const artifactDir = "scripts/artifacts/cibc-live";
+  await rm(artifactDir, { recursive: true, force: true });
   await mkdir(artifactDir, { recursive: true });
   globalThis.fetch = async (input, init) => {
     const url = String(input);
@@ -16,7 +20,19 @@ async function main() {
         headers: { "Content-Type": "text/html" },
       });
     }
-    const response = await originalFetch(input, init);
+    let response: Response;
+    if ((incompleteOnly || (injectIncomplete && !injectedIncomplete)) &&
+        url.startsWith("https://r.jina.ai/")) {
+      injectedIncomplete = true;
+      response = Response.json({ data: {
+        url: url.slice("https://r.jina.ai/".length),
+        httpStatus: 200,
+        text: "Search for Jobs page is loaded",
+        links: [],
+      } });
+    } else {
+      response = await originalFetch(input, init);
+    }
     if (url.startsWith("https://r.jina.ai/")) {
       const body = await response.clone().text();
       await writeFile(`${artifactDir}/reader-${++readerPages}.json`, body);
@@ -37,9 +53,16 @@ async function main() {
       descriptions: jobs.filter(job => job.description_text?.trim()).length,
       simplii: simplii.map(job => ({ id: job.external_id, title: job.title })),
       readerPages,
+      injectedIncomplete,
     };
     console.log(JSON.stringify(summary, null, 2));
     await writeFile(`${artifactDir}/summary.json`, JSON.stringify(summary, null, 2));
+  } catch (error) {
+    await writeFile(`${artifactDir}/failure.json`, JSON.stringify({
+      checkedAt: new Date().toISOString(), readerPages, injectedIncomplete,
+      error: error instanceof Error ? error.message : String(error),
+    }, null, 2));
+    throw error;
   } finally {
     globalThis.fetch = originalFetch;
   }

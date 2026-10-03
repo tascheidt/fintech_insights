@@ -51,6 +51,8 @@ next-env.d.ts
 # are kept; the transient *-page.html and *-smoke.json outputs aren't.
 scripts/artifacts/*-smoke.json
 scripts/artifacts/*-page.html
+scripts/artifacts/cibc-live/
+scripts/artifacts/cibc-live-exhaustion/
 
 # Generated extracts from one-off reporting scripts
 # (e.g. scripts/report-ai-engineering-roles.ts, which writes to web/reports/).
