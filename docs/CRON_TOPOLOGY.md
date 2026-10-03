@@ -157,3 +157,7 @@ No new Vercel cron (the cap of two is untouched) and no GitHub Action — this i
   not drive production schedules.
 - The deprecated `cron_logs` table is gone. All scheduled jobs write to
   `job_runs` instead.
+
+## Read-only CIBC source check
+
+[`cibc-live-check.yml`](../.github/workflows/cibc-live-check.yml) runs on relevant pull requests or manual dispatch, with no schedule and no application secrets. It exercises the CIBC Simplii-only fallback without ingest or analysis and retains public Reader response artifacts, including failed attempts. It is a source/description check, not a successful production ingestion run.

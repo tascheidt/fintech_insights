@@ -1,0 +1,40 @@
+name: CIBC read-only live check
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'web/lib/scrapers/workday-cibc*'
+      - 'web/scripts/check-cibc-live.ts'
+      - '.github/workflows/cibc-live-check.yml'
+permissions:
+  contents: read
+jobs:
+  source-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - name: Verify exhausted incomplete reads fail without success output
+        working-directory: web
+        run: |
+          set +e
+          npx tsx scripts/check-cibc-live.ts --incomplete-only
+          result=$?
+          set -e
+          test "$result" -eq 1
+          node -e 'const fs = require("fs"); const dir = "scripts/artifacts/cibc-live"; const failure = JSON.parse(fs.readFileSync(`${dir}/failure.json`)); if (failure.readerPages !== 3 || fs.existsSync(`${dir}/summary.json`)) process.exit(1);'
+          mv scripts/artifacts/cibc-live scripts/artifacts/cibc-live-exhaustion
+      - run: npx tsx scripts/check-cibc-live.ts --incomplete-first
+        working-directory: web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cibc-public-source-evidence
+          path: web/scripts/artifacts/cibc-live*/

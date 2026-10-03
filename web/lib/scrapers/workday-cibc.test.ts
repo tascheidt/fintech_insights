@@ -21,9 +21,11 @@ import {
 } from "./workday-utils";
 import {
   buildCibcListingRequest,
+  buildCibcReaderHeaders,
   isSimpliiPosting,
   parseCibcReaderDetail,
   parseCibcReaderListing,
+  summarizeCibcReaderPage,
 } from "./workday-cibc";
 
 const LISTING_FIXTURE: WorkdayListingResponse = JSON.parse(
@@ -78,6 +80,9 @@ describe("workday-cibc listing scope", () => {
 });
 
 describe("CIBC browser-backed reader fallback", () => {
+  const liveText = JSON.parse(readFileSync(
+    resolve(__dirname, "__fixtures__/workday-cibc-reader-text.json"), "utf8"
+  ));
   const listing = {
     content: "2 JOBS FOUND\n\n1 - 2 of 2 jobs",
     links: [
@@ -92,6 +97,55 @@ describe("CIBC browser-backed reader fallback", () => {
       ],
     ],
   };
+
+  it("requests full DOM text and explicit rendering completion only for listings", () => {
+    expect(buildCibcReaderHeaders(true)).toMatchObject({
+      "X-Respond-With": "text",
+      "X-Timeout": "30",
+      "X-No-Cache": "true",
+      "X-With-Links-Summary": "all",
+    });
+    expect(buildCibcReaderHeaders()).not.toHaveProperty("X-Respond-With");
+    expect(buildCibcReaderHeaders()).not.toHaveProperty("X-Timeout");
+  });
+
+  it("parses the captured full DOM text response without article content", () => {
+    expect(liveText).not.toHaveProperty("content");
+    const jobs = parseCibcReaderListing(liveText);
+    expect(jobs).toHaveLength(10);
+    expect(jobs[0].title).toBe("Growth Analyst - Simplii Financial");
+    expect(jobs[0].url).not.toContain("?q=");
+  });
+
+  it("rejects successful HTTP snapshots missing a count or link inventory", () => {
+    expect(() => parseCibcReaderListing({ text: "Search for Jobs page is loaded", links: [] }))
+      .toThrow("count=missing, links=0");
+    expect(() => parseCibcReaderListing({ text: "10 JOBS FOUND" }))
+      .toThrow("count=10, links=missing");
+  });
+
+  it("records source state and notices without including the response body", () => {
+    const summary = summarizeCibcReaderPage({
+      httpStatus: 200, text: "Maintenance: temporarily unavailable\nprivate-value", links: [],
+    });
+    expect(summary).toMatchObject({
+      count: null, linksCount: 0, maintenanceNotice: true, challengeNotice: false,
+    });
+    expect(JSON.stringify(summary)).not.toContain("private-value");
+    expect(summarizeCibcReaderPage({ content: "Akamai Access Denied" }).challengeNotice).toBe(true);
+  });
+
+  it("rejects partial and duplicate links even with a complete DOM count", () => {
+    expect(() => parseCibcReaderListing({ ...liveText, links: liveText.links.slice(0, 3) }))
+      .toThrow("2 links for 10 jobs");
+    expect(() => parseCibcReaderListing({ ...listing, links: [listing.links[1], listing.links[1]] }))
+      .toThrow("duplicate job link");
+  });
+
+  it("accepts a verified zero-result page but never treats a loading page as empty", () => {
+    expect(parseCibcReaderListing({ text: "0 JOBS FOUND", links: [] })).toEqual([]);
+    expect(() => parseCibcReaderListing({ text: "Loading...", links: [] })).toThrow();
+  });
 
   it("keeps only canonical CIBC Workday job links and preserves requisition IDs", () => {
     const jobs = parseCibcReaderListing(listing);
