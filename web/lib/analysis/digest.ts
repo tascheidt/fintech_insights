@@ -8,7 +8,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { checkVoice } from "@/lib/ai/voice-validator";
-import { recordUsage } from "@/lib/ai/gemini-meter";
+import { recordUsage, type GeminiUsageMetadata, type OnUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import {
   getActiveWeeklyDigestAiConfig,
@@ -26,6 +26,14 @@ import {
 import { isIncumbentSignalJob } from "@/lib/analysis/incumbent-signal";
 import { getIncumbentTrackingEnabled } from "@/lib/settings/incumbent-tracking";
 import { ROLE_CATEGORIES } from "@/lib/analysis/function-categories";
+import {
+  assertDigestGenerationFinished,
+  buildDigestCommentaryFallback,
+  generateCompleteDigestCopy,
+  isCompleteDigestProse,
+  parseDigestCommentaryResponse,
+  parseDigestGlobalSummaryResponse,
+} from "./digest-copy";
 
 export type { RoleThemeSummary } from "@/lib/analysis/role-themes";
 export { aggregateRoleThemes } from "@/lib/analysis/role-themes";
@@ -78,8 +86,8 @@ export interface DigestCommentary {
   body: string;
   /**
    * One sentence naming only the genuinely new thing this week (editorial v2).
-   * Null / absent when nothing is genuinely new — the "Signals" section then
-   * falls back to `body` for backwards compatibility with stored digests.
+   * Null / absent when nothing is genuinely new. New reports omit the signal
+   * rather than duplicating the company body; stored signal rows still render.
    */
   new_signal?: string | null;
 }
@@ -284,49 +292,56 @@ function cleanJsonText(text: string): string {
   return cleaned.trim();
 }
 
-function parseDigestCommentaryResponse(text: string, companyName: string): DigestCommentary {
-  const cleaned = cleanJsonText(text);
-
+/** Meter every attempt, including rejected copy, so retries remain visible in cost telemetry. */
+async function requestDigestCopy<T>(
+  prompt: string,
+  config: WeeklyDigestAiConfig,
+  callSite: string,
+  parse: (text: string) => T,
+  attempt: number,
+  extra: Record<string, unknown>,
+  onUsage?: OnUsage
+): Promise<T> {
+  const startedAt = Date.now();
+  let usageMetadata: GeminiUsageMetadata | undefined;
+  let finishReason: string | undefined;
+  let failure: unknown;
+  const maxOutputTokens = Math.min(config.maxOutputTokens * (attempt + 1), 64000);
   try {
-    const parsed = JSON.parse(cleaned);
-    if (parsed.headline && parsed.body) {
-      const newSignal =
-        typeof parsed.new_signal === "string" && parsed.new_signal.trim().length > 0
-          ? parsed.new_signal.replace(/\s+/g, " ").trim()
-          : null;
-      return {
-        headline: String(parsed.headline).replace(/\s+/g, " ").trim(),
-        body: String(parsed.body).replace(/\s+/g, " ").trim(),
-        new_signal: newSignal,
-      };
-    }
-  } catch {
-    // JSON was malformed or truncated — extract whatever fields are present
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) throw new Error("GEMINI_API_KEY not configured");
+    const model = new GoogleGenerativeAI(key).getGenerativeModel({
+      model: config.model,
+      generationConfig: {
+        temperature: config.temperature,
+        maxOutputTokens,
+        responseMimeType: "application/json",
+      },
+    });
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+    usageMetadata = result.response.usageMetadata;
+    finishReason = result.response.candidates?.[0]?.finishReason;
+    assertDigestGenerationFinished(finishReason);
+    return parse(result.response.text());
+  } catch (error) {
+    failure = error;
+    throw error;
+  } finally {
+    const record = recordUsage({
+      callSite,
+      modelRequested: config.model,
+      groundingEnabled: false,
+      usageMetadata,
+      latencyMs: Date.now() - startedAt,
+      status: failure ? "error" : "ok",
+      errorMessage: failure instanceof Error ? failure.message : undefined,
+      extra: { ...extra, attempt: attempt + 1, finishReason, maxOutputTokens, promptVersion: config.version },
+    });
+    writeUsageEvent(record);
+    onUsage?.(record);
   }
-
-  const headlineMatch = text.match(/"headline":\s*"([^"]+)"/);
-  const bodyMatch = text.match(/"body":\s*"([^"]+)"/);
-  if (headlineMatch && bodyMatch) {
-    return {
-      headline: headlineMatch[1].replace(/\s+/g, " ").trim(),
-      body: bodyMatch[1].replace(/\s+/g, " ").trim(),
-    };
-  }
-
-  // Truncated response: headline present but body cut off mid-string
-  if (headlineMatch) {
-    const partialBody = text.match(/"body":\s*"([\s\S]+)/);
-    const recovered = partialBody
-      ? partialBody[1].replace(/["}\s]+$/, "").replace(/\s+/g, " ").trim()
-      : `${companyName} posted new roles this week.`;
-    console.warn(`[digest] Recovered truncated response for ${companyName}`);
-    return {
-      headline: headlineMatch[1].replace(/\s+/g, " ").trim(),
-      body: recovered,
-    };
-  }
-
-  throw new Error(`Failed to parse weekly digest response for ${companyName}. Raw response: ${text.substring(0, 200)}`);
 }
 
 function buildWeeklyDigestPrompt(
@@ -352,48 +367,21 @@ function buildWeeklyDigestPrompt(
 
 export async function generateWeeklyDigestCommentary(
   input: WeeklyDigestCompanyInput,
-  config?: WeeklyDigestAiConfig
+  config?: WeeklyDigestAiConfig,
+  onUsage?: OnUsage
 ): Promise<DigestCommentary> {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) {
-    throw new Error("GEMINI_API_KEY not configured - cannot generate weekly digest commentary");
-  }
-
   const activeConfig = config ?? await getActiveWeeklyDigestAiConfig();
   const taskPrompt = buildWeeklyDigestPrompt(input, activeConfig);
   const prompt = `${getVoiceDirective("digest")}\n\n${taskPrompt}`;
-  const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({
-    model: activeConfig.model,
-    generationConfig: {
-      temperature: activeConfig.temperature,
-      maxOutputTokens: activeConfig.maxOutputTokens,
-    },
-  });
-
-  const _startMs = Date.now();
-  const result = await model.generateContent({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-  });
-
-  writeUsageEvent(
-    recordUsage({
-      callSite: "generateWeeklyDigestCommentary",
-      modelRequested: activeConfig.model,
-      groundingEnabled: false,
-      usageMetadata: result.response.usageMetadata,
-      latencyMs: Date.now() - _startMs,
-      status: "ok",
-      extra: { companyName: input.company_name },
-    })
+  const commentary = await generateCompleteDigestCopy(
+    (attempt) => requestDigestCopy(
+      attempt === 0 ? prompt : `${prompt}\n\nThe previous attempt failed validation. Write a fresh, shorter response with complete sentences and closed JSON. Do not continue the previous response.`,
+      activeConfig, "generateWeeklyDigestCommentary", parseDigestCommentaryResponse,
+      attempt, { companyName: input.company_name }, onUsage
+    ),
+    () => buildDigestCommentaryFallback(input),
+    (error, attempt) => console.warn(`[digest] Rejected commentary for ${input.company_name} (attempt ${attempt + 1}/2):`, error)
   );
-
-  const text = result.response.text()?.trim();
-  if (!text) {
-    throw new Error(`Empty response from Gemini for ${input.company_name}`);
-  }
-
-  const commentary = parseDigestCommentaryResponse(text, input.company_name);
   const voice = checkVoice({
     headline: commentary.headline,
     body: commentary.body,
@@ -617,9 +605,9 @@ ${ledeLines}
 Write JSON with exactly these fields:
 {
   "headline": "6-12 words naming this week's single most interesting specific fact — a company, a role, or a number. Never a generic theme statement.",
-  "key_insight": "One sentence: the most interesting thing in this week's data and why it matters.",
-  "body": "2-4 sentences. Expand on the key insight with the concrete evidence behind it, then one sentence on what the rest of the week looked like. Vary sentence structure; no lists.",
-  "watching": "One forward-looking sentence naming what next week's postings would confirm or deny, grounded in this week's entries. Use null if nothing has earned a watch item."
+  "key_insight": "One complete sentence connecting the strongest signals across companies, without restating the headline.",
+  "body": "1-2 complete sentences, at most 60 words, adding context about the breadth or contrast in the week. Detailed titles and individual company explanations appear below; do not retell them here.",
+  "watching": "One complete sentence naming a concrete hiring pattern to watch over subsequent weeks. Further postings may strengthen or weaken an inference, but cannot confirm a launch or disprove a strategy. Use null if nothing has earned a watch item."
 }
 
 Rules:
@@ -627,58 +615,31 @@ Rules:
 - Quote job titles when they carry the story; use a number only when the number is the point.
 - Plain, specific, evidence-first language. No hype, no emojis, no exclamation marks.
 - Do not repeat the company entries verbatim — synthesize.
+- Each field must add information: headline = lead, key_insight = connection, body = wider context, watching = an observable follow-up. Do not repeat the same claim in all four.
+- Job titles establish hiring intent, not completed hires, deployment scale, launches, backfills, or proven strategic pivots. Keep at most one explicitly qualified inference in the entire opening.
+- Theme labels are classification aids, not evidence that AI roles concern risk or fraud. Do not add a specialty absent from the actual titles.
+- Finish every sentence. Do not use ellipses or dangling conjunctions. Return fully closed JSON.
 
 Respond with ONLY valid JSON.`;
 
   const prompt = `${getVoiceDirective("digest")}\n\n${taskPrompt}`;
 
   try {
-    const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({
-      model: config.model,
-      generationConfig: {
-        temperature: config.temperature,
-        maxOutputTokens: config.maxOutputTokens,
-      },
-    });
-
-    const _startMs = Date.now();
-    const response = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    });
-
-    writeUsageEvent(
-      recordUsage({
-        callSite: "generateDigestGlobalSummary",
-        modelRequested: config.model,
-        groundingEnabled: false,
-        usageMetadata: response.response.usageMetadata,
-        latencyMs: Date.now() - _startMs,
-        status: "ok",
-        extra: { companyCount: companies.length },
-      })
+    const summary = await generateCompleteDigestCopy<GlobalSummary | null>(
+      (attempt) => requestDigestCopy(
+        prompt, config, "generateDigestGlobalSummary", parseDigestGlobalSummaryResponse,
+        attempt, { companyCount: companies.length }
+      ),
+      () => null,
+      (error, attempt) => console.warn(`[digest] Rejected global summary (attempt ${attempt + 1}/2):`, error)
     );
-
-    const text = response.response.text()?.trim();
-    if (!text) return null;
-
-    const parsed = JSON.parse(cleanJsonText(text)) as Record<string, unknown>;
-    const headline = typeof parsed.headline === "string" ? parsed.headline.replace(/\s+/g, " ").trim() : "";
-    const keyInsight = typeof parsed.key_insight === "string" ? parsed.key_insight.replace(/\s+/g, " ").trim() : "";
-    const body = typeof parsed.body === "string" ? parsed.body.replace(/\s+/g, " ").trim() : "";
-    const watching =
-      typeof parsed.watching === "string" && parsed.watching.trim().length > 0
-        ? parsed.watching.replace(/\s+/g, " ").trim()
-        : null;
-
-    if (!headline || !keyInsight || !body) return null;
-
-    const voice = checkVoice({ headline, body, insight_summary: keyInsight });
+    if (!summary) return null;
+    const voice = checkVoice({ headline: summary.headline, body: summary.body, insight_summary: summary.key_insight });
     if (!voice.passed) {
       console.warn("[voice] digest global summary:", voice.warnings.join("; "));
     }
 
-    return { headline, key_insight: keyInsight, body, watching };
+    return summary;
   } catch (error) {
     console.warn(
       "[digest] Global summary AI call failed; using deterministic fallback:",
@@ -741,7 +702,7 @@ async function getHistoricalPatternContext(
       currentOpenJobCount: activeJobs.length,
       yearToDateJobCount: ytdJobs.length,
       openRoleThemes: aggregateRoleThemes(activeJobs),
-      yearToDateRoleThemes: aggregateRoleThemes(ytdJobs),
+      yearToDateRoleThemes: aggregateRoleThemes(ytdJobs, Infinity),
     });
   }
 
@@ -895,19 +856,17 @@ export function detectIndustryTrends(companies: CompanyWeeklySummary[]): Industr
     }));
 }
 
-function buildStrategySignals(companies: CompanyWeeklySummary[]): StrategySignal[] {
+export function buildStrategySignals(companies: CompanyWeeklySummary[]): StrategySignal[] {
   return companies
-    .filter((company) => company.hiring_pattern.new_themes.length > 0)
+    .filter((company) => company.ai_commentary.new_signal && isCompleteDigestProse(company.ai_commentary.new_signal))
     .slice(0, 3)
     .map((company) => ({
       company: company.company_name,
       alignment: "new_direction",
       signal: company.ai_commentary.headline,
-      // Editorial v2: the Signals section carries only the signal-specific
-      // sentence — the full body appears once, in the company section below.
-      // Fall back to the body for pre-v2 commentary without a new_signal.
-      detail: company.ai_commentary.new_signal?.trim() || company.ai_commentary.body,
-      interpretation: `New this week: ${company.hiring_pattern.new_themes.join(", ").toLowerCase()}.`,
+      // Only a complete editorial signal earns a highlight, not a taxonomy change.
+      detail: company.ai_commentary.new_signal!,
+      interpretation: "",
     }));
 }
 
@@ -1130,6 +1089,7 @@ Respond with ONLY valid JSON, an array with one object per bank:
 
     const text = response.response.text()?.trim();
     if (!text) return result;
+    assertDigestGenerationFinished(response.response.candidates?.[0]?.finishReason);
 
     const parsed = JSON.parse(cleanJsonText(text)) as
       | IncumbentWatchInterpretation[]
@@ -1147,7 +1107,7 @@ Respond with ONLY valid JSON, an array with one object per bank:
         typeof e.interpretation === "string"
           ? e.interpretation.replace(/\s+/g, " ").trim()
           : "";
-      if (!name || !interpretation) continue;
+      if (!name || !isCompleteDigestProse(interpretation)) continue;
       const companyId = byName.get(name.toLowerCase());
       if (companyId) {
         const voice = checkVoice({ headline: name, body: interpretation });

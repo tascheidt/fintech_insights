@@ -41,6 +41,15 @@
 
 ## Banned phrases and patterns (analytical surfaces)
 
+### Digest editing (October 2026)
+
+- Every prose field must contain complete sentences. `web/lib/analysis/digest-copy.ts` enforces this before publication, independently of the warning-only voice checker; never salvage incomplete JSON with regular expressions or add punctuation to a fragment.
+- Give each section a purpose: the opening connects companies and adds context, Signals offers one concise preview of a supported change, and Company Highlights supplies the detail. Do not repeat classification or continuity lines beneath the prose.
+- A routine week gets one useful sentence about the actual openings. Avoid dismissive "only" or "just", and stock "nothing changed" conclusions. A substantive signal gets 2–3 sentences, with a distinct fact in each.
+- Postings indicate hiring intent, not completed hires, launches, deployment scale, or a confirmed pivot. Historical digest headlines are editorial memory, not independent evidence. Theme labels alone cannot establish risk/fraud work or a first-ever capability.
+
+### Phrases to avoid
+
 Avoid these in headlines and analytical summaries (validator flags them):
 
 - Hype / slang: “bets big”, “doubles down”, “game-changer”, “huge”, “massive”, “crushing it”, “moonshot”

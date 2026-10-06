@@ -118,6 +118,34 @@ Named strategic evidence:
 
 export const WEEKLY_DIGEST_BENCHMARKS: WeeklyDigestBenchmarkCase[] = [
   {
+    // Synthetic regression case: generic ML-platform work must not become
+    // risk-specific prose just because of its classification label.
+    id: "partnerships-with-generic-ml",
+    companyName: "Benchmark WealthTech",
+    input: {
+      company_name: "Benchmark WealthTech", week_job_count: 5,
+      current_open_job_count: 24, year_to_date_job_count: 110,
+      weekly_role_themes: [
+        { id: "engineering", label: "Engineering", count: 3, sample_titles: ["Trading UI Engineer", "ML Infrastructure Engineer", "Developer Tools Engineer"] },
+        { id: "ai_ml_risk", label: "AI and machine learning for risk", count: 1, sample_titles: ["ML Infrastructure Engineer"] },
+        { id: "sales", label: "Sales", count: 1, sample_titles: ["Partnerships Lead, Member Rewards"] },
+        { id: "operations", label: "Operations", count: 1, sample_titles: ["Estate Planning Advisor"] },
+      ],
+      open_role_themes: [],
+      year_to_date_role_themes: [
+        { id: "engineering", label: "Engineering", count: 35, sample_titles: ["AI Platform Engineer", "Data Platform Engineer"] },
+        { id: "operations", label: "Operations", count: 30, sample_titles: ["Trading Operations Associate"] },
+      ],
+      continuing_themes: ["Engineering", "Operations"],
+      new_themes: ["AI and machine learning for risk", "Sales"],
+      sample_titles: ["Partnerships Lead, Member Rewards", "Estate Planning Advisor", "ML Infrastructure Engineer", "Developer Tools Engineer", "Trading UI Engineer"],
+      continuity: "mixed",
+    },
+    expectedContinuity: "mixed",
+    expectedInclude: ["partnerships"],
+    expectedExclude: ["risk AI", "fraud detection", "proves", "first-ever"],
+  },
+  {
     id: "continued-field-sales",
     companyName: "Neo Financial",
     input: {
@@ -142,7 +170,7 @@ export const WEEKLY_DIGEST_BENCHMARKS: WeeklyDigestBenchmarkCase[] = [
       continuity: "continuing",
     },
     expectedContinuity: "continuing",
-    expectedInclude: ["continues", "in-person sales", "year"],
+    expectedInclude: ["sales", "mortgage"],
     expectedExclude: ["pivot", "new direction", "surprise move"],
   },
   {

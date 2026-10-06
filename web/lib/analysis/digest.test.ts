@@ -18,6 +18,8 @@
 import { describe, it, expect } from "vitest";
 import {
   buildWeeklyDigestCompanyInput,
+  buildStrategySignals,
+  type CompanyWeeklySummary,
   type CompanyJobData,
   type WeeklyJob,
 } from "./digest";
@@ -40,6 +42,26 @@ function makeJob(title: string, department: string | null = null): WeeklyJob {
 }
 
 describe("buildWeeklyDigestCompanyInput", () => {
+  it("does not call an established smaller role area new when it falls outside the five largest themes", () => {
+    const history = [
+      ...Array.from({ length: 10 }, () => ({ title: "Software Engineer", standardized_department: "Engineering" })),
+      ...Array.from({ length: 9 }, () => ({ title: "Operations Analyst", standardized_department: "Operations" })),
+      ...Array.from({ length: 8 }, () => ({ title: "Financial Analyst", standardized_department: "Finance" })),
+      ...Array.from({ length: 7 }, () => ({ title: "Product Designer", standardized_department: "Product" })),
+      ...Array.from({ length: 6 }, () => ({ title: "Risk Analyst", standardized_department: "Risk" })),
+      { title: "Sales Representative", standardized_department: "Sales" },
+    ];
+    const allThemes = aggregateRoleThemes(history, Infinity);
+    expect(allThemes.length).toBeGreaterThan(5);
+    const company = { company_id: "acme", company_name: "Acme", company_slug: "acme", jobs: [makeJob("Sales Representative", "Sales")] };
+    const result = buildWeeklyDigestCompanyInput(company, {
+      currentOpenJobCount: 1, yearToDateJobCount: history.length,
+      openRoleThemes: [], yearToDateRoleThemes: allThemes,
+    });
+    expect(result.new_themes).toEqual([]);
+    expect(result.continuity).toBe("continuing");
+  });
+
   it("flags continuity='continuing' when all weekly themes match the YTD set", () => {
     const weeklyJobs = [
       makeJob("Senior Backend Engineer", "Engineering"),
@@ -106,5 +128,28 @@ describe("buildWeeklyDigestCompanyInput", () => {
     expect(result.continuing_themes).toEqual([]);
     expect(result.new_themes.length).toBeGreaterThan(0);
     expect(result.week_job_count).toBe(2);
+  });
+});
+
+describe("buildStrategySignals", () => {
+  it("requires a complete editorial signal and never duplicates a company body", () => {
+    const pattern = buildWeeklyDigestCompanyInput({
+      company_id: "acme", company_name: "Acme", company_slug: "acme",
+      jobs: [makeJob("Platform Engineer", "Engineering")],
+    }, { currentOpenJobCount: 1, yearToDateJobCount: 0, openRoleThemes: [], yearToDateRoleThemes: [] });
+    const company: CompanyWeeklySummary = {
+      company_id: "acme", company_name: "Acme", company_slug: "acme",
+      new_job_count: 1, current_open_job_count: 1, year_to_date_job_count: 0,
+      departments: {}, dominant_tech: [], seniority_breakdown: {}, jobs: [], hiring_pattern: pattern,
+      ai_commentary: { headline: "Acme adds platform engineering role", body: "The Platform Engineer listing covers infrastructure tooling.", new_signal: null },
+    };
+    expect(buildStrategySignals([company])).toEqual([]);
+    company.ai_commentary.new_signal = "The platform opening includes";
+    expect(buildStrategySignals([company])).toEqual([]);
+    company.ai_commentary.new_signal = "A Platform Engineer opening adds infrastructure capacity.";
+    const [signal] = buildStrategySignals([company]);
+    expect(signal.detail).toBe(company.ai_commentary.new_signal);
+    expect(signal.detail).not.toBe(company.ai_commentary.body);
+    expect(signal.interpretation).toBe("");
   });
 });

@@ -267,22 +267,28 @@ Write JSON with exactly these fields:
 {
   "headline": "6-12 words, plain and specific. Must not repeat the sentence shape of the recent-week headlines above.",
   "body": "See LENGTH RULE.",
-  "new_signal": "One sentence naming ONLY the genuinely new thing this week and why it matters, quoting the job title(s) behind it. Use null when nothing is genuinely new."
+  "new_signal": "One complete sentence, at most 35 words, naming ONLY the genuinely new thing this week and why it matters. Use null when nothing is genuinely new. This is a brief preview; the body should add supporting detail rather than repeat it verbatim."
 }
 
 LENGTH RULE — spend words where the signal is:
-- Nothing genuinely new: body is ONE short sentence saying so plainly, plus at most one concrete detail (a title or a number). Do not pad a quiet week into three sentences.
-- A real new signal or a notable number: body is 2-4 sentences that LEAD with the new or most interesting fact, then set it against the established pattern.
+- Nothing genuinely new: body is ONE short sentence naming the most useful concrete opening or role mix. Let that detail carry continuity; do not pad a quiet week or add a stock "nothing changed" conclusion.
+- A real new signal or a notable number: body is 2-3 complete sentences, at most 75 words, that LEAD with the most interesting fact, then add distinct supporting context. Select the strongest 1-2 facts; do not catalogue every role.
 
 WRITING RULES:
 - Lead with the most interesting specific fact, not the company's routine.
 - Quote 1-2 actual job titles when they carry the story — a title like "Staff AI Platform Engineer" is more informative than any adjective.
 - Use a number only when the number itself is the story (open roles climbing week over week, an unusual year-to-date total). A stat line under your text already shows the raw counts; never restate them mechanically.
 - Use the recent-weeks context for memory: if a theme has now appeared several weeks running, say so ("third straight week of..."); if this week breaks with last week, note the break. Never claim a streak the context does not show.
-- Say "nothing new" like a person would: "Same mix it has run all year." — short and direct.
+- Give routine openings the same precise language as novel ones; readers still need to know what was listed.
 - BANNED constructions (these made past issues read machine-written; do not use them or close variants): "This activity continues", "established year-to-date pattern", "aligns with the company's established", "no new trends were detected", "observed data", "establishes a baseline", "represents a minor addition", "suggests a minor".
 - Do not open the body with "[Company] continues to hire" or "[Company] is still hiring" — earn any continuity framing with a specific detail instead of a stock opener.
 - At most ONE clearly flagged inference ("that reads as...", "the kind of hire a company makes when..."). Everything else stays observational.
+- Postings show hiring intent. Do not infer completed hires, deployment scale, launches, backfills, or proven strategic pivots from titles alone. Do not characterize routine hiring as trivial, or use "only", "just", or "nothing new" to dismiss concrete openings.
+- New theme labels mean newly observed categories in our tracked data, not a company's first-ever capability. Generic AI titles do not establish risk or fraud work; take the actual specialty from the title.
+- Recent issues are editorial memory, not independent evidence. Do not extend a prior headline's speculation into a fact. If the supplied history lacks exact role titles, avoid precise claims about past functions or their absence.
+- Do not claim "first", "first-ever", "introduces", or a shift from one function to another based on incomplete theme summaries. Describe the current search and qualify what it may support; a partnerships title does not establish a new loyalty initiative or product launch.
+- Each sentence must add a fact or a grounded implication. Do not repeat the headline as sentence one, or add a concluding sentence that merely paraphrases the paragraph.
+- Finish every sentence with terminal punctuation. Never cut a sentence to meet a word limit, end on a conjunction, use an ellipsis, or leave a quote open. Return fully closed JSON.
 - Translate internal theme labels into natural prose: "risk and fraud" becomes "risk roles"; "ai and machine learning for risk" becomes "AI-risk work". Never paste a lowercase taxonomy label into a sentence.
 - No hype, slang, emojis, exclamation marks, or dramatic strategy language. Only claim a new direction when the postings clearly support it.
 
@@ -316,8 +322,8 @@ export const DEFAULT_WEEKLY_DIGEST_AI_CONFIG: WeeklyDigestAiConfig = {
   // editorial-v2 prompt asks for varied sentence structure, and 0.2 was one
   // of the reasons every entry converged on the same three-beat skeleton.
   temperature: 0.4,
-  maxOutputTokens: 2048,
-  version: "digest-editorial-v2",
+  maxOutputTokens: 4096,
+  version: "digest-editorial-v3",
   benchmarkScore: null,
 };
 

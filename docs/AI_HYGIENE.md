@@ -36,6 +36,13 @@ npx tsx --env-file=.env.local scripts/gemini-compare.ts --scenario=<name> --mode
 npx tsx --env-file=.env.local scripts/gemini-compare.ts --scenario=<name> --mode=compare --baseline=<prior-artifact>
 ```
 
+For digest-copy changes, use `--scenario=weekly-digest --mode=baseline`.
+This scenario evaluates synthetic company inputs, including routine hiring,
+risk/AI changes, and a misleading generic-ML classification. No production
+digest records are loaded; neutral benchmark names are sent to Gemini. The
+report includes rejected attempts and any factual fallback, so a passing parser
+cannot hide a failed live generation.
+
 The seeded 20-job fixture at `web/scripts/fixtures/gemini-sample-jobs.json` is the source of truth. **Regenerate it annually, not per change** — if everyone regenerates the fixture per PR, we lose the longitudinal signal.
 
 ### 3. Don't stack grounded calls
