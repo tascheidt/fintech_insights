@@ -132,11 +132,12 @@ export function getThemeIdByLabel(label: string): string | null {
 }
 
 /**
- * Aggregate theme counts over a collection of jobs. Returns the top 5 themes
- * sorted by count, each with up to 3 sample titles.
+ * Aggregate theme counts, with up to 3 sample titles. Display rollups default
+ * to 5; continuity comparisons need the complete historical set.
  */
 export function aggregateRoleThemes(
-  jobs: Array<{ title: string; standardized_department: string | null }>
+  jobs: Array<{ title: string; standardized_department: string | null }>,
+  limit: number = 5
 ): RoleThemeSummary[] {
   const themeMap = new Map<string, { count: number; titles: string[] }>();
 
@@ -163,5 +164,5 @@ export function aggregateRoleThemes(
       sample_titles: value.titles,
     }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
+    .slice(0, limit);
 }

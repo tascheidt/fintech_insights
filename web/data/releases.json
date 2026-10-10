@@ -1,5 +1,19 @@
 [
   {
+    "version": "2.15.5",
+    "date": "2026-10-06",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "Weekly digests reject unfinished AI text and broken quoted titles, retry once, and use complete factual copy if generation still fails. Smaller established role areas are no longer labelled new just because they fall outside the largest historical categories."
+      },
+      {
+        "type": "improvement",
+        "description": "Digest openings are more concise, company summaries focus on the strongest evidence, and repeated classification lines are removed. Highlights require a specific new signal, while routine openings get clear, brief coverage."
+      }
+    ]
+  },
+  {
     "version": "2.15.4",
     "date": "2026-10-03",
     "changes": [

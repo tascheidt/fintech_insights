@@ -216,9 +216,6 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                       {row.signal.detail && (
                         <div className="text-sm mt-2">{row.signal.detail}</div>
                       )}
-                      <div className="text-sm text-muted-foreground mt-2">
-                        {row.signal.interpretation}
-                      </div>
                     </div>
                     <span className={`px-2 py-1 rounded text-[10px] font-medium uppercase tracking-wide ${
                       row.signal.alignment === "aligned"
@@ -323,7 +320,7 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
           <CardContent>
             <div className="space-y-6">
               {companyViews.map((view) => {
-                const { company, links, primaryFocus, isContinuing, hasNewThemes, newThemes } = view;
+                const { company, links, primaryFocus } = view;
                 return (
                   <div key={company.company_id} className="border-b last:border-b-0 pb-6 last:pb-0">
                     <div className="flex items-start justify-between mb-2">
@@ -339,35 +336,6 @@ export function DigestViewer({ digest, digestId }: DigestViewerProps) {
                       <div className="font-medium">{company.ai_commentary.headline}</div>
                       <div className="text-sm text-muted-foreground">
                         {company.ai_commentary.body}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {isContinuing ? (
-                          "No new role areas this week."
-                        ) : hasNewThemes ? (
-                          <>
-                            {"New this week: "}
-                            {newThemes.map((chip, idx) =>
-                              chip.href ? (
-                                <span key={`${chip.label}-${idx}`}>
-                                  <Link
-                                    href={chip.href}
-                                    className="underline decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
-                                  >
-                                    {chip.label}
-                                  </Link>
-                                  {chip.separator}
-                                </span>
-                              ) : (
-                                <span key={`${chip.label}-${idx}`}>
-                                  {chip.label}
-                                  {chip.separator}
-                                </span>
-                              )
-                            )}
-                          </>
-                        ) : (
-                          "This week's mix is close to the company's recent hiring pattern."
-                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2">
                         <span>

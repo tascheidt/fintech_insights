@@ -51,7 +51,9 @@ const DIGEST_ADDENDUM = `For this digest summary specifically:
 - Spend words where the signal is: a quiet week gets one plain sentence, a real signal gets the detail.
 - Use a number only when the number is the story; never restate stats mechanically.
 - Do not mention tech stacks unless essential to the role type.
-- If there is no clear change this week, say so in one short, human sentence.`;
+- For routine weeks, name a useful concrete opening in one sentence; avoid dismissive "only", "just", or stock "nothing changed" lines.
+- Keep every sentence complete. Each sentence adds a fact or qualified implication; no repeated conclusions.
+- Postings show hiring intent, not confirmed hires, launches, deployment scale, or strategic pivots. Do not turn a prior digest's inference into a fact.`;
 
 const NARRATIVE_ADDENDUM = `For this narrative:
 - Name systems, vendors, or role clusters when the evidence supports it.

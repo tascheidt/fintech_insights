@@ -48,6 +48,11 @@ The digest no longer treats tech-stack commentary as a primary output. The main 
   Builds the weekly digest model, historical role context, company commentary prompts, and global summary.
   Also defines `DigestData` (alias of `WeeklyDigest`) and `DigestRendererProps` — the shared handoff contract for renderers.
 
+- `web/lib/analysis/digest-copy.ts`
+  Strict JSON field parsing, complete-prose checks, natural-finish validation,
+  bounded retry, and factual company-copy fallback. Pure regression tests cover
+  dangling conjunctions, escaped title quotes, optional prose, and token cutoffs.
+
 - `web/components/digests/digest-render-helpers.ts`
   Shared, primitive-free data-shaping module consumed by both renderers. Owns
   slug lookups, date-range / year-label formatting, leading-theme resolution,
@@ -164,7 +169,7 @@ The default runs at temperature 0.4 (up from 0.2) because sentence-structure var
 
 ### Global summary (AI lede with deterministic fallback)
 
-`generateGlobalSummaryCommentary` writes the issue lede from the already-generated company entries + cross-company trends: `headline`, `key_insight`, `body`, and an optional forward-looking `watching` line rendered as "What we're watching". One ungrounded Flash call, telemetered to `gemini_usage_events` (`callSite: generateDigestGlobalSummary`). On any failure it returns null and `buildGlobalSummary` (the deterministic v1 builder) supplies the fallback — the digest never fails because the lede call did.
+`generateGlobalSummaryCommentary` writes the issue lede from the already-generated company entries + cross-company trends: `headline`, `key_insight`, `body`, and an optional forward-looking `watching` line rendered as "What we're watching". The opening connects the signals and adds wider context in 1–2 sentences, leaving detailed company explanations to the sections below. It uses one ungrounded Flash call, with one retry if rejected, telemetered to `gemini_usage_events` (`callSite: generateDigestGlobalSummary`). If both attempts fail, it returns null and `buildGlobalSummary` supplies the deterministic fallback.
 
 ### Scope note
 
@@ -227,7 +232,7 @@ Each company section should answer:
 ### Cross-company sections
 
 - `Role Focus This Week` summarizes role themes that appeared across multiple companies.
-- `Signals` (formerly `New This Week`) is reserved for higher-confidence changes in role focus. It renders headline + the one-sentence `new_signal` (falling back to `body` for pre-v2 stored digests), so prose is never duplicated between it and the company sections.
+- `Signals` (formerly `New This Week`) is reserved for supported changes in role focus. New reports render a headline and one complete `new_signal` sentence; absent signals are omitted instead of copying the company body. Historical stored signal rows retain their saved text.
 - `What we're watching` is an optional forward-looking closer from the AI lede.
 
 ---
@@ -241,6 +246,38 @@ Each company section should answer:
   - `year_to_date_role_themes`
   - `continuity`
   - the active `weekly_digest_ai` prompt config
+
+### Publication validation (October 2026)
+
+Company commentary and opening prose must be valid JSON with string fields,
+terminal punctuation, balanced quotes/brackets, and no dangling conjunctions
+or ellipses. A response must finish with `STOP`; even apparently complete text
+from a `MAX_TOKENS` candidate is rejected. Regex field recovery is removed: it
+accepted mid-sentence fragments and mistook escaped title quotes for field ends.
+Every generated prose field is checked, including `new_signal`, `key_insight`,
+and `watching`. Incumbent interpretations undergo the same finish/prose checks
+and can be omitted while retaining their structured role counts.
+
+Company and opening generation retry once, with a larger bounded token allowance.
+Each attempt records status, finish reason, attempt number, and prompt version in
+usage telemetry. If company generation still fails, complete factual copy based
+on the weekly count and role themes keeps that company and its jobs in the digest;
+the fallback never invents a signal. Default output allowance is 4096 tokens.
+
+New reports only put companies with a complete, non-null `new_signal` into
+Signals. They never fall back to the full company body or infer an editorial
+signal from a taxonomy change. Both renderers omit the repeated interpretation
+and company continuity/taxonomy lines. Previously stored Signals rows still
+render from their persisted data.
+
+Historical continuity uses **all** year-to-date role themes; using just the top
+five incorrectly labelled small established areas as new. Display rollups remain
+limited to five themes.
+
+The comparison harness now supports `--scenario=weekly-digest` using only
+synthetic benchmarks with neutral company names. It captures the real generation
+path, usage, validation rejections, and fallback use without loading production
+digests or sending their history to the model.
 
 ---
 

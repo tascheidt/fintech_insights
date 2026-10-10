@@ -16,7 +16,7 @@
  *     --scenario=analyze-advanced --mode=baseline --limit=10
  *
  * Flags:
- *   --scenario=extract-structure | analyze-advanced
+ *   --scenario=extract-structure | analyze-advanced | weekly-digest
  *   --mode=baseline                  (compare mode ships with Phase 2)
  *   --variant=default | no-prefetch  For analyze-advanced: `no-prefetch` skips
  *                                    the Pro+grounded performWebSearch call by
@@ -38,13 +38,16 @@ import { execSync } from "child_process";
 
 import { extractJobStructure, type JobStructureForDB } from "@/lib/analysis/structure";
 import { analyzeJobAdvanced, type AdvancedAnalyzeResult } from "@/lib/analysis/advanced-strategic";
+import { generateWeeklyDigestCommentary, type DigestCommentary } from "@/lib/analysis/digest";
+import { WEEKLY_DIGEST_BENCHMARKS } from "@/lib/labs/prompt-forge-benchmarks";
 import {
   DEFAULT_JOB_STRUCTURE_AI_CONFIG,
+  DEFAULT_WEEKLY_DIGEST_AI_CONFIG,
   type AllowedAiModel,
 } from "@/lib/ai/prompt-config";
 import type { UsageRecord } from "@/lib/ai/gemini-meter";
 
-type Scenario = "extract-structure" | "analyze-advanced";
+type Scenario = "extract-structure" | "analyze-advanced" | "weekly-digest";
 type Mode = "baseline";
 type Variant = "default" | "no-prefetch";
 
@@ -73,7 +76,7 @@ interface PerJobResult {
   title: string;
   companySlug: string;
   calls: UsageRecord[];
-  output: JobStructureForDB | AdvancedAnalyzeResult | null;
+  output: JobStructureForDB | AdvancedAnalyzeResult | DigestCommentary | null;
   errorMessage?: string;
 }
 
@@ -121,7 +124,7 @@ function parseFlags(argv: string[]): Flags {
   for (const a of argv) {
     if (a.startsWith("--scenario=")) {
       const v = a.slice("--scenario=".length);
-      if (v !== "extract-structure" && v !== "analyze-advanced") {
+      if (v !== "extract-structure" && v !== "analyze-advanced" && v !== "weekly-digest") {
         throw new Error(`Unknown scenario: ${v}`);
       }
       scenario = v;
@@ -148,7 +151,7 @@ function parseFlags(argv: string[]): Flags {
 
   if (!scenario) {
     throw new Error(
-      "Missing --scenario. Use --scenario=extract-structure or --scenario=analyze-advanced."
+      "Missing --scenario. Use extract-structure, analyze-advanced, or weekly-digest."
     );
   }
 
@@ -406,6 +409,36 @@ async function runAnalyzeAdvanced(
   return results;
 }
 
+async function runWeeklyDigest(flags: Flags): Promise<PerJobResult[]> {
+  const results: PerJobResult[] = [];
+  for (const benchmark of WEEKLY_DIGEST_BENCHMARKS.slice(0, flags.limit ?? WEEKLY_DIGEST_BENCHMARKS.length)) {
+    const calls: UsageRecord[] = [];
+    const entry: PerJobResult = {
+      jobId: benchmark.id, title: benchmark.companyName,
+      companySlug: benchmark.id, calls, output: null,
+    };
+    if (!flags.dryRun) {
+      try {
+        // Send only synthetic fixtures, with neutral company names. Never load
+        // production digests or their history for this evaluation scenario.
+        entry.output = await generateWeeklyDigestCommentary({
+          ...benchmark.input, company_name: `Benchmark ${benchmark.id}`,
+        }, {
+          ...DEFAULT_WEEKLY_DIGEST_AI_CONFIG,
+          ...(flags.model ? { model: flags.model as AllowedAiModel } : {}),
+        }, (usage) => calls.push(usage));
+        if (!calls.some((call) => call.status === "ok")) {
+          entry.errorMessage = "All generation attempts failed; factual fallback used.";
+        }
+      } catch (error) {
+        entry.errorMessage = error instanceof Error ? error.message : String(error);
+      }
+    }
+    results.push(entry);
+  }
+  return results;
+}
+
 async function main() {
   const flags = parseFlags(process.argv.slice(2));
 
@@ -417,13 +450,15 @@ async function main() {
   const { jobs: fixtureJobs, fixtureFile } = await loadFixture();
 
   console.error(
-    `scenario=${flags.scenario} mode=${flags.mode} fixture=${fixtureJobs.length} jobs limit=${flags.limit ?? "default"}`
+    `scenario=${flags.scenario} mode=${flags.mode} fixture=${flags.scenario === "weekly-digest" ? WEEKLY_DIGEST_BENCHMARKS.length : fixtureJobs.length} cases limit=${flags.limit ?? "default"}`
   );
 
   const perJob: PerJobResult[] =
     flags.scenario === "extract-structure"
       ? await runExtractStructure(fixtureJobs, flags)
-      : await runAnalyzeAdvanced(fixtureJobs, flags);
+      : flags.scenario === "weekly-digest"
+        ? await runWeeklyDigest(flags)
+        : await runAnalyzeAdvanced(fixtureJobs, flags);
 
   const allUsages = perJob.flatMap((r) => r.calls);
   const { totals, byCallSite } = aggregate(allUsages);
@@ -434,8 +469,8 @@ async function main() {
     variant: flags.variant,
     gitSha: gitSha(),
     generatedAt: new Date().toISOString(),
-    fixtureFile,
-    fixtureCount: fixtureJobs.length,
+    fixtureFile: flags.scenario === "weekly-digest" ? "lib/labs/prompt-forge-benchmarks.ts" : fixtureFile,
+    fixtureCount: flags.scenario === "weekly-digest" ? WEEKLY_DIGEST_BENCHMARKS.length : fixtureJobs.length,
     processedCount: perJob.length,
     totals,
     byCallSite,

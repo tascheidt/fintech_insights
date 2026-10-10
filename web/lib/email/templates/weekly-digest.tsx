@@ -89,7 +89,7 @@ function CompanySection({
   view: CompanySectionView;
   yearLabel: string;
 }) {
-  const { company, primaryFocus, isContinuing, hasNewThemes, newThemes, links } = view;
+  const { company, primaryFocus, links } = view;
 
   return (
     <Section style={companySection}>
@@ -106,33 +106,6 @@ function CompanySection({
       {/* AI Body */}
       <Text style={bodyText}>
         {company.ai_commentary.body}
-      </Text>
-
-      <Text style={{ ...statsLine, marginBottom: "12px", color: EMAIL_COLORS.fg2 }}>
-        {isContinuing ? (
-          "No new role areas this week."
-        ) : hasNewThemes ? (
-          <>
-            {"New this week: "}
-            {newThemes.map((chip, idx) =>
-              chip.href ? (
-                <React.Fragment key={`${chip.label}-${idx}`}>
-                  <Link href={chip.href} style={inlineLink}>
-                    {chip.label}
-                  </Link>
-                  {chip.separator}
-                </React.Fragment>
-              ) : (
-                <React.Fragment key={`${chip.label}-${idx}`}>
-                  {chip.label}
-                  {chip.separator}
-                </React.Fragment>
-              )
-            )}
-          </>
-        ) : (
-          "This week's mix is close to the company's recent hiring pattern."
-        )}
       </Text>
 
       {/* Stats Footer */}
@@ -276,9 +249,6 @@ export function WeeklyDigestEmail({
                         {row.signal.detail}
                       </Text>
                     )}
-                    <Text style={{ fontSize: "12px", color: EMAIL_COLORS.fgMuted }}>
-                      {row.signal.interpretation}
-                    </Text>
                   </div>
                 ))}
                 {signalRows.length > 3 && (
