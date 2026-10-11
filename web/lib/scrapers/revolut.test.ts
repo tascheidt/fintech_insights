@@ -12,11 +12,12 @@
  * nothing and silently return 0 jobs for weeks.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assessListing,
   describeBlockedPage,
   extractExternalId,
+  fetchRevolutJobsViaReader,
   formatRevolutLocations,
   isCanadianLocation,
   mapRevolutJob,
@@ -161,11 +162,16 @@ describe("assessListing", () => {
     });
   });
 
-  it("treats global-present + filtered-absent as legitimately empty, not a failure", () => {
+  it("rejects global-present + filtered-absent because it cannot prove Canada is empty", () => {
     expect(assessListing(0, counts(null, 678))).toMatchObject({
-      ok: true,
-      reason: "genuinely-empty",
+      ok: false,
+      reason: "unrendered",
     });
+  });
+
+  it("reads the filtered count when it is an input placeholder", () => {
+    expect(parseListingCounts('<p>We have 368 open positions</p><input placeholder="Search from 1 open positions">'))
+      .toEqual(counts(1, 368));
   });
 });
 
@@ -260,6 +266,8 @@ describe("mapRevolutJob", () => {
 });
 
 describe("server-rendered payload fallback", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   const position = {
     id: "bbec30b1-a090-4fd1-b441-fa3f3445ad8a",
     text: "Head of Lending",
@@ -301,5 +309,58 @@ describe("server-rendered payload fallback", () => {
     expect(() => parseRevolutReaderPageProps("Just a moment...")).toThrow(
       "no Next.js JSON payload"
     );
+  });
+
+  const payload = (pageProps: object) => new Response(
+    "Markdown Content:\n" + JSON.stringify({ props: { pageProps } })
+  );
+
+  it("keeps the Canadian filter, bypasses cache, and enriches the recovered role", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(payload({ positions: [position] }))
+      .mockResolvedValueOnce(payload({ position }));
+    vi.stubGlobal("fetch", fetchMock);
+    const jobs = await fetchRevolutJobsViaReader("https://www.revolut.com/careers/?city=Canada");
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].description_text).toContain("Lead lending in Canada");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://r.jina.ai/https://www.revolut.com/careers/?city=Canada");
+    for (const [, options] of fetchMock.mock.calls) {
+      expect(options.headers["X-No-Cache"]).toBe("true");
+    }
+  });
+
+  it("fails a false-empty regional payload when the rendered Canadian board reports a role", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(payload({ positions: [] }))
+      .mockResolvedValueOnce(new Response("Markdown Content:\nWe have 368 open positions\nSearch from 1 open positions")));
+    await expect(fetchRevolutJobsViaReader("https://www.revolut.com/careers/?city=Canada"))
+      .rejects.toThrow("page reports 1 open role(s)");
+  });
+
+  it("returns zero only after the rendered Canadian filter explicitly confirms zero", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(payload({ positions: [] }))
+      .mockResolvedValueOnce(new Response("Markdown Content:\nWe have 368 open positions\nSearch from 0 open positions")));
+    await expect(fetchRevolutJobsViaReader("https://www.revolut.com/careers/?city=Canada"))
+      .resolves.toEqual([]);
+  });
+
+  it("does not silently discard a malformed Canadian role", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(payload({
+      positions: [{ ...position, id: "broken-id" }],
+    })));
+    await expect(fetchRevolutJobsViaReader("https://www.revolut.com/careers/?city=Canada"))
+      .rejects.toThrow("without a usable ID or title");
+  });
+
+  it("recovers when the Reader temporarily misses the detail script", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(payload({ positions: [position] }))
+      .mockResolvedValueOnce(new Response("No script available", { status: 422 }))
+      .mockResolvedValueOnce(payload({ position }));
+    vi.stubGlobal("fetch", fetchMock);
+    const jobs = await fetchRevolutJobsViaReader("https://www.revolut.com/careers/?city=Canada");
+    expect(jobs[0].description_text).toContain("Lead lending in Canada");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

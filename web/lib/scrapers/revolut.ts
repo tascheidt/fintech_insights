@@ -374,7 +374,11 @@ export interface ListingCounts {
  * page always shows the global total.
  */
 export function parseListingCounts(html: string): ListingCounts {
-  const text = (parseHtml(html).body?.textContent || "").replace(/\s+/g, " ");
+  const doc = parseHtml(html);
+  const placeholders = Array.from(doc.querySelectorAll("input[placeholder]"))
+    .map((input) => input.getAttribute("placeholder") ?? "")
+    .join(" ");
+  const text = `${doc.body?.textContent || ""} ${placeholders}`.replace(/\s+/g, " ");
   const toNum = (m: RegExpMatchArray | null): number | null =>
     m ? Number(m[1].replace(/,/g, "")) : null;
   return {
@@ -400,7 +404,8 @@ export type ListingVerdict =
  *   - rawCount > 0                      → parsed (happy path)
  *   - 0 parsed, no counters at all      → unrendered (block/redirect/redesign)
  *   - 0 parsed, filter reports N>0      → selector-drift (the June 2026 bug)
- *   - 0 parsed, filter reports 0/absent → genuinely-empty (legitimate)
+ *   - 0 parsed, filter explicitly reports 0 → genuinely-empty (legitimate)
+ *   - 0 parsed, filtered count absent  → unrendered (cannot prove empty)
  *
  * Pure + exported for unit testing.
  */
@@ -410,13 +415,13 @@ export function assessListing(
 ): ListingVerdict {
   if (rawCount > 0) return { ok: true, reason: "parsed", counts };
 
-  if (counts.global === null && counts.filtered === null) {
+  if (counts.filtered === null) {
     return {
       ok: false,
       reason: "unrendered",
       counts,
       message:
-        "careers listing did not render (no 'We have N' / 'Search from N' counter found) — likely a Cloudflare challenge, a redirect, or a markup redesign",
+        "careers listing did not render its filtered 'Search from N' counter — cannot confirm an empty Canadian board (possible challenge, redirect, or markup redesign)",
     };
   }
 
@@ -696,20 +701,48 @@ async function enrichDescriptions(page: Page, jobs: JobData[]): Promise<void> {
   log.info({ enriched, total: jobs.length }, "[revolut] description enrichment complete");
 }
 
-async function fetchReaderPageProps(targetUrl: string): Promise<RevolutReaderPageProps> {
-  const response = await fetch(`${REVOLUT_READER_ORIGIN}${targetUrl}`, {
-    headers: {
-      Accept: "text/plain",
-      "X-Engine": "browser",
-      "X-Target-Selector": "script#__NEXT_DATA__",
-      "X-Timeout": "45",
-    },
-    signal: AbortSignal.timeout(READER_TIMEOUT_MS),
-  });
-  if (!response.ok) {
-    throw new Error(`reader status ${response.status}`);
+async function fetchReaderBody(targetUrl: string, payloadOnly = true): Promise<string> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await fetch(`${REVOLUT_READER_ORIGIN}${targetUrl}`, {
+        headers: {
+          Accept: "text/plain",
+          "X-Engine": "browser",
+          // The unfiltered Reader payload omitted Canada's live role on
+          // Oct 8–9. Fetch current data rather than replaying a cached snapshot.
+          "X-No-Cache": "true",
+          "X-Timeout": "30",
+          ...(payloadOnly
+            ? { "X-Target-Selector": "script#__NEXT_DATA__" }
+            : { "X-Respond-With": "text" }),
+        },
+        signal: AbortSignal.timeout(READER_TIMEOUT_MS),
+      });
+      if (!response.ok) throw new Error(`reader status ${response.status}`);
+      const body = await response.text();
+      if (payloadOnly) {
+        parseRevolutReaderPageProps(body);
+      } else {
+        const counts = parseListingCounts(body);
+        if (counts.filtered === null) {
+          throw new RevolutScrapeError("unrendered", "reader did not render the Canadian filter count", counts);
+        }
+      }
+      return body;
+    } catch (error) {
+      if (attempt === 3) throw error;
+      log.warn(
+        { attempt, err: error instanceof Error ? error.message : String(error) },
+        "[revolut] reader snapshot unavailable; retrying fresh request"
+      );
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
+    }
   }
-  return parseRevolutReaderPageProps(await response.text());
+  throw new Error("reader attempts exhausted");
+}
+
+async function fetchReaderPageProps(targetUrl: string): Promise<RevolutReaderPageProps> {
+  return parseRevolutReaderPageProps(await fetchReaderBody(targetUrl));
 }
 
 async function enrichReaderDescriptions(jobs: JobData[]): Promise<void> {
@@ -764,6 +797,7 @@ export async function fetchRevolutJobsViaReader(
   // comes from tenant configuration, so it must never turn this fallback into
   // an arbitrary third-party fetch.
   const target = new URL("/careers/", REVOLUT_ORIGIN);
+  target.searchParams.set("city", "Canada");
 
   const pageProps = await fetchReaderPageProps(target.toString());
   if (!Array.isArray(pageProps.positions)) {
@@ -778,6 +812,29 @@ export async function fetchRevolutJobsViaReader(
   const jobs = canadianPositions
     .map(mapRevolutPayloadPosition)
     .filter((job): job is JobData => job !== null);
+  if (jobs.length !== canadianPositions.length) {
+    throw new RevolutScrapeError(
+      "selector-drift",
+      "reader payload contained a Canadian position without a usable ID or title",
+      { filtered: canadianPositions.length, global: pageProps.positions.length }
+    );
+  }
+  if (jobs.length === 0) {
+    // Absence from the structured payload is not evidence that Canada's
+    // board is empty. Verify against the rendered filter count before ingest
+    // can close existing roles; a positive/missing count triggers the normal
+    // fresh-runner retry instead of recording a false successful zero.
+    const counts = parseListingCounts(await fetchReaderBody(target.toString(), false));
+    const verdict = assessListing(0, counts);
+    if (!verdict.ok) {
+      throw new RevolutScrapeError(
+        verdict.reason,
+        `reader payload had no Canadian positions; ${verdict.message}`,
+        counts
+      );
+    }
+    log.info({ counts }, "[revolut] empty reader payload confirmed by the rendered Canadian filter");
+  }
   log.info(
     { global: pageProps.positions.length, canadian: jobs.length, source: "reader-next-data" },
     "[revolut] recovered listing from server-rendered payload"
