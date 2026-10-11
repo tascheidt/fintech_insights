@@ -24,10 +24,13 @@ async function main() {
   try {
     // Launch browser for testing
     console.log("🚀 Launching browser...");
-    const executablePath = await chromium.executablePath();
+    const localExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    const executablePath = localExecutablePath || await chromium.executablePath();
     
     const browser = await puppeteer.launch({
-      args: chromium.args,
+      args: localExecutablePath
+        ? ["--no-sandbox", "--disable-crash-reporter"]
+        : chromium.args,
       // @ts-expect-error - defaultViewport exists at runtime but types may be outdated
       defaultViewport: chromium.defaultViewport,
       executablePath,

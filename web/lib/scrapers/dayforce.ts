@@ -48,30 +48,16 @@ export async function fetchDayforceJobs(
     return apiJobs;
   }
 
-  // Fall back to headless browser scraping
+  // Fall back to the authoritative browser listing. Any pagination or render
+  // failure must propagate so ingest cannot close jobs from a partial corpus.
   try {
     const { scrapeDayforceWithBrowser } = await import("./browser");
     const browserJobs = await scrapeDayforceWithBrowser(atsIdentifier, browser);
-    if (browserJobs.length > 0) {
-      return browserJobs;
-    }
+    return browserJobs;
   } catch (e) {
-    // Browser scraping failed, try one more HTML approach
     log.error({ err: e }, "Browser scraping failed:");
+    throw e;
   }
-
-  // Last resort: try basic HTML fetch
-  try {
-    const htmlJobs = await fetchDayforceJobsFromHtml(atsIdentifier);
-    if (htmlJobs.length > 0) {
-      return htmlJobs;
-    }
-  } catch {
-    // Ignore
-  }
-
-  // Return empty array if nothing works - at least don't error out
-  return [];
 }
 
 async function tryDayforceApis(atsIdentifier: string): Promise<JobData[] | null> {
@@ -123,7 +109,12 @@ async function tryDayforceApis(atsIdentifier: string): Promise<JobData[] | null>
         const data = (await res.json()) as DayforceSearchResponse;
         const jobData = data.jobs ?? data.jobPostings ?? data.data ?? data.results ?? data.Items ?? [];
         
-        if (Array.isArray(jobData) && jobData.length > 0) {
+        const advertisedTotal = data.totalCount ?? data.total;
+        if (
+          Array.isArray(jobData) &&
+          jobData.length > 0 &&
+          advertisedTotal === jobData.length
+        ) {
           return jobData.map((job) => mapDayforceJob(job, atsIdentifier));
         }
       }
@@ -187,58 +178,4 @@ function mapDayforceJob(job: DayforceJob, atsIdentifier: string): JobData {
     posted_date: parsedDate,
     url: jobUrl,
   };
-}
-
-async function fetchDayforceJobsFromHtml(atsIdentifier: string): Promise<JobData[]> {
-  const pageUrl = `https://jobs.dayforcehcm.com/en-US/${atsIdentifier}/CANDIDATEPORTAL`;
-  
-  const res = await fetch(pageUrl, {
-    headers: {
-      "Accept": "text/html,application/xhtml+xml",
-      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-    },
-    signal: AbortSignal.timeout(15000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Dayforce page error: ${res.status}`);
-  }
-
-  const html = await res.text();
-  const jobs: JobData[] = [];
-  const seenIds = new Set<string>();
-
-  // Extract job IDs and titles from any embedded data or links
-  const patterns = [
-    /\/jobs\/(\d+)"[^>]*>([^<]+)/gi,
-    /data-job-id="(\d+)"[\s\S]*?title[^>]*>([^<]+)/gi,
-  ];
-
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(html)) !== null) {
-      const [, jobId, title] = match;
-      if (jobId && title && !seenIds.has(jobId)) {
-        const cleanTitle = title.replace(/\s+/g, " ").trim();
-        if (cleanTitle.length > 2 && cleanTitle.length < 200) {
-          seenIds.add(jobId);
-          jobs.push({
-            external_id: jobId,
-            title: cleanTitle,
-            department: null,
-            team: null,
-            location: null,
-            location_type: null,
-            description_html: null,
-            description_text: null,
-            commitment: "full-time",
-            posted_date: null,
-            url: `https://jobs.dayforcehcm.com/en-US/${atsIdentifier}/CANDIDATEPORTAL/jobs/${jobId}`,
-          });
-        }
-      }
-    }
-  }
-
-  return jobs;
 }
