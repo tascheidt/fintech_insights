@@ -10,6 +10,13 @@
 import type { JobData } from "./types";
 import type { Browser } from "puppeteer-core";
 import { detectLocationType, normalizeCommitment } from "./utils";
+import {
+  DayforceListingError,
+  parseDayforcePaginationSummary,
+  validateDayforcePageCount,
+  validateDayforceListingPages,
+  type DayforceListingPage,
+} from "./dayforce-listing";
 
 let puppeteer: typeof import("puppeteer-core") | null = null;
 // Dynamic import target. The original code accessed `defaultViewport` and
@@ -255,67 +262,81 @@ export async function scrapeDayforceWithBrowser(
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       );
 
-      // Navigate to job listings page
-      await page.goto(url, {
-        waitUntil: "networkidle2",
-        timeout: 30000,
-      });
+      const listingPages: DayforceListingPage[] = [];
+      let pageCount = 1;
 
-      // Wait for job listings to load
-      await page.waitForSelector('a[href*="/jobs/"]', { timeout: 10000 }).catch(() => {});
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Extra wait for Dayforce
+      try {
+        for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+          const pageUrl = pageNumber === 1 ? url : `${url}?page=${pageNumber}`;
+          await page.goto(pageUrl, { waitUntil: "networkidle2", timeout: 30000 });
 
-      // Extract job links from listing page
-      const jobLinks = await page.evaluate(() => {
-        const jobs: Array<{ id: string; title: string; url: string }> = [];
-        const seenIds = new Set<string>();
-        
-        const jobElements = document.querySelectorAll('a[href*="/jobs/"], [class*="job"], [data-testid*="job"]');
-        
-        for (const el of jobElements) {
-          const link = el.tagName === 'A' ? el : el.querySelector('a[href*="/jobs/"]');
-          if (!link) continue;
-          
-          const href = (link as HTMLAnchorElement).href;
-          const idMatch = href.match(/\/jobs\/(\d+)/);
-          if (!idMatch) continue;
-          
-          const id = idMatch[1];
-          if (seenIds.has(id)) continue;
-          seenIds.add(id);
-          
-          // Find the job card container
-          let container = el;
-          while (container.parentElement && !container.className.includes('card') && !container.className.includes('item')) {
-            container = container.parentElement;
-            if (container.tagName === 'BODY') {
-              container = el;
-              break;
+          await page.waitForFunction(
+            (expectedPage) => {
+              const results = document.querySelector('[test-id="job-results"]');
+              const pagination = document.querySelector('.ant-pagination[aria-label]');
+              const spinner = results?.querySelector('.ant-spin-spinning, .ant-spin-dot');
+              const cards = results?.querySelectorAll('[test-id="job-posting-card"]') ?? [];
+              const activePage = document.querySelector(
+                '.ant-pagination-item-active, [aria-current="page"]'
+              );
+              const activePageNumber = Number(activePage?.textContent?.trim());
+              return Boolean(
+                results && pagination && !spinner && cards.length > 0 &&
+                (!Number.isFinite(activePageNumber) || activePageNumber === expectedPage)
+              );
+            },
+            { timeout: 30000 },
+            pageNumber
+          );
+
+          const snapshot = await page.evaluate((requestedPage) => {
+            const paginationSummary = document.querySelector(
+              '.ant-pagination[aria-label]'
+            )?.getAttribute('aria-label');
+            const cards = document.querySelectorAll('[test-id="job-posting-card"]');
+            const jobs: Array<{ id: string; title: string; url: string }> = [];
+            const seenIds = new Set<string>();
+
+            for (const card of cards) {
+              const link = card.querySelector<HTMLAnchorElement>('a[href*="/jobs/"]');
+              const id = card.getAttribute('job-posting-id') ?? link?.href.match(/\/jobs\/(\d+)/)?.[1];
+              const title = link?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+              if (!link || !id || !title || seenIds.has(id)) continue;
+              seenIds.add(id);
+              jobs.push({ id, title: title.substring(0, 200), url: link.href });
             }
+
+            return { requestedPage, paginationSummary: paginationSummary ?? null, jobs };
+          }, pageNumber);
+
+          const pagination = parseDayforcePaginationSummary(snapshot.paginationSummary);
+          if (!pagination || pagination.currentPage !== pageNumber) {
+            throw new DayforceListingError(
+              "unrendered",
+              `Dayforce page ${pageNumber} did not expose matching pagination: ${snapshot.paginationSummary ?? "missing"}`
+            );
           }
-          
-          // Extract title
-          let title = '';
-          const titleEl = container.querySelector('h1, h2, h3, h4, strong, [class*="title"], [class*="Title"]');
-          if (titleEl) {
-            title = titleEl.textContent?.trim() || '';
-          } else {
-            title = link.textContent?.trim() || '';
-          }
-          
-          if (!title || title.length < 3) continue;
-          
-          jobs.push({
-            id,
-            title: title.substring(0, 200),
-            url: href,
+
+          if (pageNumber === 1) pageCount = validateDayforcePageCount(pagination.totalPages);
+          listingPages.push({
+            page: snapshot.requestedPage,
+            totalPages: pagination.totalPages,
+            links: snapshot.jobs,
           });
         }
-        
-        return jobs;
-      });
+      } catch (error) {
+        if (error instanceof DayforceListingError) throw error;
+        throw new DayforceListingError(
+          "unrendered",
+          `Dayforce listing pagination failed before a complete collection: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
 
-      console.log(`Found ${jobLinks.length} job links for Dayforce ${atsIdentifier}`);
+      const jobLinks = validateDayforceListingPages(listingPages);
+
+      console.log(
+        `Found ${jobLinks.length} complete job links across ${listingPages.length} Dayforce page(s) for ${atsIdentifier}`
+      );
 
       // Visit each job link to get full description
       const jobsWithDescriptions: JobData[] = [];
