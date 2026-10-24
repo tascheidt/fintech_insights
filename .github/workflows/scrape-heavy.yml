@@ -1,6 +1,9 @@
 name: Heavy Scraper
 
 on:
+  # Recover after Workday Saturday maintenance (13:15/14:15 Eastern).
+  schedule:
+    - cron: '15 18 * * 6'
   workflow_dispatch:
     inputs:
       company_id:
@@ -43,6 +46,7 @@ jobs:
         working-directory: web
         env:
           COMPANY_ID: ${{ inputs.company_id }}
+          COMPANY_SLUG: ${{ github.event_name == 'schedule' && 'cibc' || '' }}
           TASK_ID: ${{ inputs.task_id }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -99,6 +103,7 @@ jobs:
         working-directory: web
         env:
           COMPANY_ID: ${{ inputs.company_id }}
+          COMPANY_SLUG: ${{ github.event_name == 'schedule' && 'cibc' || '' }}
           TASK_ID: ${{ inputs.task_id }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
