@@ -8,7 +8,8 @@
  *   COMPANY_ID=<uuid> [TASK_ID=<uuid>] npx tsx web/scripts/scrape-heavy.ts
  * 
  * Environment Variables:
- *   COMPANY_ID - UUID of the company to scrape (required)
+ *   COMPANY_ID - UUID of company (or provide COMPANY_SLUG)
+ *   COMPANY_SLUG - Slug for scheduled recovery runs
  *   TASK_ID - UUID of existing task to update (optional, creates new task if not provided)
  *   NEXT_PUBLIC_SUPABASE_URL - Supabase project URL
  *   SUPABASE_SERVICE_ROLE_KEY - Supabase service role key
@@ -229,15 +230,16 @@ async function markTaskFailed(
 async function main() {
   console.log("🚀 Starting heavy scraper script...");
 
-  // Step 1: Get COMPANY_ID and optional TASK_ID from environment
-  const companyId = process.env.COMPANY_ID;
+  // Step 1: Resolve a manual company ID or scheduled company slug.
+  let companyId = process.env.COMPANY_ID;
+  const companySlug = process.env.COMPANY_SLUG;
   const taskId = process.env.TASK_ID;
   
-  if (!companyId) {
-    console.error("❌ Error: COMPANY_ID environment variable is required");
+  if (!companyId && !companySlug) {
+    console.error("❌ Error: COMPANY_ID or COMPANY_SLUG environment variable is required");
     process.exit(1);
   }
-  console.log(`📋 Company ID: ${companyId}`);
+  console.log(`📋 Company: ${companyId || companySlug}`);
   if (taskId) {
     console.log(`📋 Task ID: ${taskId} (will update existing task)`);
   } else {
@@ -268,22 +270,27 @@ async function main() {
   // it was dispatched by id), which made the logs lie about the real cause. A
   // genuinely missing row (HTTP-OK, zero rows → PGRST116) is a hard config error
   // and is NOT retried; only transient outages (isTransientDbError) are.
-  console.log(`🔍 Fetching company record for ID: ${companyId}...`);
+  console.log(`🔍 Fetching company record: ${companyId || companySlug}...`);
   let company: Company;
   try {
     company = await withTransientRetry("fetch company", async () => {
       const { data, error } = await supabase
         .from("companies")
         .select("*")
-        .eq("id", companyId)
+        .eq(companyId ? "id" : "slug", companyId || companySlug!)
         .single();
       if (error) throw error; // transient → retried; PGRST116 (no row) → rethrown
-      if (!data) throw new Error(`Company ${companyId} not found`);
+      if (!data) throw new Error(`Company ${companyId || companySlug} not found`);
       return data as Company;
     });
   } catch (error) {
     console.error(`❌ Error fetching company: ${describeError(error)}`);
     process.exit(1);
+  }
+  companyId = company.id;
+  if (companySlug && !company.is_active) {
+    console.log(`Skipping inactive scheduled company: ${company.slug}`);
+    return;
   }
   console.log(`✅ Found company: ${company.name} (${company.ats_type})`);
   // The scheduler still invokes an incumbent parent when an active fintech

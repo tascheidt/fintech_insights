@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.15.7",
+    "date": "2026-10-24",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "CIBC and Simplii collection gets a Saturday recovery run after Workday maintenance. Source verification accepts a complete search with no genuine Simplii openings while continuing to reject incomplete results."
+      }
+    ]
+  },
+  {
     "version": "2.15.6",
     "date": "2026-10-11",
     "changes": [

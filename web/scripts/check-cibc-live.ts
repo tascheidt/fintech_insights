@@ -44,8 +44,8 @@ async function main() {
   try {
     const jobs = await fetchWorkdayCibcJobs({ simpliiOnly: true });
     const simplii = jobs.filter(job => job.companySlugOverride === "simplii");
-    if (!jobs.length || !simplii.length || jobs.some(job => !job.description_text?.trim())) {
-      throw new Error("Live check requires candidates, Simplii matches, and every description");
+    if (jobs.some(job => !job.description_text?.trim())) {
+      throw new Error("Live check requires every candidate description");
     }
     const summary = {
       checkedAt: new Date().toISOString(),

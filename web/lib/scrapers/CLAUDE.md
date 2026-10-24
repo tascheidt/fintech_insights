@@ -107,3 +107,8 @@ Companies with `ats_type: custom` use the generic Puppeteer scraper (`scrapeGene
 ### CIBC live source verification
 
 `npx tsx scripts/check-cibc-live.ts --incomplete-first` is a read-only source smoke: it forces direct CXS challenges, injects one HTTP-200 incomplete Reader snapshot, then requires a complete live candidate list, every description, and at least one authoritative Simplii match. No Supabase, Gemini, ingest or email calls. `.github/workflows/cibc-live-check.yml` runs it on relevant PRs and manual dispatch, saving the public source responses as artifacts even on failure. A genuine zero-role day intentionally fails this nonempty smoke; the production parser separately accepts only a verified zero-result page. See `docs/CIBC_SCRAPER_FAILURE_2026-10-03.md` for evidence and remaining limits.
+
+CIBC Saturday recovery: `scrape-heavy.yml` runs again at 18:15 UTC Saturdays
+after Workday maintenance, resolving `COMPANY_SLUG=cibc`. A fully enriched
+search with zero Simplii classifier matches is valid; `check-cibc-live.ts`
+accepts it while still rejecting incomplete reader listings or descriptions.

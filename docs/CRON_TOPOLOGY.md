@@ -1,7 +1,7 @@
 # Cron Topology
 
-Seven scheduled jobs run in production. Two live on Vercel (Hobby plan caps at 2),
-five run from GitHub Actions. Most GH Actions cron jobs `curl` back into the
+Eight scheduled jobs run in production. Two live on Vercel (Hobby plan caps at 2),
+six run from GitHub Actions. Most GH Actions cron jobs `curl` back into the
 deployed Next.js app; the editorial, embeddings-backfill, and scraper-drift-check
 crons are the exceptions — they run a script directly inside the runner because
 GH Actions has the runtime budget for the long-running work.
@@ -16,11 +16,12 @@ GH Actions has the runtime budget for the long-running work.
 | editorial          | GitHub Actions | `0 11 * * 1`   | `npx tsx web/scripts/regenerate-editorial.ts`         | Service-role + Gemini secrets in repo |
 | gemini-cost-alarm  | GitHub Actions | `0 14 * * *`   | `GET /api/admin/cost-alarm`                           | Workflow sends `Bearer CRON_SECRET`   |
 | embeddings-backfill| GitHub Actions | `30 7 * * *`   | `npx tsx web/scripts/backfill-job-embeddings.ts`      | Service-role + Gemini secrets in repo |
+| cibc-saturday-recovery | GitHub Actions | `15 18 * * 6` | `npx tsx web/scripts/scrape-heavy.ts` (`COMPANY_SLUG=cibc`) | Service-role + Gemini secrets in repo |
 | scraper-drift-check| GitHub Actions | `0 12 * * 1`   | `npx tsx web/scripts/scraper-drift-check.ts`          | Service-role + Resend secrets in repo |
 
 Source of truth:
 - Vercel: [`web/vercel.json`](../web/vercel.json) `crons` array.
-- GitHub Actions: [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml), [`.github/workflows/editorial-cron.yml`](../.github/workflows/editorial-cron.yml), [`.github/workflows/gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml), [`.github/workflows/embeddings-backfill-cron.yml`](../.github/workflows/embeddings-backfill-cron.yml), [`.github/workflows/scraper-drift-check.yml`](../.github/workflows/scraper-drift-check.yml).
+- GitHub Actions: [`.github/workflows/scrape-heavy.yml`](../.github/workflows/scrape-heavy.yml), [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml), [`.github/workflows/editorial-cron.yml`](../.github/workflows/editorial-cron.yml), [`.github/workflows/gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml), [`.github/workflows/embeddings-backfill-cron.yml`](../.github/workflows/embeddings-backfill-cron.yml), [`.github/workflows/scraper-drift-check.yml`](../.github/workflows/scraper-drift-check.yml).
 
 The scraper-drift-check cron compares every company's stored ATS config
 against its live careers surface: inactive fintech companies with a live
@@ -161,3 +162,20 @@ No new Vercel cron (the cap of two is untouched) and no GitHub Action — this i
 ## Read-only CIBC source check
 
 [`cibc-live-check.yml`](../.github/workflows/cibc-live-check.yml) runs on relevant pull requests or manual dispatch, with no schedule and no application secrets. It exercises the CIBC Simplii-only fallback without ingest or analysis and retains public Reader response artifacts, including failed attempts. It is a source/description check, not a successful production ingestion run.
+
+### CIBC / Simplii Saturday recovery
+
+The daily 06:00 UTC collection overlaps Workday Saturday maintenance. On
+October 17 and 24, both immediate runner attempts returned an incomplete
+388-character search page; the source rendered normally later that morning.
+`scrape-heavy.yml` also runs Saturdays at 18:15 UTC, after the usual weekly
+and extended maintenance windows. It resolves CIBC by slug, skips an inactive
+parent, and uses the existing tracked heavy-scrape path (new job_runs and task
+rows). Incumbent-off scope remains Simplii-only. Manual dispatches continue
+to use COMPANY_ID and optional TASK_ID. The fresh-runner retry still applies
+to both triggers. No Vercel cron is added.
+
+A complete Simplii search can contain only CIBC false positives. Zero brand
+matches is valid when every candidate description was read; the read-only
+source check accepts this state. The zero-active-postings health warning
+remains visible so a quiet board is not confused with a new opening.
