@@ -199,6 +199,19 @@ async function main() {
     }
   }
 
+  // `embedText` swallows API errors (returns null), so without this a
+  // provider-wide failure — e.g. Gemini 402 "prepayment credits are depleted"
+  // (Nov 2026) — finishes with exit 0 and the cron shows green while nothing
+  // is embedded. Partial failures stay non-fatal (the next sweep retries
+  // them); a sweep where every attempted row failed is a real outage.
+  if (succeeded === 0 && failed > 0) {
+    console.error(
+      `\n❌ Every attempted embedding failed (${failed}/${processed}) — ` +
+        `treating as an outage. First error: ${errors[0]?.error ?? "unknown"}`
+    );
+    process.exit(1);
+  }
+
   console.log(`\n✅ Backfill complete!${dryRun ? " (dry run — nothing written)" : ""}`);
 }
 
