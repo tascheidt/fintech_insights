@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ModelParams } from "@google/generative-ai";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const PROMPT_STAGES = ["job-structure", "tech-stack", "weekly-digest"] as const;
@@ -160,6 +161,64 @@ export function setEvalModelOverride(surface: ModelSurface, model: string | null
  */
 export const EMBEDDING_MODEL = "gemini-embedding-001";
 export const EMBEDDING_DIMS = 768;
+
+/**
+ * Per-model request shaping. Some models need different generation settings
+ * to run our prompts correctly — not different prompts. Example (Nov 2026
+ * probe): Gemini 4 Hydrogen cannot turn thinking off, and its thinking tokens
+ * count against `maxOutputTokens`, so at a call site's 4096 cap it can spend
+ * the whole budget thinking and return a truncated answer.
+ *
+ * - `thinkingLevel` is applied only when the call site sets no thinkingConfig
+ *   of its own (extraction's `thinkingBudget: 0` always wins).
+ * - `thinkingHeadroomTokens` is ADDED to each call site's `maxOutputTokens`
+ *   (capped at 65536), so the site's intended answer length survives thinking.
+ *
+ * Empty for a model ⇒ `withModelProfile` returns the params object untouched,
+ * so models without an entry run byte-for-byte as before. The eval harness can
+ * try variants via `setEvalProfileOverride` (e.g. `model-eval --models=x@low`).
+ */
+export interface ModelGenerationProfile {
+  thinkingLevel?: "low" | "medium" | "high";
+  thinkingHeadroomTokens?: number;
+}
+
+export const MODEL_GENERATION_PROFILES: Partial<Record<string, ModelGenerationProfile>> = {};
+
+const evalProfileOverrides = new Map<string, ModelGenerationProfile>();
+
+/** Eval harness only (same guard as `setEvalModelOverride`). */
+export function setEvalProfileOverride(model: string, profile: ModelGenerationProfile | null): void {
+  if (process.env.VERCEL || process.env.NEXT_RUNTIME) {
+    throw new Error("setEvalProfileOverride is eval-harness only and cannot run in a deployed server");
+  }
+  if (profile === null) evalProfileOverrides.delete(model);
+  else evalProfileOverrides.set(model, profile);
+}
+
+export function profileFor(model: string): ModelGenerationProfile {
+  return evalProfileOverrides.get(model) ?? MODEL_GENERATION_PROFILES[model] ?? {};
+}
+
+/**
+ * Wrap the params passed to `getGenerativeModel` so the model's generation
+ * profile applies. Every text-generation call site goes through this.
+ */
+export function withModelProfile<T extends { model: string; generationConfig?: object }>(params: T): ModelParams {
+  // The SDK's ModelParams predates `googleSearch` tools and `thinkingConfig`;
+  // both are runtime-supported, so the cast lives here once instead of a
+  // `@ts-expect-error` at every grounded call site.
+  const p = profileFor(params.model);
+  if (!p.thinkingLevel && !p.thinkingHeadroomTokens) return params as unknown as ModelParams;
+  const gc: Record<string, unknown> = { ...(params.generationConfig ?? {}) };
+  if (p.thinkingHeadroomTokens && typeof gc.maxOutputTokens === "number") {
+    gc.maxOutputTokens = Math.min(65536, gc.maxOutputTokens + p.thinkingHeadroomTokens);
+  }
+  if (p.thinkingLevel && gc.thinkingConfig === undefined) {
+    gc.thinkingConfig = { thinkingLevel: p.thinkingLevel };
+  }
+  return { ...params, generationConfig: gc } as unknown as ModelParams;
+}
 
 export type AllowedAiModel = (typeof AI_MODEL_OPTIONS)[number]["value"];
 

@@ -8,7 +8,7 @@ import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { requireUser } from "@/lib/auth/guards";
 import { log } from "@/lib/log";
 import { z } from "zod";
-import { modelFor } from "@/lib/ai/prompt-config";
+import { modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 
 const chatSchema = z.object({
   question: z.string().min(1).max(2000),
@@ -166,16 +166,15 @@ Your role is to answer follow-up questions about this insight, provide deeper an
 
     const genAI = new GoogleGenerativeAI(key);
 
-    const model = genAI.getGenerativeModel({
+    const model = genAI.getGenerativeModel(withModelProfile({
       model: modelFor("insight-chat"),
-      // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
       systemInstruction: systemPrompt,
       generationConfig: {
         temperature: 0.7,
         maxOutputTokens: 16384,
       },
-    });
+    }));
 
     // Build conversation history
     const history = previousMessages.map((msg) => ({

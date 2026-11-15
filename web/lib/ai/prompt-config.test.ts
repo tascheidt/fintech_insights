@@ -146,3 +146,24 @@ describe("model-ID policy", () => {
     }
   });
 });
+
+describe("withModelProfile", () => {
+  it("returns params untouched for a model with no profile", async () => {
+    const { withModelProfile } = await import("./prompt-config");
+    const params = { model: "gemini-flash-latest", generationConfig: { maxOutputTokens: 4096 } };
+    expect(withModelProfile(params)).toBe(params);
+  });
+
+  it("adds headroom and a thinking level, but never overrides a call site's own thinkingConfig", async () => {
+    const { withModelProfile, setEvalProfileOverride } = await import("./prompt-config");
+    setEvalProfileOverride("test-model", { thinkingLevel: "low", thinkingHeadroomTokens: 8192 });
+    const out = withModelProfile({ model: "test-model", generationConfig: { maxOutputTokens: 4096 } });
+    expect(out.generationConfig).toEqual({ maxOutputTokens: 12288, thinkingConfig: { thinkingLevel: "low" } });
+    const keep = withModelProfile({
+      model: "test-model",
+      generationConfig: { maxOutputTokens: 60000, thinkingConfig: { thinkingBudget: 0 } } as object,
+    });
+    expect(keep.generationConfig).toEqual({ maxOutputTokens: 65536, thinkingConfig: { thinkingBudget: 0 } });
+    setEvalProfileOverride("test-model", null);
+  });
+});

@@ -1,0 +1,384 @@
+{
+  "capturedAt": "2026-11-15T21:44:30.995Z",
+  "models": [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-pro-preview-customtools",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-transcribe",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    "gemini-3.8-flash",
+    "gemini-4-argon",
+    "gemini-4-carbon",
+    "gemini-4-hydrogen",
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    "gemini-nano-banana-2.1",
+    "gemini-omni-1.1-flash",
+    "gemini-omni-1.2-flash",
+    "gemini-omni-flash-preview",
+    "gemini-pro-latest"
+  ],
+  "aliases": {
+    "gemini-flash-latest": "gemini-3.8-flash",
+    "gemini-flash-lite-latest": "gemini-3.5-flash-lite",
+    "gemini-pro-latest": "gemini-3.1-pro-preview"
+  },
+  "catalog": [
+    {
+      "id": "gemini-2.5-flash",
+      "displayName": "Gemini 2.5 Flash",
+      "version": "001",
+      "description": "Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "displayName": "Gemini 2.5 Flash-Lite",
+      "version": "001",
+      "description": "Stable version of Gemini 2.5 Flash-Lite, released in July of 2025",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "displayName": "Gemini 2.5 Pro",
+      "version": "2.5",
+      "description": "Stable release (June 17th, 2025) of Gemini 2.5 Pro",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-3-flash-preview",
+      "displayName": "Gemini 3 Flash Preview",
+      "version": "3-flash-preview-12-2025",
+      "description": "Gemini 3 Flash Preview",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-3.1-flash-lite",
+      "displayName": "Gemini 3.1 Flash Lite",
+      "version": "3.1-flash-lite-05-2026",
+      "description": "Gemini 3.1 Flash Lite",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-3.1-flash-lite-preview",
+      "displayName": "Gemini 3.1 Flash Lite Preview",
+      "version": "3.1-flash-lite-preview-03-2026",
+      "description": "Gemini 3.1 Flash Lite Preview",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "displayName": "Gemini 3.1 Pro Preview",
+      "version": "3.1-pro-preview-01-2026",
+      "description": "Gemini 3.1 Pro Preview",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-3.1-pro-preview-customtools",
+      "displayName": "Gemini 3.1 Pro Preview Custom Tools",
+      "version": "3.1-pro-preview-01-2026",
+      "description": "Gemini 3.1 Pro Preview optimized for custom tool usage",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-3.5-flash",
+      "displayName": "Gemini 3.5 Flash",
+      "version": "3.5-flash-05-2026",
+      "description": "Gemini 3.5 Flash",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-3.5-flash-lite",
+      "displayName": "Gemini 3.5 Flash Lite",
+      "version": "3.5-flash-lite-07-2026",
+      "description": "Gemini 3.5 Flash Lite",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-3.5-transcribe",
+      "displayName": "Gemini 3.5 Transcribe",
+      "version": "3.5-transcribe-08-2026",
+      "description": "Gemini 3.5 Transcribe",
+      "inputTokenLimit": 98304,
+      "outputTokenLimit": 32768,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens"
+      ],
+      "thinking": null
+    },
+    {
+      "id": "gemini-3.6-flash",
+      "displayName": "Gemini 3.6 Flash",
+      "version": "3.6-flash-07-2026",
+      "description": "Gemini 3.6 Flash",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-3.7-flash",
+      "displayName": "Gemini 3.7 Flash",
+      "version": "3.7-flash-08-2026",
+      "description": "Gemini 3.7 Flash",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-3.8-flash",
+      "displayName": "Gemini 3.8 Flash",
+      "version": "3.0",
+      "description": "Gemini 3.8 Flash",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-4-argon",
+      "displayName": "Gemini 4 Argon",
+      "version": "3.0",
+      "description": "Gemini 4 Argon",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 32768,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-4-carbon",
+      "displayName": "Gemini 4 Carbon",
+      "version": "3.0",
+      "description": "Gemini 4 Carbon",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 32768,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-4-hydrogen",
+      "displayName": "Gemini 4 Hydrogen",
+      "version": "3.0",
+      "description": "Gemini 4 Hydrogen",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-flash-latest",
+      "displayName": "Gemini Flash Latest",
+      "version": "Gemini Flash Latest",
+      "description": "Latest release of Gemini Flash",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-flash-lite-latest",
+      "displayName": "Gemini Flash-Lite Latest",
+      "version": "Gemini Flash-Lite Latest",
+      "description": "Latest release of Gemini Flash-Lite",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-nano-banana-2.1",
+      "displayName": "Nano Banana 2.1",
+      "version": "3.0",
+      "description": "Gemini Nano Banana 2.1.",
+      "inputTokenLimit": 65536,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-omni-1.1-flash",
+      "displayName": "Gemini Omni 1.1 Flash",
+      "version": "001",
+      "description": "Gemini Omni 1.1 Flash ",
+      "inputTokenLimit": 131072,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-omni-1.2-flash",
+      "displayName": "Gemini Omni 1.2 Flash",
+      "version": "001",
+      "description": "Gemini Omni 1.2 Flash",
+      "inputTokenLimit": 131072,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-omni-flash-preview",
+      "displayName": "Gemini Omni Flash Preview",
+      "version": "001",
+      "description": "Gemini Omni Flash Preview",
+      "inputTokenLimit": 131072,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens"
+      ],
+      "thinking": true
+    },
+    {
+      "id": "gemini-pro-latest",
+      "displayName": "Gemini Pro Latest",
+      "version": "Gemini Pro Latest",
+      "description": "Latest release of Gemini Pro",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "thinking": true
+    }
+  ]
+}

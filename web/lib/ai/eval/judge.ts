@@ -23,6 +23,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { withModelProfile } from "../prompt-config";
 import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 
@@ -205,10 +206,10 @@ export function winRate(verdicts: CandidateVerdict[]): number {
 async function judgeOnce(prompt: string, judgeModel: string, onUsage?: OnUsage): Promise<JudgeVerdict | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY not configured");
-  const model = new GoogleGenerativeAI(key).getGenerativeModel({
+  const model = new GoogleGenerativeAI(key).getGenerativeModel(withModelProfile({
     model: judgeModel,
     generationConfig: { temperature: 0, maxOutputTokens: 4096, responseMimeType: "application/json" },
-  });
+  }));
   for (let attempt = 1; attempt <= 2; attempt++) {
     const started = Date.now();
     try {

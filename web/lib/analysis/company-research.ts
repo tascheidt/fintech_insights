@@ -14,7 +14,7 @@ import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { scoreRankedSource } from "./source-scoring";
 import { log } from "@/lib/log";
-import { modelFor } from "@/lib/ai/prompt-config";
+import { modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 
 // ============================================================================
 // Types
@@ -175,14 +175,14 @@ export async function detectCompanyType(
 
   try {
     const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({
+    const model = genAI.getGenerativeModel(withModelProfile({
       model: modelFor("company-research"),
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 256,
         responseMimeType: "application/json",
       },
-    });
+    }));
 
     const prompt = `Is "${companyName}" a publicly traded company? If yes, what is its stock symbol and exchange?
 
@@ -424,11 +424,10 @@ export async function performDeepResearch(
     estimatedCost += 0.02; // Estimated cost per search
 
     try {
-      const model = genAI.getGenerativeModel({
+      const model = genAI.getGenerativeModel(withModelProfile({
         model: modelFor("company-research"),
-        // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
         tools: [{ googleSearch: {} }],
-      });
+      }));
 
       const _searchStartMs = Date.now();
       const result = await model.generateContent({
@@ -759,13 +758,13 @@ async function extractStatedStrategy(
   if (sources.length === 0) return null;
 
   try {
-    const model = genAI.getGenerativeModel({
+    const model = genAI.getGenerativeModel(withModelProfile({
       model: modelFor("company-research"),
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 2048,
       },
-    });
+    }));
 
     const sourceText = rankSourcesForPrompt(sources)
       .slice(0, 6)
@@ -825,14 +824,14 @@ async function extractFinancialContext(
   if (fundingSources.length === 0) return null;
 
   try {
-    const model = genAI.getGenerativeModel({
+    const model = genAI.getGenerativeModel(withModelProfile({
       model: modelFor("company-research"),
       generationConfig: {
         temperature: 0.2,
         maxOutputTokens: 2048,
         responseMimeType: "application/json",
       },
-    });
+    }));
 
     const sourceText = rankSourcesForPrompt(fundingSources)
       .slice(0, 5)

@@ -13,6 +13,7 @@ import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import {
   getActiveWeeklyDigestAiConfig,
   type WeeklyDigestAiConfig,
+  withModelProfile,
 } from "@/lib/ai/prompt-config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -310,14 +311,14 @@ async function requestDigestCopy<T>(
   try {
     const key = process.env.GEMINI_API_KEY;
     if (!key) throw new Error("GEMINI_API_KEY not configured");
-    const model = new GoogleGenerativeAI(key).getGenerativeModel({
+    const model = new GoogleGenerativeAI(key).getGenerativeModel(withModelProfile({
       model: config.model,
       generationConfig: {
         temperature: config.temperature,
         maxOutputTokens,
         responseMimeType: "application/json",
       },
-    });
+    }));
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
@@ -1062,13 +1063,13 @@ Respond with ONLY valid JSON, an array with one object per bank:
 
   try {
     const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({
+    const model = genAI.getGenerativeModel(withModelProfile({
       model: config.model,
       generationConfig: {
         temperature: config.temperature,
         maxOutputTokens: config.maxOutputTokens,
       },
-    });
+    }));
 
     const _startMs = Date.now();
     const response = await model.generateContent({

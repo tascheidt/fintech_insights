@@ -36,7 +36,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
-import { SURFACE_MODELS, modelFor } from "@/lib/ai/prompt-config";
+import { SURFACE_MODELS, modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { log } from "@/lib/log";
@@ -402,7 +402,7 @@ async function callGemini(
   if (!key) throw new Error("GEMINI_API_KEY not configured");
 
   const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({
+  const model = genAI.getGenerativeModel(withModelProfile({
     model: modelFor("feedback-triage"),
     generationConfig: {
       temperature: 0.3,
@@ -411,7 +411,7 @@ async function callGemini(
       maxOutputTokens: 8000,
       responseMimeType: "application/json",
     },
-  });
+  }));
 
   const startMs = Date.now();
   try {

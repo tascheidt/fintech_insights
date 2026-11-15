@@ -30,8 +30,8 @@ export interface ModelRates {
 export const GEMINI_PRICING: Record<string, ModelRates> = {
   "gemini-flash-latest": {
     inputPerM: 1.5,
-    outputPerM: 9.0,
-    notes: "Floating alias → Gemini 3.5 Flash as of 2026-05 ($1.50/$9.00 per the GCP export). Re-reconcile on rotation.",
+    outputPerM: 7.5,
+    notes: "Floating alias → gemini-3.8-flash as of 2026-11-15 (probe). Steady-state $1.50/$7.50 from 2027-01-01; intro $0.75/$3.75 until 2026-12-31. UNVERIFIED third-party rates — reconcile with the GCP SKU export. (Was 3.5 Flash $1.50/$9.00 in 2026-05.)",
   },
   "gemini-flash-lite-latest": {
     inputPerM: 0.25,
@@ -41,7 +41,7 @@ export const GEMINI_PRICING: Record<string, ModelRates> = {
   "gemini-pro-latest": {
     inputPerM: 2.0,
     outputPerM: 12.0,
-    notes: "Floating alias → Gemini 3 Pro (standard <200k context) as of 2026-05 ($2.00/$12.00). Tiered rates above ~200k-token prompts are not modeled here.",
+    notes: "Floating alias → gemini-3.1-pro-preview as of 2026-11-15 (probe) — a PREVIEW model behind the alias. $2.00/$12.00 standard <200k context per the 2026-05 export. Tiered rates above ~200k-token prompts are not modeled here.",
   },
   "gemini-embedding-001": {
     inputPerM: 0.15,
@@ -55,6 +55,33 @@ export const GEMINI_PRICING: Record<string, ModelRates> = {
     inputPerM: 1.5,
     outputPerM: 9.0,
     notes: "Concrete version behind gemini-flash-latest (2026-05).",
+  },
+
+  "gemini-3.8-flash": {
+    inputPerM: 1.5,
+    outputPerM: 7.5,
+    notes: "Concrete version behind gemini-flash-latest (2026-11). Steady-state rate; intro $0.75/$3.75 until 2026-12-31. UNVERIFIED.",
+  },
+
+  // --- Gemini 4 (stable versioned ids; no -latest alias published) ---------
+  // UNVERIFIED: third-party consensus, 2026-11-15 (Google's pricing page was
+  // unreachable from the eval environment). Steady-state rates are used so
+  // eval cost comparisons don't flatter a model on a weeks-long promo.
+  // Reconcile with the GCP SKU export after the first billing cycle.
+  "gemini-4-argon": {
+    inputPerM: 4.0,
+    outputPerM: 20.0,
+    notes: "Steady-state from 2026-12-01; promo $2.00/$10.00 through 2026-11-30. UNVERIFIED.",
+  },
+  "gemini-4-carbon": {
+    inputPerM: 4.0,
+    outputPerM: 20.0,
+    notes: "Same list price as Argon per third-party sources; promo $2.00/$10.00 through 2026-11-30. UNVERIFIED.",
+  },
+  "gemini-4-hydrogen": {
+    inputPerM: 1.5,
+    outputPerM: 7.5,
+    notes: "Launched 2026-11-12. No scheduled change reported. UNVERIFIED.",
   },
 
   // --- Open-model evaluation candidates (NOT production; eval harness only) ---

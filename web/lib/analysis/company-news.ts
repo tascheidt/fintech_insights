@@ -13,7 +13,7 @@ import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { log } from "@/lib/log";
-import { modelFor } from "@/lib/ai/prompt-config";
+import { modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 
 export interface NewsItem {
   headline: string;
@@ -223,16 +223,15 @@ async function fetchFreshNewsContext(companyName: string): Promise<CompanyNewsCo
     
     // Use Gemini Flash with grounding for web search (Flash supports Google Search
     // and is significantly cheaper than Pro — company-research.ts already uses this pattern)
-    const model = genAI.getGenerativeModel({
+    const model = genAI.getGenerativeModel(withModelProfile({
       model: modelFor("company-news"),
-      // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 4000,
         responseMimeType: "application/json",
       },
-    });
+    }));
     
     const prompt = `
 Research "${companyName}" fintech company. Find information from the last 30 days:

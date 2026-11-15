@@ -5,7 +5,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { modelFor } from "@/lib/ai/prompt-config";
+import { modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
@@ -87,13 +87,13 @@ export async function generateCompanyInsightChatReply(
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY not configured");
   const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({
+  const model = genAI.getGenerativeModel(withModelProfile({
     model: modelFor("insight-chat"),
     generationConfig: {
       temperature: 0.7,
       maxOutputTokens: 16384,
     },
-  });
+  }));
 
   const _chatStartMs = Date.now();
   const result = await model.generateContent(prompt);

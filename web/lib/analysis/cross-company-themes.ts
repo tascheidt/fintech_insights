@@ -16,7 +16,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { SURFACE_MODELS, modelFor } from "@/lib/ai/prompt-config";
+import { SURFACE_MODELS, modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getVoiceDirective } from "@/lib/ai/voice";
@@ -248,7 +248,7 @@ async function attemptThemeLabels(
   ).replace("{groups_block}", formatGroupsBlock(bundles));
 
   const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({
+  const model = genAI.getGenerativeModel(withModelProfile({
     model: modelFor("theme-labels"),
     generationConfig: {
       temperature: 0.25,
@@ -259,7 +259,7 @@ async function attemptThemeLabels(
       maxOutputTokens: 4096,
       responseMimeType: "application/json",
     },
-  });
+  }));
 
   const startMs = Date.now();
   let response;

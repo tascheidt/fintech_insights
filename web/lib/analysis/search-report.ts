@@ -22,7 +22,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
-import { SURFACE_MODELS, modelFor } from "@/lib/ai/prompt-config";
+import { SURFACE_MODELS, modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
@@ -285,14 +285,14 @@ async function attemptSynthesis(
     .replace("{jobs_block}", formatJobsBlock(sample));
 
   const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({
+  const model = genAI.getGenerativeModel(withModelProfile({
     model: modelFor("search-report"),
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 4096,
       responseMimeType: "application/json",
     },
-  });
+  }));
 
   const startMs = Date.now();
   let response;
