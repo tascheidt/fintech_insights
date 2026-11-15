@@ -68,6 +68,10 @@ Every distinct AI output is a **surface** (`MODEL_SURFACES` in `prompt-config.ts
 - `setEvalModelOverride(surface, model)` is the **eval-only** seam the model eval suite uses to drive a candidate through the real production function. It throws inside a deployed server (`VERCEL` / `NEXT_RUNTIME` set), and the override map is empty in every production process.
 - The three Prompt Forge stages (`job-structure`, `tech-stack`, `weekly-digest`) take their **default** from `SURFACE_MODELS`, but a stored `system_settings` row wins at runtime — a model change there also needs a data migration.
 
+## Per-model generation profiles (`withModelProfile`)
+
+Some models need different *request settings* (not prompts) to run our prompts. Every text-generation call site wraps its `getGenerativeModel` params in `withModelProfile(...)`, which applies `MODEL_GENERATION_PROFILES[model]`: an optional `thinkingLevel` (only when the call site sets no `thinkingConfig` itself) and `thinkingHeadroomTokens` added on top of the site's `maxOutputTokens`. A model with no entry gets the params object back untouched. Current entries: `gemini-4-hydrogen` → `thinkingLevel: "low"` + 8,192 headroom (the `@low` variant the Nov 2026 eval shipped; see `docs/MODEL_EVALS.md` decision record). Why it exists: thinking tokens count against `maxOutputTokens`, and Gemini 4 Hydrogen cannot turn thinking off — at a 4096 cap it can spend the whole budget thinking (probe, 2026-11-15). The wrapper returns the SDK's `ModelParams`, which is also where the `googleSearch` typing gap is handled (no per-site `@ts-expect-error`). New call sites MUST wrap too. Embeddings are excluded.
+
 ## Model evals (`eval/`, `model-catalog.ts`)
 
 - **`eval/judge.ts`** — pairwise, position-swapped LLM judge (pure prompt/parse/combine + `runJudge`). Telemetered as `modelEval.judge`.
@@ -78,10 +82,11 @@ Every distinct AI output is a **surface** (`MODEL_SURFACES` in `prompt-config.ts
 
 ## Named model handles
 
-`PRO_MODEL` / `FLASH_MODEL` in `prompt-config.ts` are typed as `ApprovedModel`, so a call site that always wants one tier (and has no user-selectable config row) imports the handle instead of retyping the literal. Removing or renaming an entry in `AI_MODEL_OPTIONS` then fails the build rather than leaving a stray string behind. `SURFACE_MODELS` entries are built from these handles; call sites go through `modelFor(surface)`, and the `advanced-strategic.ts` quota fallback uses `FLASH_MODEL` directly.
+`PRO_MODEL` / `FLASH_MODEL` / `HYDROGEN_MODEL` in `prompt-config.ts` are typed as `ApprovedModel`, so a call site that always wants one tier (and has no user-selectable config row) imports the handle instead of retyping the literal. Removing or renaming an entry in `AI_MODEL_OPTIONS` then fails the build rather than leaving a stray string behind. `SURFACE_MODELS` entries are built from these handles; call sites go through `modelFor(surface)`, and the `advanced-strategic.ts` quota fallback uses `FLASH_MODEL` directly.
 
 ## Rules of the road
 
+0. **Model-ID policy:** `-latest` aliases or stable (GA) versioned IDs only — never preview / experimental / dated-snapshot. New models need an eval report and a pricing row; `isAllowedModelId` + tests enforce the shape. Full table in [`docs/AI_HYGIENE.md`](../../../docs/AI_HYGIENE.md) → "Model-ID policy".
 1. **No hardcoded model strings outside `prompt-config.ts`.** A model id living outside this repo is the same failure with a longer fuse: feedback triage ran from a Supabase Edge Function pinned to `gemini-3-pro-preview`, which `prompt-config.test.ts` names by example and could not catch, because the call site was out of tree. Google retired that id on 2026-07-31 and every submission silently stopped being triaged.
 2. **Every new call site writes to `gemini_usage_events`** via `writeUsageEvent`.
 3. **Don't stack grounded calls** — check upstream for an existing `googleSearch` enable before adding another. The Apr 2026 incident was two grounded Pro calls per job.

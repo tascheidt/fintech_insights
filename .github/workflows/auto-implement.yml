@@ -10,9 +10,9 @@ on:
 
 # Model selection: use the floating `opus` alias, not a pinned version.
 #
-# This is the same rule CLAUDE.md §5 applies to Gemini ("always use floating
-# -latest aliases; never pin a versioned or preview model ID"), for the same
-# reason. The pinned value here had gone stale — `claude-opus-4-7` while the
+# This workflow has no eval suite behind it, so it follows the conservative
+# end of CLAUDE.md §5's model-ID policy (aliases preferred; never a preview
+# ID) for the same reason. The pinned value here had gone stale — `claude-opus-4-7` while the
 # commit trailer below independently hardcoded "Claude Opus 4.6", so the
 # workflow disagreed with itself about which model wrote the code. Meanwhile
 # feedback triage was pinned to `gemini-3-pro-preview`, which Google retired on

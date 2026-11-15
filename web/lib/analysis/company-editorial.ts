@@ -20,7 +20,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { SURFACE_MODELS, modelFor } from "@/lib/ai/prompt-config";
+import { SURFACE_MODELS, modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 import { z } from "zod";
 import { subDays } from "date-fns";
 import { getVoiceDirective } from "@/lib/ai/voice";
@@ -469,14 +469,14 @@ async function attemptEditorialGeneration(
   }
 
   const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({
+  const model = genAI.getGenerativeModel(withModelProfile({
     model: modelFor("company-editorial"),
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 6000,
       responseMimeType: "application/json",
     },
-  });
+  }));
 
   const startMs = Date.now();
   let response;

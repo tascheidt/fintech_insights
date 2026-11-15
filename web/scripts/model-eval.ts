@@ -17,6 +17,12 @@
  *   npx tsx --env-file=.env.local scripts/model-eval.ts \
  *     --models=<candidate>,<candidate> --judges=<model>[,<model>]
  *
+ * Model variants: `id` runs the model exactly as production would call it
+ * today (its MODEL_GENERATION_PROFILES entry, usually none — a drop-in test).
+ * `id@low|medium|high` adds that thinking level plus 8192 tokens of output
+ * headroom; `id@default` adds only the headroom. Use variants to test a model
+ * the way you would actually ship it (see docs/MODEL_EVALS.md).
+ *
  * Flags:
  *   --models=a,b          Candidate models (required). The production model
  *                         for each surface (SURFACE_MODELS) is always the baseline.
@@ -43,6 +49,9 @@ import {
   MODEL_SURFACES,
   SURFACE_MODELS,
   setEvalModelOverride,
+  setEvalProfileOverride,
+  profileFor,
+  type ModelGenerationProfile,
   type ModelSurface,
 } from "@/lib/ai/prompt-config";
 import { addUsageObserver } from "@/lib/ai/gemini-telemetry";
@@ -154,11 +163,27 @@ interface ModelRun {
   cases: CaseResult[];
 }
 
-async function runSurfaceModel(spec: SurfaceSpec, cases: EvalCase[], model: string, isBaseline: boolean, flags: Flags): Promise<ModelRun> {
+const EVAL_HEADROOM = 8192;
+
+/** `id@low` → { base: id, profile: {thinkingLevel: "low", headroom} }; plain id → no override. */
+function parseVariant(label: string): { base: string; profile: ModelGenerationProfile | null } {
+  const [base, variant] = label.split("@");
+  if (!variant) return { base, profile: null };
+  if (variant === "default") return { base, profile: { thinkingHeadroomTokens: EVAL_HEADROOM } };
+  if (variant === "low" || variant === "medium" || variant === "high") {
+    return { base, profile: { thinkingLevel: variant, thinkingHeadroomTokens: EVAL_HEADROOM } };
+  }
+  throw new Error(`Unknown model variant "@${variant}" (use @low, @medium, @high or @default)`);
+}
+
+async function runSurfaceModel(spec: SurfaceSpec, cases: EvalCase[], label: string, isBaseline: boolean, flags: Flags): Promise<ModelRun> {
+  const { base: model, profile } = parseVariant(label);
+  const previous = profileFor(model);
   setEvalModelOverride(spec.surface, model);
+  if (profile) setEvalProfileOverride(model, profile);
   try {
     const results = await pool(cases, flags.concurrency, async (c) => {
-      const bucket = `${spec.surface}|${model}|${c.id}`;
+      const bucket = `${spec.surface}|${label}|${c.id}`;
       const started = Date.now();
       let output: unknown = null;
       let error: string | undefined;
@@ -178,7 +203,7 @@ async function runSurfaceModel(spec: SurfaceSpec, cases: EvalCase[], model: stri
       }
       if (!error && (output === null || output === undefined)) error = "no output";
       const ok = !error;
-      process.stderr.write(`  ${ok ? "✓" : "✗"} ${spec.surface} ${model} ${c.id}${ok ? "" : ` — ${error?.slice(0, 120)}`}\n`);
+      process.stderr.write(`  ${ok ? "✓" : "✗"} ${spec.surface} ${label} ${c.id}${ok ? "" : ` — ${error?.slice(0, 120)}`}\n`);
       return {
         caseId: c.id,
         ok,
@@ -192,9 +217,10 @@ async function runSurfaceModel(spec: SurfaceSpec, cases: EvalCase[], model: stri
         verdicts: {},
       } satisfies CaseResult;
     });
-    return { surface: spec.surface, model, isBaseline, cases: results };
+    return { surface: spec.surface, model: label, isBaseline, cases: results };
   } finally {
     setEvalModelOverride(spec.surface, null);
+    if (profile) setEvalProfileOverride(model, Object.keys(previous).length ? previous : null);
   }
 }
 
@@ -421,7 +447,10 @@ async function main() {
   }
   if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is required");
 
-  const allModels = [...new Set([...flags.surfaces.map((s) => SURFACE_MODELS[s]), ...flags.models, ...flags.judges])];
+  for (const j of flags.judges) setEvalProfileOverride(j, { thinkingHeadroomTokens: EVAL_HEADROOM });
+  const allModels = [
+    ...new Set([...flags.surfaces.map((s) => SURFACE_MODELS[s]), ...flags.models.map((m) => parseVariant(m).base), ...flags.judges]),
+  ];
   process.stderr.write(`Probing ${allModels.length} model ids for modelVersion…\n`);
   const servedAs: Record<string, string | null> = {};
   for (const r of await Promise.all(allModels.map((m) => probeModelVersion(m)))) servedAs[r.model] = r.modelVersion;
@@ -472,7 +501,7 @@ async function main() {
     }
   }
 
-  const summaries = runs.map((r) => summarize(r, servedAs[r.model] ?? null, flags.judges));
+  const summaries = runs.map((r) => summarize(r, servedAs[parseVariant(r.model).base] ?? null, flags.judges));
   for (const s of summaries) {
     const base = summaries.find((b) => b.surface === s.surface && b.isBaseline);
     if (base && !s.isBaseline) s.verdict = verdictFor(s, base, PRIMARY[s.surface]);

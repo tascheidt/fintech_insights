@@ -137,7 +137,7 @@ All Prompt Forge outputs that become user-visible prose should align with **[voi
 
 ## Supported Models
 
-Prompt Forge currently supports these approved Gemini models (all floating `-latest` aliases — the concrete version rolls with Google's releases; see CLAUDE.md `AI Model Requirements`):
+Prompt Forge offers exactly the models in `AI_MODEL_OPTIONS` — floating `-latest` aliases and/or stable versioned IDs, never previews (see CLAUDE.md §5 and `docs/AI_HYGIENE.md` → "Model-ID policy"). At the time of writing:
 
 - `gemini-flash-latest`
 - `gemini-pro-latest`
@@ -709,7 +709,7 @@ Admin access is enforced by:
 
 Model values are restricted by schema validation in `web/lib/ai/prompt-config.ts`.
 
-Only approved Gemini `-latest` alias models should be accepted (see CLAUDE.md `AI Model Requirements`).
+Only models in `AI_MODEL_OPTIONS` are accepted — `-latest` aliases or stable versioned IDs, never preview / experimental IDs (see CLAUDE.md §5).
 
 ### Prompt validation
 

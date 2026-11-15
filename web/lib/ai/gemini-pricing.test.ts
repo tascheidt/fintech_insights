@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { estimateUsd, GROUNDING_PER_REQUEST_USD, GROUNDING_CALIBRATION } from "./gemini-pricing";
+import { estimateUsd, GROUNDING_PER_REQUEST_USD, GROUNDING_CALIBRATION, GEMINI_PRICING } from "./gemini-pricing";
 
 describe("estimateUsd — thinking tokens (Gemini 3.x)", () => {
   it("bills thinking tokens at the output rate for Pro", () => {
@@ -14,14 +14,15 @@ describe("estimateUsd — thinking tokens (Gemini 3.x)", () => {
   });
 
   it("bills thinking tokens at the output rate for Flash", () => {
-    // Flash outputPerM = $9.0 (Gemini 3.5 Flash, 2026-05 GCP rate)
+    // 1M thinking tokens cost exactly one million output tokens, whatever
+    // the current Flash rate is (it moves when the alias rotates).
     const usd = estimateUsd("gemini-flash-latest", {
       inputTokens: 0,
       outputTokens: 0,
       thoughtsTokens: 1_000_000,
       groundingEnabled: false,
     });
-    expect(usd).toBeCloseTo(9.0, 6);
+    expect(usd).toBeCloseTo(GEMINI_PRICING["gemini-flash-latest"].outputPerM, 6);
   });
 
   it("sums input + output + thinking + grounding correctly", () => {

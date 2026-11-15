@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { modelFor } from "@/lib/ai/prompt-config";
+import { modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 import { recordUsage, type OnUsage, type GeminiUsageMetadata } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { resolveProvider } from "@/lib/ai/providers/registry";
@@ -227,14 +227,14 @@ export async function categorizePosting(
     if (provider === "gemini") {
       const genAI = new GoogleGenerativeAI(key as string);
 
-      const model = genAI.getGenerativeModel({
+      const model = genAI.getGenerativeModel(withModelProfile({
         model: requestedModel,
         generationConfig: {
           temperature: 0.2,
           maxOutputTokens: 64000,
           responseMimeType: "application/json",
         },
-      });
+      }));
 
       const result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],

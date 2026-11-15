@@ -3,7 +3,7 @@ import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { log } from "@/lib/log";
-import { modelFor } from "./prompt-config";
+import { modelFor, withModelProfile } from "./prompt-config";
 
 /**
  * Strategy Analysis Pipeline
@@ -170,14 +170,14 @@ export async function analyzeCompanyStrategy(
 
   try {
     const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({
+    const model = genAI.getGenerativeModel(withModelProfile({
       model: modelFor("strategy-lab"),
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 8192,
         responseMimeType: "application/json",
       },
-    });
+    }));
 
     const _startMs = Date.now();
     const result = await model.generateContent({

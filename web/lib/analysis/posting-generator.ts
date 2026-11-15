@@ -5,7 +5,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { modelFor } from "@/lib/ai/prompt-config";
+import { modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
@@ -100,13 +100,13 @@ export async function generatePosting(
   const prompt = buildPostingPrompt(jobs, params);
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
+    const model = genAI.getGenerativeModel(withModelProfile({
       model: modelFor("posting-generator"),
       generationConfig: {
         temperature: 0.4,
         maxOutputTokens: 4096,
       },
-    });
+    }));
 
     const startMs = Date.now();
     const result = await model.generateContent({

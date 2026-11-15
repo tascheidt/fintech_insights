@@ -4,6 +4,7 @@ import { ROLE_CATEGORIES, type RoleCategory } from "./function-categories";
 import {
   DEFAULT_JOB_STRUCTURE_AI_CONFIG,
   type JobStructureAiConfig,
+  withModelProfile,
 } from "@/lib/ai/prompt-config";
 import { recordUsage, type OnUsage, type GeminiUsageMetadata } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
@@ -191,10 +192,10 @@ export async function extractJobStructure(
         (generationConfig as Record<string, unknown>).thinkingConfig = { thinkingBudget: 0 };
       }
 
-      const model = genAI.getGenerativeModel({
+      const model = genAI.getGenerativeModel(withModelProfile({
         model: config.model,
         generationConfig,
-      });
+      }));
 
       const result = await withTimeout(
         model.generateContent({

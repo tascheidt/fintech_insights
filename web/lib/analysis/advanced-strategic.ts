@@ -8,7 +8,7 @@
  */
 
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
-import { FLASH_MODEL, SURFACE_MODELS, modelFor } from "@/lib/ai/prompt-config";
+import { FLASH_MODEL, SURFACE_MODELS, modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 import { checkVoice } from "@/lib/ai/voice-validator";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
@@ -348,11 +348,10 @@ export async function performWebSearch(
 
   try {
     const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({
+    const model = genAI.getGenerativeModel(withModelProfile({
       model: modelFor("job-analysis"),
-      // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
-    });
+    }));
 
     const now = new Date();
     const cutoff = new Date(now);
@@ -487,16 +486,15 @@ export async function analyzeJobAdvanced(
     const genAI = new GoogleGenerativeAI(key);
 
     const buildAnalysisModel = (modelId: string, withSearch: boolean): GenerativeModel =>
-      genAI.getGenerativeModel({
+      genAI.getGenerativeModel(withModelProfile({
         model: modelId,
         ...(withSearch
           ? {
-              // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
               tools: [{ googleSearch: {} }],
             }
           : {}),
         generationConfig,
-      });
+      }));
 
     let model: GenerativeModel = buildAnalysisModel(analysisModel, analysisGoogleSearch);
 
@@ -516,10 +514,10 @@ export async function analyzeJobAdvanced(
       if (allowFallback && isQuotaError(error)) {
         const msg = error instanceof Error ? error.message : String(error);
         log.warn(`${analysisModel} quota exceeded: ${msg}. Falling back to ${FLASH_MODEL}.`);
-        model = genAI.getGenerativeModel({
+        model = genAI.getGenerativeModel(withModelProfile({
           model: FLASH_MODEL,
           generationConfig,
-        });
+        }));
         modelServed = FLASH_MODEL;
         groundingServed = false;
         result = await model.generateContent({

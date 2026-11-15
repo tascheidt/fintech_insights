@@ -1270,7 +1270,7 @@ export function buildPromptPromotionIssue(options: {
 1. Update \`${settingsFile}\` so the default config for \`${options.stage}\` matches the approved model and prompt below.
 2. Ensure the stage implementation in \`${targetFile}\` still consumes the default config correctly.
 3. Do not remove runtime loading from \`system_settings\`; the app must continue honoring saved admin settings.
-4. Keep all model options restricted to approved Gemini \`-latest\` alias models only (see \`AI_MODEL_OPTIONS\` in \`web/lib/ai/prompt-config.ts\`).
+4. Keep all model options restricted to \`AI_MODEL_OPTIONS\` in \`web/lib/ai/prompt-config.ts\` (\`-latest\` aliases or stable versioned IDs; never preview or experimental IDs).
 5. Do not change unrelated UI or business logic.
 
 ## Approved prompt text

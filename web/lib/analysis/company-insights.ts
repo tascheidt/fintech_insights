@@ -30,7 +30,7 @@ import {
   type FinancialContext,
 } from "./company-research";
 import { log } from "@/lib/log";
-import { modelFor } from "@/lib/ai/prompt-config";
+import { modelFor, withModelProfile } from "@/lib/ai/prompt-config";
 
 // ============================================================================
 // Types
@@ -545,7 +545,7 @@ export async function generateInsightWithLLM(
   }
 
   const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({
+  const model = genAI.getGenerativeModel(withModelProfile({
     model: modelFor("company-insight"),
     generationConfig: {
       temperature: 0.25,
@@ -555,7 +555,7 @@ export async function generateInsightWithLLM(
       maxOutputTokens: 8192,
       responseMimeType: "application/json",
     },
-  });
+  }));
 
   const hiringContext = formatExtendedContextForPrompt(context);
   const researchContext = formatResearchForPrompt(research);

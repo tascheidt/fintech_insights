@@ -16,7 +16,7 @@ Aesthetic: Notion-style. Clean white / very subtle off-white theme, high-contras
 - **Backend:** Python 3 + Click CLI, SQLAlchemy 2.0, BeautifulSoup4 (legacy CLI flow).
 - **Database:** Supabase (PostgreSQL) with RLS.
 - **Auth:** Supabase SSR with Google OAuth. Per-area rules in [`web/lib/auth/CLAUDE.md`](./web/lib/auth/CLAUDE.md).
-- **AI:** Google Gemini via floating `-latest` aliases. See section 5.
+- **AI:** Google Gemini — `-latest` aliases or stable versioned IDs, chosen per output surface (`SURFACE_MODELS`). See section 5.
 - **Email:** Resend API. Digest architecture in [`docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md`](./docs/WEEKLY_DIGEST_EMAIL_ARCHITECTURE.md).
 - **Scraping:** Puppeteer Core (serverless) + BeautifulSoup4. See [`web/lib/scrapers/CLAUDE.md`](./web/lib/scrapers/CLAUDE.md).
 - **TS path alias:** `@/*` → `/web/*`.
@@ -76,9 +76,9 @@ All scheduled jobs MUST log into the `job_runs` table. `cron_logs` is deprecated
 
 Compact rules; long-form rationale + April 2026 cost-incident context in [`docs/AI_HYGIENE.md`](./docs/AI_HYGIENE.md).
 
-- **Always use floating `-latest` aliases.** Never pin a versioned or preview model ID. The comparison harness (`web/scripts/gemini-compare.ts`) and `gemini_usage_events` telemetry are how we catch a bad alias rotation.
-- **Approved models:** `gemini-pro-latest` (grounded analysis), `gemini-flash-latest` (default), `gemini-flash-lite-latest` (high-volume low-stakes only, gated by ≥95% L1 field agreement in the harness report).
-- **Embeddings are the one pinned exception.** Google publishes no `-latest` alias for embedding models, so Jobs semantic search pins `gemini-embedding-001` (768d) via `EMBEDDING_MODEL` / `EMBEDDING_DIMS` in `prompt-config.ts` — still the single source of truth, just not a floating alias. Every embedded row stamps `embedding_model` + `embedding_dims`; changing the model REQUIRES a re-embed (the backfill detects the mismatch). Comparing vectors across models is silently wrong.
+- **Model IDs: a floating `-latest` alias or a stable (GA) versioned ID — never preview, experimental, or dated-snapshot.** Aliases (`gemini-flash-latest`) upgrade themselves, which can change cost and behaviour under us (May 2026 rotation); stable versioned IDs (e.g. a Gemini 4 model id) stay fixed until Google retires them. Pick per surface on eval evidence. Never `-preview` / `-exp` / dated snapshots like `-preview-05-20`: Google retires those on short notice (the July 2026 `gemini-3-pro-preview` triage outage). Any model added to `AI_MODEL_OPTIONS` needs a `model-eval.ts` report ([`docs/MODEL_EVALS.md`](./docs/MODEL_EVALS.md)) and a `gemini-pricing.ts` row; `model-watch.yml` flags alias rotations and a production model's retirement. Shape + pricing enforced by `isAllowedModelId` tests in `prompt-config.test.ts`.
+- **Approved models** are exactly `AI_MODEL_OPTIONS`; which output uses which is `SURFACE_MODELS` (one line per surface, read via `modelFor`). Currently `gemini-pro-latest` (grounded analysis), `gemini-flash-latest` (default), `gemini-flash-lite-latest` (high-volume low-stakes only, gated by ≥95% golden L1 in the eval report).
+- **Embeddings are pinned by necessity.** Google publishes no `-latest` alias for embedding models, so Jobs semantic search pins `gemini-embedding-001` (768d) via `EMBEDDING_MODEL` / `EMBEDDING_DIMS` in `prompt-config.ts` — still the single source of truth, just not a floating alias. Every embedded row stamps `embedding_model` + `embedding_dims`; changing the model REQUIRES a re-embed (the backfill detects the mismatch). Comparing vectors across models is silently wrong.
 - **All model strings resolve through `AI_MODEL_OPTIONS` (and `EMBEDDING_MODEL`) in `web/lib/ai/prompt-config.ts`.** No hardcoded strings elsewhere. The one documented exception is the **eval-only** open-model registry (`web/lib/ai/providers/registry.ts`): GLM-5.2 / DeepSeek V4-Flash are kept out of `AI_MODEL_OPTIONS` on purpose so the admin UI never exposes an unvetted model. It's a bake-off seam only — `resolveProvider` returns `"gemini"` for everything else, so production is unchanged. See [`docs/OPEN_MODEL_EVALUATION.md`](./docs/OPEN_MODEL_EVALUATION.md).
 - **Every Gemini call writes to `gemini_usage_events`** via `writeUsageEvent` from `@/lib/ai/gemini-telemetry` (build the record with `recordUsage` from `@/lib/ai/gemini-meter`). Fire-and-forget; errors are swallowed.
 - **PRs touching `web/lib/ai/**` or `web/lib/analysis/**` MUST run `gemini-compare.ts`** and attach the markdown report; commit JSON artifacts under `web/scripts/artifacts/`.
@@ -148,7 +148,7 @@ Things that will get a PR rejected:
 - Hardcoding a color outside `web/app/globals.css` (raw hex, rgb, hsl, oklch, or `bg-[#…]`). Add a token instead. Lint rule: `design-system/no-raw-color`.
 - Using Fraunces (`font-display`) outside the four approved editorial surfaces (digest hero, marketing hero, login hero, company stated-strategy callout).
 - Using Tailwind's default green/red/yellow scales for hiring numbers or signal strength. Use `growth-500`, `sunset-*`, `accent`, `highlight` instead.
-- Pinning a versioned/preview Gemini model ID (e.g. `gemini-2.0-flash`). Always `-latest`.
+- Using a preview, experimental, or dated-snapshot Gemini model ID (e.g. `gemini-3-pro-preview`, `gemini-2.5-flash-preview-05-20`). Use a `-latest` alias or a stable GA versioned ID, added with an eval report.
 - Adding a Gemini call site that doesn't write to `gemini_usage_events`.
 - Adding a second grounded Pro call per job (the April 2026 incident).
 - Adding the voice directive to internal extraction/classification prompts (it only burns tokens; users never see the output).

@@ -4,6 +4,7 @@ import { writeUsageEvent } from "./gemini-telemetry";
 import {
   DEFAULT_TECH_STACK_AI_CONFIG,
   type TechStackAiConfig,
+  withModelProfile,
 } from "./prompt-config";
 import { modelFor } from "./prompt-config";
 
@@ -264,14 +265,14 @@ export async function extractCompanyTechStack(
   }
 
   const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({
+  const model = genAI.getGenerativeModel(withModelProfile({
     model: modelFor("tech-stack"),
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 8192,
       responseMimeType: "application/json",
     },
-  });
+  }));
 
   const stack: CompanyTechStack = {
     categories: [],
@@ -672,14 +673,14 @@ export async function enrichTechStackWithAnalysis(
     const genAI = new GoogleGenerativeAI(key);
 
     for (let attempt = 0; attempt < 2; attempt++) {
-      const model = genAI.getGenerativeModel({
+      const model = genAI.getGenerativeModel(withModelProfile({
         model: config.model,
         generationConfig: {
           temperature: attempt === 0 ? config.temperature : Math.min(config.temperature, 0.1),
           maxOutputTokens: config.maxOutputTokens,
           responseMimeType: "application/json",
         },
-      });
+      }));
 
       const _startMs = Date.now();
       const result = await withTimeout(
