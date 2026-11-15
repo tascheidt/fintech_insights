@@ -11,8 +11,9 @@
  *   npx tsx --env-file=.env.local scripts/model-watch.ts            # report diff
  *   npx tsx --env-file=.env.local scripts/model-watch.ts --update   # accept + rewrite snapshot
  *
- * Exit codes: 0 no change · 2 change detected (markdown on stdout) · 1 error.
- * With `--update` it always exits 0 after rewriting the snapshot.
+ * Exit codes: 0 no change · 2 change detected, or no committed snapshot yet
+ * (markdown on stdout) · 1 error. With `--update` it rewrites the snapshot and
+ * exits 0 — that is the only path that writes the file.
  */
 
 import { readFile, writeFile } from "fs/promises";
@@ -50,16 +51,24 @@ async function main() {
     // First run: no snapshot yet.
   }
 
-  if (update || !prev) {
+  if (update) {
     await writeFile(SNAPSHOT, JSON.stringify({ ...next, catalog }, null, 2) + "\n");
     console.error(`snapshot written: ${models.length} text models, ${tracked.length} tracked aliases`);
-    if (!prev || update) return;
+    return;
   }
 
-  const diff = diffCatalog(prev, next);
-  const prodRotations = diff.rotated.filter((r) => Object.values(SURFACE_MODELS).includes(r.alias as never));
+  // No committed baseline: report everything as new rather than silently
+  // writing one — in CI a written file is discarded, so a "first run" that
+  // exits 0 would repeat forever and never flag a real change.
+  const diff = diffCatalog(prev ?? { capturedAt: "none", models: [], aliases: {} }, next);
+  // Without a baseline every alias looks "rotated"; only warn on a real change.
+  const prodRotations = prev
+    ? diff.rotated.filter((r) => Object.values(SURFACE_MODELS).includes(r.alias as never))
+    : [];
   const lines = [
-    `## Gemini model catalog changed (${next.capturedAt.slice(0, 10)})`,
+    prev
+      ? `## Gemini model catalog changed (${next.capturedAt.slice(0, 10)})`
+      : `## No committed model-catalog snapshot yet — baseline below (${next.capturedAt.slice(0, 10)})`,
     "",
     diff.added.length ? `**New models:** ${diff.added.map((m) => `\`${m}\``).join(", ")}` : "",
     diff.removed.length ? `**Removed models:** ${diff.removed.map((m) => `\`${m}\``).join(", ")}` : "",
