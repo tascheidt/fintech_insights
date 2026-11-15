@@ -28,7 +28,7 @@ const eslintConfig = defineConfig([
   // incident). Writes are allowed (the rule lets `.insert/.update/.upsert/
   // .delete` through). Scoped to the surfaces that build user-facing reads;
   // admin / labs / ops / route code stays on the base tables by design. See
-  // migration 20260601130000 and CLAUDE.md §"Company-active read scoping".
+  // migration 20260601130000 and AGENTS.md §"Company-active read scoping".
   {
     files: [
       "lib/dashboard-queries.ts",

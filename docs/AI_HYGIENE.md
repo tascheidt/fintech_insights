@@ -1,6 +1,6 @@
 # AI hygiene
 
-Rules for every Gemini call. This file is the long-form home for the call-site discipline that root `CLAUDE.md` only summarizes.
+Rules for every Gemini call. This file is the long-form home for the call-site discipline that root `AGENTS.md` only summarizes.
 
 ## Why these rules exist
 

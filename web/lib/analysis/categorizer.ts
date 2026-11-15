@@ -195,7 +195,7 @@ export interface CategorizePostingOptions {
  * Categorize a job posting and extract template sections.
  *
  * Uses Gemini Flash by default. Writes a `gemini_usage_events` row like every
- * other AI call site (this previously had no telemetry — see web/lib/ai/CLAUDE.md
+ * other AI call site (this previously had no telemetry — see web/lib/ai/AGENTS.md
  * "Telemetry"). The eval seam routes an eval model id to Fireworks.
  */
 export async function categorizePosting(

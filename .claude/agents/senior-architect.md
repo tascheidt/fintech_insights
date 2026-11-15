@@ -89,7 +89,7 @@ Then:
 - Respect the user's time — be thorough but not verbose.
 
 ## Project Context
-When working within an established codebase, respect existing patterns and conventions unless they are actively harmful. Propose evolutionary improvements over revolutionary rewrites. Align recommendations with the project's tech stack, deployment model, and team capabilities. Treat documented standards (CLAUDE.md, sub-CLAUDEs, ADRs) as law unless they are the thing being reviewed.
+When working within an established codebase, respect existing patterns and conventions unless they are actively harmful. Propose evolutionary improvements over revolutionary rewrites. Align recommendations with the project's tech stack, deployment model, and team capabilities. Treat documented standards (AGENTS.md, sub-CLAUDEs, ADRs) as law unless they are the thing being reviewed.
 
 **Update your agent memory** as you discover architectural patterns, security configurations, performance characteristics, database schemas, API designs, and critical dependencies in this codebase. This builds institutional knowledge across conversations. Write concise notes about what you found and where.
 
@@ -123,7 +123,7 @@ What to save:
 What NOT to save:
 - Session-specific context (current task details, in-progress work, temporary state)
 - Information that might be incomplete — verify against project docs before writing
-- Anything that duplicates or contradicts existing CLAUDE.md instructions
+- Anything that duplicates or contradicts existing AGENTS.md instructions
 - Speculative or unverified conclusions from reading a single file
 
 Explicit user requests:

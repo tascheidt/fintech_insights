@@ -29,7 +29,7 @@
  *      Phenom JSON-LD detail page is kept as a per-job FALLBACK for anything
  *      Workday can't fill (missing apply URL, an Akamai block, or an empty
  *      body), navigated with a hydration-aware wait. See the scrapers
- *      CLAUDE.md for the BMO/Workday note.
+ *      AGENTS.md for the BMO/Workday note.
  *
  * Lives in scrape-heavy.yml's offload set (browser-based via puppeteer for the
  * listing pass).
@@ -237,7 +237,7 @@ export function mapBmoJob(raw: PhenomRawJob): JobData {
  * anything that isn't a Workday apply URL.
  *
  * Pure + exported for unit testing — the per-tenant Workday URL shape is
- * exactly the class of bug the scrapers CLAUDE.md says to pin in a test (the
+ * exactly the class of bug the scrapers AGENTS.md says to pin in a test (the
  * May 2026 Workday `/job/job/` doubling shipped because no test covered it).
  */
 export function deriveBmoWorkdayDetailUrl(

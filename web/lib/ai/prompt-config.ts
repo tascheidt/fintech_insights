@@ -33,7 +33,7 @@ export const AI_MODEL_OPTIONS = [
 ] as const;
 
 /**
- * Model-ID policy (CLAUDE.md §5). Allowed in `AI_MODEL_OPTIONS`:
+ * Model-ID policy (AGENTS.md §5). Allowed in `AI_MODEL_OPTIONS`:
  *   - Google's floating `-latest` aliases (upgrade themselves; can change cost
  *     and behaviour under us — the May 2026 rotation), and
  *   - stable (GA) versioned IDs, e.g. a Gemini 4 model id (fixed until Google
@@ -62,7 +62,7 @@ export type ApprovedModel = (typeof AI_MODEL_OPTIONS)[number]["value"];
  * user-selectable config row (e.g. feedback triage). The annotation is the
  * point: these are typed as `ApprovedModel`, so dropping or renaming an entry
  * in `AI_MODEL_OPTIONS` fails the build here rather than silently leaving a
- * stray literal behind. Prefer these over re-typing the string — CLAUDE.md §5
+ * stray literal behind. Prefer these over re-typing the string — AGENTS.md §5
  * requires every model string to resolve through this file.
  */
 export const PRO_MODEL: ApprovedModel = "gemini-pro-latest";

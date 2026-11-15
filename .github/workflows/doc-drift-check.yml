@@ -71,7 +71,7 @@ jobs:
               'Architecture-sensitive files in this PR:',
               fileList,
               '',
-              'Relevant docs to consider updating: root `CLAUDE.md`, `docs/AGENTS.md`, the per-area sub-CLAUDEs in `web/lib/analysis/`, `web/lib/scrapers/`, `web/lib/ai/`, `web/lib/auth/`, plus `docs/CRON_TOPOLOGY.md`, `docs/AI_HYGIENE.md`, `docs/INGESTION_PIPELINE.md`, and `web/data/releases.json`.',
+              'Relevant docs to consider updating: root `AGENTS.md`, `docs/OPERATOR_MANUAL.md`, the per-area `AGENTS.md` files in `web/lib/analysis/`, `web/lib/scrapers/`, `web/lib/ai/`, `web/lib/auth/`, plus `docs/CRON_TOPOLOGY.md`, `docs/AI_HYGIENE.md`, `docs/INGESTION_PIPELINE.md`, and `web/data/releases.json`.',
               '',
               'This warning is **non-blocking** — a reviewer can override.',
             ].join('\n');

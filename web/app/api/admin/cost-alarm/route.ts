@@ -22,7 +22,7 @@
  * Auth: `requireCronSecret` — same pattern as `/api/cron/**`. This is the
  * one route under `/api/admin/**` that intentionally does NOT require an
  * admin user, because the GH Actions runner has no Supabase session.
- * Documented in [`web/lib/auth/CLAUDE.md`](../../../../lib/auth/CLAUDE.md).
+ * Documented in [`web/lib/auth/AGENTS.md`](../../../../lib/auth/AGENTS.md).
  */
 
 import { NextRequest, NextResponse } from "next/server";

@@ -5,7 +5,7 @@ import path from "node:path";
 /**
  * Vitest config for the web app.
  *
- * Philosophy (see docs/AGENTS.md#Tests): regression protection on the
+ * Philosophy (see docs/OPERATOR_MANUAL.md#Tests): regression protection on the
  * highest-leverage pure functions, not a coverage chase. The full unit-test
  * surface is intentionally tiny (six files); cron handlers and other
  * mock-heavy boundaries are covered by Playwright + production telemetry,

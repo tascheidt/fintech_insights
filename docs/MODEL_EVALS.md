@@ -140,7 +140,7 @@ Both are allowed (policy table in [`AI_HYGIENE.md`](./AI_HYGIENE.md) → "Model-
       `extractJobStructure` sends `thinkingBudget: 0` and degrades once on rejection;
       watch `err calls` in the report.
 - [ ] Commit the eval artifacts, update this file's decision record, `AI_HYGIENE.md`
-      (approved models), `web/lib/ai/CLAUDE.md`, `releases.json` + version.
+      (approved models), `web/lib/ai/AGENTS.md`, `releases.json` + version.
 - [ ] After deploy: watch `gemini_usage_events` by `model_served` and the daily cost
       alarm for a week.
 

@@ -7,7 +7,7 @@
  * triage fields through the service-role client.
  *
  * Guarded by CRON_SECRET, matching the internal fan-out convention in
- * web/lib/auth/CLAUDE.md (`/api/internal/**` -> requireCronSecret). Called
+ * web/lib/auth/AGENTS.md (`/api/internal/**` -> requireCronSecret). Called
  * fire-and-forget by POST /api/feedback after an insert, and by the re-triage
  * script.
  */

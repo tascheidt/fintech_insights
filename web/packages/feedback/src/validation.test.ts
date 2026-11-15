@@ -6,7 +6,7 @@
  *   - The admin feedback panel mutates real DB rows and an over-permissive
  *     parse here would let a bad request slip through.
  *
- * Per CLAUDE.md §7: Zod errors are read via `.issues`, never `.errors`. The
+ * Per AGENTS.md §7: Zod errors are read via `.issues`, never `.errors`. The
  * second case below asserts that exact contract — Vercel's TS is strict
  * enough that `.errors` would silently typecheck against `unknown` but
  * return undefined at runtime.
@@ -43,7 +43,7 @@ describe("adminPatchSchema", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      // Per CLAUDE.md: read Zod errors via `.issues`, never `.errors`.
+      // Per AGENTS.md: read Zod errors via `.issues`, never `.errors`.
       // This assertion locks the contract so a future Zod major can't
       // silently break the convention.
       expect(Array.isArray(result.error.issues)).toBe(true);

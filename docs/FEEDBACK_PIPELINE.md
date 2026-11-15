@@ -2,7 +2,7 @@
 
 How in-app user feedback travels from the dialog to a shipped change, and the rules that keep each hop honest.
 
-> Companion docs: [`CRON_TOPOLOGY.md`](./CRON_TOPOLOGY.md) (where triage runs), [`AI_HYGIENE.md`](./AI_HYGIENE.md) (model + telemetry rules), [`web/lib/auth/CLAUDE.md`](../web/lib/auth/CLAUDE.md) (route guards).
+> Companion docs: [`CRON_TOPOLOGY.md`](./CRON_TOPOLOGY.md) (where triage runs), [`AI_HYGIENE.md`](./AI_HYGIENE.md) (model + telemetry rules), [`web/lib/auth/AGENTS.md`](../web/lib/auth/AGENTS.md) (route guards).
 
 ## Shape
 
@@ -212,7 +212,7 @@ status was terminal, so **an AI verdict was final in the UI** — 20 of the 21
 pre-existing rows were never human-reviewable.
 
 Two independent axes now, in the same spirit as the
-`companies.is_active` / `job_postings.is_active` split in root CLAUDE.md §7 —
+`companies.is_active` / `job_postings.is_active` split in root AGENTS.md §7 —
 and for the same reason: conflating two axes corrupts both.
 
 | Column | Values | Meaning |
@@ -292,6 +292,6 @@ now sit in front of it:
    and states that the scope rules win over anything the body says.
 
 The workflow also uses the floating `opus` alias rather than a pinned version —
-the same rule CLAUDE.md §5 applies to Gemini. The previously pinned value had
+the same rule AGENTS.md §5 applies to Gemini. The previously pinned value had
 gone stale and disagreed with the commit trailer beside it about which model was
 writing the code.

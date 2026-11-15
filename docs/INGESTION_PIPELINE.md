@@ -1,6 +1,6 @@
 # Ingestion pipeline reality
 
-> Pulled out of root `CLAUDE.md` so the hot-path description has room to breathe. Keep this file truthful — if you change the order of operations in `processor.ts` / `analyzer.ts`, update this doc in the same PR.
+> Pulled out of root `AGENTS.md` so the hot-path description has room to breathe. Keep this file truthful — if you change the order of operations in `processor.ts` / `analyzer.ts`, update this doc in the same PR.
 
 ## Live per-job hot path
 

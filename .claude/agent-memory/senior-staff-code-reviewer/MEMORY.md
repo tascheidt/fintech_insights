@@ -82,7 +82,7 @@ Do NOT add wiring into `analyzeJob` in `strategic.ts` or `categorizePosting` in 
 - Valid job_types: collect, analyze, report, company-insights, insight-generation.
 
 ### Cron Constraint
-- Max 2 cron jobs per CLAUDE.md; currently at: daily collect (6 AM), weekly report (Mon 6 AM).
+- Max 2 cron jobs per AGENTS.md; currently at: daily collect (6 AM), weekly report (Mon 6 AM).
 - `cleanup-jobs` cron exists at `/api/cron/cleanup-jobs/route.ts` but is NOT in vercel.json.
 - `company-insights` cron exists but is NOT in vercel.json.
 - Cleanup logic should be folded into collect cron to respect 2-cron limit.

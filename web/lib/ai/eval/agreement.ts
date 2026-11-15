@@ -7,7 +7,7 @@
  * golden record (correctness). See docs/OPEN_MODEL_EVALUATION.md.
  *
  * This finally implements the "L1 field agreement" metric the docs assume
- * exists (CLAUDE.md / prompt-config.ts reference a "≥95% L1" gate that was
+ * exists (AGENTS.md / prompt-config.ts reference a "≥95% L1" gate that was
  * never actually computed in the harness).
  */
 

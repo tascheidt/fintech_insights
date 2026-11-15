@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
  *
  * Reduced from the original "homepage -> digest -> admin trigger" plan to
  * just "login page renders + OAuth button visible." See
- * `docs/AGENTS.md#Tests` for the rationale: digests and admin pages need
+ * `docs/OPERATOR_MANUAL.md#Tests` for the rationale: digests and admin pages need
  * authenticated DB state, so a meaningful e2e there requires fixtures we
  * don't have yet. This test is the minimum-viable canary that catches a
  * fully broken deploy.
