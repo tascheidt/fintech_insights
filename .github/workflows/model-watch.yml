@@ -1,0 +1,89 @@
+name: Model Watch
+
+# Weekly check for new Gemini models and alias rotations (see
+# web/scripts/model-watch.ts). Compares the live catalog, and what each
+# `-latest` alias / production model actually serves, against the committed
+# snapshot web/scripts/fixtures/gemini-model-catalog.json.
+#
+# On a change it opens (or comments on) a single GitHub issue labelled
+# `model-watch` with the diff and the eval command to run. It does NOT run
+# the eval or change any model — that is a deliberate, reviewed decision
+# (docs/MODEL_EVALS.md). Cost: one ListModels call plus a ~10-token probe per
+# tracked alias (well under $0.01/run).
+#
+# Why: the May 2026 alias rotation to Gemini 3.x went unnoticed until the
+# invoice, and the July 2026 retirement of a pinned preview id silently broke
+# feedback triage. This is the early warning for both.
+#
+# Required repository secrets:
+#   - GEMINI_API_KEY
+#
+# Schedule: Monday 07:00 UTC — before the Monday ops crons, so a rotation is
+# flagged before the weekly digest/editorial runs on the new model.
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate required secrets
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::Missing required secret GEMINI_API_KEY"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Diff the model catalog
+        id: watch
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set +e
+          npx tsx scripts/model-watch.ts > ../model-watch.md
+          code=$?
+          set -e
+          if [ "$code" = "2" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            cat ../model-watch.md >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$code" != "0" ]; then
+            exit "$code"
+          fi
+
+      - name: Open or update the model-watch issue
+        if: steps.watch.outputs.changed == 'true'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create model-watch --color 5319E7 --description "New Gemini models / alias rotations" 2>/dev/null || true
+          existing=$(gh issue list --label model-watch --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file model-watch.md
+          else
+            gh issue create --title "New Gemini models detected — run the model eval" --label model-watch --body-file model-watch.md
+          fi

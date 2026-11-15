@@ -30,6 +30,7 @@ import {
   type FinancialContext,
 } from "./company-research";
 import { log } from "@/lib/log";
+import { modelFor } from "@/lib/ai/prompt-config";
 
 // ============================================================================
 // Types
@@ -523,7 +524,8 @@ function formatPreviousInsightContext(
   return sections.join("\n");
 }
 
-async function generateInsightWithLLM(
+/** Exported for the model eval suite (fixture-driven, no DB). */
+export async function generateInsightWithLLM(
   companyName: string,
   context: ExtendedHistoricalContext,
   research: ResearchResult,
@@ -544,7 +546,7 @@ async function generateInsightWithLLM(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: "gemini-flash-latest",
+    model: modelFor("company-insight"),
     generationConfig: {
       temperature: 0.25,
       // 8192 was 4096 — incumbent banks (BMO/RBC/Scotia) with grounded
@@ -577,7 +579,7 @@ async function generateInsightWithLLM(
     writeUsageEvent(
       recordUsage({
         callSite: "generateCompanyInsight",
-        modelRequested: "gemini-flash-latest",
+        modelRequested: modelFor("company-insight"),
         groundingEnabled: false,
         usageMetadata: result.response.usageMetadata,
         latencyMs: Date.now() - _startMs,

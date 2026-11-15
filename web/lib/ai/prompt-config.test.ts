@@ -62,3 +62,62 @@ describe("getActiveWeeklyDigestAiConfig", () => {
     expect(typeof config.maxOutputTokens).toBe("number");
   });
 });
+
+describe("per-surface model resolution", () => {
+  it("modelFor returns the SURFACE_MODELS entry when no eval override is set", async () => {
+    const { MODEL_SURFACES, SURFACE_MODELS, modelFor, AI_MODEL_VALUES } = await import("./prompt-config");
+    for (const surface of MODEL_SURFACES) {
+      expect(modelFor(surface)).toBe(SURFACE_MODELS[surface]);
+      expect(AI_MODEL_VALUES).toContain(SURFACE_MODELS[surface]);
+      expect(SURFACE_MODELS[surface]).not.toMatch(/preview|exp/i);
+    }
+  });
+
+  it("eval overrides apply per surface and clear cleanly", async () => {
+    const { SURFACE_MODELS, modelFor, setEvalModelOverride } = await import("./prompt-config");
+    setEvalModelOverride("search-report", "candidate-model");
+    expect(modelFor("search-report")).toBe("candidate-model");
+    expect(modelFor("job-analysis")).toBe(SURFACE_MODELS["job-analysis"]);
+    setEvalModelOverride("search-report", null);
+    expect(modelFor("search-report")).toBe(SURFACE_MODELS["search-report"]);
+  });
+});
+
+describe("no hardcoded model strings outside prompt-config", () => {
+  // CLAUDE.md §5: every model string resolves through prompt-config.ts. This
+  // scans production source so a literal like "gemini-flash-latest" or
+  // "gemini-4-argon" in a call site fails CI instead of silently escaping
+  // the eval suite and the SURFACE_MODELS table.
+  it("finds no Gemini model literals in lib/ or app/", async () => {
+    const { readdirSync, readFileSync, statSync } = await import("fs");
+    const { join, relative } = await import("path");
+    const root = join(__dirname, "..", "..");
+    const allow = new Set([
+      "lib/ai/prompt-config.ts",
+      "lib/ai/gemini-pricing.ts", // rate table is keyed by model string
+    ]);
+    const MODEL_LITERAL =
+      /["']gemini-(?:\d|pro|flash|embedding|argon|carbon|hydrogen|ultra|nano)[a-z0-9.\-]*["']/i;
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) {
+          if (name !== "node_modules") walk(full);
+          continue;
+        }
+        if (!/\.(ts|tsx)$/.test(name) || /\.test\.tsx?$/.test(name)) continue;
+        const rel = relative(root, full).split("\\").join("/");
+        if (allow.has(rel)) continue;
+        readFileSync(full, "utf8")
+          .split("\n")
+          .forEach((line, i) => {
+            if (MODEL_LITERAL.test(line)) offenders.push(`${rel}:${i + 1}: ${line.trim()}`);
+          });
+      }
+    };
+    walk(join(root, "lib"));
+    walk(join(root, "app"));
+    expect(offenders).toEqual([]);
+  });
+});

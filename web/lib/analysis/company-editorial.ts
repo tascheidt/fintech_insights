@@ -20,6 +20,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { SURFACE_MODELS, modelFor } from "@/lib/ai/prompt-config";
 import { z } from "zod";
 import { subDays } from "date-fns";
 import { getVoiceDirective } from "@/lib/ai/voice";
@@ -43,7 +44,9 @@ import { log } from "@/lib/log";
 // ---------------------------------------------------------------------------
 
 export const EDITORIAL_PROMPT_VERSION = "company-editorial-v2";
-export const EDITORIAL_MODEL = "gemini-pro-latest" as const;
+/** Production model stamped on `companies.editorial_model`. Resolved from
+ *  `SURFACE_MODELS` (prompt-config.ts) — never a literal here. */
+export const EDITORIAL_MODEL = SURFACE_MODELS["company-editorial"];
 
 const EDITORIAL_TIMEOUT_MS = 120_000;
 
@@ -101,7 +104,7 @@ export type EditorialBet = z.infer<typeof BetSchema>;
 // Context builder (deterministic, no AI)
 // ---------------------------------------------------------------------------
 
-interface EditorialContext {
+export interface EditorialContext {
   companyId: string;
   companyName: string;
   country: string | null;
@@ -467,7 +470,7 @@ async function attemptEditorialGeneration(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: EDITORIAL_MODEL,
+    model: modelFor("company-editorial"),
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 6000,
@@ -489,7 +492,7 @@ async function attemptEditorialGeneration(
     writeUsageEvent(
       recordUsage({
         callSite: "generateCompanyEditorial",
-        modelRequested: EDITORIAL_MODEL,
+        modelRequested: modelFor("company-editorial"),
         groundingEnabled: false,
         latencyMs: Date.now() - startMs,
         status: "error",
@@ -503,7 +506,7 @@ async function attemptEditorialGeneration(
   writeUsageEvent(
     recordUsage({
       callSite: "generateCompanyEditorial",
-      modelRequested: EDITORIAL_MODEL,
+      modelRequested: modelFor("company-editorial"),
       groundingEnabled: false,
       usageMetadata: response.response.usageMetadata,
       latencyMs: Date.now() - startMs,
@@ -557,7 +560,18 @@ export async function generateCompanyEditorial(
   companyName: string
 ): Promise<EditorialOutput> {
   const ctx = await buildEditorialContext(companyId, companyName);
+  return generateEditorialFromContext(ctx);
+}
 
+/**
+ * The model half of `generateCompanyEditorial`, given an already-built
+ * context. Split out so the model eval suite can drive the production prompt
+ * and post-processing with a fixture context (no DB).
+ */
+export async function generateEditorialFromContext(
+  ctx: EditorialContext
+): Promise<EditorialOutput> {
+  const { companyId, companyName } = ctx;
   const prompt = EDITORIAL_PROMPT.replace(
     "{voice_block}",
     getVoiceDirective("narrative")

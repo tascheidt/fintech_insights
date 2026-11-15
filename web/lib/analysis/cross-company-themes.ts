@@ -16,6 +16,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { SURFACE_MODELS, modelFor } from "@/lib/ai/prompt-config";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getVoiceDirective } from "@/lib/ai/voice";
@@ -27,7 +28,7 @@ import { DEFAULT_TIERS, type CompanyTier } from "@/lib/dashboard-queries";
 import { log } from "@/lib/log";
 
 export const THEME_LABELER_PROMPT_VERSION = "cross-company-themes-v1";
-export const THEME_LABELER_MODEL = "gemini-flash-latest" as const;
+export const THEME_LABELER_MODEL = SURFACE_MODELS["theme-labels"];
 const THEME_TIMEOUT_MS = 45_000;
 
 /**
@@ -248,7 +249,7 @@ async function attemptThemeLabels(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: THEME_LABELER_MODEL,
+    model: modelFor("theme-labels"),
     generationConfig: {
       temperature: 0.25,
       // 4096 was 2048 — headroom against mid-JSON truncation, the same
@@ -274,7 +275,7 @@ async function attemptThemeLabels(
     writeUsageEvent(
       recordUsage({
         callSite: "generateThemeLabels",
-        modelRequested: THEME_LABELER_MODEL,
+        modelRequested: modelFor("theme-labels"),
         groundingEnabled: false,
         latencyMs: Date.now() - startMs,
         status: "error",
@@ -291,7 +292,7 @@ async function attemptThemeLabels(
   writeUsageEvent(
     recordUsage({
       callSite: "generateThemeLabels",
-      modelRequested: THEME_LABELER_MODEL,
+      modelRequested: modelFor("theme-labels"),
       groundingEnabled: false,
       usageMetadata: response.response.usageMetadata,
       latencyMs: Date.now() - startMs,

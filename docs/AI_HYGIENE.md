@@ -76,7 +76,7 @@ The company editorial engine was tempted to fire its own grounded research call.
 
 ## Approved models (recap)
 
-Single source of truth lives in `web/lib/ai/prompt-config.ts` (`AI_MODEL_OPTIONS` enum). Never hardcode a model string outside that module.
+Single source of truth lives in `web/lib/ai/prompt-config.ts` (`AI_MODEL_OPTIONS` enum). Never hardcode a model string outside that module — a test now scans `lib/` and `app/` for Gemini model literals. Which approved model each output uses is the per-surface table `SURFACE_MODELS`; call sites read it via `modelFor("<surface>")`. Changing a surface's model is an eval-driven decision: see [`MODEL_EVALS.md`](./MODEL_EVALS.md).
 
 - `gemini-pro-latest` — advanced analysis with web search/grounding; deeper reasoning and narrative quality.
 - `gemini-flash-latest` — fast, cost-effective; default for extraction, classification, digest, chat.

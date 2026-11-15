@@ -1,0 +1,89 @@
+name: Model Eval
+
+# Manual-only. Runs the full model eval suite (web/scripts/model-eval.ts):
+# every AI output surface through the candidate models and the current
+# production model, with deterministic scorers + a position-swapped LLM
+# judge. Posts the markdown report to the run summary and uploads the JSON
+# artifact. Commit the artifact under web/scripts/artifacts/ in the PR that
+# acts on it (docs/MODEL_EVALS.md).
+#
+# Never scheduled: a full run costs real money (order of $10–30 with three
+# candidates and two judges, mostly grounded calls and judging). Triggered by a
+# person — usually after the Model Watch issue fires.
+#
+# Required repository secrets:
+#   - GEMINI_API_KEY
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: "Candidate model ids, comma-separated"
+        required: true
+        type: string
+      judges:
+        description: "Judge model ids, comma-separated (blank = no judging)"
+        required: false
+        type: string
+      surfaces:
+        description: "Surfaces to run (comma-separated, or 'all')"
+        required: false
+        type: string
+        default: all
+      limit:
+        description: "Max cases per surface (blank = all)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate required secrets
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::Missing required secret GEMINI_API_KEY"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Run model eval
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MODELS: ${{ inputs.models }}
+          JUDGES: ${{ inputs.judges }}
+          SURFACES: ${{ inputs.surfaces }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          set -e
+          ARGS="--models=$MODELS --surfaces=${SURFACES:-all}"
+          if [ -n "$JUDGES" ]; then ARGS="$ARGS --judges=$JUDGES"; fi
+          if [ -n "$LIMIT" ]; then ARGS="$ARGS --limit=$LIMIT"; fi
+          echo "Running: npx tsx scripts/model-eval.ts $ARGS"
+          npx tsx scripts/model-eval.ts $ARGS > ../model-eval.md
+          cat ../model-eval.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-eval
+          path: web/scripts/artifacts/model-eval-*

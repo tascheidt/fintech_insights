@@ -53,7 +53,7 @@ Two AI calls per job. `analyzeJob` (in `web/lib/analysis/strategic.ts`) and `cat
 
 ## 4. Cron topology
 
-**Two Vercel crons (collect, report) + five GH Actions crons (company-insights, editorial, gemini-cost-alarm, embeddings-backfill, scraper-drift-check).** Hard cap: never more than two Vercel crons. Most GH Actions crons `curl` back into the deployed app with `Bearer ${CRON_SECRET}`; the editorial, embeddings-backfill, and scraper-drift-check crons run their script directly in the runner.
+**Two Vercel crons (collect, report) + six GH Actions crons (company-insights, editorial, gemini-cost-alarm, embeddings-backfill, scraper-drift-check, model-watch).** Hard cap: never more than two Vercel crons. Most GH Actions crons `curl` back into the deployed app with `Bearer ${CRON_SECRET}`; the editorial, embeddings-backfill, scraper-drift-check, and model-watch crons run their script directly in the runner.
 
 - Vercel daily 6 AM UTC: `/api/cron/collect` — collects jobs and triggers analysis.
 - Vercel weekly Mon 5 AM UTC: `/api/cron/report` — generates the weekly digest.
@@ -62,6 +62,7 @@ Two AI calls per job. `analyzeJob` (in `web/lib/analysis/strategic.ts`) and `cat
 - GitHub Actions daily 14:00 UTC: `gemini-cost-alarm.yml` — reads last 24h `gemini_usage_events` and fires `Sentry.captureMessage` on any of three tripwires (calibrated USD / grounded-call count / token volume; `estimated_usd` alone under-counts grounding ~2.7x). Tripwire math in `web/lib/ai/cost-alarm-eval.ts`.
 - GitHub Actions daily 07:30 UTC: `embeddings-backfill-cron.yml` — runs `web/scripts/backfill-job-embeddings.ts` to (re-)embed job rows with a null/stale `embedding` for Jobs semantic search. Decoupled from the ingest hot path on purpose.
 - GitHub Actions weekly Mon 12:00 UTC: `scraper-drift-check.yml` — runs `web/scripts/scraper-drift-check.ts` to compare every company's stored ATS config against its live careers surface (dormant company with a live board / careers_url resolving to a different ATS / dead configured endpoint) and email findings to admins via Resend. No Gemini calls. Born from the Koho incident (July 2026); rules in `web/lib/scrapers/drift.ts`, details in `docs/OBSERVABILITY.md`.
+- GitHub Actions weekly Mon 07:00 UTC: `model-watch.yml` — runs `web/scripts/model-watch.ts` to diff the live Gemini catalog and what every `-latest`/production model actually serves (`modelVersion`) against `web/scripts/fixtures/gemini-model-catalog.json`; on a new model or alias rotation it opens/updates one `model-watch` GitHub issue. Changes nothing itself. The eval it points at is the **manual-only** `model-eval.yml` (`workflow_dispatch`, not a cron). Runbook: `docs/MODEL_EVALS.md`.
 
 CIBC/Simplii also gets a Saturday 18:15 UTC recovery run in `scrape-heavy.yml` after Workday maintenance; it resolves `COMPANY_SLUG=cibc` and uses the same tracked scraper path.
 

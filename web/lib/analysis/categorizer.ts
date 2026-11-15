@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { modelFor } from "@/lib/ai/prompt-config";
 import { recordUsage, type OnUsage, type GeminiUsageMetadata } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { resolveProvider } from "@/lib/ai/providers/registry";
@@ -189,7 +190,6 @@ export interface CategorizePostingOptions {
   onUsage?: OnUsage;
 }
 
-const DEFAULT_CATEGORIZE_MODEL = "gemini-flash-latest";
 
 /**
  * Categorize a job posting and extract template sections.
@@ -204,7 +204,7 @@ export async function categorizePosting(
   description: string,
   options?: CategorizePostingOptions
 ): Promise<JobCategoryResult | null> {
-  const requestedModel = options?.model ?? DEFAULT_CATEGORIZE_MODEL;
+  const requestedModel = options?.model ?? modelFor("categorize");
   const provider = resolveProvider(requestedModel);
   const key = process.env.GEMINI_API_KEY;
   if (provider === "gemini" && !key) {
@@ -227,7 +227,6 @@ export async function categorizePosting(
     if (provider === "gemini") {
       const genAI = new GoogleGenerativeAI(key as string);
 
-      // Using Gemini Flash (via `gemini-flash-latest`) as requested
       const model = genAI.getGenerativeModel({
         model: requestedModel,
         generationConfig: {

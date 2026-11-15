@@ -36,13 +36,13 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
-import { PRO_MODEL } from "@/lib/ai/prompt-config";
+import { SURFACE_MODELS, modelFor } from "@/lib/ai/prompt-config";
 import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { log } from "@/lib/log";
 
 export const TRIAGE_PROMPT_VERSION = "feedback-triage-v2";
-export const TRIAGE_MODEL = PRO_MODEL;
+export const TRIAGE_MODEL = SURFACE_MODELS["feedback-triage"];
 
 const TRIAGE_TIMEOUT_MS = 90_000;
 const TRIAGE_MAX_ATTEMPTS = 3;
@@ -403,7 +403,7 @@ async function callGemini(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: TRIAGE_MODEL,
+    model: modelFor("feedback-triage"),
     generationConfig: {
       temperature: 0.3,
       // The old edge function allowed 64000 output tokens for what is a few
@@ -423,7 +423,7 @@ async function callGemini(
 
     const record = recordUsage({
       callSite: "triageFeedback",
-      modelRequested: TRIAGE_MODEL,
+      modelRequested: modelFor("feedback-triage"),
       groundingEnabled: false,
       usageMetadata: response.response.usageMetadata,
       latencyMs: Date.now() - startMs,
@@ -437,7 +437,7 @@ async function callGemini(
   } catch (err) {
     const record = recordUsage({
       callSite: "triageFeedback",
-      modelRequested: TRIAGE_MODEL,
+      modelRequested: modelFor("feedback-triage"),
       groundingEnabled: false,
       latencyMs: Date.now() - startMs,
       status: "error",

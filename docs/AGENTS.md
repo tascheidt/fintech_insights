@@ -112,6 +112,8 @@ npx tsx --env-file=.env.local scripts/gemini-compare.ts --scenario=<name> --mode
 npx tsx --env-file=.env.local scripts/gemini-compare.ts --scenario=<name> --mode=compare --baseline=<prior-artifact>
 ```
 
+Evaluating a **new model** (any surface, quality + cost): `scripts/model-eval.ts` — runbook in [`MODEL_EVALS.md`](./MODEL_EVALS.md). `scripts/model-watch.ts` flags new models / alias rotations weekly.
+
 Commit the JSON artifact under `web/scripts/artifacts/`. Attach the markdown report to your PR description.
 
 Required for any PR touching `web/lib/ai/**` or `web/lib/analysis/**`.

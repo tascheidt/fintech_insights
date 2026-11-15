@@ -61,9 +61,24 @@ harness, NOT a production provider switch. Full methodology in
 - **`tech-stack-extraction.ts`** / **`tech-stack-aggregation.ts`** — Detects and aggregates company tech-stack signals from descriptions.
 - **`embeddings.ts`** — `embedText()` wraps `gemini-embedding-001` (768d, L2-normalized) for Jobs semantic search; meters like any other call site. Two callers: the `backfill-job-embeddings.ts` sweep and the `/jobs` semantic query path in `dashboard-queries.ts`. `jobEmbeddingInput()` composes the per-job text (title + summary/description).
 
+## Per-surface model table (`SURFACE_MODELS` / `modelFor`)
+
+Every distinct AI output is a **surface** (`MODEL_SURFACES` in `prompt-config.ts`: `job-structure`, `job-analysis`, `weekly-digest`, `company-editorial`, `search-report`, …). `SURFACE_MODELS` maps each one to its production model, and every call site resolves its model with `modelFor("<surface>")` — never a literal (enforced by a source-scanning test in `prompt-config.test.ts`). A model upgrade is therefore a one-line change per surface, decided by the eval suite.
+
+- `setEvalModelOverride(surface, model)` is the **eval-only** seam the model eval suite uses to drive a candidate through the real production function. It throws inside a deployed server (`VERCEL` / `NEXT_RUNTIME` set), and the override map is empty in every production process.
+- The three Prompt Forge stages (`job-structure`, `tech-stack`, `weekly-digest`) take their **default** from `SURFACE_MODELS`, but a stored `system_settings` row wins at runtime — a model change there also needs a data migration.
+
+## Model evals (`eval/`, `model-catalog.ts`)
+
+- **`eval/judge.ts`** — pairwise, position-swapped LLM judge (pure prompt/parse/combine + `runJudge`). Telemetered as `modelEval.judge`.
+- **`eval/agreement.ts`** — also hosts `scoreAgainstGolden`, the correctness scorer for the hand-labeled `golden-extraction.json`.
+- **`model-catalog.ts`** — `listGeminiModels` + `probeModelVersion` (reads `modelVersion`, i.e. what an alias *actually* served) + pure `diffCatalog`. Production telemetry records the requested alias only; this is how we see rotations.
+- **`gemini-telemetry.ts` → `addUsageObserver`** — in-process observer (empty in production) so the eval suite can cost every surface through the one chokepoint every call site already uses.
+- Driven by `web/scripts/model-eval.ts` (surface registry in `web/scripts/model-eval/`) and `web/scripts/model-watch.ts`. Runbook: [`docs/MODEL_EVALS.md`](../../../docs/MODEL_EVALS.md).
+
 ## Named model handles
 
-`PRO_MODEL` / `FLASH_MODEL` in `prompt-config.ts` are typed as `ApprovedModel`, so a call site that always wants one tier (and has no user-selectable config row) imports the handle instead of retyping the literal. Removing or renaming an entry in `AI_MODEL_OPTIONS` then fails the build at the call site rather than leaving a stray string behind. `feedback-triage.ts` uses `PRO_MODEL` this way.
+`PRO_MODEL` / `FLASH_MODEL` in `prompt-config.ts` are typed as `ApprovedModel`, so a call site that always wants one tier (and has no user-selectable config row) imports the handle instead of retyping the literal. Removing or renaming an entry in `AI_MODEL_OPTIONS` then fails the build rather than leaving a stray string behind. `SURFACE_MODELS` entries are built from these handles; call sites go through `modelFor(surface)`, and the `advanced-strategic.ts` quota fallback uses `FLASH_MODEL` directly.
 
 ## Rules of the road
 

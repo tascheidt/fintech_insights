@@ -14,6 +14,7 @@ import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
 import { scoreRankedSource } from "./source-scoring";
 import { log } from "@/lib/log";
+import { modelFor } from "@/lib/ai/prompt-config";
 
 // ============================================================================
 // Types
@@ -175,7 +176,7 @@ export async function detectCompanyType(
   try {
     const genAI = new GoogleGenerativeAI(key);
     const model = genAI.getGenerativeModel({
-      model: "gemini-flash-latest",
+      model: modelFor("company-research"),
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 256,
@@ -201,7 +202,7 @@ Only say high confidence if you are certain. Most fintech startups are private.`
     writeUsageEvent(
       recordUsage({
         callSite: "detectCompanyType",
-        modelRequested: "gemini-flash-latest",
+        modelRequested: modelFor("company-research"),
         groundingEnabled: false,
         usageMetadata: result.response.usageMetadata,
         latencyMs: Date.now() - _startMs,
@@ -424,7 +425,7 @@ export async function performDeepResearch(
 
     try {
       const model = genAI.getGenerativeModel({
-        model: "gemini-flash-latest",
+        model: modelFor("company-research"),
         // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
         tools: [{ googleSearch: {} }],
       });
@@ -440,7 +441,7 @@ export async function performDeepResearch(
       writeUsageEvent(
         recordUsage({
           callSite: "performDeepResearch.search",
-          modelRequested: "gemini-flash-latest",
+          modelRequested: modelFor("company-research"),
           groundingEnabled: true,
           usageMetadata: result.response.usageMetadata,
           latencyMs: Date.now() - _searchStartMs,
@@ -759,7 +760,7 @@ async function extractStatedStrategy(
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-flash-latest",
+      model: modelFor("company-research"),
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 2048,
@@ -788,7 +789,7 @@ If there's not enough information to summarize a strategy, say "Insufficient pub
     writeUsageEvent(
       recordUsage({
         callSite: "extractStatedStrategy",
-        modelRequested: "gemini-flash-latest",
+        modelRequested: modelFor("company-research"),
         groundingEnabled: false,
         usageMetadata: result.response.usageMetadata,
         latencyMs: Date.now() - _startMs,
@@ -825,7 +826,7 @@ async function extractFinancialContext(
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-flash-latest",
+      model: modelFor("company-research"),
       generationConfig: {
         temperature: 0.2,
         maxOutputTokens: 2048,
@@ -863,7 +864,7 @@ ${sourceText}`;
     writeUsageEvent(
       recordUsage({
         callSite: "extractFinancialContext",
-        modelRequested: "gemini-flash-latest",
+        modelRequested: modelFor("company-research"),
         groundingEnabled: false,
         usageMetadata: result.response.usageMetadata,
         latencyMs: Date.now() - _startMs,

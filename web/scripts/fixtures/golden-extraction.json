@@ -1,19 +1,931 @@
 {
-  "_README": "Human-labeled golden set for the open-model bake-off (extract-structure). Each record's `expected` is a hand-VERIFIED JobStructureForDB for the matching fixture job id in gemini-sample-jobs.json. Scoring a model against this set measures CORRECTNESS, not just similarity to Gemini. Populate ~25-30 stratified jobs, then run: npx tsx --env-file=.env.local scripts/model-bakeoff.ts --scenario=extract-structure --models=gemini-flash-latest,glm-5.2,deepseek-v4-flash --reference=golden. Until populated, omit --reference=golden and the harness scores against the Gemini baseline output instead.",
+  "_README": "Hand-labeled golden set for extraction CORRECTNESS (not similarity to a model). One record per job in gemini-sample-jobs.json, labeled from exactly what the extractor sees (first 6000 chars of description_text) and graded against the production prompt's own rules (e.g. Jira/Slack/Excel are excluded from tech_stack). `expected` is the best answer; `acceptable` lists defensible alternatives for genuinely ambiguous fields. tech_required entries must appear (an array entry = synonyms, any one counts); tech_allowed entries are borderline items that are not penalized; anything else in a model's tech_stack counts against precision. Scored by scoreAgainstGolden() in web/lib/ai/eval/agreement.ts. Labeled 2026-11-15 by Claude Code; spot-check before treating as gospel.",
   "_schema": {
-    "jobId": "string (must match an id in gemini-sample-jobs.json)",
+    "jobId": "id in gemini-sample-jobs.json",
     "expected": {
-      "summary": "string",
-      "seniority_level": "intern|junior|mid|senior|staff|principal|lead|executive",
-      "salary_min": "number|null",
-      "salary_max": "number|null",
-      "salary_currency": "string (e.g. USD)",
-      "tech_stack": ["string"],
-      "keywords": ["string"],
-      "standardized_department": "string",
-      "function_category": "one of ROLE_CATEGORIES",
-      "location_structured": { "city": "string|null", "state": "string|null", "country": "string|null", "formatted": "string|null" }
+      "seniority_level": "enum",
+      "standardized_department": "enum",
+      "function_category": "ROLE_CATEGORIES",
+      "salary": "{min,max,currency}|null",
+      "location": "{city|null,country}|null — from title+description only (the prompt never sees the ATS location field)",
+      "tech_required": [
+        "string | string[] (synonyms)"
+      ],
+      "tech_allowed": [
+        "string"
+      ]
+    },
+    "acceptable": {
+      "<field>": [
+        "alternative values"
+      ]
     }
   },
-  "records": []
+  "records": [
+    {
+      "jobId": "645839c0-151d-4404-8d8f-940ea48f368a",
+      "title": "ServiceNow Engineer",
+      "company": "EQ Bank",
+      "expected": {
+        "seniority_level": "mid",
+        "standardized_department": "Engineering",
+        "function_category": "it-internal-systems",
+        "salary": null,
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [
+          "ServiceNow",
+          "JavaScript"
+        ],
+        "tech_allowed": [
+          "HTML",
+          "CSS",
+          "REST",
+          "SOAP",
+          "XML",
+          "JSON"
+        ]
+      },
+      "acceptable": {
+        "function_category": [
+          "engineering-backend",
+          "engineering-fullstack"
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "2+ yrs ServiceNow dev; internal ITSM platform."
+    },
+    {
+      "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d",
+      "title": "Senior Estates and Trust Coordinator",
+      "company": "EQ Bank",
+      "expected": {
+        "seniority_level": "senior",
+        "standardized_department": "Operations",
+        "function_category": "business-operations",
+        "salary": null,
+        "location": {
+          "city": "Toronto",
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": [
+          "CRM"
+        ]
+      },
+      "acceptable": {
+        "seniority_level": [
+          "mid"
+        ],
+        "function_category": [
+          "customer-operations"
+        ]
+      },
+      "notes": "Trust admin coordinator; Excel/Office excluded by prompt rules."
+    },
+    {
+      "jobId": "9af5a8d4-c15e-490c-b2a6-6f34d804e1b9",
+      "title": "Senior Backend Engineer (CARE Pod)",
+      "company": "EQ Bank",
+      "expected": {
+        "seniority_level": "senior",
+        "standardized_department": "Engineering",
+        "function_category": "engineering-backend",
+        "salary": null,
+        "location": {
+          "city": "Toronto",
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "function_category": [
+          "engineering-ai-ml"
+        ]
+      },
+      "notes": "No technology is explicitly named; any tech_stack entry is inferred."
+    },
+    {
+      "jobId": "5add9237-0247-4579-ba5f-38199b5dad8c",
+      "title": "Senior People Partner",
+      "company": "Koho",
+      "expected": {
+        "seniority_level": "senior",
+        "standardized_department": "HR",
+        "function_category": "people-ops-hr",
+        "salary": {
+          "min": 110000,
+          "max": 160000,
+          "currency": "CAD"
+        },
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [
+          "BambooHR"
+        ],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "seniority_level": [
+          "mid"
+        ],
+        "salary": [
+          {
+            "min": 130000,
+            "max": 160000,
+            "currency": "CAD"
+          },
+          {
+            "min": 110000,
+            "max": 130000,
+            "currency": "CAD"
+          }
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "Open at intermediate or senior; two published bands."
+    },
+    {
+      "jobId": "a67a3e67-354b-40dc-abfc-c10b6318bfe5",
+      "title": "Senior Manager, Financial Risk",
+      "company": "Koho",
+      "expected": {
+        "seniority_level": "lead",
+        "standardized_department": "Finance",
+        "function_category": "risk-management",
+        "salary": {
+          "min": 150000,
+          "max": 190000,
+          "currency": "CAD"
+        },
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [
+          "SQL",
+          "Python",
+          "SAS"
+        ],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "seniority_level": [
+          "senior",
+          "executive"
+        ],
+        "standardized_department": [
+          "Operations",
+          "Legal"
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "Senior Manager leading analysts. IFRS 9 is a standard (excluded)."
+    },
+    {
+      "jobId": "e64cce30-4b02-42c6-83a3-a22cc989f667",
+      "title": "Director, Financial Risk",
+      "company": "Koho",
+      "expected": {
+        "seniority_level": "executive",
+        "standardized_department": "Finance",
+        "function_category": "risk-management",
+        "salary": null,
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "seniority_level": [
+          "lead"
+        ],
+        "standardized_department": [
+          "Operations",
+          "Legal"
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "Salary is past the 6000-char extraction window, so null is correct."
+    },
+    {
+      "jobId": "025a033e-94e6-4dd5-97c2-d800ce743bb8",
+      "title": "Banking Advisor",
+      "company": "National Bank",
+      "expected": {
+        "seniority_level": "junior",
+        "standardized_department": "Sales",
+        "function_category": "account-management-customer-success",
+        "salary": null,
+        "location": {
+          "city": "Longueuil",
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "seniority_level": [
+          "mid"
+        ],
+        "standardized_department": [
+          "Customer Success",
+          "Support"
+        ],
+        "function_category": [
+          "sales-account-executives",
+          "customer-support-cx",
+          "customer-support"
+        ]
+      },
+      "notes": "Branch banking advisor."
+    },
+    {
+      "jobId": "763200a2-89d6-4a37-83e8-eaa028abf273",
+      "title": "Banking Advisor Jobs for Indigenous People",
+      "company": "National Bank",
+      "expected": {
+        "seniority_level": "junior",
+        "standardized_department": "Sales",
+        "function_category": "account-management-customer-success",
+        "salary": {
+          "min": 18.73,
+          "max": null,
+          "currency": "CAD"
+        },
+        "location": {
+          "city": "Montreal",
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "standardized_department": [
+          "Customer Success",
+          "Support"
+        ],
+        "function_category": [
+          "sales-account-executives",
+          "customer-support-cx",
+          "customer-support"
+        ],
+        "salary": [
+          {
+            "min": 18.73,
+            "max": 18.73,
+            "currency": "CAD"
+          }
+        ]
+      },
+      "notes": "Hourly starting rate $18.73."
+    },
+    {
+      "jobId": "0dd79afa-9afa-47cd-90fb-fc0fc2c6a665",
+      "title": "Banking Advisor",
+      "company": "National Bank",
+      "expected": {
+        "seniority_level": "junior",
+        "standardized_department": "Sales",
+        "function_category": "account-management-customer-success",
+        "salary": null,
+        "location": {
+          "city": "Sorel-Tracy",
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "standardized_department": [
+          "Customer Success",
+          "Support"
+        ],
+        "function_category": [
+          "sales-account-executives",
+          "customer-support-cx",
+          "customer-support"
+        ]
+      },
+      "notes": "Branch banking advisor."
+    },
+    {
+      "jobId": "9a297c56-b3ba-47fa-9393-01a4f3b1d951",
+      "title": "Sales Representative - Southgate Mall",
+      "company": "Neo Financial",
+      "expected": {
+        "seniority_level": "junior",
+        "standardized_department": "Sales",
+        "function_category": "sales-account-executives",
+        "salary": {
+          "min": 20,
+          "max": null,
+          "currency": "CAD"
+        },
+        "location": {
+          "city": "Edmonton",
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "function_category": [
+          "business-development-partnerships"
+        ],
+        "salary": [
+          {
+            "min": 20,
+            "max": 36,
+            "currency": "CAD"
+          },
+          {
+            "min": 20,
+            "max": 20,
+            "currency": "CAD"
+          }
+        ],
+        "location": [
+          {
+            "city": null,
+            "country": "Canada"
+          },
+          null
+        ]
+      },
+      "notes": "$20/hr base; $36/hr average on-target."
+    },
+    {
+      "jobId": "96a9b880-5540-42a4-b7ec-388280623af6",
+      "title": "Director, Marketing Analytics",
+      "company": "Neo Financial",
+      "expected": {
+        "seniority_level": "executive",
+        "standardized_department": "Marketing",
+        "function_category": "data-analytics-bi",
+        "salary": null,
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [
+          "Snowflake",
+          "SQL"
+        ],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "seniority_level": [
+          "lead",
+          "principal",
+          "senior"
+        ],
+        "function_category": [
+          "marketing-growth-performance"
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "Director-titled IC (no reports)."
+    },
+    {
+      "jobId": "eb3e9b33-7ca4-4ed7-9b6d-3e46494280d0",
+      "title": " Représentant des ventes - Laval ",
+      "company": "Neo Financial",
+      "expected": {
+        "seniority_level": "junior",
+        "standardized_department": "Sales",
+        "function_category": "sales-account-executives",
+        "salary": {
+          "min": 20,
+          "max": null,
+          "currency": "CAD"
+        },
+        "location": {
+          "city": "Laval",
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "function_category": [
+          "business-development-partnerships"
+        ],
+        "salary": [
+          {
+            "min": 20,
+            "max": 36,
+            "currency": "CAD"
+          },
+          {
+            "min": 20,
+            "max": 20,
+            "currency": "CAD"
+          }
+        ],
+        "location": [
+          {
+            "city": null,
+            "country": "Canada"
+          }
+        ]
+      },
+      "notes": "French-language posting; $20/hr base."
+    },
+    {
+      "jobId": "492f71bc-ab2d-447e-a076-5affe0038756",
+      "title": "Third Party Risk and Vendor Management Officer",
+      "company": "Questrade",
+      "expected": {
+        "seniority_level": "mid",
+        "standardized_department": "Operations",
+        "function_category": "risk-management",
+        "salary": {
+          "min": 70000,
+          "max": 95000,
+          "currency": "CAD"
+        },
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "seniority_level": [
+          "junior"
+        ],
+        "standardized_department": [
+          "Legal",
+          "Finance"
+        ],
+        "function_category": [
+          "compliance",
+          "regulatory-affairs"
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "TPRM officer; OSFI B-10 is a guideline (excluded)."
+    },
+    {
+      "jobId": "afb62032-c97d-492f-a9f2-fbbcd65dc103",
+      "title": "Analyst, Mutual Fund, Security Master and Physical Securities (Contract)",
+      "company": "Questrade",
+      "expected": {
+        "seniority_level": "mid",
+        "standardized_department": "Operations",
+        "function_category": "business-operations",
+        "salary": {
+          "min": 60000,
+          "max": 65000,
+          "currency": "CAD"
+        },
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [
+          "Broadridge"
+        ],
+        "tech_allowed": [
+          "Fundserv",
+          "BPS",
+          "Broadridge BPS",
+          "MSD",
+          "CDS",
+          "DTC"
+        ]
+      },
+      "acceptable": {
+        "seniority_level": [
+          "junior"
+        ],
+        "function_category": [
+          "customer-operations",
+          "capital-markets-treasury",
+          "finance-accounting"
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "Clearing operations analyst, 12-month contract."
+    },
+    {
+      "jobId": "7ddca5ee-2708-4120-a8b9-fa703115d899",
+      "title": "Head of Marketing - Questbank",
+      "company": "Questrade",
+      "expected": {
+        "seniority_level": "executive",
+        "standardized_department": "Marketing",
+        "function_category": "marketing-product-brand",
+        "salary": null,
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "seniority_level": [
+          "lead"
+        ],
+        "function_category": [
+          "marketing-growth-performance"
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "Head of B2B marketing, 10+ yrs."
+    },
+    {
+      "jobId": "70658554-12d3-4e79-884d-b98cec3fa40a",
+      "title": "Clearing & Custody Wealth Management Banker",
+      "company": "RBC",
+      "expected": {
+        "seniority_level": "senior",
+        "standardized_department": "Sales",
+        "function_category": "sales-account-executives",
+        "salary": {
+          "min": 120000,
+          "max": 200000,
+          "currency": "USD"
+        },
+        "location": {
+          "city": "New York",
+          "country": "United States"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "function_category": [
+          "business-development-partnerships",
+          "account-management-customer-success"
+        ],
+        "salary": [
+          {
+            "min": 90000,
+            "max": 200000,
+            "currency": "USD"
+          }
+        ]
+      },
+      "notes": "NY band primary; multi-city bands published."
+    },
+    {
+      "jobId": "f6357a87-6877-4a5e-8371-4a95d507693c",
+      "title": "Senior Network Analyst",
+      "company": "RBC",
+      "expected": {
+        "seniority_level": "senior",
+        "standardized_department": "Engineering",
+        "function_category": "engineering-platform-sre-devops",
+        "salary": null,
+        "location": {
+          "city": "Toronto",
+          "country": "Canada"
+        },
+        "tech_required": [
+          "Cisco",
+          "Aruba",
+          "ServiceNow",
+          "Wireshark",
+          "Infoblox",
+          [
+            "Silver Peak",
+            "Silver Peak EdgeConnect"
+          ]
+        ],
+        "tech_allowed": [
+          "NetMRI",
+          "CA Spectrum",
+          "Spectrum",
+          "NetScout nGenius",
+          "nGenius",
+          "NetScout",
+          "AirWave",
+          "ClearPass",
+          "Cisco DNAC",
+          "Cisco DNA Center",
+          "SecureCRT",
+          "Python",
+          "Ansible",
+          "Cisco Viptela",
+          "Viptela",
+          "Cisco Prime Infrastructure",
+          "BGP",
+          "OSPF",
+          "MPLS",
+          "SD-WAN",
+          "SDWAN",
+          "Sniffer"
+        ]
+      },
+      "acceptable": {
+        "seniority_level": [
+          "mid"
+        ],
+        "function_category": [
+          "it-internal-systems"
+        ]
+      },
+      "notes": "Network SRE; many named vendor tools."
+    },
+    {
+      "jobId": "2c0ddecd-ae50-4e65-8a43-6e2c585416e3",
+      "title": "2026 CFO, Data Governance Summer Analyst (4 Months)",
+      "company": "RBC",
+      "expected": {
+        "seniority_level": "intern",
+        "standardized_department": "Finance",
+        "function_category": "data-analytics-bi",
+        "salary": null,
+        "location": {
+          "city": "Toronto",
+          "country": "Canada"
+        },
+        "tech_required": [
+          "SQL"
+        ],
+        "tech_allowed": [
+          "Tableau"
+        ]
+      },
+      "acceptable": {
+        "standardized_department": [
+          "Operations",
+          "Engineering"
+        ],
+        "function_category": [
+          "business-operations"
+        ]
+      },
+      "notes": "4-month co-op, Office of the CFO."
+    },
+    {
+      "jobId": "4a410d00-c43c-49c8-95b1-407cdfad1cee",
+      "title": "Senior Manager, External Communications &amp; Community Investment - 18-month contract - Tangerine",
+      "company": "Tangerine",
+      "expected": {
+        "seniority_level": "lead",
+        "standardized_department": "Marketing",
+        "function_category": "marketing-product-brand",
+        "salary": null,
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [],
+        "tech_allowed": []
+      },
+      "acceptable": {
+        "seniority_level": [
+          "senior"
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "Senior Manager, comms + CSR; manages a team."
+    },
+    {
+      "jobId": "ecdfc114-788a-45ca-a90e-3b1631c33fb4",
+      "title": "Senior Database Administrator",
+      "company": "Tangerine",
+      "expected": {
+        "seniority_level": "senior",
+        "standardized_department": "Engineering",
+        "function_category": "engineering-data",
+        "salary": null,
+        "location": null,
+        "tech_required": [
+          [
+            "Oracle",
+            "Oracle Database"
+          ],
+          [
+            "Redis",
+            "Redis Enterprise"
+          ],
+          [
+            "GCP",
+            "Google Cloud",
+            "Google Cloud Platform"
+          ],
+          "AlloyDB",
+          "Terraform"
+        ],
+        "tech_allowed": [
+          "SQL",
+          "Qlik Replicate",
+          "Attunity",
+          "Cloud SQL",
+          "Oracle Data Guard",
+          "Data Guard",
+          "Dataguard",
+          "RMAN",
+          "Linux",
+          "Unix",
+          "TDE"
+        ]
+      },
+      "acceptable": {
+        "function_category": [
+          "engineering-platform-sre-devops",
+          "it-internal-systems"
+        ],
+        "location": [
+          {
+            "city": null,
+            "country": "Canada"
+          }
+        ]
+      },
+      "notes": "Senior DBA, 8+ yrs."
+    },
+    {
+      "jobId": "6a5cba55-4879-4046-b5e8-4bc97d73e198",
+      "title": "Sr DevOps Specialist, Tools and Administration - Tangerine",
+      "company": "Tangerine",
+      "expected": {
+        "seniority_level": "senior",
+        "standardized_department": "Engineering",
+        "function_category": "engineering-platform-sre-devops",
+        "salary": null,
+        "location": {
+          "city": "Toronto",
+          "country": "Canada"
+        },
+        "tech_required": [
+          "Jenkins",
+          "Terraform",
+          "Kubernetes",
+          [
+            "GitHub Actions"
+          ],
+          [
+            "GCP",
+            "Google Cloud",
+            "Google Cloud Platform"
+          ],
+          "Java",
+          "SonarQube",
+          "Artifactory",
+          [
+            "Git",
+            "GitHub"
+          ]
+        ],
+        "tech_allowed": [
+          "Groovy",
+          "JavaScript",
+          "Bash",
+          "Shell",
+          "Linux",
+          "Windows",
+          "Crowd",
+          "GitHub",
+          "Git"
+        ]
+      },
+      "acceptable": {},
+      "notes": "Jira/Confluence/Slack are excluded by the prompt rules."
+    },
+    {
+      "jobId": "a9ad7dc0-9fe1-483e-bb62-712bc980ca5c",
+      "title": "Specialist, Derivatives Risk Remediation",
+      "company": "Wealthsimple",
+      "expected": {
+        "seniority_level": "junior",
+        "standardized_department": "Operations",
+        "function_category": "risk-management",
+        "salary": null,
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [
+          "SQL",
+          "Python"
+        ],
+        "tech_allowed": [
+          "Oracle",
+          "Oracle DB",
+          "ICE",
+          "FactSet",
+          "Preset",
+          "Apache Superset",
+          "Superset"
+        ]
+      },
+      "acceptable": {
+        "seniority_level": [
+          "mid"
+        ],
+        "standardized_department": [
+          "Finance"
+        ],
+        "function_category": [
+          "capital-markets-treasury",
+          "business-operations"
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "1-3 yrs; Jira/Notion/Slack/Excel excluded by rules."
+    },
+    {
+      "jobId": "c1f15941-82a8-426c-933a-d2c7c42f2d9b",
+      "title": "Senior Analyst, Quantitative Research",
+      "company": "Wealthsimple",
+      "expected": {
+        "seniority_level": "senior",
+        "standardized_department": "Product",
+        "function_category": "data-science",
+        "salary": null,
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [
+          "Python",
+          "pandas",
+          "NumPy"
+        ],
+        "tech_allowed": [
+          "statsmodels"
+        ]
+      },
+      "acceptable": {
+        "standardized_department": [
+          "Finance",
+          "Engineering"
+        ],
+        "function_category": [
+          "capital-markets-treasury",
+          "product-research"
+        ],
+        "location": [
+          null
+        ]
+      },
+      "notes": "Quant research, portfolio optimization."
+    },
+    {
+      "jobId": "286a62b4-5991-4eb8-897d-819faae319e2",
+      "title": "Senior Software Developer, Ledger",
+      "company": "Wealthsimple",
+      "expected": {
+        "seniority_level": "senior",
+        "standardized_department": "Engineering",
+        "function_category": "engineering-backend",
+        "salary": null,
+        "location": {
+          "city": null,
+          "country": "Canada"
+        },
+        "tech_required": [
+          "Java",
+          "Kotlin",
+          "React",
+          "Kafka"
+        ],
+        "tech_allowed": [
+          "SQL",
+          "Oracle EBS",
+          "Oracle"
+        ]
+      },
+      "acceptable": {
+        "location": [
+          null
+        ]
+      },
+      "notes": "Ledger backend; Kafka is a bonus-points mention but explicitly named."
+    }
+  ]
 }
