@@ -17,6 +17,10 @@ name: Scraper Drift Check
 #   - NEXT_PUBLIC_SUPABASE_ANON_KEY
 #   - SUPABASE_SERVICE_ROLE_KEY
 #   - RESEND_API_KEY
+#   - RESEND_FROM  — a sender on your Resend-verified domain (same value as the
+#     Vercel env var). Without it the script falls back to Resend's sandbox
+#     sender `onboarding@resend.dev`, which can only email the Resend account
+#     owner; Resend then rejects the whole admin batch (Nov 2026).
 #
 # Schedule: Monday 12:00 UTC — after company-insights (09:00) and editorial
 # (11:00) so the weekly ops emails arrive together.
@@ -50,8 +54,9 @@ jobs:
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
         run: |
-          for secret in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY RESEND_API_KEY; do
+          for secret in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY RESEND_API_KEY RESEND_FROM; do
             value=$(eval echo \$$secret)
             if [ -z "$value" ]; then
               echo "::error::Missing required secret $secret"
