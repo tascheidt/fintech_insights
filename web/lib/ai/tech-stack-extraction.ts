@@ -5,6 +5,7 @@ import {
   DEFAULT_TECH_STACK_AI_CONFIG,
   type TechStackAiConfig,
 } from "./prompt-config";
+import { modelFor } from "./prompt-config";
 
 /**
  * Tech Stack Extraction
@@ -264,7 +265,7 @@ export async function extractCompanyTechStack(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: "gemini-flash-latest",
+    model: modelFor("tech-stack"),
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 8192,
@@ -305,7 +306,7 @@ export async function extractCompanyTechStack(
       writeUsageEvent(
         recordUsage({
           callSite: "extractCompanyTechStack",
-          modelRequested: "gemini-flash-latest",
+          modelRequested: modelFor("tech-stack"),
           groundingEnabled: false,
           usageMetadata: result.response.usageMetadata,
           latencyMs: Date.now() - _startMs,

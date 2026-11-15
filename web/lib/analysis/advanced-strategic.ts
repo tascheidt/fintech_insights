@@ -8,6 +8,7 @@
  */
 
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import { FLASH_MODEL, SURFACE_MODELS, modelFor } from "@/lib/ai/prompt-config";
 import { checkVoice } from "@/lib/ai/voice-validator";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage, type OnUsage } from "@/lib/ai/gemini-meter";
@@ -19,8 +20,8 @@ import { log } from "@/lib/log";
 // Constants
 // ---------------------------------------------------------------------------
 
-const PRO_MODEL = "gemini-pro-latest";
-const FLASH_MODEL = "gemini-flash-latest";
+// Models resolve through prompt-config (`SURFACE_MODELS["job-analysis"]`);
+// the quota fallback drops to the Flash tier handle.
 
 /** How many days of hiring history to include as context for each job analysis. */
 const HISTORICAL_CONTEXT_DAYS = 180;
@@ -104,7 +105,7 @@ export interface AnalyzeJobOptions {
    */
   webSearchContext?: WebSearchContext;
   /**
-   * Gemini model for the main analysis JSON call. Default: `gemini-pro-latest`.
+   * Gemini model for the main analysis JSON call. Default: `modelFor("job-analysis")`.
    */
   analysisModel?: string;
   /**
@@ -348,7 +349,7 @@ export async function performWebSearch(
   try {
     const genAI = new GoogleGenerativeAI(key);
     const model = genAI.getGenerativeModel({
-      model: PRO_MODEL,
+      model: modelFor("job-analysis"),
       // @ts-expect-error - googleSearch tool exists at runtime but types may be outdated
       tools: [{ googleSearch: {} }],
     });
@@ -382,7 +383,7 @@ export async function performWebSearch(
 
     const _webSearchUsage = recordUsage({
       callSite: "performWebSearch",
-      modelRequested: PRO_MODEL,
+      modelRequested: modelFor("job-analysis"),
       groundingEnabled: true,
       usageMetadata: result.response.usageMetadata,
       latencyMs: Date.now() - _startMs,
@@ -451,7 +452,7 @@ export async function analyzeJobAdvanced(
     job,
     historicalContext,
     webSearchContext,
-    analysisModel = PRO_MODEL,
+    analysisModel = modelFor("job-analysis"),
     analysisGoogleSearch = true,
     analysisQuotaFallback = true,
     onUsage,
@@ -510,7 +511,7 @@ export async function analyzeJobAdvanced(
     } catch (error: unknown) {
       const allowFallback =
         analysisQuotaFallback &&
-        analysisModel === PRO_MODEL &&
+        analysisModel === SURFACE_MODELS["job-analysis"] &&
         analysisGoogleSearch;
       if (allowFallback && isQuotaError(error)) {
         const msg = error instanceof Error ? error.message : String(error);

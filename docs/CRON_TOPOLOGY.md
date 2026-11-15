@@ -1,9 +1,9 @@
 # Cron Topology
 
-Eight scheduled jobs run in production. Two live on Vercel (Hobby plan caps at 2),
-six run from GitHub Actions. Most GH Actions cron jobs `curl` back into the
-deployed Next.js app; the editorial, embeddings-backfill, and scraper-drift-check
-crons are the exceptions — they run a script directly inside the runner because
+Nine scheduled jobs run in production. Two live on Vercel (Hobby plan caps at 2),
+seven run from GitHub Actions. Most GH Actions cron jobs `curl` back into the
+deployed Next.js app; the editorial, embeddings-backfill, scraper-drift-check and
+model-watch crons are the exceptions — they run a script directly inside the runner because
 GH Actions has the runtime budget for the long-running work.
 
 ## Jobs
@@ -18,10 +18,20 @@ GH Actions has the runtime budget for the long-running work.
 | embeddings-backfill| GitHub Actions | `30 7 * * *`   | `npx tsx web/scripts/backfill-job-embeddings.ts`      | Service-role + Gemini secrets in repo |
 | cibc-saturday-recovery | GitHub Actions | `15 18 * * 6` | `npx tsx web/scripts/scrape-heavy.ts` (`COMPANY_SLUG=cibc`) | Service-role + Gemini secrets in repo |
 | scraper-drift-check| GitHub Actions | `0 12 * * 1`   | `npx tsx web/scripts/scraper-drift-check.ts`          | Service-role + Resend secrets in repo |
+| model-watch        | GitHub Actions | `0 7 * * 1`    | `npx tsx web/scripts/model-watch.ts`                  | `GEMINI_API_KEY` + workflow `GITHUB_TOKEN` (issues: write) |
 
 Source of truth:
 - Vercel: [`web/vercel.json`](../web/vercel.json) `crons` array.
-- GitHub Actions: [`.github/workflows/scrape-heavy.yml`](../.github/workflows/scrape-heavy.yml), [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml), [`.github/workflows/editorial-cron.yml`](../.github/workflows/editorial-cron.yml), [`.github/workflows/gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml), [`.github/workflows/embeddings-backfill-cron.yml`](../.github/workflows/embeddings-backfill-cron.yml), [`.github/workflows/scraper-drift-check.yml`](../.github/workflows/scraper-drift-check.yml).
+- GitHub Actions: [`.github/workflows/scrape-heavy.yml`](../.github/workflows/scrape-heavy.yml), [`.github/workflows/company-insights-cron.yml`](../.github/workflows/company-insights-cron.yml), [`.github/workflows/editorial-cron.yml`](../.github/workflows/editorial-cron.yml), [`.github/workflows/gemini-cost-alarm.yml`](../.github/workflows/gemini-cost-alarm.yml), [`.github/workflows/embeddings-backfill-cron.yml`](../.github/workflows/embeddings-backfill-cron.yml), [`.github/workflows/scraper-drift-check.yml`](../.github/workflows/scraper-drift-check.yml), [`.github/workflows/model-watch.yml`](../.github/workflows/model-watch.yml).
+
+The model-watch cron lists the Gemini catalog and probes what every `-latest`
+alias and every production model actually serves (`modelVersion`), diffs that
+against the committed snapshot `web/scripts/fixtures/gemini-model-catalog.json`,
+and on any change opens (or comments on) one GitHub issue labelled
+`model-watch` with the diff and the eval command. It changes nothing itself.
+The eval it points at is the **manual-only** `model-eval.yml` workflow
+(`workflow_dispatch`, never scheduled — a full run costs real money). Runbook:
+[`MODEL_EVALS.md`](./MODEL_EVALS.md).
 
 The scraper-drift-check cron compares every company's stored ATS config
 against its live careers surface: inactive fintech companies with a live
@@ -80,6 +90,10 @@ it needs Supabase + Gemini credentials in addition to `CRON_SECRET`:
 The scraper-drift-check cron also runs in-runner and needs the Supabase trio
 plus `RESEND_API_KEY` (and optionally `RESEND_FROM` / `NEXT_PUBLIC_APP_URL`)
 as GitHub repo secrets so it can email its findings to admins.
+
+The model-watch cron and the manual model-eval workflow need only
+`GEMINI_API_KEY`; model-watch files its issue with the workflow's own
+`GITHUB_TOKEN` (`permissions: issues: write`), so no extra secret.
 
 ## Adding a new scheduled job — decision tree
 

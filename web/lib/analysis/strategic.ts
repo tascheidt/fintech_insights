@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { log } from "@/lib/log";
+import { modelFor } from "@/lib/ai/prompt-config";
 
 /**
  * Strategic Analysis using Gemini Flash
@@ -70,7 +71,7 @@ export async function analyzeJob(
     
     // Use Gemini Flash with JSON mode for guaranteed structured output
     const model = genAI.getGenerativeModel({
-      model: "gemini-flash-latest",
+      model: modelFor("legacy-job-analysis"),
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 64000,

@@ -22,7 +22,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
-import { AI_MODEL_OPTIONS } from "@/lib/ai/prompt-config";
+import { SURFACE_MODELS, modelFor } from "@/lib/ai/prompt-config";
 import { getVoiceDirective } from "@/lib/ai/voice";
 import { recordUsage } from "@/lib/ai/gemini-meter";
 import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
@@ -38,9 +38,8 @@ import {
 } from "@/lib/reports/types";
 
 export const SEARCH_REPORT_PROMPT_VERSION = "search-report-synthesis-v1";
-/** Flash — the default tier (see CLAUDE.md §5). Index 0 of the single source
- *  of truth, same resolution the /api/ai/generate-posting route uses. */
-export const SEARCH_REPORT_MODEL = AI_MODEL_OPTIONS[0].value;
+/** Production model stamped on the report row. Resolved from `SURFACE_MODELS`. */
+export const SEARCH_REPORT_MODEL = SURFACE_MODELS["search-report"];
 
 const SYNTHESIS_TIMEOUT_MS = 45_000;
 const SYNTHESIS_MAX_ATTEMPTS = 3;
@@ -287,7 +286,7 @@ async function attemptSynthesis(
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: SEARCH_REPORT_MODEL,
+    model: modelFor("search-report"),
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 4096,
@@ -309,7 +308,7 @@ async function attemptSynthesis(
     writeUsageEvent(
       recordUsage({
         callSite: "generateSearchReportSynthesis",
-        modelRequested: SEARCH_REPORT_MODEL,
+        modelRequested: modelFor("search-report"),
         groundingEnabled: false,
         latencyMs: Date.now() - startMs,
         status: "error",
@@ -327,7 +326,7 @@ async function attemptSynthesis(
   writeUsageEvent(
     recordUsage({
       callSite: "generateSearchReportSynthesis",
-      modelRequested: SEARCH_REPORT_MODEL,
+      modelRequested: modelFor("search-report"),
       groundingEnabled: false,
       usageMetadata: response.response.usageMetadata,
       latencyMs: Date.now() - startMs,

@@ -93,3 +93,69 @@ describe("scoreCategorization", () => {
     expect(a.qualityAgreement).toBeCloseTo(1 - 2 / 4, 6);
   });
 });
+
+describe("scoreAgainstGolden", () => {
+  const golden: import("./agreement").GoldenExtractionRecord = {
+    jobId: "j1",
+    expected: {
+      seniority_level: "senior",
+      standardized_department: "Engineering",
+      function_category: "engineering-data",
+      salary: { min: 100000, max: 120000, currency: "CAD" },
+      location: { city: "Toronto", country: "Canada" },
+      tech_required: [["Oracle", "Oracle Database"], "Terraform"],
+      tech_allowed: ["SQL"],
+    },
+    acceptable: { seniority_level: ["staff"], function_category: ["engineering-platform-sre-devops"] },
+  };
+  const base = {
+    summary: "s",
+    seniority_level: "senior",
+    salary_min: 100000,
+    salary_max: 120000,
+    salary_currency: "CAD",
+    tech_stack: ["Oracle Database", "Terraform", "SQL"],
+    keywords: [],
+    standardized_department: "Engineering",
+    function_category: "engineering-data",
+    location_structured: { city: "Toronto", state: "Ontario", country: "Canada", formatted: "Toronto" },
+  } as unknown as JobStructureForDB;
+
+  it("scores a fully correct extraction as 1", async () => {
+    const { scoreAgainstGolden } = await import("./agreement");
+    const s = scoreAgainstGolden(base, golden);
+    expect(s.l1Correctness).toBe(1);
+    expect(s.techUnexpected).toEqual([]);
+  });
+
+  it("accepts listed alternatives and penalizes everything else", async () => {
+    const { scoreAgainstGolden } = await import("./agreement");
+    const alt = scoreAgainstGolden({ ...base, seniority_level: "staff", function_category: "engineering-platform-sre-devops" } as JobStructureForDB, golden);
+    expect(alt.l1Correctness).toBe(1);
+    const wrong = scoreAgainstGolden({ ...base, seniority_level: "junior" } as JobStructureForDB, golden);
+    expect(wrong.fields.find((f) => f.field === "seniority_level")?.score).toBe(0);
+  });
+
+  it("counts excluded/inferred tech against precision and missing required against recall", async () => {
+    const { scoreAgainstGolden } = await import("./agreement");
+    const s = scoreAgainstGolden({ ...base, tech_stack: ["Oracle", "Jira", "Slack"] } as JobStructureForDB, golden);
+    expect(s.techRecall).toBe(0.5);
+    expect(s.techPrecision).toBeCloseTo(1 / 3);
+    expect(s.techUnexpected).toEqual(["Jira", "Slack"]);
+  });
+
+  it("treats an inferred salary as wrong when none is published", async () => {
+    const { scoreAgainstGolden } = await import("./agreement");
+    const g = { ...golden, expected: { ...golden.expected, salary: null } };
+    expect(scoreAgainstGolden(base, g).fields.find((f) => f.field === "salary")?.score).toBe(0);
+    const none = { ...base, salary_min: null, salary_max: null } as JobStructureForDB;
+    expect(scoreAgainstGolden(none, g).fields.find((f) => f.field === "salary")?.score).toBe(1);
+  });
+
+  it("normalizes country aliases", async () => {
+    const { scoreAgainstGolden } = await import("./agreement");
+    const g = { ...golden, expected: { ...golden.expected, location: { city: "New York", country: "United States" } } };
+    const c = { ...base, location_structured: { city: "New York", state: "NY", country: "United States of America", formatted: "" } } as JobStructureForDB;
+    expect(scoreAgainstGolden(c, g).fields.find((f) => f.field === "location")?.score).toBe(1);
+  });
+});

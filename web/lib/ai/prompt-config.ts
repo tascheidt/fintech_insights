@@ -44,6 +44,88 @@ export const PRO_MODEL: ApprovedModel = "gemini-pro-latest";
 export const FLASH_MODEL: ApprovedModel = "gemini-flash-latest";
 
 /**
+ * Every distinct AI output the product produces, one id per surface. This is
+ * the unit the model eval suite (`web/scripts/model-eval.ts`) scores, and the
+ * unit a model upgrade is decided at: an eval report says "surface X on model
+ * Y", and the change is one line in `SURFACE_MODELS` below.
+ *
+ * Three surfaces (`job-structure`, `tech-stack`, `weekly-digest`) are ALSO
+ * admin-tunable through `system_settings` (Prompt Forge). For those, the entry
+ * here is the code default; a stored config row wins at runtime. Changing the
+ * model for one of them therefore needs a data migration for the stored row
+ * too (see `20260419120000_gemini_alias_migration.sql` for the pattern).
+ */
+export const MODEL_SURFACES = [
+  "job-structure", // extractJobStructure — per-job hot path, ungrounded JSON
+  "job-analysis", // analyzeJobAdvanced — per-job hot path, grounded
+  "weekly-digest", // digest per-company entries, lede, Incumbent Watch
+  "tech-stack", // enrichTechStackWithAnalysis
+  "company-insight", // generateCompanyInsight narrative
+  "company-research", // detectCompanyType / performDeepResearch (grounded) / stated strategy / financials
+  "company-news", // fetchCompanyNewsContext (grounded)
+  "company-editorial", // generateCompanyEditorial (thesis / interpretation / bets)
+  "theme-labels", // generateThemeLabels (Jobs right rail)
+  "search-report", // generateSearchReportSynthesis (public share link)
+  "feedback-triage", // triageFeedback (internal classification)
+  "insight-chat", // the two insight chat routes
+  "posting-generator", // /api/ai/generate-posting
+  "strategy-lab", // analyzeCompanyStrategy (labs)
+  "categorize", // categorizePosting (backfill only)
+  "legacy-job-analysis", // analyzeJob in strategic.ts (no live callers)
+] as const;
+
+export type ModelSurface = (typeof MODEL_SURFACES)[number];
+
+/**
+ * The production model for each surface. Typed as `ApprovedModel`, so every
+ * entry must be in `AI_MODEL_OPTIONS`. Decided by the eval suite — see
+ * docs/MODEL_EVALS.md for the runbook and the last decision record.
+ */
+export const SURFACE_MODELS: Record<ModelSurface, ApprovedModel> = {
+  "job-structure": FLASH_MODEL,
+  "job-analysis": PRO_MODEL,
+  "weekly-digest": FLASH_MODEL,
+  "tech-stack": FLASH_MODEL,
+  "company-insight": FLASH_MODEL,
+  "company-research": FLASH_MODEL,
+  "company-news": FLASH_MODEL,
+  "company-editorial": PRO_MODEL,
+  "theme-labels": FLASH_MODEL,
+  "search-report": FLASH_MODEL,
+  "feedback-triage": PRO_MODEL,
+  "insight-chat": FLASH_MODEL,
+  "posting-generator": FLASH_MODEL,
+  "strategy-lab": FLASH_MODEL,
+  "categorize": FLASH_MODEL,
+  "legacy-job-analysis": FLASH_MODEL,
+};
+
+/**
+ * Eval-only, process-local overrides. Empty in every production process, so
+ * `modelFor` returns exactly `SURFACE_MODELS[surface]`. Only the eval harness
+ * (a CLI script) writes here, to drive an unapproved candidate model through
+ * the real production function and prompt without a code change.
+ */
+const evalModelOverrides = new Map<ModelSurface, string>();
+
+/** The model a surface should call. Resolve every call site through this. */
+export function modelFor(surface: ModelSurface): string {
+  return evalModelOverrides.get(surface) ?? SURFACE_MODELS[surface];
+}
+
+/**
+ * Eval harness only. Refuses to run inside a deployed server so a stray import
+ * can never re-route production traffic to an unvetted model.
+ */
+export function setEvalModelOverride(surface: ModelSurface, model: string | null): void {
+  if (process.env.VERCEL || process.env.NEXT_RUNTIME) {
+    throw new Error("setEvalModelOverride is eval-harness only and cannot run in a deployed server");
+  }
+  if (model === null) evalModelOverrides.delete(surface);
+  else evalModelOverrides.set(surface, model);
+}
+
+/**
  * Embedding model for Jobs semantic search. Kept separate from
  * `AI_MODEL_OPTIONS` (those are user-selectable text-gen tiers) but still the
  * single source of truth — resolve every embedding model string through here,
@@ -296,7 +378,7 @@ Respond with ONLY valid JSON.`;
 
 export const DEFAULT_JOB_STRUCTURE_AI_CONFIG: JobStructureAiConfig = {
   stage: "job-structure",
-  model: "gemini-flash-latest",
+  model: SURFACE_MODELS["job-structure"],
   promptTemplate: DEFAULT_JOB_STRUCTURE_PROMPT,
   temperature: 0.2,
   maxOutputTokens: 4096,
@@ -306,7 +388,7 @@ export const DEFAULT_JOB_STRUCTURE_AI_CONFIG: JobStructureAiConfig = {
 
 export const DEFAULT_TECH_STACK_AI_CONFIG: TechStackAiConfig = {
   stage: "tech-stack",
-  model: "gemini-flash-latest",
+  model: SURFACE_MODELS["tech-stack"],
   promptTemplate: DEFAULT_TECH_STACK_PROMPT,
   temperature: 0.25,
   maxOutputTokens: 4096,
@@ -316,7 +398,7 @@ export const DEFAULT_TECH_STACK_AI_CONFIG: TechStackAiConfig = {
 
 export const DEFAULT_WEEKLY_DIGEST_AI_CONFIG: WeeklyDigestAiConfig = {
   stage: "weekly-digest",
-  model: "gemini-flash-latest",
+  model: SURFACE_MODELS["weekly-digest"],
   promptTemplate: DEFAULT_WEEKLY_DIGEST_PROMPT,
   // Slightly higher temperature than the extraction stages on purpose: the
   // editorial-v2 prompt asks for varied sentence structure, and 0.2 was one

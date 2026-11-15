@@ -29,10 +29,34 @@ export interface WriteUsageEventOptions {
  * Fire-and-forget write to `gemini_usage_events`. Always returns immediately;
  * the actual insert happens in the background. Errors are logged and swallowed.
  */
+/**
+ * Process-local observers. Empty in production. The model eval suite
+ * registers one so it can cost every surface uniformly — most surface
+ * functions have no `onUsage` parameter, but every one of them already calls
+ * `writeUsageEvent`, so this is the single chokepoint.
+ */
+const usageObservers = new Set<(record: UsageRecord) => void>();
+
+/** Register an in-process observer; returns an unsubscribe function. */
+export function addUsageObserver(fn: (record: UsageRecord) => void): () => void {
+  usageObservers.add(fn);
+  return () => {
+    usageObservers.delete(fn);
+  };
+}
+
 export function writeUsageEvent(
   record: UsageRecord,
   opts?: WriteUsageEventOptions
 ): void {
+  for (const fn of usageObservers) {
+    try {
+      fn(record);
+    } catch {
+      // An observer must never break the call site.
+    }
+  }
+
   // Skip when the env flag explicitly disables telemetry (used by dev scripts
   // that don't want to pollute the production events table with fixture runs).
   if (process.env.GEMINI_TELEMETRY_DISABLED === "1") return;

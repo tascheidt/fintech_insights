@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getVoiceDirective } from "@/lib/ai/voice";
-import { recordUsage } from "@/lib/ai/gemini-meter";
-import { writeUsageEvent } from "@/lib/ai/gemini-telemetry";
+import {
+  buildCompanyInsightChatPrompt,
+  generateCompanyInsightChatReply,
+} from "@/lib/analysis/insight-chat";
 import { requireUser } from "@/lib/auth/guards";
 import { log } from "@/lib/log";
 import { z } from "zod";
@@ -110,78 +110,16 @@ export async function POST(
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-flash-latest",
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 16384,
-      },
+    const prompt = buildCompanyInsightChatPrompt({
+      companyName: company.name,
+      insight,
+      history: existingMessages,
+      message,
     });
-
-    // Build context from insight
-    const insightContext = `
-Company: ${company.name}
-Analysis Period: ${new Date(insight.analysis_period_start).toLocaleDateString()} - ${new Date(insight.analysis_period_end).toLocaleDateString()}
-
-Executive Summary:
-${insight.executive_summary}
-
-Strategic Hypothesis:
-${insight.strategic_hypothesis}
-
-Core Functions Being Hired:
-${JSON.stringify(insight.core_functions?.slice(0, 10), null, 2)}
-
-Stated Strategy:
-${insight.stated_strategy || "Not available"}
-
-Alignment Analysis:
-${insight.alignment_analysis}
-
-Discrepancies:
-${JSON.stringify(insight.discrepancies, null, 2)}
-
-Strategic Implications:
-${insight.strategic_implications}
-`;
-
-    // Build conversation history
-    const conversationHistory = existingMessages
-      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-      .join("\n\n");
-
-    const prompt = `${getVoiceDirective("chat")}
-
-You are a competitive intelligence analyst helping a user understand this company insight analysis.
-
-## Company Insight Context
-${insightContext}
-
-## Conversation History
-${conversationHistory || "No previous messages."}
-
-## User's Question
-${message}
-
-Provide a helpful, insightful response based on the company insight data. Be specific and reference the data when relevant. If you don't have enough information to answer, say so.`;
-
-    const _chatStartMs = Date.now();
-    const result = await model.generateContent(prompt);
-
-    writeUsageEvent(
-      recordUsage({
-        callSite: "companyInsightChat",
-        modelRequested: "gemini-flash-latest",
-        groundingEnabled: false,
-        usageMetadata: result.response.usageMetadata,
-        latencyMs: Date.now() - _chatStartMs,
-        status: "ok",
-        extra: { companyId: company.id, insightId: insight.id },
-      })
-    );
-
-    const aiResponse = result.response.text()?.trim() || "I apologize, but I couldn't generate a response.";
+    const aiResponse = await generateCompanyInsightChatReply(prompt, {
+      companyId: company.id,
+      insightId: insight.id,
+    });
 
     // Update conversation with new messages
     const updatedMessages = [

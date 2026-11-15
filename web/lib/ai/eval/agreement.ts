@@ -155,3 +155,180 @@ export function scoreCategorization(
     overall: roleCategoryMatch,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Golden-set (correctness) scoring
+// ---------------------------------------------------------------------------
+
+/** A golden salary band. `max` may be null for a single published rate. */
+export interface GoldenSalary {
+  min: number | null;
+  max: number | null;
+  currency: string;
+}
+
+/** One hand-labeled record from scripts/fixtures/golden-extraction.json. */
+export interface GoldenExtractionRecord {
+  jobId: string;
+  title?: string;
+  expected: {
+    seniority_level: string;
+    standardized_department: string;
+    function_category: string;
+    salary: GoldenSalary | null;
+    /** Only what the prompt can see (title + description), never the ATS field. */
+    location: GoldenLocation | null;
+    /** Must appear. An array entry is a synonym group — any one satisfies it. */
+    tech_required: Array<string | string[]>;
+    /** Borderline items that are neither required nor penalized. */
+    tech_allowed: string[];
+  };
+  /** Defensible alternatives for genuinely ambiguous fields. */
+  acceptable?: {
+    seniority_level?: string[];
+    standardized_department?: string[];
+    function_category?: string[];
+    salary?: GoldenSalary[];
+    /** `null` entries mean "no location" is also acceptable. */
+    location?: Array<GoldenLocation | null>;
+  };
+}
+
+export interface GoldenLocation {
+  city: string | null;
+  country: string | null;
+}
+
+export interface GoldenScore {
+  fields: FieldAgreement[];
+  /** Mean over the six correctness fields. This is the number the gate reads. */
+  l1Correctness: number;
+  /** tech_stack detail: required items found / required items. */
+  techRecall: number;
+  /** tech_stack detail: candidate items that are required-or-allowed / candidate items. */
+  techPrecision: number;
+  /** Candidate tech items that are neither required nor allowed (for the report). */
+  techUnexpected: string[];
+}
+
+function normLoose(s: string | null | undefined): string {
+  return (s ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9+#. ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const COUNTRY_ALIASES: Record<string, string> = {
+  "united states of america": "united states",
+  usa: "united states",
+  us: "united states",
+  "u s": "united states",
+  ca: "canada",
+  can: "canada",
+  uk: "united kingdom",
+  "great britain": "united kingdom",
+};
+
+function normCountry(s: string | null | undefined): string {
+  const n = normLoose(s);
+  return COUNTRY_ALIASES[n] ?? n;
+}
+
+/** Tech names match on normalized equality or whole-word containment (≥3 chars). */
+export function techMatches(a: string, b: string): boolean {
+  const x = normLoose(a);
+  const y = normLoose(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+  if (short.length < 3) return false;
+  return ` ${long} `.includes(` ${short} `);
+}
+
+function oneOf(value: string | null | undefined, expected: string, alternatives?: string[]): number {
+  const v = normLoose(value);
+  if (v === normLoose(expected)) return 1;
+  return (alternatives ?? []).some((a) => normLoose(a) === v) ? 1 : 0;
+}
+
+function numEq(a: number | null, b: number | null): boolean {
+  if (a === null || b === null) return a === b;
+  return Math.abs(a - b) <= Math.max(1, Math.abs(b) * 0.01);
+}
+
+function goldenSalaryScore(c: JobStructureForDB, g: GoldenExtractionRecord): number {
+  const options = [g.expected.salary, ...(g.acceptable?.salary ?? [])];
+  const candHasSalary = c.salary_min != null || c.salary_max != null;
+  let best = 0;
+  for (const opt of options) {
+    if (opt === null) {
+      if (!candHasSalary) return 1;
+      continue;
+    }
+    if (!candHasSalary) continue;
+    const s =
+      ((numEq(c.salary_min, opt.min) ? 1 : 0) +
+        (numEq(c.salary_max, opt.max) ? 1 : 0) +
+        (normLoose(c.salary_currency) === normLoose(opt.currency) ? 1 : 0)) /
+      3;
+    best = Math.max(best, s);
+  }
+  return best;
+}
+
+function goldenLocationScore(c: JobStructureForDB, g: GoldenExtractionRecord): number {
+  const loc = c.location_structured;
+  const candEmpty = !loc || (!normLoose(loc.city) && !normLoose(loc.country));
+  let best = 0;
+  for (const opt of [g.expected.location, ...(g.acceptable?.location ?? [])]) {
+    if (opt === null) {
+      if (candEmpty) return 1;
+      continue;
+    }
+    if (candEmpty) continue;
+    const country = normCountry(loc!.country) === normCountry(opt.country) ? 1 : 0;
+    const city = normLoose(loc!.city) === normLoose(opt.city) ? 1 : 0;
+    best = Math.max(best, (country + city) / 2);
+  }
+  return best;
+}
+
+/**
+ * Score one extraction against a hand-labeled golden record. Unlike
+ * `scoreExtraction` (similarity to another model's output), this measures
+ * correctness, so it does not reward copying the incumbent model's mistakes.
+ */
+export function scoreAgainstGolden(
+  candidate: JobStructureForDB,
+  golden: GoldenExtractionRecord
+): GoldenScore {
+  const required = golden.expected.tech_required.map((r) => (Array.isArray(r) ? r : [r]));
+  const permitted = [...required.flat(), ...golden.expected.tech_allowed];
+  const cand = (candidate.tech_stack ?? []).filter((t) => normLoose(t));
+
+  const found = required.filter((group) => group.some((syn) => cand.some((t) => techMatches(t, syn))));
+  const techRecall = required.length === 0 ? 1 : found.length / required.length;
+  const techUnexpected = cand.filter((t) => !permitted.some((p) => techMatches(t, p)));
+  const techPrecision = cand.length === 0 ? 1 : (cand.length - techUnexpected.length) / cand.length;
+  const techScore =
+    techRecall + techPrecision === 0 ? 0 : (2 * techRecall * techPrecision) / (techRecall + techPrecision);
+
+  const fields: FieldAgreement[] = [
+    { field: "seniority_level", score: oneOf(candidate.seniority_level, golden.expected.seniority_level, golden.acceptable?.seniority_level), l1: true },
+    { field: "standardized_department", score: oneOf(candidate.standardized_department, golden.expected.standardized_department, golden.acceptable?.standardized_department), l1: true },
+    { field: "function_category", score: oneOf(candidate.function_category, golden.expected.function_category, golden.acceptable?.function_category), l1: true },
+    { field: "salary", score: goldenSalaryScore(candidate, golden), l1: true },
+    { field: "location", score: goldenLocationScore(candidate, golden), l1: true },
+    { field: "tech_stack", score: techScore, l1: true },
+  ];
+  return {
+    fields,
+    l1Correctness: fields.reduce((a, f) => a + f.score, 0) / fields.length,
+    techRecall,
+    techPrecision,
+    techUnexpected,
+  };
+}

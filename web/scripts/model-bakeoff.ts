@@ -38,6 +38,8 @@ import { DEFAULT_JOB_STRUCTURE_AI_CONFIG, type AllowedAiModel } from "@/lib/ai/p
 import type { UsageRecord } from "@/lib/ai/gemini-meter";
 import {
   scoreExtraction,
+  scoreAgainstGolden,
+  type GoldenExtractionRecord,
   scoreCategorization,
   type ExtractionAgreement,
   type CategorizationAgreement,
@@ -131,17 +133,39 @@ async function loadFixture(): Promise<{ jobs: FixtureJob[]; fixtureFile: string 
   return { jobs: parsed.jobs, fixtureFile };
 }
 
-async function loadGolden(): Promise<Map<string, JobStructureForDB>> {
+async function loadGolden(): Promise<Map<string, GoldenExtractionRecord>> {
   const file = resolve(process.cwd(), "scripts/fixtures/golden-extraction.json");
-  try {
-    const raw = await readFile(file, "utf8");
-    const parsed = JSON.parse(raw) as { records: { jobId: string; expected: JobStructureForDB }[] };
-    return new Map(parsed.records.map((r) => [r.jobId, r.expected]));
-  } catch {
-    throw new Error(
-      `--reference=golden requires ${file}. Populate it with human-verified extractions first.`
-    );
+  const raw = await readFile(file, "utf8");
+  const parsed = JSON.parse(raw) as { records: GoldenExtractionRecord[] };
+  if (!parsed.records?.length) {
+    throw new Error(`--reference=golden requires labeled records in ${file}.`);
   }
+  return new Map(parsed.records.map((r) => [r.jobId, r]));
+}
+
+/** Correctness vs the hand-labeled golden set (scoreAgainstGolden), in the agreement-summary shape. */
+function summarizeGoldenCorrectness(
+  run: ModelRun,
+  golden: Map<string, GoldenExtractionRecord>
+): ExtractionAgreementSummary {
+  const perFieldTotals: Record<string, { sum: number; n: number }> = {};
+  let l1Sum = 0;
+  let scored = 0;
+  for (const p of run.perJob) {
+    const g = golden.get(p.jobId);
+    if (!g || p.output === null) continue;
+    const s = scoreAgainstGolden(p.output as JobStructureForDB, g);
+    scored += 1;
+    l1Sum += s.l1Correctness;
+    for (const f of s.fields) {
+      const t = (perFieldTotals[f.field] ??= { sum: 0, n: 0 });
+      t.sum += f.score;
+      t.n += 1;
+    }
+  }
+  const perField: Record<string, number> = {};
+  for (const [k, v] of Object.entries(perFieldTotals)) perField[k] = v.n ? v.sum / v.n : 0;
+  return { scored, meanL1: scored ? l1Sum / scored : 0, meanSummarySim: 0, perField };
 }
 
 async function runScenarioForModel(
@@ -402,19 +426,19 @@ async function main() {
 
   if (!flags.dryRun) {
     if (flags.scenario === "extract-structure") {
-      let refMap: Map<string, JobStructureForDB>;
+      extractionAgreement = {};
       if (flags.reference === "golden") {
-        refMap = await loadGolden();
+        const golden = await loadGolden();
+        for (const run of runs) extractionAgreement[run.model] = summarizeGoldenCorrectness(run, golden);
       } else {
         const refRun = runs.find((r) => r.model === flags.reference);
-        refMap = new Map(
+        const refMap = new Map(
           (refRun?.perJob ?? [])
             .filter((p) => p.output !== null)
             .map((p) => [p.jobId, p.output as JobStructureForDB])
         );
+        for (const run of runs) extractionAgreement[run.model] = summarizeExtractionAgreement(run, refMap);
       }
-      extractionAgreement = {};
-      for (const run of runs) extractionAgreement[run.model] = summarizeExtractionAgreement(run, refMap);
     } else {
       const refRun = runs.find((r) => r.model === flags.reference);
       const refMap = new Map(
