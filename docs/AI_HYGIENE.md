@@ -118,6 +118,7 @@ Rules that apply to both allowed kinds:
 - **Eval first.** A model enters `AI_MODEL_OPTIONS` / `SURFACE_MODELS` only with a `model-eval.ts` report in the PR ([`MODEL_EVALS.md`](./MODEL_EVALS.md)).
 - **Priced.** Every approved model has a `gemini-pricing.ts` row (unknown models cost $0 in telemetry and blind the cost alarm). Enforced by a test.
 - **Watched.** `model-watch.yml` diffs the catalog weekly: alias rotations, and any production model that disappears from the API (the pinned-ID failure mode), open a `model-watch` issue.
+- **Request settings travel with the model.** Thinking level / output headroom a model needs live in `MODEL_GENERATION_PROFILES` and are applied by `withModelProfile` at every call site — never per-site special cases.
 - **Shape enforced.** `isAllowedModelId` in `prompt-config.ts` rejects preview / experimental / alpha / beta / dated-snapshot IDs; `prompt-config.test.ts` runs it over every option and every `SURFACE_MODELS` entry.
 
 ### What pinning a preview actually cost us (July 2026)

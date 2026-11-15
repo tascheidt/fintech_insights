@@ -68,6 +68,10 @@ Every distinct AI output is a **surface** (`MODEL_SURFACES` in `prompt-config.ts
 - `setEvalModelOverride(surface, model)` is the **eval-only** seam the model eval suite uses to drive a candidate through the real production function. It throws inside a deployed server (`VERCEL` / `NEXT_RUNTIME` set), and the override map is empty in every production process.
 - The three Prompt Forge stages (`job-structure`, `tech-stack`, `weekly-digest`) take their **default** from `SURFACE_MODELS`, but a stored `system_settings` row wins at runtime — a model change there also needs a data migration.
 
+## Per-model generation profiles (`withModelProfile`)
+
+Some models need different *request settings* (not prompts) to run our prompts. Every text-generation call site wraps its `getGenerativeModel` params in `withModelProfile(...)`, which applies `MODEL_GENERATION_PROFILES[model]`: an optional `thinkingLevel` (only when the call site sets no `thinkingConfig` itself) and `thinkingHeadroomTokens` added on top of the site's `maxOutputTokens`. A model with no entry gets the params object back untouched. Why it exists: thinking tokens count against `maxOutputTokens`, and Gemini 4 Hydrogen cannot turn thinking off — at a 4096 cap it can spend the whole budget thinking (probe, 2026-11-15). The wrapper returns the SDK's `ModelParams`, which is also where the `googleSearch` typing gap is handled (no per-site `@ts-expect-error`). New call sites MUST wrap too. Embeddings are excluded.
+
 ## Model evals (`eval/`, `model-catalog.ts`)
 
 - **`eval/judge.ts`** — pairwise, position-swapped LLM judge (pure prompt/parse/combine + `runJudge`). Telemetered as `modelEval.judge`.

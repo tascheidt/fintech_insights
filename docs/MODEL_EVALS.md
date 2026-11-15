@@ -40,6 +40,8 @@ npx tsx --env-file=.env.local scripts/model-eval.ts --models=<id> --limit=2 \
   --skip=job-analysis,company-research,company-news
 ```
 
+**Variants.** A plain model id runs exactly as production would call it today — a true drop-in test. Append `@low` / `@medium` / `@high` to add that thinking level plus 8,192 tokens of output headroom, or `@default` for headroom only (e.g. `--models=gemini-4-hydrogen,gemini-4-hydrogen@low`). If a variant wins, ship its settings as a `MODEL_GENERATION_PROFILES` entry in `prompt-config.ts` — that is what makes the deployed calls match what was evaluated.
+
 Writes `web/scripts/artifacts/model-eval-<date>-<sha>.{json,md}`. Commit both in the
 PR that acts on the result and paste the `.md` into the PR description (this
 satisfies the `lib/ai/**` "attach a comparison report" rule).
@@ -133,6 +135,7 @@ Both are allowed (policy table in [`AI_HYGIENE.md`](./AI_HYGIENE.md) → "Model-
       validation and **silently fall back to the code default, discarding admin-tuned prompts**.
 - [ ] Add/verify the model's rate in `gemini-pricing.ts` (unknown models price at $0
       and blind the cost alarm). Reconcile against the GCP SKU export after a week.
+- [ ] Ship the evaluated request settings as a `MODEL_GENERATION_PROFILES` entry if the winner was a `@variant`.
 - [ ] Check request-shape compatibility (thinking controls, temperature, grounding) —
       `extractJobStructure` sends `thinkingBudget: 0` and degrades once on rejection;
       watch `err calls` in the report.
