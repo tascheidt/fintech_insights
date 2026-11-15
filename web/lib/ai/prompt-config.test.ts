@@ -1,15 +1,13 @@
 /**
- * Regression tests for the AI model resolver.
+ * Regression tests for the AI model resolver and model-ID policy.
  *
- * Two guarantees we must preserve (per CLAUDE.md §5):
+ * Guarantees we must preserve (per CLAUDE.md §5):
  *   1. The active config returned to callers always has a model in the
  *      approved AI_MODEL_OPTIONS enum.
- *   2. That model is a `-latest` floating alias — never a versioned or
- *      preview ID like `gemini-2.0-flash` or `gemini-3-pro-preview`.
- *
- * The April 2026 cost incident was triggered by alias rotation; this test
- * is the cheap canary that fails if someone hardcodes a pinned model in a
- * default config or misses the enum check.
+ *   2. Every approved model is a floating `-latest` alias or a stable (GA)
+ *      versioned ID — never a preview, experimental, or dated-snapshot ID like
+ *      `gemini-3-pro-preview` (retired 2026-07-31, which broke feedback triage).
+ *   3. Every approved model has a pricing row, so its spend is never costed at $0.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -32,22 +30,17 @@ describe("getActiveWeeklyDigestAiConfig", () => {
     vi.clearAllMocks();
   });
 
-  it("returns a config whose model is a -latest alias", async () => {
-    const { getActiveWeeklyDigestAiConfig, AI_MODEL_VALUES } = await import(
+  it("returns a config whose model obeys the model-ID policy", async () => {
+    const { getActiveWeeklyDigestAiConfig, AI_MODEL_VALUES, isAllowedModelId } = await import(
       "./prompt-config"
     );
 
     const config = await getActiveWeeklyDigestAiConfig();
 
-    // Returned model must be one of the approved enum values.
+    // Returned model must be one of the approved enum values…
     expect(AI_MODEL_VALUES).toContain(config.model);
-
-    // CLAUDE.md hard rule: never pin a versioned/preview model. Always use
-    // a `-latest` floating alias. This guards against someone slipping in
-    // `gemini-2.0-flash` or `gemini-3-pro-preview` as a "temporary" override.
-    expect(config.model).toMatch(/-latest$/);
-    expect(config.model).not.toMatch(/preview/i);
-    expect(config.model).not.toMatch(/-\d+\.\d+/); // e.g. "-2.0-", "-1.5-"
+    // …and an alias or a stable GA id, never a preview/experimental/snapshot.
+    expect(isAllowedModelId(config.model)).toBe(true);
   });
 
   it("returns a config with the weekly-digest stage and required fields", async () => {
@@ -65,11 +58,11 @@ describe("getActiveWeeklyDigestAiConfig", () => {
 
 describe("per-surface model resolution", () => {
   it("modelFor returns the SURFACE_MODELS entry when no eval override is set", async () => {
-    const { MODEL_SURFACES, SURFACE_MODELS, modelFor, AI_MODEL_VALUES } = await import("./prompt-config");
+    const { MODEL_SURFACES, SURFACE_MODELS, modelFor, AI_MODEL_VALUES, isAllowedModelId } = await import("./prompt-config");
     for (const surface of MODEL_SURFACES) {
       expect(modelFor(surface)).toBe(SURFACE_MODELS[surface]);
       expect(AI_MODEL_VALUES).toContain(SURFACE_MODELS[surface]);
-      expect(SURFACE_MODELS[surface]).not.toMatch(/preview|exp/i);
+      expect(isAllowedModelId(SURFACE_MODELS[surface])).toBe(true);
     }
   });
 
@@ -119,5 +112,37 @@ describe("no hardcoded model strings outside prompt-config", () => {
     walk(join(root, "lib"));
     walk(join(root, "app"));
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("model-ID policy", () => {
+  it("allows -latest aliases and stable versioned ids", async () => {
+    const { isAllowedModelId } = await import("./prompt-config");
+    for (const id of ["gemini-flash-latest", "gemini-pro-latest", "gemini-2.5-flash", "gemini-4-argon"]) {
+      expect(isAllowedModelId(id)).toBe(true);
+    }
+  });
+
+  it("rejects preview, experimental and dated-snapshot ids", async () => {
+    const { isAllowedModelId } = await import("./prompt-config");
+    for (const id of [
+      "gemini-3-pro-preview",
+      "gemini-2.5-flash-preview-05-20",
+      "gemini-exp-1206",
+      "gemini-2.0-flash-experimental",
+      "gemini-4-argon-0520",
+      "gpt-4o",
+    ]) {
+      expect(isAllowedModelId(id)).toBe(false);
+    }
+  });
+
+  it("every approved model obeys the policy and has a pricing row", async () => {
+    const { AI_MODEL_VALUES, isAllowedModelId } = await import("./prompt-config");
+    const { isPricedModel } = await import("./gemini-pricing");
+    for (const id of AI_MODEL_VALUES) {
+      expect(isAllowedModelId(id), id).toBe(true);
+      expect(isPricedModel(id), `${id} needs a GEMINI_PRICING row`).toBe(true);
+    }
   });
 });

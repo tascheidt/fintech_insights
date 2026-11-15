@@ -114,6 +114,13 @@ WORSE + cost delta). Use it as the starting point, then apply judgment:
   win-rate as noise; read the raw outputs in the JSON for the surfaces you
   change.
 
+## Alias or pinned?
+
+Both are allowed (policy table in [`AI_HYGIENE.md`](./AI_HYGIENE.md) → "Model-ID policy"); preview / experimental / dated-snapshot IDs never are. Choose per surface:
+
+- **Alias** when the surface is low-stakes and you want free upgrades (extraction plumbing, classification) — and accept that cost can move without a PR.
+- **Stable versioned ID** when the output *is* the product (insight, editorial, digest, job analysis) or when no alias maps to the model you evaluated — behaviour only changes when a PR changes it. Model Watch flags its retirement.
+
 ## Shipping a model change
 
 - [ ] Add the model id to `AI_MODEL_OPTIONS` (`web/lib/ai/prompt-config.ts`) if new.

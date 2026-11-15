@@ -103,7 +103,22 @@ Not every call is scheduled. These fire on a user action, so their volume tracks
 
 One call per report generated from the Jobs page (see [`SHARED_REPORTS.md`](./SHARED_REPORTS.md)). Bounded on both axes: the prompt samples at most 40 postings at 1800 chars each, so a report's input is capped regardless of how many rows the search returned. It is **failure-tolerant by design** — a null return renders a table-only report rather than failing the request, because the output is served behind a public share link. Both the ok and error paths write telemetry, so a rash of retries is visible in `gemini_usage_events` rather than silent.
 
-**Never pin a versioned or preview model ID** (e.g. `gemini-3-flash-preview`, `gemini-2.0-flash`, `gemini-1.5-pro`). Always the `-latest` alias. The comparison harness and production telemetry are how we catch a bad alias rotation; pinning bypasses that signal.
+### Model-ID policy (Nov 2026)
+
+Two kinds of model ID are allowed in `AI_MODEL_OPTIONS`; one kind never is.
+
+| Kind | Example | Allowed | Trade-off |
+|---|---|---|---|
+| Floating alias | `gemini-flash-latest` | yes | Upgrades itself with no code change — but cost and behaviour can change under us without a PR (the May 2026 rotation to 3.x billed ~2.7x what telemetry said). |
+| Stable (GA) versioned ID | a Gemini 4 model id such as `gemini-4-argon` | yes | Behaviour and price stay fixed until Google retires it; upgrades are deliberate PRs. Retirement is a hard 404, so it must be watched. |
+| Preview / experimental / dated snapshot | `gemini-3-pro-preview`, `gemini-2.5-flash-preview-05-20`, `gemini-exp-1206` | **never** | Retired on short notice — see the July 2026 outage below. |
+
+Rules that apply to both allowed kinds:
+
+- **Eval first.** A model enters `AI_MODEL_OPTIONS` / `SURFACE_MODELS` only with a `model-eval.ts` report in the PR ([`MODEL_EVALS.md`](./MODEL_EVALS.md)).
+- **Priced.** Every approved model has a `gemini-pricing.ts` row (unknown models cost $0 in telemetry and blind the cost alarm). Enforced by a test.
+- **Watched.** `model-watch.yml` diffs the catalog weekly: alias rotations, and any production model that disappears from the API (the pinned-ID failure mode), open a `model-watch` issue.
+- **Shape enforced.** `isAllowedModelId` in `prompt-config.ts` rejects preview / experimental / alpha / beta / dated-snapshot IDs; `prompt-config.test.ts` runs it over every option and every `SURFACE_MODELS` entry.
 
 ### What pinning a preview actually cost us (July 2026)
 

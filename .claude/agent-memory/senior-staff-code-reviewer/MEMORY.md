@@ -9,9 +9,10 @@
 - **Gemini call site missing thoughts-token billing.** Gemini 2.5 returns reasoning tokens billed at the output rate. `gemini-meter.ts#recordUsage` infers them from the `totalTokenCount` residual if the SDK doesn't surface the named field. Any new Gemini call site that constructs its own usage record (not going through `recordUsage`) is undercounting cost — block the PR.
 - **Tier/role page variants that drop blocks silently.** When `{isIncumbent ? <Variant /> : <Original />}` ships, the new branch often skips conditional render blocks from the original by oversight, not design. Phase 2's incumbent variant of `companies/[slug]/page.tsx` dropped the `latestInsight` rendering entirely — RBC insights silently went nowhere. When reviewing a branched render, list every conditional block in the original and verify each is keep/drop/replace **explicitly**.
 
-### AI Model Convention (updated 2026-04-19)
-- All Gemini calls MUST use floating `-latest` aliases: `gemini-flash-latest`, `gemini-flash-lite-latest`, `gemini-pro-latest`.
-- Never pin a versioned or preview ID (`gemini-3-flash-preview`, `gemini-2.0-flash`, etc.).
+### AI Model Convention (updated 2026-11-15 — supersedes the 2026-04-19 "-latest only" rule)
+- Allowed model IDs: floating `-latest` aliases AND stable (GA) versioned IDs (e.g. Gemini 4 model ids). Chosen per surface in `SURFACE_MODELS`; call sites use `modelFor(surface)`.
+- Never preview / experimental / dated-snapshot IDs (`gemini-3-pro-preview`, `gemini-2.5-flash-preview-05-20`, `gemini-exp-1206`). `isAllowedModelId` + tests enforce this.
+- Flag a PR that adds a model to `AI_MODEL_OPTIONS` without a `model-eval.ts` report or a `gemini-pricing.ts` row.
 - Model strings must resolve through `AI_MODEL_OPTIONS` in `web/lib/ai/prompt-config.ts` — anything outside that Zod enum fails validation. Flag hardcoded strings that bypass it.
 - Pro model is used only when web-search grounding is load-bearing.
 

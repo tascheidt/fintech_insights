@@ -65,6 +65,9 @@ async function main() {
   const prodRotations = prev
     ? diff.rotated.filter((r) => Object.values(SURFACE_MODELS).includes(r.alias as never))
     : [];
+  // A pinned (non-alias) production model that drops out of the catalog is
+  // the July 2026 failure mode: every call 404s. Shout about it.
+  const prodRetired = diff.removed.filter((m) => Object.values(SURFACE_MODELS).includes(m as never));
   const lines = [
     prev
       ? `## Gemini model catalog changed (${next.capturedAt.slice(0, 10)})`
@@ -77,6 +80,9 @@ async function main() {
       : "",
     prodRotations.length
       ? `\n> ⚠️ ${prodRotations.length} alias(es) used in production rotated — production is already running the new model. Re-run the eval and re-reconcile \`gemini-pricing.ts\`.`
+      : "",
+    prodRetired.length
+      ? `\n> 🚨 Production model(s) no longer listed by the API: ${prodRetired.map((m) => `\`${m}\``).join(", ")}. Calls to a retired pinned id fail outright — move those surfaces in \`SURFACE_MODELS\` now.`
       : "",
     "",
     "### Next steps",

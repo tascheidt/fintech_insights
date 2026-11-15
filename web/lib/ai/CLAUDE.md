@@ -82,6 +82,7 @@ Every distinct AI output is a **surface** (`MODEL_SURFACES` in `prompt-config.ts
 
 ## Rules of the road
 
+0. **Model-ID policy:** `-latest` aliases or stable (GA) versioned IDs only — never preview / experimental / dated-snapshot. New models need an eval report and a pricing row; `isAllowedModelId` + tests enforce the shape. Full table in [`docs/AI_HYGIENE.md`](../../../docs/AI_HYGIENE.md) → "Model-ID policy".
 1. **No hardcoded model strings outside `prompt-config.ts`.** A model id living outside this repo is the same failure with a longer fuse: feedback triage ran from a Supabase Edge Function pinned to `gemini-3-pro-preview`, which `prompt-config.test.ts` names by example and could not catch, because the call site was out of tree. Google retired that id on 2026-07-31 and every submission silently stopped being triaged.
 2. **Every new call site writes to `gemini_usage_events`** via `writeUsageEvent`.
 3. **Don't stack grounded calls** — check upstream for an existing `googleSearch` enable before adding another. The Apr 2026 incident was two grounded Pro calls per job.

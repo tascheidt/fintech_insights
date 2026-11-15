@@ -8,7 +8,7 @@ export const AI_MODEL_OPTIONS = [
   {
     value: "gemini-flash-latest",
     label: "Gemini Flash",
-    summary: "Fastest for extraction and iteration rounds. Uses the `-latest` alias, so the active version is whatever Google currently marks as Flash-latest.",
+    summary: "Fastest for extraction and iteration rounds. A floating `-latest` alias: the active version is whatever Google currently marks as Flash-latest.",
     recommendedStages: ["job-structure", "tech-stack", "weekly-digest"],
   },
   {
@@ -24,6 +24,24 @@ export const AI_MODEL_OPTIONS = [
     recommendedStages: ["job-structure", "tech-stack", "weekly-digest"],
   },
 ] as const;
+
+/**
+ * Model-ID policy (CLAUDE.md §5). Allowed in `AI_MODEL_OPTIONS`:
+ *   - Google's floating `-latest` aliases (upgrade themselves; can change cost
+ *     and behaviour under us — the May 2026 rotation), and
+ *   - stable (GA) versioned IDs, e.g. a Gemini 4 model id (fixed until Google
+ *     retires it; `model-watch.yml` flags a production model's retirement).
+ * Never preview, experimental, or dated-snapshot IDs — Google retires those on
+ * short notice (the July 2026 `gemini-3-pro-preview` triage outage).
+ * Enforced over every option by `prompt-config.test.ts`.
+ */
+export function isAllowedModelId(id: string): boolean {
+  if (!/^gemini-[a-z0-9.-]+$/.test(id)) return false;
+  if (/(preview|exp|experimental|alpha|beta)/i.test(id)) return false;
+  // Dated snapshots such as `-05-20` / `-0520` / `-2026-05-20`.
+  if (/-\d{2}-\d{2}$|-\d{4}$|-\d{4}-\d{2}-\d{2}$/.test(id)) return false;
+  return true;
+}
 
 export const AI_MODEL_VALUES = AI_MODEL_OPTIONS.map((option) => option.value) as [
   (typeof AI_MODEL_OPTIONS)[number]["value"],
