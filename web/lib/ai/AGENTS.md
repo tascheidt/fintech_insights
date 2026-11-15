@@ -82,7 +82,7 @@ Some models need different *request settings* (not prompts) to run our prompts. 
 
 ## Named model handles
 
-`PRO_MODEL` / `FLASH_MODEL` / `HYDROGEN_MODEL` in `prompt-config.ts` are typed as `ApprovedModel`, so a call site that always wants one tier (and has no user-selectable config row) imports the handle instead of retyping the literal. Removing or renaming an entry in `AI_MODEL_OPTIONS` then fails the build rather than leaving a stray string behind. `SURFACE_MODELS` entries are built from these handles; call sites go through `modelFor(surface)`, and the `advanced-strategic.ts` quota fallback uses `FLASH_MODEL` directly.
+`FLASH_MODEL` / `HYDROGEN_MODEL` in `prompt-config.ts` are typed as `ApprovedModel`, so a call site that always wants one tier (and has no user-selectable config row) imports the handle instead of retyping the literal. Removing or renaming an entry in `AI_MODEL_OPTIONS` then fails the build rather than leaving a stray string behind. `SURFACE_MODELS` entries are built from these handles; call sites go through `modelFor(surface)`, and the `advanced-strategic.ts` quota fallback uses `FLASH_MODEL` directly.
 
 ## Rules of the road
 

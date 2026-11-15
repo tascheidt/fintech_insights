@@ -127,7 +127,7 @@ Both are allowed (policy table in [`AI_HYGIENE.md`](./AI_HYGIENE.md) → "Model-
 
 - [ ] Add the model id to `AI_MODEL_OPTIONS` (`web/lib/ai/prompt-config.ts`) if new.
 - [ ] Change the surface's line in `SURFACE_MODELS`. Hot-path tier handles
-      (`PRO_MODEL` / `FLASH_MODEL`) move only if every surface on them moves.
+      (`FLASH_MODEL` / `HYDROGEN_MODEL`) move only if every surface on them moves.
 - [ ] **Prompt Forge surfaces** (`job-structure`, `tech-stack`, `weekly-digest`)
       read a stored `system_settings` row that wins over code. Add a migration that
       rewrites the stored `model` (pattern: `20260419120000_gemini_alias_migration.sql`).
@@ -148,4 +148,30 @@ Both are allowed (policy table in [`AI_HYGIENE.md`](./AI_HYGIENE.md) → "Model-
 
 <!-- Newest first. One entry per eval-driven change (or explicit no-change). -->
 
-_Pending: Gemini 4 (Argon / Hydrogen / Carbon) evaluation, Nov 2026._
+### 2026-11-15 — Gemini 4 (Argon / Hydrogen / Carbon)
+
+**Runs.** Full suite: `model-eval-2026-11-15-48228c9-gemini4` (4 candidates × 15 surfaces, judges Carbon + Pro-latest, ≈ $36). Second run of the noisy surfaces: `model-eval-2026-11-15-ce6e8ed-gemini4-run2` (Hydrogen@low + Argon on the 3 grounded surfaces, company insight and theme labels, ≈ $4.40). Both under `web/scripts/artifacts/`.
+
+**Decision.**
+
+| Surface | Before | After | Why |
+|---|---|---|---|
+| job-analysis | `gemini-pro-latest` (served a preview) | `gemini-4-hydrogen` | Judged win 81/75% (run 1) and 88/63% (run 2) — the Pro judge was judging its *own* output as baseline and still preferred Hydrogen. −44–48% cost, ~2× faster. Confidence is calibrated (production said "high" on 8/8 cases). |
+| company-research | `gemini-flash-latest` | `gemini-4-hydrogen` | Company-type accuracy 1.00 vs 0.86 / 0.71 across two runs; −29–31% cost. |
+| company-news | `gemini-flash-latest` | `gemini-4-hydrogen` | **Overrides the mechanical WORSE.** `news_items` (count) was −0.07 in both runs, but production pads the list with duplicate stories and writes 70% of its links itself (two pointed at the wrong article); Hydrogen's links all come from the search results. `grounded_link_share` added so the next run sees this. ~2× faster, cost about equal. |
+| company-insight | `gemini-flash-latest` | `gemini-4-hydrogen` | Run 1 judges split (75% / 13%) because the judge saw a thinner input than the model and flagged the real 90-day window as invented. With the judge input fixed: 100% / 100%. +14–17% cost, accepted because the insight *is* the product. Watch: `key_signal` runs 17–19 words vs the 15-word headline heuristic. |
+| company-editorial, weekly-digest, tech-stack, search-report, feedback-triage, insight-chat, posting-generator, strategy-lab | Flash / Pro | `gemini-4-hydrogen` | Judged win ≥ 67% from both judges on every one; digest benchmark fit 0.78 → 1.00; −7–62% cost except tech-stack parity. (Shipped in #155.) |
+| job-structure | `gemini-flash-latest` | unchanged | Golden L1 0.981 → 1.000 is below the 0.03 bar, and Hydrogen cannot disable thinking: +89% cost on the highest-volume call. |
+| theme-labels | `gemini-flash-latest` | unchanged | WORSE twice (judged 13–50%): Hydrogen falls back to generic department names the prompt forbids. |
+| categorize | `gemini-flash-latest` | unchanged | Parity on golden categories; backfill only. |
+
+**Why Hydrogen and not Argon / Carbon.** Carbon won most judged comparisons but cost +100–340% and ran 2–5× slower; Argon was mostly parity at higher price. Hydrogen *with default thinking* lost on job analysis (judged 25%), truncated one search report and spent 3–7× the thinking tokens — so it ships only as the evaluated `@low` variant (`MODEL_GENERATION_PROFILES`: `thinkingLevel: "low"`, +8,192 output headroom).
+
+**Caveats.** Gemini 4 rates in `gemini-pricing.ts` are unverified third-party figures (Hydrogen assumed equal to Flash per token) — reconcile against the GCP SKU export after the first billing cycle. 2–24 cases per surface. Stable IDs don't upgrade themselves: Model Watch flags retirement.
+
+**Lessons for the next run.**
+
+1. **Give the judge exactly what the model saw.** A summarized input made the judge call real facts fabrications; one fix moved a verdict from 13% to 100%.
+2. **Count metrics reward padding.** Read outputs before trusting "more items"; prefer provenance or distinct-item metrics.
+3. **Judge-family bias is real but measurable.** The Gemini-3 judge leaned toward Gemini-3 baselines, the Gemini-4 judge toward Gemini-4 candidates. Trust a result when the judge biased *against* the candidate still prefers it.
+4. **Test the variant you would ship.** Drop-in Hydrogen and Hydrogen@low were different products.

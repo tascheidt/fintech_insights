@@ -8,7 +8,7 @@ After a `collect` run picks up new postings, every job traverses:
 
 ```
 processor.ts  → [description_hash gate]  → extractAndUpdateStructure  → extractJobStructure  (Flash)
-analyzer.ts   → analyzeJobAdvanced  (Pro + grounded; in-flight grounding, no pre-fetch)
+analyzer.ts   → analyzeJobAdvanced  (Gemini 4 Hydrogen + grounded; in-flight grounding, no pre-fetch)
 ```
 
 That's it. Any "analysis" function not named above is *not* on the live path.
