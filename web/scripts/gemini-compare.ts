@@ -40,6 +40,7 @@ import { extractJobStructure, type JobStructureForDB } from "@/lib/analysis/stru
 import { analyzeJobAdvanced, type AdvancedAnalyzeResult } from "@/lib/analysis/advanced-strategic";
 import { generateWeeklyDigestCommentary, type DigestCommentary } from "@/lib/analysis/digest";
 import { WEEKLY_DIGEST_BENCHMARKS } from "@/lib/labs/prompt-forge-benchmarks";
+import { historicalContext as fixtureHistoricalContext } from "./model-eval/fixtures";
 import {
   DEFAULT_JOB_STRUCTURE_AI_CONFIG,
   DEFAULT_WEEKLY_DIGEST_AI_CONFIG,
@@ -372,6 +373,11 @@ async function runAnalyzeAdvanced(
           location: job.location,
           description_text: job.description_text,
         },
+        // Fixture-derived history (same as model-eval) so the scenario runs
+        // without a database. Without it analyzeJobAdvanced queries Supabase
+        // and, with no credentials, returns null having made no Gemini call —
+        // an empty report that looks like a $0 run (Nov 2026).
+        historicalContext: fixtureHistoricalContext(job.company_slug),
         // Phase 3: `no-prefetch` passes an empty webSearchContext to skip
         // the duplicate Pro+grounded performWebSearch call. The main
         // analysis call still has googleSearch enabled so the model can
@@ -379,9 +385,8 @@ async function runAnalyzeAdvanced(
         ...(flags.variant === "no-prefetch"
           ? { webSearchContext: { synthesis: "", results: [] } }
           : {}),
-        // --model override (e.g. swap gemini-pro-latest → gemini-3.5-flash
-        // to evaluate cost/quality trade-offs). When omitted, the default
-        // PRO_MODEL inside analyzeJobAdvanced is used.
+        // --model override to evaluate cost/quality trade-offs. When omitted,
+        // analyzeJobAdvanced uses modelFor("job-analysis").
         ...(flags.model ? { analysisModel: flags.model } : {}),
         // Disable the auto-fallback to Flash-on-quota for evals so we
         // measure the requested model honestly.

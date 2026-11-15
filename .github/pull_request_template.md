@@ -11,11 +11,11 @@
 
 # Docs updated
 
-Tick every box that applies. If your PR changes architecture, cron topology, AI model usage, schema, directory layout, scheduler venue, or auth/security model, the relevant docs MUST be updated in this same PR. See the doc-hygiene rule in root `CLAUDE.md`.
+Tick every box that applies. If your PR changes architecture, cron topology, AI model usage, schema, directory layout, scheduler venue, or auth/security model, the relevant docs MUST be updated in this same PR. See the doc-hygiene rule in root `AGENTS.md`.
 
-- [ ] `CLAUDE.md` updated (architecture or conventions changed)
-- [ ] `docs/AGENTS.md` updated (agent workflow changed)
-- [ ] Per-area sub-CLAUDE updated (touched `web/lib/analysis`, `web/lib/scrapers`, `web/lib/ai`, or `web/lib/auth`)
+- [ ] `AGENTS.md` updated (architecture or conventions changed)
+- [ ] `docs/OPERATOR_MANUAL.md` updated (agent workflow changed)
+- [ ] Per-area `AGENTS.md` updated (touched `web/lib/analysis`, `web/lib/scrapers`, `web/lib/ai`, or `web/lib/auth`)
 - [ ] `docs/CRON_TOPOLOGY.md` updated (added or moved a scheduled job)
 - [ ] `docs/AI_HYGIENE.md` updated (added or changed AI call-sites, telemetry, or model rules)
 - [ ] `docs/INGESTION_PIPELINE.md` updated (changed the per-job hot path)

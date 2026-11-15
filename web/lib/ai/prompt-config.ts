@@ -33,7 +33,7 @@ export const AI_MODEL_OPTIONS = [
 ] as const;
 
 /**
- * Model-ID policy (CLAUDE.md §5). Allowed in `AI_MODEL_OPTIONS`:
+ * Model-ID policy (AGENTS.md §5). Allowed in `AI_MODEL_OPTIONS`:
  *   - Google's floating `-latest` aliases (upgrade themselves; can change cost
  *     and behaviour under us — the May 2026 rotation), and
  *   - stable (GA) versioned IDs, e.g. a Gemini 4 model id (fixed until Google
@@ -62,10 +62,9 @@ export type ApprovedModel = (typeof AI_MODEL_OPTIONS)[number]["value"];
  * user-selectable config row (e.g. feedback triage). The annotation is the
  * point: these are typed as `ApprovedModel`, so dropping or renaming an entry
  * in `AI_MODEL_OPTIONS` fails the build here rather than silently leaving a
- * stray literal behind. Prefer these over re-typing the string — CLAUDE.md §5
+ * stray literal behind. Prefer these over re-typing the string — AGENTS.md §5
  * requires every model string to resolve through this file.
  */
-export const PRO_MODEL: ApprovedModel = "gemini-pro-latest";
 export const FLASH_MODEL: ApprovedModel = "gemini-flash-latest";
 export const HYDROGEN_MODEL: ApprovedModel = "gemini-4-hydrogen";
 
@@ -109,12 +108,12 @@ export type ModelSurface = (typeof MODEL_SURFACES)[number];
  */
 export const SURFACE_MODELS: Record<ModelSurface, ApprovedModel> = {
   "job-structure": FLASH_MODEL,
-  "job-analysis": PRO_MODEL,
+  "job-analysis": HYDROGEN_MODEL,
   "weekly-digest": HYDROGEN_MODEL,
   "tech-stack": HYDROGEN_MODEL,
-  "company-insight": FLASH_MODEL,
-  "company-research": FLASH_MODEL,
-  "company-news": FLASH_MODEL,
+  "company-insight": HYDROGEN_MODEL,
+  "company-research": HYDROGEN_MODEL,
+  "company-news": HYDROGEN_MODEL,
   "company-editorial": HYDROGEN_MODEL,
   "theme-labels": FLASH_MODEL,
   "search-report": HYDROGEN_MODEL,

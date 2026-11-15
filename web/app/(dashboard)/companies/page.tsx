@@ -87,7 +87,7 @@ export default async function CompaniesPage({
   // header counts stay stable regardless of which lens is active (fixing the
   // bug where the pivot sub-counts and "All" reset to 0 on the Incumbents
   // lens). The incumbent list is small (≤6 Big-6 banks); the fintech list is
-  // ≤30 per CLAUDE.md, so loading both is cheap. When incumbent tracking is
+  // ≤30 per AGENTS.md, so loading both is cheap. When incumbent tracking is
   // off, we skip the incumbent query entirely (the lens is gone).
   const incumbentQuery = supabase
     .from("companies")
@@ -155,7 +155,7 @@ export default async function CompaniesPage({
     fintechList.map((c, i) => [c.id, fintechPivots[i]])
   );
 
-  // Per-company editorial signals (small N — ≤30 companies per CLAUDE.md).
+  // Per-company editorial signals (small N — ≤30 companies per AGENTS.md).
   //
   // Incumbent rows deliberately skip `classifyCompanyPivot` (and the
   // sparkline/delta queries): banks are tracked for senior-role signal, not

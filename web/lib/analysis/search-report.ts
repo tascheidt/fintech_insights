@@ -160,7 +160,7 @@ const asStringArray = (value: unknown): string[] =>
  * Load the description-level detail for a snapshot. The snapshot rows carry
  * only what the table renders; the synthesis needs the responsibilities.
  *
- * Read through `active_job_postings` (CLAUDE.md §7) — a company deactivated
+ * Read through `active_job_postings` (AGENTS.md §7) — a company deactivated
  * between the search and the report generation must not feed the synthesis.
  */
 export async function loadSynthesisInputs(

@@ -25,7 +25,7 @@
  *    and a duplicate link never by itself produces a `no`.
  *
  * 3. **No voice directive.** This is internal classification; the output is read
- *    by admins, not users. Per CLAUDE.md §5 the voice directive is forbidden
+ *    by admins, not users. Per AGENTS.md §5 the voice directive is forbidden
  *    here. `triage_reasoning` is admin-facing only — the user-facing history
  *    surface must not render it (that was how raw Gemini error strings reached
  *    submitters).

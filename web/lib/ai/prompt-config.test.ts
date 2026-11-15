@@ -1,7 +1,7 @@
 /**
  * Regression tests for the AI model resolver and model-ID policy.
  *
- * Guarantees we must preserve (per CLAUDE.md §5):
+ * Guarantees we must preserve (per AGENTS.md §5):
  *   1. The active config returned to callers always has a model in the
  *      approved AI_MODEL_OPTIONS enum.
  *   2. Every approved model is a floating `-latest` alias or a stable (GA)
@@ -77,7 +77,7 @@ describe("per-surface model resolution", () => {
 });
 
 describe("no hardcoded model strings outside prompt-config", () => {
-  // CLAUDE.md §5: every model string resolves through prompt-config.ts. This
+  // AGENTS.md §5: every model string resolves through prompt-config.ts. This
   // scans production source so a literal like "gemini-flash-latest" or
   // "gemini-4-argon" in a call site fails CI instead of silently escaping
   // the eval suite and the SURFACE_MODELS table.

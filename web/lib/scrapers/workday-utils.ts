@@ -124,7 +124,7 @@ export interface WorkdayApplyTarget {
  * (the `/job/...` tail, with a trailing `/apply` dropped) — the same shape
  * `buildWorkdayUrls` produces for the first-party Workday tenants. Returns null
  * for anything that isn't a Workday apply URL. Pure — exported for unit testing
- * (the per-tenant URL shape is exactly the bug class the scrapers CLAUDE.md
+ * (the per-tenant URL shape is exactly the bug class the scrapers AGENTS.md
  * says to pin in a test).
  */
 export function parseWorkdayApplyUrl(

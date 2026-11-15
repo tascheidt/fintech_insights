@@ -1,0 +1,505 @@
+{
+  "scenario": "analyze-advanced",
+  "mode": "baseline",
+  "variant": "default",
+  "gitSha": "ce6e8ed",
+  "generatedAt": "2026-11-15T23:34:56.774Z",
+  "fixtureFile": "/home/user/fintech_insights/web/scripts/fixtures/gemini-sample-jobs.json",
+  "fixtureCount": 24,
+  "processedCount": 10,
+  "totals": {
+    "calls": 10,
+    "inputTokens": 26031,
+    "outputTokens": 4781,
+    "cachedTokens": 0,
+    "totalTokens": 40236,
+    "estimatedUsd": 0.145584,
+    "avgLatencyMs": 7821
+  },
+  "byCallSite": {
+    "analyzeJobAdvanced+grounding": {
+      "calls": 10,
+      "inputTokens": 26031,
+      "outputTokens": 4781,
+      "totalTokens": 40236,
+      "estimatedUsd": 0.145584,
+      "avgLatencyMs": 7821,
+      "modelsServed": [
+        "gemini-4-hydrogen"
+      ]
+    }
+  },
+  "perJob": [
+    {
+      "jobId": "645839c0-151d-4404-8d8f-940ea48f368a",
+      "title": "ServiceNow Engineer",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": true,
+          "inputTokens": 2710,
+          "outputTokens": 530,
+          "cachedTokens": 0,
+          "thoughtsTokens": 785,
+          "totalTokens": 4025,
+          "estimatedUsd": 0.0139275,
+          "latencyMs": 7746,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "ServiceNow Engineer",
+            "fellBackToFlash": false,
+            "jobId": "645839c0-151d-4404-8d8f-940ea48f368a"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank adds ServiceNow Engineer to Infrastructure and Operations",
+        "category": "technology",
+        "insight_summary": "EQ Bank is hiring a ServiceNow Engineer within its Infrastructure & Operations department in Toronto. The role sits inside the bank's ServiceNow Centre of Excellence and focuses on application development, workflow customization, integrations, and production support. Requiring a minimum of two years of experience, this posting reflects ongoing maintenance and incremental expansion of internal IT service management.",
+        "what_it_means": "EQ Bank continues to invest in internal IT operations and workflow automation to support its existing banking platform.",
+        "strategic_signals": [
+          "Reports to the Manager, ServiceNow Centre of Excellence, indicating an established internal team.",
+          "Requires at least two years of ServiceNow development experience and preferred CAD or CIS certifications.",
+          "Emphasizes external system integrations, scripting, and production incident triage.",
+          "Hybrid work arrangement based at Equitable Bank's Toronto office."
+        ],
+        "is_new_direction": false,
+        "confidence": "medium",
+        "novelty_score": 3,
+        "novelty_reasoning": "A mid-level ServiceNow Engineer is a standard infrastructure and operations role for a bank of EQ Bank's scale. While the evaluation sample shows only three postings in the past 90 days, the presence of an established ServiceNow Centre of Excellence suggests this is a continuation of existing IT operations rather than a new strategic direction.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "EQ Bank likely needs additional engineering capacity to manage internal service requests, maintain system hygiene, and build integrations across its banking infrastructure as customer and operational volume grows. This is inferred from the job's focus on production support, release management, and vendor collaboration, though the lack of recent public news prevents confirming a specific platform migration.",
+        "web_corroboration": "No recent company news was found via web research to corroborate specific IT initiatives, though the posting aligns with Equitable Bank's stated scale of over 800,000 customers and $142 billion in combined assets.",
+        "model_reasoning": "Confidence is medium because the job description provides clear, detailed evidence of the role's scope and team structure, but the limited 90-day hiring sample of three postings and the absence of recent news restrict broader trend verification."
+      }
+    },
+    {
+      "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d",
+      "title": "Senior Estates and Trust Coordinator",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": true,
+          "inputTokens": 2032,
+          "outputTokens": 462,
+          "cachedTokens": 0,
+          "thoughtsTokens": 895,
+          "totalTokens": 3389,
+          "estimatedUsd": 0.0132255,
+          "latencyMs": 8100,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "Senior Estates and Trust Coordinator",
+            "fellBackToFlash": false,
+            "jobId": "4aef361c-d770-4eef-8a5a-be0515eaf62d"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank adds Senior Estates and Trust Coordinator in Toronto",
+        "category": "operational",
+        "insight_summary": "EQ Bank is hiring a Senior Estates and Trust Coordinator in Toronto to support personal trust and estate administration. The role combines client onboarding, document review, and CRM data reporting with coordination across trust officers and back-office teams. It also includes supporting thought leadership, webinars, and marketing materials for external centers of influence.",
+        "what_it_means": "EQ Bank is reinforcing operational capacity and client onboarding standards within its personal estates and trust administration unit.",
+        "strategic_signals": [
+          "Requires 3 to 5 years of trust and estate administration experience and enrollment in the STEP Certificate program.",
+          "Focuses on CRM data integrity, quarterly leadership reporting, and standardized client onboarding.",
+          "Includes oversight of thought leadership content and webinar processes alongside administrative duties.",
+          "Hybrid role based at Equitable Bank's Ontario Street office in Toronto."
+        ],
+        "is_new_direction": false,
+        "confidence": "medium",
+        "novelty_score": 3,
+        "novelty_reasoning": "This is an operational coordinator role supporting established trust and estate administration functions rather than a new product or market entry. However, the 90-day evaluation sample only shows three postings for EQ Bank, limiting direct comparison to recent hiring patterns.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The hire likely addresses growing administrative volume or a need for tighter CRM reporting and onboarding standardization in personal estates and trust services. Because no recent news was provided in the context, it is uncertain whether this reflects a broader wealth-services expansion or routine team replacement.",
+        "web_corroboration": "No recent company news was found via web research to corroborate specific strategic initiatives behind this posting.",
+        "model_reasoning": "Confidence is medium. The job description clearly outlines operational, reporting, and client-service responsibilities, but the limited 3-posting historical sample and absence of recent news prevent stronger inference about broader departmental growth."
+      }
+    },
+    {
+      "jobId": "9af5a8d4-c15e-490c-b2a6-6f34d804e1b9",
+      "title": "Senior Backend Engineer (CARE Pod)",
+      "companySlug": "eq-bank",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": true,
+          "inputTokens": 2153,
+          "outputTokens": 504,
+          "cachedTokens": 0,
+          "thoughtsTokens": 1032,
+          "totalTokens": 3689,
+          "estimatedUsd": 0.014749499999999999,
+          "latencyMs": 8418,
+          "status": "ok",
+          "extra": {
+            "companyName": "EQ Bank",
+            "jobTitle": "Senior Backend Engineer (CARE Pod)",
+            "fellBackToFlash": false,
+            "jobId": "9af5a8d4-c15e-490c-b2a6-6f34d804e1b9"
+          }
+        }
+      ],
+      "output": {
+        "headline": "EQ Bank adds senior backend engineer for agentic support workflows",
+        "category": "technology",
+        "insight_summary": "EQ Bank is hiring a Senior Backend Engineer for its CARE Pod within Digital Banking & Channel Tech. The role focuses on building and productionizing agentic workflows, evaluation harnesses, and observable backend services for customer support and back-office operations. This suggests an effort to formalize AI-assisted operational tooling with deterministic lifecycle controls and human-owned final decisions.",
+        "what_it_means": "EQ Bank is investing in production-grade, auditable agentic AI infrastructure to automate internal support workflows while maintaining human oversight.",
+        "strategic_signals": [
+          "Builds agentic task flows with human-owned final decisions for back-office automation.",
+          "Implements evaluation harnesses and regression gates for non-deterministic LLM outputs.",
+          "Replaces fragile UI triggers with backend event and API lifecycle guarantees.",
+          "Maintains knowledge ingestion pipelines with traceability and production observability."
+        ],
+        "is_new_direction": false,
+        "confidence": "medium",
+        "novelty_score": 5,
+        "novelty_reasoning": "The 90-day evaluation sample includes only three postings without role titles, limiting direct comparison. However, hiring specifically for production agentic workflows, LLM evaluation harnesses, and knowledge ingestion pipelines indicates a specialized technical focus within support engineering.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "EQ Bank likely seeks to reduce operational friction in customer support and back-office investigations by deploying automated agentic workflows. Requiring deterministic lifecycle handling, evaluation suites, and human-in-the-loop controls suggests a cautious, compliance-oriented approach to AI adoption in regulated banking. This inference is based on the job description alone, as no recent news was available.",
+        "web_corroboration": "No recent company news was found via web research to corroborate this specific hiring initiative.",
+        "model_reasoning": "Confidence is medium. The job description provides detailed technical requirements, such as evaluation harnesses, trunk-based releases, and backend API contracts, that clearly indicate production AI infrastructure work. However, the lack of role titles in the 90-day historical sample and absence of recent news prevent broader trend validation."
+      }
+    },
+    {
+      "jobId": "5add9237-0247-4579-ba5f-38199b5dad8c",
+      "title": "Senior People Partner",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": true,
+          "inputTokens": 2864,
+          "outputTokens": 460,
+          "cachedTokens": 0,
+          "thoughtsTokens": 875,
+          "totalTokens": 4199,
+          "estimatedUsd": 0.014308499999999998,
+          "latencyMs": 7095,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Senior People Partner",
+            "fellBackToFlash": false,
+            "jobId": "5add9237-0247-4579-ba5f-38199b5dad8c"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Koho hires Senior People Partner to advance AI-integrated HR operations",
+        "category": "operational",
+        "insight_summary": "Koho is recruiting an intermediate or senior People Partner in Canada to support its transition from traditional HR to a People Enablement model. The posting explicitly notes this is an existing vacancy, indicating backfill or continuity rather than net-new headcount expansion. Key priorities include automating workflows with AI, maintaining BambooHR data integrity, and managing compensation and compliance across both Canada and the US.",
+        "what_it_means": "Koho is standardizing and automating its internal people operations while maintaining cross-border HR compliance.",
+        "strategic_signals": [
+          "Explicitly framed as an existing vacancy rather than new headcount expansion.",
+          "Emphasizes AI and automation to reduce manual People Ops overhead.",
+          "Requires knowledge of compensation, benefits, and immigration in both Canada and the US.",
+          "Focuses on transitioning from traditional HR to a 2026 People Enablement model."
+        ],
+        "is_new_direction": false,
+        "confidence": "medium",
+        "novelty_score": 3,
+        "novelty_reasoning": "The role is an existing vacancy within a standard corporate function, though it reflects an updated operational mandate centered on AI-native workflows and cross-border US/Canada compliance.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "Koho likely needs to backfill a key HR partner role while executing a broader shift toward leaner, automated internal operations. The US compliance requirement suggests ongoing support for a distributed North American workforce, though this cannot be confirmed without broader headcount data.",
+        "web_corroboration": "No recent company news was found via web research to corroborate or contradict the internal operational shift described in the posting.",
+        "model_reasoning": "Confidence is medium because the job description clearly states the role is an existing vacancy and outlines specific operational priorities, but the 90-day hiring sample is small and lacks external news context."
+      }
+    },
+    {
+      "jobId": "a67a3e67-354b-40dc-abfc-c10b6318bfe5",
+      "title": "Senior Manager, Financial Risk",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": true,
+          "inputTokens": 3840,
+          "outputTokens": 465,
+          "cachedTokens": 0,
+          "thoughtsTokens": 783,
+          "totalTokens": 5088,
+          "estimatedUsd": 0.01512,
+          "latencyMs": 6776,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Senior Manager, Financial Risk",
+            "fellBackToFlash": false,
+            "jobId": "a67a3e67-354b-40dc-abfc-c10b6318bfe5"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Koho seeks Senior Manager for financial risk and IFRS 9 modeling",
+        "category": "compliance",
+        "insight_summary": "Koho is hiring a Senior Manager, Financial Risk to oversee delinquency forecasting, Expected Credit Loss calculations under IFRS 9, and liquidity stress testing. The posting notes this is an existing vacancy within the Risk and Compliance department, with a budgeted salary of 150,000 to 190,000 CAD. The role combines technical modeling in SQL, Python, or SAS with second-line oversight and mentorship of analysts.",
+        "what_it_means": "Koho is backfilling a core risk analytics leadership role to maintain regulatory compliance and portfolio oversight.",
+        "strategic_signals": [
+          "Posting explicitly states it is for an existing vacancy rather than new headcount",
+          "Focuses on IFRS 9 provisioning, stress testing, and second-line model risk management",
+          "Requires 6 to 8 years of experience in retail credit risk and treasury risk",
+          "Includes bilingual English and French job description for Canadian market compliance"
+        ],
+        "is_new_direction": false,
+        "confidence": "medium",
+        "novelty_score": 3,
+        "novelty_reasoning": "The role is a backfill for an existing vacancy in Risk and Compliance, indicating operational continuity rather than a new strategic direction.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "Koho likely needs to maintain continuity in its monthly IFRS 9 provisioning, capital planning, and regulatory stress testing following a departure. Because no recent company news was found, it is unclear whether this coincides with specific new credit product launches.",
+        "web_corroboration": "No recent company news was found via web research to corroborate external drivers for this hire.",
+        "model_reasoning": "Confidence is medium because the job description clearly defines the technical and compliance scope as an existing vacancy, but limited historical hiring context (3 postings in 90 days) and lack of recent news prevent deeper strategic attribution."
+      }
+    },
+    {
+      "jobId": "e64cce30-4b02-42c6-83a3-a22cc989f667",
+      "title": "Director, Financial Risk",
+      "companySlug": "koho",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": true,
+          "inputTokens": 4313,
+          "outputTokens": 560,
+          "cachedTokens": 0,
+          "thoughtsTokens": 927,
+          "totalTokens": 5800,
+          "estimatedUsd": 0.017622,
+          "latencyMs": 8277,
+          "status": "ok",
+          "extra": {
+            "companyName": "Koho",
+            "jobTitle": "Director, Financial Risk",
+            "fellBackToFlash": false,
+            "jobId": "e64cce30-4b02-42c6-83a3-a22cc989f667"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Koho seeks Director of Financial Risk to oversee credit and liquidity",
+        "category": "leadership",
+        "insight_summary": "Koho is hiring a Director, Financial Risk to lead strategy, analytics, and second-line governance across credit, market, and liquidity risk. The posting explicitly notes that the role is for an existing vacancy, indicating continuity in an established Risk & Compliance function rather than a new business line. Responsibilities center on IFRS 9 provisioning, Expected Credit Loss forecasting, stress testing, and cross-functional model oversight.",
+        "what_it_means": "Koho is maintaining senior-level risk governance and regulatory compliance capacity as it integrates AI and scales its financial products.",
+        "strategic_signals": [
+          "Backfills an existing Director-level vacancy with a budgeted salary of $180,000-$240,000 CAD.",
+          "Combines oversight of retail credit risk with non-credit market and liquidity risk.",
+          "Requires strict compliance with IFRS 9 standards, ECL methodologies, and board-level risk appetite reporting.",
+          "Establishes second-line effective challenge over Tech, Data Science, Finance, and Product models."
+        ],
+        "is_new_direction": false,
+        "confidence": "medium",
+        "novelty_score": 3,
+        "novelty_reasoning": "The posting explicitly states it is for an existing vacancy, which points to a replacement hire rather than a new strategic direction. While only three postings were observed in the 90-day sample, maintaining a senior risk leadership role is standard for a regulated fintech.",
+        "is_executive_movement": true,
+        "executive_context": "This is a Director-level leadership role managing people managers and individual contributors, with direct responsibility for presenting risk appetite frameworks to senior leadership and the board.",
+        "strategic_hypothesis": "Koho likely needs to sustain rigorous credit loss forecasting, liquidity stress testing, and model risk governance as it pursues leaner, more AI-integrated operations. Because the role is a backfill and no recent company news was found, it is uncertain whether this reflects recent leadership turnover or routine organizational evolution.",
+        "web_corroboration": "No recent company news was found via web research to corroborate specific product launches or regulatory drivers behind this vacancy.",
+        "model_reasoning": "Confidence is medium because the job description provides clear evidence of the role's scope, compensation, and status as an existing vacancy, but the 90-day hiring sample is small and no external news is available to confirm broader organizational context."
+      }
+    },
+    {
+      "jobId": "025a033e-94e6-4dd5-97c2-d800ce743bb8",
+      "title": "Banking Advisor",
+      "companySlug": "bnc",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": true,
+          "inputTokens": 1894,
+          "outputTokens": 420,
+          "cachedTokens": 0,
+          "thoughtsTokens": 1081,
+          "totalTokens": 3395,
+          "estimatedUsd": 0.0140985,
+          "latencyMs": 7588,
+          "status": "ok",
+          "extra": {
+            "companyName": "National Bank",
+            "jobTitle": "Banking Advisor",
+            "fellBackToFlash": false,
+            "jobId": "025a033e-94e6-4dd5-97c2-d800ce743bb8"
+          }
+        }
+      ],
+      "output": {
+        "headline": "National Bank adds Banking Advisor role in Longueuil branch",
+        "category": "customer",
+        "insight_summary": "National Bank is hiring a bilingual Banking Advisor for its Longueuil, Quebec branch. The role focuses on personal and small business advisory, covering investments, mortgages, insurance, and estate planning. This posting reflects routine branch staffing rather than a new strategic initiative.",
+        "what_it_means": "National Bank continues to maintain branch-level advisory capacity in Quebec for personal and small business clients.",
+        "strategic_signals": [
+          "Branch-based role reporting to the Branch Manager in Longueuil, Quebec.",
+          "Covers personal and small business banking, mortgages, investments, and insurance.",
+          "Requires bilingualism in English and French for client service.",
+          "Mandates a mutual fund representative licence within three months of hiring."
+        ],
+        "is_new_direction": false,
+        "confidence": "high",
+        "novelty_score": 2,
+        "novelty_reasoning": "A branch-level Banking Advisor role represents standard retail banking operations. With 3 postings observed in the last 90 days, this appears to be routine staffing rather than a new strategic direction.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The role likely addresses routine branch turnover or local client demand in Longueuil, Quebec. No recent company news was found in the provided research to suggest a broader strategic shift.",
+        "web_corroboration": "No recent company news was found via web research to corroborate or contradict this posting.",
+        "model_reasoning": "Confidence is high because the job description clearly outlines standard branch advisory duties, licensing requirements, and reporting structure. The small 90-day historical sample limits broader trend analysis, but the role itself is a standard retail banking function."
+      }
+    },
+    {
+      "jobId": "763200a2-89d6-4a37-83e8-eaa028abf273",
+      "title": "Banking Advisor Jobs for Indigenous People",
+      "companySlug": "bnc",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": true,
+          "inputTokens": 2104,
+          "outputTokens": 447,
+          "cachedTokens": 0,
+          "thoughtsTokens": 756,
+          "totalTokens": 3307,
+          "estimatedUsd": 0.012178500000000002,
+          "latencyMs": 7012,
+          "status": "ok",
+          "extra": {
+            "companyName": "National Bank",
+            "jobTitle": "Banking Advisor Jobs for Indigenous People",
+            "fellBackToFlash": false,
+            "jobId": "763200a2-89d6-4a37-83e8-eaa028abf273"
+          }
+        }
+      ],
+      "output": {
+        "headline": "National Bank adds Indigenous-focused Banking Advisor roles in Quebec",
+        "category": "customer",
+        "insight_summary": "National Bank is recruiting entry-level Banking Advisors in Montreal and across Quebec through a posting reserved for Indigenous candidates. The role focuses on frontline personal banking, transactional support, and referrals to investment and credit specialists. Starting compensation is $18.73 per hour with structured training and progression toward a mutual fund representative license.",
+        "what_it_means": "National Bank continues to staff core retail branch advisory functions while using targeted recruitment to increase Indigenous representation.",
+        "strategic_signals": [
+          "Listing is reserved for candidates identifying as First Nations, Metis, or Inuit",
+          "Multiple positions are open across Quebec with a Montreal base",
+          "Starting pay is $18.73 per hour with internal mobility pathways",
+          "Requires bilingualism in English and French for client service"
+        ],
+        "is_new_direction": false,
+        "confidence": "medium",
+        "novelty_score": 3,
+        "novelty_reasoning": "Retail Banking Advisor hiring is a standard, ongoing operational function for a commercial bank. The targeted Indigenous recruitment designation is notable for workforce inclusion, but the underlying job duties and branch structure represent routine retail banking.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "National Bank is likely combining routine branch staffing needs in Quebec with diversity and inclusion hiring targets. However, with only three postings in the 90-day sample and no recent news, it is unclear whether this reflects a broader regional expansion or standard replacement hiring.",
+        "web_corroboration": "No recent company news was found via web research to corroborate specific Indigenous hiring initiatives or branch expansion plans.",
+        "model_reasoning": "Confidence is medium because the job description provides clear details on compensation, location, and duties, but the limited 90-day hiring sample and absence of recent news restrict broader strategic verification."
+      }
+    },
+    {
+      "jobId": "0dd79afa-9afa-47cd-90fb-fc0fc2c6a665",
+      "title": "Banking Advisor",
+      "companySlug": "bnc",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": true,
+          "inputTokens": 1829,
+          "outputTokens": 423,
+          "cachedTokens": 0,
+          "thoughtsTokens": 1077,
+          "totalTokens": 3329,
+          "estimatedUsd": 0.013993499999999999,
+          "latencyMs": 7947,
+          "status": "ok",
+          "extra": {
+            "companyName": "National Bank",
+            "jobTitle": "Banking Advisor",
+            "fellBackToFlash": false,
+            "jobId": "0dd79afa-9afa-47cd-90fb-fc0fc2c6a665"
+          }
+        }
+      ],
+      "output": {
+        "headline": "National Bank adds branch Banking Advisor role in Sorel-Tracy, Quebec",
+        "category": "customer",
+        "insight_summary": "National Bank is hiring a Banking Advisor for its branch in Sorel-Tracy, Quebec. The role focuses on personal banking transactions, digital tool adoption, and referrals to internal specialists. This appears to be standard retail branch staffing rather than a new strategic initiative.",
+        "what_it_means": "The posting reflects routine branch-level staffing to maintain personal banking service and digital onboarding in Quebec.",
+        "strategic_signals": [
+          "Branch-based personal banking role located in Sorel-Tracy, Quebec.",
+          "Includes assisting clients with banking applications and ABMs.",
+          "Requires referring clients to investment, credit, and mortgage specialists.",
+          "Mandates adherence to compliance and risk management rules."
+        ],
+        "is_new_direction": false,
+        "confidence": "medium",
+        "novelty_score": 2,
+        "novelty_reasoning": "A branch-level Banking Advisor role represents standard retail banking operations. Although the observed 90-day sample contains only three postings, frontline branch staffing is a routine function for a major Canadian bank.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "National Bank is likely backfilling or maintaining frontline capacity at its Sorel-Tracy branch to support personal banking clients and encourage self-service digital adoption. No recent news was available to link this hire to a specific regional campaign.",
+        "web_corroboration": "No recent company news was provided in the research context to corroborate or contradict this posting.",
+        "model_reasoning": "The job description clearly outlines standard branch advisory, referral, and digital-assistance duties. Confidence is rated medium because the evaluation sample includes only three historical postings and no recent web news, limiting broader trend verification."
+      }
+    },
+    {
+      "jobId": "9a297c56-b3ba-47fa-9393-01a4f3b1d951",
+      "title": "Sales Representative - Southgate Mall",
+      "companySlug": "neo-financial",
+      "calls": [
+        {
+          "callSite": "analyzeJobAdvanced",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": true,
+          "inputTokens": 2292,
+          "outputTokens": 510,
+          "cachedTokens": 0,
+          "thoughtsTokens": 1213,
+          "totalTokens": 4015,
+          "estimatedUsd": 0.0163605,
+          "latencyMs": 9253,
+          "status": "ok",
+          "extra": {
+            "companyName": "Neo Financial",
+            "jobTitle": "Sales Representative - Southgate Mall",
+            "fellBackToFlash": false,
+            "jobId": "9a297c56-b3ba-47fa-9393-01a4f3b1d951"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Neo Financial adds mall sales representative role in Edmonton",
+        "category": "expansion",
+        "insight_summary": "Neo Financial is hiring a contract Sales Representative at Southgate Mall in Edmonton, Alberta. The role focuses on in-person customer acquisition for the Neo Credit card and Neo Money account at malls, campuses, and retail partner locations. This indicates continued reliance on physical activation channels alongside digital onboarding.",
+        "what_it_means": "Neo Financial continues to invest in localized, commission-driven field sales to grow its consumer product base in Western Canada.",
+        "strategic_signals": [
+          "Contract role offering $20/hour base pay plus instant point-of-sale commissions",
+          "Focuses on in-person sign-ups for Neo Credit card and Neo Money account",
+          "Targets high-traffic physical venues including Southgate Mall, campuses, and retail partners",
+          "Requires security screening including criminal records and credit checks"
+        ],
+        "is_new_direction": false,
+        "confidence": "medium",
+        "novelty_score": 2,
+        "novelty_reasoning": "Frontline mall and event sales roles are a standard, ongoing customer acquisition channel for Neo Financial rather than a new strategic pivot. The posting references an established base of 10,000+ retail partners and 1M+ customers, suggesting this is routine replenishment or localized staffing.",
+        "is_executive_movement": false,
+        "strategic_hypothesis": "The role likely supports ongoing regional customer acquisition and brand visibility in Edmonton, using variable-cost contract labor to drive credit card and deposit account sign-ups. However, with no recent news provided, it is unclear if this represents a new local push or standard turnover replacement.",
+        "web_corroboration": "No recent company news was found via web research to corroborate a specific Edmonton campaign. The posting itself cites 2023–2025 Deloitte Technology Fast 50 rankings and 2024 Globe & Mail growth recognition as ongoing company context.",
+        "model_reasoning": "Confidence is medium because the job description clearly details the compensation, product focus, and in-person activation model, but the 90-day historical sample is limited to three postings and lacks recent external news context."
+      }
+    }
+  ]
+}

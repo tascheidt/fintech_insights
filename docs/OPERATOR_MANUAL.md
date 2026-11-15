@@ -1,18 +1,18 @@
-# Agents Manual
+# Operator manual
 
-Operator's manual for any coding agent (human or AI) entering this repo. If you only read one doc, read root [`CLAUDE.md`](../CLAUDE.md). This file is the second one.
+Operator's manual for any coding agent (human or AI) entering this repo. If you only read one doc, read root [`AGENTS.md`](../AGENTS.md). This file is the second one.
 
 ## Before you start
 
-1. Read [`CLAUDE.md`](../CLAUDE.md). It has the cron count, the AI model rules, and the conventions.
+1. Read [`AGENTS.md`](../AGENTS.md). It has the cron count, the AI model rules, and the conventions.
 2. Skim [`docs/CRON_TOPOLOGY.md`](./CRON_TOPOLOGY.md) so you know the Vercel-2 + GitHub-Actions-1 split before you propose a "just add a cron" change.
 3. Skim [`docs/AI_HYGIENE.md`](./AI_HYGIENE.md) before you touch anything in `web/lib/ai/**` or `web/lib/analysis/**`.
 4. If your change is on a user-facing AI surface, read [`docs/voice.md`](./voice.md).
-5. Check the per-area sub-CLAUDE files for the directory you're editing:
-   - `web/lib/ai/CLAUDE.md`
-   - `web/lib/analysis/CLAUDE.md`
-   - `web/lib/scrapers/CLAUDE.md`
-   - `web/lib/auth/CLAUDE.md`
+5. Check the per-area `AGENTS.md` files for the directory you're editing:
+   - `web/lib/ai/AGENTS.md`
+   - `web/lib/analysis/AGENTS.md`
+   - `web/lib/scrapers/AGENTS.md`
+   - `web/lib/auth/AGENTS.md`
 
 ## Adding a new API route
 
@@ -125,7 +125,7 @@ Edit `web/data/releases.json`:
 1. Add a bullet to the current version's `changes` array, **or** create a new version entry if shipping a version bump.
 2. Use one of: `"feature"` | `"fix"` | `"improvement"`.
 3. One sentence per entry.
-4. Bump the version in both `web/package.json` and `web/data/releases.json` if appropriate (patch/minor/major — see root `CLAUDE.md`).
+4. Bump the version in both `web/package.json` and `web/data/releases.json` if appropriate (patch/minor/major — see root `AGENTS.md`).
 
 ## Tests
 
@@ -141,7 +141,7 @@ npm run test:watch
 
 Six colocated `*.test.ts` files cover the highest-leverage pure functions: the `description_hash` gate in [`web/lib/jobs/processor.ts`](../web/lib/jobs/processor.ts), the digest input builder in [`web/lib/analysis/digest.ts`](../web/lib/analysis/digest.ts), the AI model resolver in [`web/lib/ai/prompt-config.ts`](../web/lib/ai/prompt-config.ts), the env validator in [`web/lib/env.ts`](../web/lib/env.ts), the voice heuristic in [`web/lib/ai/voice-validator.ts`](../web/lib/ai/voice-validator.ts), and the admin-feedback Zod schema in [`web/packages/feedback/src/validation.ts`](../web/packages/feedback/src/validation.ts).
 
-**Philosophy:** regression protection on pure functions, not coverage chase. Cron handlers are mock-heavy and low ROI — we test the helpers they consume, not the routes themselves. Per the CLAUDE.md anti-pattern list, we don't mock the Supabase DB schema in tests; the Supabase mocks here only stand in for the client object so a unit test can run hermetically against a single function. Anything more substantial belongs in production telemetry, not unit tests.
+**Philosophy:** regression protection on pure functions, not coverage chase. Cron handlers are mock-heavy and low ROI — we test the helpers they consume, not the routes themselves. Per the AGENTS.md anti-pattern list, we don't mock the Supabase DB schema in tests; the Supabase mocks here only stand in for the client object so a unit test can run hermetically against a single function. Anything more substantial belongs in production telemetry, not unit tests.
 
 When adding a new test, ask: is this function pure, deterministic, and high-leverage (cost regression, security boundary, output contract)? If yes, add it. If no, add telemetry.
 
@@ -170,4 +170,4 @@ The migration filename check in CI is a pragmatic substitute for `supabase db di
 
 ## Editing this repo's docs
 
-The doc-hygiene rule is in root [`CLAUDE.md`](../CLAUDE.md). The short version: **if your PR changes architecture, cron topology, AI model usage, schema, directory layout, scheduler venue, or auth/security model, update the relevant `.md` file in the same PR.** The PR template has a checkbox for each major doc area.
+The doc-hygiene rule is in root [`AGENTS.md`](../AGENTS.md). The short version: **if your PR changes architecture, cron topology, AI model usage, schema, directory layout, scheduler venue, or auth/security model, update the relevant `.md` file in the same PR.** The PR template has a checkbox for each major doc area.

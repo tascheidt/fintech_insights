@@ -1,6 +1,6 @@
 # Ingestion pipeline reality
 
-> Pulled out of root `CLAUDE.md` so the hot-path description has room to breathe. Keep this file truthful — if you change the order of operations in `processor.ts` / `analyzer.ts`, update this doc in the same PR.
+> Pulled out of root `AGENTS.md` so the hot-path description has room to breathe. Keep this file truthful — if you change the order of operations in `processor.ts` / `analyzer.ts`, update this doc in the same PR.
 
 ## Live per-job hot path
 
@@ -8,7 +8,7 @@ After a `collect` run picks up new postings, every job traverses:
 
 ```
 processor.ts  → [description_hash gate]  → extractAndUpdateStructure  → extractJobStructure  (Flash)
-analyzer.ts   → analyzeJobAdvanced  (Pro + grounded; in-flight grounding, no pre-fetch)
+analyzer.ts   → analyzeJobAdvanced  (Gemini 4 Hydrogen + grounded; in-flight grounding, no pre-fetch)
 ```
 
 That's it. Any "analysis" function not named above is *not* on the live path.

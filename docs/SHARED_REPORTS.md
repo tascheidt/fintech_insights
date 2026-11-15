@@ -111,7 +111,7 @@ re-reads them itself, because the result is published to people without
 accounts. Enforced there:
 
 - reads go through `active_job_postings`, so a deactivated company cannot be
-  published (CLAUDE.md §7);
+  published (AGENTS.md §7);
 - incumbent-tier rows are dropped when `incumbent_tracking_enabled` is off,
   matching what the Jobs page would have shown;
 - the function-group label in the search context is validated against

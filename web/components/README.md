@@ -145,7 +145,7 @@ If you find yourself wanting to change a color in a component:
 
 ## Doc hygiene
 
-Per the root `CLAUDE.md` section 9, any PR that:
+Per the root `AGENTS.md` section 9, any PR that:
 
 - adds a token,
 - changes the editorial-vs-chrome boundary,

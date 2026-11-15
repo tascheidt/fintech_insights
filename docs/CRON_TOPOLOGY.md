@@ -104,7 +104,7 @@ The model-watch cron and the manual model-eval workflow need only
    - **No** → add to `web/vercel.json` `crons`.
    - **Yes** → GitHub Actions workflow that `curl`s the route with `CRON_SECRET`.
 3. Either way: the route must call `requireCronAuth(req)` first and write a
-   `job_runs` row (`job_type` from the approved enum, see `CLAUDE.md`).
+   `job_runs` row (`job_type` from the approved enum, see `AGENTS.md`).
 4. Update this file.
 
 ## Heavy-scraper offload (`scrape-heavy.yml`)
@@ -144,7 +144,7 @@ reuses the dispatched `task_id`, so both attempts write the **same**
 `job_run_tasks` row (no forked task). It retries on any failure, not just the
 Akamai block, because that's cheap and the block is the dominant mode; a
 second consecutive greylist is rare and the daily cron is the backstop. See
-[`web/lib/scrapers/CLAUDE.md`](../web/lib/scrapers/CLAUDE.md) → "Two different
+[`web/lib/scrapers/AGENTS.md`](../web/lib/scrapers/AGENTS.md) → "Two different
 Workday failures."
 
 ## Sentry alerts

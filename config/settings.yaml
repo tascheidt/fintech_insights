@@ -3,7 +3,7 @@ database:
 
 analysis:
   provider: gemini
-  model: gemini-flash-latest  # A `-latest` alias or a stable versioned ID; never preview/experimental IDs (CLAUDE.md §5)
+  model: gemini-flash-latest  # A `-latest` alias or a stable versioned ID; never preview/experimental IDs (AGENTS.md §5)
   temperature: 0.3
   max_tokens: 65536
 

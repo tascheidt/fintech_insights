@@ -13,7 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *
  * The flag lives in `system_settings`, NOT on `companies` — it must never be
  * conflated with `companies.is_active` (those two axes are kept independent;
- * see root CLAUDE.md §7). Reading `system_settings` here also keeps this file
+ * see root AGENTS.md §7). Reading `system_settings` here also keeps this file
  * out of the `design-system/active-company-scope` lint rule's scope.
  */
 

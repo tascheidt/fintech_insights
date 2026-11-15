@@ -10,7 +10,7 @@
  *
  * Two further scoping rules are enforced server-side for the same reason:
  *   - the read goes through `active_job_postings`, so a deactivated company
- *     cannot be published (CLAUDE.md §7);
+ *     cannot be published (AGENTS.md §7);
  *   - incumbent-tier rows are dropped when `incumbent_tracking_enabled` is off,
  *     matching what the Jobs page itself would have shown.
  *

@@ -110,7 +110,7 @@ When reviewing a new component, force the author to declare which it is, and rej
 
 ### Doc hygiene
 
-Per root `CLAUDE.md` section 9, any PR that adds a token, changes the editorial-vs-chrome boundary, introduces a new shared visual primitive, or changes the lint rule's strictness **must update `web/components/DESIGN_SYSTEM.md` in the same PR**. Flag silent drift as a blocker.
+Per root `AGENTS.md` section 9, any PR that adds a token, changes the editorial-vs-chrome boundary, introduces a new shared visual primitive, or changes the lint rule's strictness **must update `web/components/DESIGN_SYSTEM.md` in the same PR**. Flag silent drift as a blocker.
 
 ## How You Work
 
@@ -228,7 +228,7 @@ What to save:
 What NOT to save:
 - Session-specific context (current task details, in-progress work, temporary state)
 - Information that might be incomplete — verify against project docs before writing
-- Anything that duplicates or contradicts existing CLAUDE.md instructions
+- Anything that duplicates or contradicts existing AGENTS.md instructions
 - Speculative or unverified conclusions from reading a single file
 
 Explicit user requests:

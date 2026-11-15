@@ -75,4 +75,4 @@ Lives at `advanced-strategic.ts:467-485`. Now observable via `gemini_usage_event
 `web/lib/ai/gemini-pricing.ts` is hand-maintained from Google's public pricing page and intended for relative trending only. Reconcile `estimated_usd` totals to Google Cloud billing monthly; expect drift. Update the constants when observed drift exceeds ~10%.
 
 ### Cron constraint
-Max 2 Vercel crons per CLAUDE.md. Currently daily `/api/cron/collect` at 06:00 UTC and weekly `/api/cron/report` Mon 05:00 UTC. Any future scheduled quality-suite run must fold into one of these or replace the oldest entry.
+Max 2 Vercel crons per AGENTS.md. Currently daily `/api/cron/collect` at 06:00 UTC and weekly `/api/cron/report` Mon 05:00 UTC. Any future scheduled quality-suite run must fold into one of these or replace the oldest entry.

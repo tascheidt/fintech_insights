@@ -99,7 +99,7 @@ If any trips, it calls `Sentry.captureMessage("[cost-alarm] Daily Gemini usage t
 
 **Why three signals:** `estimated_usd` is a model that under-counts the GCP invoice ~2.7x — and most on the grounded calls that drive spikes (the 2026-05 spike never paged: telemetry saw $27 < $50 on a ~$90 day). Grounded-call count and raw token volume come from un-priced SDK fields, so a fan-out spike pages even when the dollar estimate is wrong. See [`AI_HYGIENE.md`](./AI_HYGIENE.md) → "Cost reconciliation".
 
-**Auth note:** the route lives under `/api/admin/**` but is gated by `requireCronSecret`, not `requireAdmin`, because the GH Actions runner has no Supabase session. This is the only intentional exception in the `/api/admin/**` namespace and is called out in [`web/lib/auth/CLAUDE.md`](../web/lib/auth/CLAUDE.md).
+**Auth note:** the route lives under `/api/admin/**` but is gated by `requireCronSecret`, not `requireAdmin`, because the GH Actions runner has no Supabase session. This is the only intentional exception in the `/api/admin/**` namespace and is called out in [`web/lib/auth/AGENTS.md`](../web/lib/auth/AGENTS.md).
 
 ### Verifying locally
 

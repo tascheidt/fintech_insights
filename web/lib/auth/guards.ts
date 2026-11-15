@@ -5,7 +5,7 @@
  * auth. These guards make the intent explicit and enforce a single canonical
  * pattern (no per-route ad-hoc auth checks).
  *
- * Routing policy (see `web/lib/auth/CLAUDE.md`):
+ * Routing policy (see `web/lib/auth/AGENTS.md`):
  *   - /api/cron/**       -> requireCronSecret(req)
  *   - /api/internal/**   -> requireCronSecret(req)
  *   - /api/admin/**      -> requireAdmin()

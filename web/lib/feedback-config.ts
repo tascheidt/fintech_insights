@@ -53,7 +53,7 @@ export const feedbackConfig: FeedbackConfig = {
   rateLimit: { maxPerHour: 10, duplicateWindowMinutes: 10 },
 
   // Route package-internal messages into the app's pino pipeline instead of
-  // raw console (CLAUDE.md §7). The package keeps `console` as its default so
+  // raw console (AGENTS.md §7). The package keeps `console` as its default so
   // it stays portable.
   logger: {
     info: (...args) => log.info({ args }, "[feedback]"),

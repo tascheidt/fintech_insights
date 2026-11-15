@@ -204,7 +204,7 @@ export default async function JobsPage({
     getCrossCompanyThemes(),
     // Company filter options — every active company in the selected tier(s),
     // independent of the current search. Through `active_companies` so a
-    // deactivated company can't leak in (CLAUDE.md §7).
+    // deactivated company can't leak in (AGENTS.md §7).
     supabase
       .from("active_companies")
       .select("slug, name")

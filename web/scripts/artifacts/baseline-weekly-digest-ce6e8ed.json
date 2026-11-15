@@ -1,0 +1,133 @@
+{
+  "scenario": "weekly-digest",
+  "mode": "baseline",
+  "variant": "default",
+  "gitSha": "ce6e8ed",
+  "generatedAt": "2026-11-15T23:32:54.617Z",
+  "fixtureFile": "lib/labs/prompt-forge-benchmarks.ts",
+  "fixtureCount": 3,
+  "processedCount": 3,
+  "totals": {
+    "calls": 3,
+    "inputTokens": 4930,
+    "outputTokens": 354,
+    "cachedTokens": 0,
+    "totalTokens": 7757,
+    "estimatedUsd": 0.028597,
+    "avgLatencyMs": 5317
+  },
+  "byCallSite": {
+    "generateWeeklyDigestCommentary": {
+      "calls": 3,
+      "inputTokens": 4930,
+      "outputTokens": 354,
+      "totalTokens": 7757,
+      "estimatedUsd": 0.028597499999999998,
+      "avgLatencyMs": 5317,
+      "modelsServed": [
+        "gemini-4-hydrogen"
+      ]
+    }
+  },
+  "perJob": [
+    {
+      "jobId": "partnerships-with-generic-ml",
+      "title": "Benchmark WealthTech",
+      "companySlug": "partnerships-with-generic-ml",
+      "calls": [
+        {
+          "callSite": "generateWeeklyDigestCommentary",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": false,
+          "inputTokens": 1654,
+          "outputTokens": 155,
+          "cachedTokens": 0,
+          "thoughtsTokens": 1070,
+          "totalTokens": 2879,
+          "estimatedUsd": 0.011668499999999998,
+          "latencyMs": 6798,
+          "status": "ok",
+          "extra": {
+            "companyName": "Benchmark partnerships-with-generic-ml",
+            "attempt": 1,
+            "finishReason": "STOP",
+            "maxOutputTokens": 4096,
+            "promptVersion": "digest-editorial-v3"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Benchmark adds partnerships lead alongside engineering and advisory roles",
+        "body": "Benchmark opened a search for a Partnerships Lead, Member Rewards, its first sales-focused listing in tracked data. The rest of the week's five postings lean toward core product and client support, including a Trading UI Engineer, an ML Infrastructure Engineer, and an Estate Planning Advisor. Engineering and operations remain the company's primary hiring tracks, accounting for more than half of its 110 postings year-to-date.",
+        "new_signal": "A new search for a Partnerships Lead, Member Rewards marks the first sales-oriented role in tracked data, suggesting an effort to expand external reward-program relationships."
+      }
+    },
+    {
+      "jobId": "continued-field-sales",
+      "title": "Neo Financial",
+      "companySlug": "continued-field-sales",
+      "calls": [
+        {
+          "callSite": "generateWeeklyDigestCommentary",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": false,
+          "inputTokens": 1636,
+          "outputTokens": 73,
+          "cachedTokens": 0,
+          "thoughtsTokens": 578,
+          "totalTokens": 2287,
+          "estimatedUsd": 0.007336499999999999,
+          "latencyMs": 4304,
+          "status": "ok",
+          "extra": {
+            "companyName": "Benchmark continued-field-sales",
+            "attempt": 1,
+            "finishReason": "STOP",
+            "maxOutputTokens": 4096,
+            "promptVersion": "digest-editorial-v3"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Benchmark continued-field-sales posts mall sales and mortgage roles",
+        "body": "New postings this week center on in-person retail sales, led by Sales Representative - Yorkdale and Sales Representative - Chinook Centre, alongside a Mortgage Fulfillment Specialist role.",
+        "new_signal": null
+      }
+    },
+    {
+      "jobId": "new-risk-ai-signal",
+      "title": "EQ Bank",
+      "companySlug": "new-risk-ai-signal",
+      "calls": [
+        {
+          "callSite": "generateWeeklyDigestCommentary",
+          "modelRequested": "gemini-4-hydrogen",
+          "modelServed": "gemini-4-hydrogen",
+          "groundingEnabled": false,
+          "inputTokens": 1640,
+          "outputTokens": 126,
+          "cachedTokens": 0,
+          "thoughtsTokens": 825,
+          "totalTokens": 2591,
+          "estimatedUsd": 0.0095925,
+          "latencyMs": 4848,
+          "status": "ok",
+          "extra": {
+            "companyName": "Benchmark new-risk-ai-signal",
+            "attempt": 1,
+            "finishReason": "STOP",
+            "maxOutputTokens": 4096,
+            "promptVersion": "digest-editorial-v3"
+          }
+        }
+      ],
+      "output": {
+        "headline": "Benchmark new-risk-ai-signal opens fraud and credit risk AI roles",
+        "body": "Two new listings target automated risk modeling: Senior Machine Learning Engineer, Fraud and Manager, Credit Risk Models. Sales remains the largest hiring area, with three new postings this week including Business Development Manager, Prairies. That pairing suggests the company is building out risk infrastructure alongside regional commercial expansion.",
+        "new_signal": "AI-risk work appears in tracked postings for the first time this week, pointing to potential investment in fraud detection and credit modeling."
+      }
+    }
+  ]
+}

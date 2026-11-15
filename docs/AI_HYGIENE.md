@@ -1,6 +1,6 @@
 # AI hygiene
 
-Rules for every Gemini call. This file is the long-form home for the call-site discipline that root `CLAUDE.md` only summarizes.
+Rules for every Gemini call. This file is the long-form home for the call-site discipline that root `AGENTS.md` only summarizes.
 
 ## Why these rules exist
 
@@ -78,9 +78,9 @@ The company editorial engine was tempted to fire its own grounded research call.
 
 Single source of truth lives in `web/lib/ai/prompt-config.ts` (`AI_MODEL_OPTIONS` enum). Never hardcode a model string outside that module — a test now scans `lib/` and `app/` for Gemini model literals. Which approved model each output uses is the per-surface table `SURFACE_MODELS`; call sites read it via `modelFor("<surface>")`. Changing a surface's model is an eval-driven decision: see [`MODEL_EVALS.md`](./MODEL_EVALS.md).
 
-- `gemini-4-hydrogen` — stable Gemini 4 id (no `-latest` alias exists). Since the Nov 2026 eval, the production model for the narrative, research and triage surfaces (see `SURFACE_MODELS`). It cannot turn thinking off, so it always runs through its `MODEL_GENERATION_PROFILES` entry (`thinkingLevel: "low"` + 8,192 tokens of output headroom), which is exactly the variant the eval chose.
-- `gemini-pro-latest` — kept as an option and a comparison baseline. Note: as of 2026-11-15 this alias serves **`gemini-3.1-pro-preview`** (a preview), which is part of why the Pro surfaces moved off it.
-- `gemini-flash-latest` — fast, cost-effective; extraction (`thinkingBudget: 0`), theme labels, categorization, and the advanced-analysis quota fallback.
+- `gemini-4-hydrogen` — stable Gemini 4 id (no `-latest` alias exists). Since the Nov 2026 eval, the production model for grounded job analysis and every narrative, research and triage surface except theme labels (see `SURFACE_MODELS`). It cannot turn thinking off, so it always runs through its `MODEL_GENERATION_PROFILES` entry (`thinkingLevel: "low"` + 8,192 tokens of output headroom), which is exactly the variant the eval chose.
+- `gemini-pro-latest` — kept as an option and a comparison baseline. Note: as of 2026-11-15 this alias serves **`gemini-3.1-pro-preview`** (a preview), which is part of why every surface that used it moved off; no surface uses it today.
+- `gemini-flash-latest` — fast, cost-effective; extraction (`thinkingBudget: 0`), theme labels, categorization, and the job-analysis quota fallback.
 - `gemini-flash-lite-latest` — cheapest tier for high-volume, low-stakes calls. Use only where the comparison report confirms ≥95% L1 field agreement. (Extraction was evaluated against it in 2026-05 and **kept on Flash** — it failed the gate. See "Cheaper extraction" below.)
 
 ## Editorial pipeline call sites

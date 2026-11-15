@@ -523,8 +523,17 @@ export const SURFACES: SurfaceSpec[] = [
       if (!o) return {};
       const items = [...o.recentNews, ...o.leadershipChanges];
       return {
+        // Coverage only: it rewards padding (the Nov 2026 run had the same
+        // credit facility listed three times). Read with the two below.
         news_items: Math.min(1, o.recentNews.length / 5),
-        items_with_source: items.length ? items.filter((n) => Boolean((n as { url?: string; source?: string }).url ?? (n as { source?: string }).source)).length / items.length : 0,
+        items_with_source: items.length ? items.filter((n) => Boolean(n.sourceUrl)).length / items.length : 0,
+        // Share of links taken from the search tool's results rather than
+        // written by the model. Model-written URLs were mismatched to their
+        // headline in the Nov 2026 run; tool links are what was actually read.
+        grounded_link_share: (() => {
+          const links = items.map((n) => n.sourceUrl).filter((u): u is string => Boolean(u));
+          return links.length ? links.filter((u) => u.includes("grounding-api-redirect")).length / links.length : 0;
+        })(),
       };
     },
   },
