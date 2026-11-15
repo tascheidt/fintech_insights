@@ -83,7 +83,7 @@ The daily checks watch scrape *outcomes*; nothing re-asks whether the stored ATS
 - `ats_drift` — an active company whose `careers_url` resolves (high-confidence `detectATSFromUrl`) to a different `ats_type`/`ats_identifier` than configured.
 - `dead_config` — an active company whose configured API board endpoint no longer answers, with any live slug-sweep hit named as the likely destination.
 
-Findings are emailed to admins via Resend (`--dry-run` logs only). Decision rules are pure in [`web/lib/scrapers/drift.ts`](../web/lib/scrapers/drift.ts), unit-tested in `drift.test.ts`. The script exits 0 even with findings — the email is the signal; non-zero is reserved for the script itself breaking.
+Findings are emailed to admins via Resend (`--dry-run` logs only). The workflow requires the `RESEND_API_KEY` **and** `RESEND_FROM` repository secrets (Actions secrets, separate from Vercel's env vars): without `RESEND_FROM` the sandbox sender `onboarding@resend.dev` can only reach the Resend account owner, and Resend rejects the entire admin batch. Decision rules are pure in [`web/lib/scrapers/drift.ts`](../web/lib/scrapers/drift.ts), unit-tested in `drift.test.ts`. The script exits 0 even with findings — the email is the signal; non-zero is reserved for the script itself breaking.
 
 ## Daily Gemini cost alarm
 
