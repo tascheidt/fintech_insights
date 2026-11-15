@@ -37,7 +37,8 @@ import { triageFeedback, type TriageResult } from "@/lib/analysis/feedback-triag
 import { buildCompanyInsightChatPrompt, generateCompanyInsightChatReply } from "@/lib/analysis/insight-chat";
 import { generatePosting } from "@/lib/analysis/posting-generator";
 import { analyzeCompanyStrategy, type StrategyAnalysisResult } from "@/lib/ai/strategy-analysis";
-import { detectCompanyType, performDeepResearch, type CompanyType, type ResearchResult } from "@/lib/analysis/company-research";
+import { detectCompanyType, formatResearchForPrompt, performDeepResearch, type CompanyType, type ResearchResult } from "@/lib/analysis/company-research";
+import { formatExtendedContextForPrompt } from "@/lib/analysis/context-builder";
 import { fetchCompanyNewsContext, type CompanyNewsContext } from "@/lib/analysis/company-news";
 import { categorizePosting, type JobCategoryResult } from "@/lib/analysis/categorizer";
 import type { ReportSynthesis } from "@/lib/reports/types";
@@ -268,7 +269,14 @@ export const SURFACES: SurfaceSpec[] = [
     userFacing: true,
     grounded: false,
     cases: () =>
-      fx.NARRATIVE_COMPANIES.map((slug) => ({ id: slug, input: slug, source: contextSource(slug) })),
+      // The judge sees the SAME context blocks the prompt is built from. A
+      // slimmer summary made the judges flag the real 90-day window and
+      // function-group names as fabrications (Nov 2026 run).
+      fx.NARRATIVE_COMPANIES.map((slug) => ({
+        id: slug,
+        input: slug,
+        source: `${formatExtendedContextForPrompt(fx.extendedContext(slug))}\n\n${formatResearchForPrompt(fx.NO_RESEARCH)}`,
+      })),
     run: (c, model) => {
       void model;
       const slug = c.input as string;

@@ -78,8 +78,9 @@ The company editorial engine was tempted to fire its own grounded research call.
 
 Single source of truth lives in `web/lib/ai/prompt-config.ts` (`AI_MODEL_OPTIONS` enum). Never hardcode a model string outside that module — a test now scans `lib/` and `app/` for Gemini model literals. Which approved model each output uses is the per-surface table `SURFACE_MODELS`; call sites read it via `modelFor("<surface>")`. Changing a surface's model is an eval-driven decision: see [`MODEL_EVALS.md`](./MODEL_EVALS.md).
 
-- `gemini-pro-latest` — advanced analysis with web search/grounding; deeper reasoning and narrative quality.
-- `gemini-flash-latest` — fast, cost-effective; default for extraction, classification, digest, chat.
+- `gemini-4-hydrogen` — stable Gemini 4 id (no `-latest` alias exists). Since the Nov 2026 eval, the production model for the narrative, research and triage surfaces (see `SURFACE_MODELS`). It cannot turn thinking off, so it always runs through its `MODEL_GENERATION_PROFILES` entry (`thinkingLevel: "low"` + 8,192 tokens of output headroom), which is exactly the variant the eval chose.
+- `gemini-pro-latest` — kept as an option and a comparison baseline. Note: as of 2026-11-15 this alias serves **`gemini-3.1-pro-preview`** (a preview), which is part of why the Pro surfaces moved off it.
+- `gemini-flash-latest` — fast, cost-effective; extraction (`thinkingBudget: 0`), theme labels, categorization, and the advanced-analysis quota fallback.
 - `gemini-flash-lite-latest` — cheapest tier for high-volume, low-stakes calls. Use only where the comparison report confirms ≥95% L1 field agreement. (Extraction was evaluated against it in 2026-05 and **kept on Flash** — it failed the gate. See "Cheaper extraction" below.)
 
 ## Editorial pipeline call sites
@@ -88,7 +89,7 @@ The v2 editorial fields (working thesis, interpretation, strategic bets, last me
 
 | Call site                  | Module                                       | Model                  | Grounded | Prompt version              |
 |----------------------------|----------------------------------------------|------------------------|----------|-----------------------------|
-| `generateCompanyEditorial` | `web/lib/analysis/company-editorial.ts`      | `gemini-pro-latest`    | no       | `company-editorial-v1`      |
+| `generateCompanyEditorial` | `web/lib/analysis/company-editorial.ts`      | `gemini-4-hydrogen`    | no       | `company-editorial-v1`      |
 | `generateThemeLabels`      | `web/lib/analysis/cross-company-themes.ts`   | `gemini-flash-latest`  | no       | `cross-company-themes-v1`   |
 
 Both are refreshable via `web/scripts/regenerate-editorial.ts` (per company or `--all`) and the `editorial-cron.yml` GH Actions workflow (Mondays 11:00 UTC). The bet auto-suggestions surfaced in the editorial form are rule-based (`web/lib/analysis/bet-suggester.ts`) — no AI calls.
@@ -99,7 +100,7 @@ Not every call is scheduled. These fire on a user action, so their volume tracks
 
 | Call site                        | Module                                    | Model                 | Grounded | Prompt version              |
 |----------------------------------|-------------------------------------------|-----------------------|----------|-----------------------------|
-| `generateSearchReportSynthesis`  | `web/lib/analysis/search-report.ts`       | `gemini-flash-latest` | no       | `search-report-synthesis-v1`|
+| `generateSearchReportSynthesis`  | `web/lib/analysis/search-report.ts`       | `gemini-4-hydrogen`   | no       | `search-report-synthesis-v1`|
 
 One call per report generated from the Jobs page (see [`SHARED_REPORTS.md`](./SHARED_REPORTS.md)). Bounded on both axes: the prompt samples at most 40 postings at 1800 chars each, so a report's input is capped regardless of how many rows the search returned. It is **failure-tolerant by design** — a null return renders a table-only report rather than failing the request, because the output is served behind a public share link. Both the ok and error paths write telemetry, so a rash of retries is visible in `gemini_usage_events` rather than silent.
 
@@ -136,13 +137,13 @@ Every submission from that point sat in `reviewing` forever. Three compounding f
 2. **No telemetry.** The call wrote no `gemini_usage_events` row, so the daily cost alarm saw neither the spend before nor the sudden drop to zero after.
 3. **The error was the user-facing status.** The handler wrote `Triage error: <raw Gemini message>` into `triage_reasoning`, which the submitter's feedback history renders verbatim.
 
-The engine now lives at `web/lib/analysis/feedback-triage.ts` on `PRO_MODEL`, telemetered like every other call site. The rule generalizes: **a model string outside this repo is the same anti-pattern with a longer fuse.**
+The engine now lives at `web/lib/analysis/feedback-triage.ts` (model: `SURFACE_MODELS["feedback-triage"]`), telemetered like every other call site. The rule generalizes: **a model string outside this repo is the same anti-pattern with a longer fuse.**
 
 ## Feedback triage call site
 
 | Call site        | Module                                     | Model               | Grounded | Prompt version       |
 |------------------|--------------------------------------------|---------------------|----------|----------------------|
-| `triageFeedback` | `web/lib/analysis/feedback-triage.ts`      | `gemini-pro-latest` | no       | `feedback-triage-v2` |
+| `triageFeedback` | `web/lib/analysis/feedback-triage.ts`      | `gemini-4-hydrogen` | no       | `feedback-triage-v2` |
 
 Internal classification, so **no voice directive** (rule 5). Reachable only through `POST /api/internal/feedback/triage` behind `CRON_SECRET`; replay historical submissions with `web/scripts/triage-feedback.ts --replay --dry-run`.
 

@@ -24,6 +24,12 @@ export const AI_MODEL_OPTIONS = [
     summary: "Best for deeper reasoning and narrative quality.",
     recommendedStages: ["job-structure", "tech-stack", "weekly-digest"],
   },
+  {
+    value: "gemini-4-hydrogen",
+    label: "Gemini 4 Hydrogen",
+    summary: "Stable Gemini 4 id (no -latest alias exists). Production model for the narrative and research surfaces since the Nov 2026 eval; always runs with thinking on, shaped to `low` by MODEL_GENERATION_PROFILES.",
+    recommendedStages: ["tech-stack", "weekly-digest"],
+  },
 ] as const;
 
 /**
@@ -61,6 +67,7 @@ export type ApprovedModel = (typeof AI_MODEL_OPTIONS)[number]["value"];
  */
 export const PRO_MODEL: ApprovedModel = "gemini-pro-latest";
 export const FLASH_MODEL: ApprovedModel = "gemini-flash-latest";
+export const HYDROGEN_MODEL: ApprovedModel = "gemini-4-hydrogen";
 
 /**
  * Every distinct AI output the product produces, one id per surface. This is
@@ -103,18 +110,18 @@ export type ModelSurface = (typeof MODEL_SURFACES)[number];
 export const SURFACE_MODELS: Record<ModelSurface, ApprovedModel> = {
   "job-structure": FLASH_MODEL,
   "job-analysis": PRO_MODEL,
-  "weekly-digest": FLASH_MODEL,
-  "tech-stack": FLASH_MODEL,
+  "weekly-digest": HYDROGEN_MODEL,
+  "tech-stack": HYDROGEN_MODEL,
   "company-insight": FLASH_MODEL,
   "company-research": FLASH_MODEL,
   "company-news": FLASH_MODEL,
-  "company-editorial": PRO_MODEL,
+  "company-editorial": HYDROGEN_MODEL,
   "theme-labels": FLASH_MODEL,
-  "search-report": FLASH_MODEL,
-  "feedback-triage": PRO_MODEL,
-  "insight-chat": FLASH_MODEL,
-  "posting-generator": FLASH_MODEL,
-  "strategy-lab": FLASH_MODEL,
+  "search-report": HYDROGEN_MODEL,
+  "feedback-triage": HYDROGEN_MODEL,
+  "insight-chat": HYDROGEN_MODEL,
+  "posting-generator": HYDROGEN_MODEL,
+  "strategy-lab": HYDROGEN_MODEL,
   "categorize": FLASH_MODEL,
   "legacy-job-analysis": FLASH_MODEL,
 };
@@ -183,7 +190,12 @@ export interface ModelGenerationProfile {
   thinkingHeadroomTokens?: number;
 }
 
-export const MODEL_GENERATION_PROFILES: Partial<Record<string, ModelGenerationProfile>> = {};
+export const MODEL_GENERATION_PROFILES: Partial<Record<string, ModelGenerationProfile>> = {
+  // Exactly the `gemini-4-hydrogen@low` variant the Nov 2026 eval chose
+  // (docs/MODEL_EVALS.md decision record). Default thinking spent 3-7x the
+  // tokens, truncated one search report, and lost on job analysis.
+  "gemini-4-hydrogen": { thinkingLevel: "low", thinkingHeadroomTokens: 8192 },
+};
 
 const evalProfileOverrides = new Map<string, ModelGenerationProfile>();
 

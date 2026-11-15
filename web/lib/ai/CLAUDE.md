@@ -70,7 +70,7 @@ Every distinct AI output is a **surface** (`MODEL_SURFACES` in `prompt-config.ts
 
 ## Per-model generation profiles (`withModelProfile`)
 
-Some models need different *request settings* (not prompts) to run our prompts. Every text-generation call site wraps its `getGenerativeModel` params in `withModelProfile(...)`, which applies `MODEL_GENERATION_PROFILES[model]`: an optional `thinkingLevel` (only when the call site sets no `thinkingConfig` itself) and `thinkingHeadroomTokens` added on top of the site's `maxOutputTokens`. A model with no entry gets the params object back untouched. Why it exists: thinking tokens count against `maxOutputTokens`, and Gemini 4 Hydrogen cannot turn thinking off — at a 4096 cap it can spend the whole budget thinking (probe, 2026-11-15). The wrapper returns the SDK's `ModelParams`, which is also where the `googleSearch` typing gap is handled (no per-site `@ts-expect-error`). New call sites MUST wrap too. Embeddings are excluded.
+Some models need different *request settings* (not prompts) to run our prompts. Every text-generation call site wraps its `getGenerativeModel` params in `withModelProfile(...)`, which applies `MODEL_GENERATION_PROFILES[model]`: an optional `thinkingLevel` (only when the call site sets no `thinkingConfig` itself) and `thinkingHeadroomTokens` added on top of the site's `maxOutputTokens`. A model with no entry gets the params object back untouched. Current entries: `gemini-4-hydrogen` → `thinkingLevel: "low"` + 8,192 headroom (the `@low` variant the Nov 2026 eval shipped; see `docs/MODEL_EVALS.md` decision record). Why it exists: thinking tokens count against `maxOutputTokens`, and Gemini 4 Hydrogen cannot turn thinking off — at a 4096 cap it can spend the whole budget thinking (probe, 2026-11-15). The wrapper returns the SDK's `ModelParams`, which is also where the `googleSearch` typing gap is handled (no per-site `@ts-expect-error`). New call sites MUST wrap too. Embeddings are excluded.
 
 ## Model evals (`eval/`, `model-catalog.ts`)
 
@@ -82,7 +82,7 @@ Some models need different *request settings* (not prompts) to run our prompts. 
 
 ## Named model handles
 
-`PRO_MODEL` / `FLASH_MODEL` in `prompt-config.ts` are typed as `ApprovedModel`, so a call site that always wants one tier (and has no user-selectable config row) imports the handle instead of retyping the literal. Removing or renaming an entry in `AI_MODEL_OPTIONS` then fails the build rather than leaving a stray string behind. `SURFACE_MODELS` entries are built from these handles; call sites go through `modelFor(surface)`, and the `advanced-strategic.ts` quota fallback uses `FLASH_MODEL` directly.
+`PRO_MODEL` / `FLASH_MODEL` / `HYDROGEN_MODEL` in `prompt-config.ts` are typed as `ApprovedModel`, so a call site that always wants one tier (and has no user-selectable config row) imports the handle instead of retyping the literal. Removing or renaming an entry in `AI_MODEL_OPTIONS` then fails the build rather than leaving a stray string behind. `SURFACE_MODELS` entries are built from these handles; call sites go through `modelFor(surface)`, and the `advanced-strategic.ts` quota fallback uses `FLASH_MODEL` directly.
 
 ## Rules of the road
 
