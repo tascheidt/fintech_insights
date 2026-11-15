@@ -36,6 +36,10 @@ The embeddings-backfill cron sweeps job rows whose `embedding` is null or was
 produced by a stale model and (re-)embeds them for Jobs semantic search. It is
 idempotent and decoupled from the ingest hot path on purpose — an embedding-API
 outage must never stall job ingestion. Same script/secret pattern as editorial.
+Individual embed failures are non-fatal (the next sweep retries them), but a
+sweep where **every** attempted row fails exits non-zero so a provider-wide
+outage (e.g. Gemini 402 "prepayment credits are depleted", Nov 2026) turns the
+run red instead of silently succeeding.
 
 The `report` job also generates one company insight per run as a side effect.
 The GH Actions `company-insights` workflow loops one-company-per-HTTP-request
