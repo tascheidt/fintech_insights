@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DayforceListingError,
+  confirmDayforceEmptyBoard,
   parseDayforcePaginationSummary,
   validateDayforcePageCount,
   validateDayforceListingPages,
@@ -63,5 +64,26 @@ describe("Dayforce listing pagination", () => {
       { page: 1, totalPages: 1, links: [] },
     ])).toThrow(/expected 1-25/);
     expect(() => validateDayforcePageCount(201, 200)).toThrow(/above the safety cap/);
+  });
+});
+
+describe("Dayforce empty board", () => {
+  it("accepts an empty board only when the DOM and search API agree on zero", () => {
+    expect(confirmDayforceEmptyBoard({ domShowsNoResults: true, apiMaxCount: 0 })).toBe(true);
+  });
+
+  it("rejects an empty render the search API does not corroborate", () => {
+    expect(() => confirmDayforceEmptyBoard({ domShowsNoResults: true, apiMaxCount: null })).toThrow(
+      DayforceListingError
+    );
+    expect(() => confirmDayforceEmptyBoard({ domShowsNoResults: true, apiMaxCount: 12 })).toThrow(
+      /reported 12 job/
+    );
+  });
+
+  it("rejects a board that rendered neither cards nor an empty state", () => {
+    expect(() => confirmDayforceEmptyBoard({ domShowsNoResults: false, apiMaxCount: 0 })).toThrow(
+      DayforceListingError
+    );
   });
 });
