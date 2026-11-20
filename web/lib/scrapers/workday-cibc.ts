@@ -40,11 +40,14 @@ import {
   parseWorkdayListingRow,
   parseWorkdayJobDetail,
   parseWorkdayJson,
-  WorkdayBlockedError,
+  WorkdayRateLimitedError,
+  isWorkdayEdgeBlock,
+  isWorkdayEdgeRefusalStatus,
   resolveWorkdayJobCap,
   type WorkdayListingResponse,
   type WorkdayJobDetailResponse,
 } from "./workday-utils";
+import { readerAuthHeaders } from "./reader-auth";
 import { log } from "@/lib/log";
 
 const TENANT = "cibc";
@@ -107,7 +110,7 @@ async function fetchReaderPage<T>(
     let snapshot: ReturnType<typeof summarizeCibcReaderPage> | undefined;
     try {
       const response = await fetch(`${READER_ORIGIN}${targetUrl}`, {
-        headers: buildCibcReaderHeaders(listing),
+        headers: { ...buildCibcReaderHeaders(listing), ...readerAuthHeaders() },
         signal: AbortSignal.timeout(READER_TIMEOUT_MS),
       });
       if (!response.ok) {
@@ -285,6 +288,9 @@ export async function fetchWorkdayCibcJobs(
         body: JSON.stringify(buildCibcListingRequest(offset, options)),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
+      if (isWorkdayEdgeRefusalStatus(res.status)) {
+        throw new WorkdayRateLimitedError(TENANT, res.status);
+      }
       if (!res.ok) {
         throw new Error(`Workday CIBC listing error: ${res.status}`);
       }
@@ -308,7 +314,7 @@ export async function fetchWorkdayCibcJobs(
       if (total != null && offset >= total) break;
     }
   } catch (error) {
-    if (!options.simpliiOnly || !(error instanceof WorkdayBlockedError)) throw error;
+    if (!options.simpliiOnly || !isWorkdayEdgeBlock(error)) throw error;
     log.warn({ err: error.message }, "[workday-cibc] direct listing blocked; using browser-backed reader");
     jobs.length = 0;
     jobs.push(...await fetchReaderPage(READER_SEARCH_URL, parseCibcReaderListing, true));

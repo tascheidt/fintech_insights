@@ -6,6 +6,10 @@
       {
         "type": "fix",
         "description": "Questrade collection no longer fails when its Dayforce job board has no open postings. An empty board is accepted only when the page and Dayforce's own search both report zero; anything less clear still fails before any postings are closed."
+      },
+      {
+        "type": "fix",
+        "description": "CIBC and Simplii collection recovers when CIBC's job site rate-limits our scraper. Instead of failing, the run now reads the same Simplii search through the backup route already used for other blocks, and still fails rather than ingesting a partial list."
       }
     ]
   },

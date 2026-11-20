@@ -95,6 +95,7 @@
  * the Workday `WorkdayBlockedError` pattern.
  */
 
+import { readerAuthHeaders } from "./reader-auth";
 import type { JobData } from "./types";
 import type { Browser, Page } from "puppeteer-core";
 import { detectLocationType, htmlToText, decodeHtmlEntities } from "./utils";
@@ -706,6 +707,7 @@ async function fetchReaderBody(targetUrl: string, payloadOnly = true): Promise<s
     try {
       const response = await fetch(`${REVOLUT_READER_ORIGIN}${targetUrl}`, {
         headers: {
+          ...readerAuthHeaders(),
           Accept: "text/plain",
           "X-Engine": "browser",
           // The unfiltered Reader payload omitted Canada's live role on

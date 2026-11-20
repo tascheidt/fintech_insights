@@ -8,6 +8,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  WorkdayRateLimitedError,
+  isWorkdayEdgeBlock,
+  isWorkdayEdgeRefusalStatus,
   buildWorkdayUrls,
   parseWorkdayApplyUrl,
   parseWorkdayListingRow,
@@ -312,5 +315,21 @@ describe("resolveWorkdayJobCap", () => {
 
   it("clamps zero up to 1", () => {
     expect(resolveWorkdayJobCap("0")).toBe(1);
+  });
+});
+
+describe("Workday edge-block classification", () => {
+  it("treats 429 and 403 as runner refusals, not request errors", () => {
+    expect(isWorkdayEdgeRefusalStatus(429)).toBe(true);
+    expect(isWorkdayEdgeRefusalStatus(403)).toBe(true);
+    expect(isWorkdayEdgeRefusalStatus(404)).toBe(false);
+    expect(isWorkdayEdgeRefusalStatus(406)).toBe(false);
+    expect(isWorkdayEdgeRefusalStatus(500)).toBe(false);
+  });
+
+  it("routes both challenge pages and refusals to the edge-block path", () => {
+    expect(isWorkdayEdgeBlock(new WorkdayBlockedError("cibc", "<!DOCTYPE html>"))).toBe(true);
+    expect(isWorkdayEdgeBlock(new WorkdayRateLimitedError("cibc", 429))).toBe(true);
+    expect(isWorkdayEdgeBlock(new Error("Workday CIBC listing error: 500"))).toBe(false);
   });
 });
