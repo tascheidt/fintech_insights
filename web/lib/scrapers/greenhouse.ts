@@ -1,7 +1,21 @@
 import type { JobData } from "./types";
-import { htmlToText, detectLocationType, normalizeCommitment } from "./utils";
+import { htmlToText, detectLocationType, normalizeCommitment, decodeHtmlEntities } from "./utils";
 
 const BASE = "https://boards-api.greenhouse.io/v1/boards";
+
+/**
+ * Greenhouse's Job Board API returns `content` HTML-entity-escaped
+ * (`&lt;div class=&quot;content-intro&quot;&gt;…`). Passed straight to
+ * `htmlToText`, there are no real tags to strip, so the entities decode into
+ * literal markup and `description_text` starts with `<div class="…"><p>…`
+ * (seen on Questrade's board, Nov 2026). Decode once when the payload is
+ * escaped; leave real HTML untouched so a literal `&lt;` in prose survives.
+ */
+export function decodeGreenhouseContent(content: string): string {
+  if (!content) return "";
+  const looksEscaped = content.includes("&lt;") && !/<[a-z!/]/i.test(content);
+  return looksEscaped ? decodeHtmlEntities(content) : content;
+}
 
 export async function fetchGreenhouseJobs(atsIdentifier: string): Promise<JobData[]> {
   const res = await fetch(`${BASE}/${atsIdentifier}/jobs?content=true`, { signal: AbortSignal.timeout(30000) });
@@ -21,7 +35,7 @@ export async function fetchGreenhouseJobs(atsIdentifier: string): Promise<JobDat
     const offices = (j.offices as { name?: string }[]) ?? [];
     const loc = (location || offices[0]?.name) ?? "";
 
-    const descriptionHtml = (j.content as string) ?? "";
+    const descriptionHtml = decodeGreenhouseContent((j.content as string) ?? "");
 
     let postedDate: Date | null = null;
     const up = j.updated_at as string | undefined;

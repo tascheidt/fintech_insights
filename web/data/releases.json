@@ -1,5 +1,19 @@
 [
   {
+    "version": "2.17.2",
+    "date": "2026-11-21",
+    "changes": [
+      {
+        "type": "fix",
+        "description": "Questrade jobs are collected again from its new Greenhouse careers site, after Questrade moved off Dayforce. Postings from the old Dayforce board are retired so Questrade isn't double-counted."
+      },
+      {
+        "type": "fix",
+        "description": "Job descriptions from companies on Greenhouse no longer contain stray HTML markup."
+      }
+    ]
+  },
+  {
     "version": "2.17.1",
     "date": "2026-11-17",
     "changes": [

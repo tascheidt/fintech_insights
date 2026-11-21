@@ -24,13 +24,13 @@ companies:
   #   ats_identifier: neofinancial
   #   careers_url: https://www.neofinancial.com/careers
 
-  # Note: Questrade uses Dayforce ATS — no DayforceScraper exists, currently disabled
-  # - name: Questrade
-  #   slug: questrade
-  #   country: CA
-  #   ats_type: dayforce
-  #   ats_identifier: qfg
-  #   careers_url: https://jobs.dayforcehcm.com/en-US/qfg/CANDIDATEPORTAL
+  # Questrade moved from Dayforce to Greenhouse in Nov 2026.
+  - name: Questrade
+    slug: questrade
+    country: CA
+    ats_type: greenhouse
+    ats_identifier: questrade
+    careers_url: https://job-boards.greenhouse.io/questrade
 
   - name: Tangerine
     slug: tangerine

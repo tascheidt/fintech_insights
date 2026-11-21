@@ -130,7 +130,7 @@ Currently offloaded:
 | `phenom`        | RBC, BMO, National Bank                        | Phenom is client-rendered → Puppeteer |
 | `workday-td`    | TD                                             | API-based but a ~1,500-job cold scrape exceeds Vercel's 300s |
 | `workday-cibc`  | CIBC (+ live Simplii classifier)               | Same                            |
-| `dayforce`      | Questrade                                      | Browser scrape                  |
+| `dayforce`      | — (no live tenant; Questrade moved to Greenhouse, Nov 2026) | Browser scrape        |
 | `successfactors`| Tangerine                                      | Browser scrape (Scotia portal)  |
 
 The `workday-td` and `workday-cibc` scrapers are HTTP-only and could in
