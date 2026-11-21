@@ -12,6 +12,7 @@ import type { Browser } from "puppeteer-core";
 import { detectLocationType, normalizeCommitment } from "./utils";
 import {
   DayforceListingError,
+  confirmDayforceEmptyBoard,
   parseDayforcePaginationSummary,
   validateDayforcePageCount,
   validateDayforceListingPages,
@@ -268,9 +269,25 @@ export async function scrapeDayforceWithBrowser(
       try {
         for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
           const pageUrl = pageNumber === 1 ? url : `${url}?page=${pageNumber}`;
+
+          // On page 1, observe the board's own search response so a rendered
+          // "no results" state can be corroborated (see confirmDayforceEmptyBoard).
+          const searchCount =
+            pageNumber === 1
+              ? page
+                  .waitForResponse((res) => res.url().includes("/jobposting/search"), {
+                    timeout: 30000,
+                  })
+                  .then(async (res) => {
+                    const body = (await res.json()) as { maxCount?: unknown };
+                    return typeof body.maxCount === "number" ? body.maxCount : null;
+                  })
+                  .catch(() => null)
+              : Promise.resolve(null);
+
           await page.goto(pageUrl, { waitUntil: "networkidle2", timeout: 30000 });
 
-          await page.waitForFunction(
+          const renderState = await page.waitForFunction(
             (expectedPage) => {
               const results = document.querySelector('[test-id="job-results"]');
               const pagination = document.querySelector('.ant-pagination[aria-label]');
@@ -280,14 +297,35 @@ export async function scrapeDayforceWithBrowser(
                 '.ant-pagination-item-active, [aria-current="page"]'
               );
               const activePageNumber = Number(activePage?.textContent?.trim());
-              return Boolean(
+              if (
                 results && pagination && !spinner && cards.length > 0 &&
                 (!Number.isFinite(activePageNumber) || activePageNumber === expectedPage)
-              );
+              ) {
+                return "cards";
+              }
+              // A board with zero open postings renders an explicit empty state
+              // and no pagination. Only meaningful on page 1; a later page going
+              // empty means the corpus shifted mid-run and must still fail.
+              if (
+                expectedPage === 1 && results && !spinner && cards.length === 0 &&
+                results.querySelector('[test-id="job-search-no-results-found"]')
+              ) {
+                return "empty";
+              }
+              return false;
             },
             { timeout: 30000 },
             pageNumber
           );
+
+          if ((await renderState.jsonValue()) === "empty") {
+            confirmDayforceEmptyBoard({
+              domShowsNoResults: true,
+              apiMaxCount: await searchCount,
+            });
+            console.log(`Dayforce board for ${atsIdentifier} has no open postings`);
+            return [];
+          }
 
           const snapshot = await page.evaluate((requestedPage) => {
             const paginationSummary = document.querySelector(

@@ -359,6 +359,34 @@ export function extractCookieJar(response: Response): string {
  * URL-doubling bug fixed by correcting the URL (`curl` first), and it
  * returned a 4xx, not a 200-with-HTML. Don't conflate them.
  */
+/**
+ * The Workday edge refused the request outright (HTTP 429 / 403) instead of
+ * serving a challenge page. From GitHub Actions runner IPs this is an IP-level
+ * rate limit (CIBC, Nov 16 2026 onward: every primary + retry runner got 429 on
+ * the first listing POST while the same request from elsewhere returned clean
+ * JSON). Like `WorkdayBlockedError` it says nothing about the request shape, so
+ * callers with a Reader fallback should treat the two the same way.
+ */
+export class WorkdayRateLimitedError extends Error {
+  constructor(
+    public readonly tenant: string,
+    public readonly status: number
+  ) {
+    super(`Workday ${tenant}: edge refused the listing request (HTTP ${status}) — runner IP is likely rate-limited`);
+    this.name = "WorkdayRateLimitedError";
+  }
+}
+
+/** HTTP statuses that mean "this runner is refused", not "this request is wrong". */
+export function isWorkdayEdgeRefusalStatus(status: number): boolean {
+  return status === 429 || status === 403;
+}
+
+/** True for either kind of edge-side block (challenge page or outright refusal). */
+export function isWorkdayEdgeBlock(error: unknown): error is WorkdayBlockedError | WorkdayRateLimitedError {
+  return error instanceof WorkdayBlockedError || error instanceof WorkdayRateLimitedError;
+}
+
 export class WorkdayBlockedError extends Error {
   constructor(
     public readonly tenant: string,

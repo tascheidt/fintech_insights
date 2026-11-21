@@ -41,6 +41,12 @@ const envSchema = z.object({
   FIREWORKS_GLM_MODEL: z.string().optional(),
   FIREWORKS_DEEPSEEK_MODEL: z.string().optional(),
 
+  // --- Scraper Reader relay (scrape-heavy runner only) ---
+  // Optional r.jina.ai key for the CIBC / Revolut Reader fallbacks. Without it
+  // the relay is called anonymously, which GitHub runner IPs sometimes get a
+  // 401 for. See lib/scrapers/reader-auth.ts.
+  JINA_API_KEY: z.string().optional(),
+
   // --- Sentry (server-side only — DSN deliberately not NEXT_PUBLIC_*) ---
   // Required in production; optional in development. The runtime check below
   // throws when production deploys ship without a DSN, so we cannot rely on a

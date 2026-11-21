@@ -119,3 +119,30 @@ export function validateDayforceListingPages(
 
   return [...jobs.values()];
 }
+
+/**
+ * A Dayforce board can legitimately have zero open postings (Questrade,
+ * Nov 2026): the page renders `job-search-no-results-found` instead of cards
+ * and pagination, so the card wait can never resolve. Accept "empty" only when
+ * BOTH signals agree — the rendered empty state AND the board's own
+ * `/jobposting/search` response reporting zero. A blank DOM alone (slow
+ * render, bot wall) or an API that wasn't observed must still throw, so an
+ * unreadable board can never be mistaken for a closed one.
+ */
+export function confirmDayforceEmptyBoard(signals: {
+  domShowsNoResults: boolean;
+  apiMaxCount: number | null;
+}): true {
+  if (!signals.domShowsNoResults) {
+    throw new DayforceListingError("unrendered", "Dayforce board did not render job cards or an empty state");
+  }
+  if (signals.apiMaxCount !== 0) {
+    throw new DayforceListingError(
+      "unrendered",
+      `Dayforce board rendered an empty state but the search API reported ${
+        signals.apiMaxCount === null ? "no readable count" : `${signals.apiMaxCount} job(s)`
+      }`
+    );
+  }
+  return true;
+}

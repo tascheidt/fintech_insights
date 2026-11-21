@@ -91,6 +91,12 @@ The scraper-drift-check cron also runs in-runner and needs the Supabase trio
 plus `RESEND_API_KEY` (and optionally `RESEND_FROM` / `NEXT_PUBLIC_APP_URL`)
 as GitHub repo secrets so it can email its findings to admins.
 
+`scrape-heavy.yml` (and its CIBC Saturday recovery run) can optionally use
+`JINA_API_KEY` as a repo secret. It authenticates the r.jina.ai Reader relay
+that the CIBC and Revolut fallbacks use when the runner IP is blocked. The
+relay works anonymously too, but anonymous calls from runner IPs are sometimes
+refused with HTTP 401 (Revolut, Nov 19 2026).
+
 The model-watch cron and the manual model-eval workflow need only
 `GEMINI_API_KEY`; model-watch files its issue with the workflow's own
 `GITHUB_TOKEN` (`permissions: issues: write`), so no extra secret.
